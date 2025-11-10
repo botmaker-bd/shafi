@@ -1,9 +1,5 @@
-// Command Editor functionality
 let currentBot = null;
 let currentCommand = null;
-let codeEditor = null;
-let commandHistory = [];
-let historyPointer = -1;
 
 document.addEventListener('DOMContentLoaded', async () => {
     const token = localStorage.getItem('token');
@@ -14,19 +10,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
-    // Initialize CodeMirror
-    codeEditor = CodeMirror.fromTextArea(document.getElementById('commandCode'), {
-        mode: 'javascript',
-        theme: 'monokai',
-        lineNumbers: true,
-        indentUnit: 4,
-        smartIndent: true,
-        matchBrackets: true,
-        autoCloseBrackets: true,
-        lineWrapping: true
-    });
-
-    // Get bot ID from URL
     const urlParams = new URLSearchParams(window.location.search);
     const botId = urlParams.get('bot');
     
@@ -39,13 +22,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadBotInfo(botId);
     await loadCommands(botId);
 
-    // Event listeners
     document.getElementById('addCommandBtn').addEventListener('click', addNewCommand);
     document.getElementById('saveCommandBtn').addEventListener('click', saveCommand);
     document.getElementById('deleteCommandBtn').addEventListener('click', deleteCommand);
-    document.getElementById('testCommandBtn').addEventListener('click', testCommand);
-    document.getElementById('undoBtn').addEventListener('click', undoAction);
-    document.getElementById('redoBtn').addEventListener('click', redoAction);
+
+    document.getElementById('logoutBtn').addEventListener('click', (e) => {
+        e.preventDefault();
+        localStorage.clear();
+        window.location.href = 'index.html';
+    });
 });
 
 async function loadBotInfo(botId) {
@@ -54,9 +39,7 @@ async function loadBotInfo(botId) {
         const user = JSON.parse(localStorage.getItem('user'));
         
         const response = await fetch(`/api/bots/user/${user.id}`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
+            headers: { 'Authorization': `Bearer ${token}` }
         });
 
         if (response.ok) {
@@ -67,13 +50,10 @@ async function loadBotInfo(botId) {
                 currentBot = bot;
                 document.getElementById('botName').textContent = `Command Editor - ${bot.name}`;
                 document.getElementById('botUsername').textContent = `Managing commands for @${bot.username}`;
-            } else {
-                alert('Bot not found');
-                window.location.href = 'bot-management.html';
             }
         }
     } catch (error) {
-        console.error('Load bot info error:', error);
+        console.error('Load bot error:', error);
     }
 }
 
@@ -81,9 +61,7 @@ async function loadCommands(botId) {
     try {
         const token = localStorage.getItem('token');
         const response = await fetch(`/api/commands/bot/${currentBot.token}`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
+            headers: { 'Authorization': `Bearer ${token}` }
         });
 
         if (response.ok) {
@@ -100,25 +78,20 @@ function displayCommands(commands) {
     
     if (!commands || commands.length === 0) {
         commandsList.innerHTML = `
-            <div class="empty-commands">
+            <div class="empty-state">
                 <p>No commands yet</p>
-                <p>Click "Add Command" to create your first command</p>
             </div>
         `;
         return;
     }
 
     commandsList.innerHTML = commands.map(command => `
-        <div class="command-item ${currentCommand?.id === command.id ? 'active' : ''}" 
-             onclick="selectCommand('${command.id}')">
+        <div class="command-item" onclick="selectCommand('${command.id}')">
             <div class="command-header">
                 <h4>${command.name}</h4>
                 <span class="command-pattern">${command.pattern}</span>
             </div>
             <p class="command-desc">${command.description || 'No description'}</p>
-            <div class="command-status ${command.is_active ? 'active' : 'inactive'}">
-                ${command.is_active ? '🟢 Active' : '🔴 Inactive'}
-            </div>
         </div>
     `).join('');
 }
@@ -129,38 +102,25 @@ function addNewCommand() {
         name: 'New Command',
         pattern: '^/command$',
         description: '',
-        code: `// Write your command code here
-// Use these functions:
-// bot.sendMessage("Hello World!")
-// bot.sendPhoto(photoUrl)
-// bot.sendDocument(documentUrl)
-
-const message = "Hello from your bot!";
-return bot.sendMessage(message);`
+        code: '// Write your command code here\nreturn bot.sendMessage("Hello World!");'
     };
 
     showCommandEditor();
     populateCommandForm();
-    addToHistory('create', currentCommand);
 }
 
 function selectCommand(commandId) {
-    // Find command in the list (in a real app, you'd fetch from API)
-    const commandItem = document.querySelector(`[onclick="selectCommand('${commandId}')"]`);
-    const commandName = commandItem.querySelector('h4').textContent;
-    
-    // For demo purposes - in real app, you'd fetch command details
+    // For demo - in real app, fetch command details
     currentCommand = {
         id: commandId,
-        name: commandName,
-        pattern: '^/' + commandName.toLowerCase() + '$',
-        description: 'Command description',
-        code: `// ${commandName} command code\nreturn bot.sendMessage("This is ${commandName} command!");`
+        name: 'Selected Command',
+        pattern: '^/start$',
+        description: 'Start command',
+        code: 'return bot.sendMessage("Welcome!");'
     };
 
     showCommandEditor();
     populateCommandForm();
-    updateCommandListSelection();
 }
 
 function showCommandEditor() {
@@ -174,11 +134,8 @@ function populateCommandForm() {
     document.getElementById('commandName').value = currentCommand.name;
     document.getElementById('commandPattern').value = currentCommand.pattern;
     document.getElementById('commandDescription').value = currentCommand.description || '';
+    document.getElementById('commandCode').value = currentCommand.code || '';
     document.getElementById('currentCommandName').textContent = currentCommand.name;
-    
-    if (codeEditor) {
-        codeEditor.setValue(currentCommand.code || '');
-    }
 }
 
 async function saveCommand() {
@@ -189,7 +146,7 @@ async function saveCommand() {
         name: document.getElementById('commandName').value,
         pattern: document.getElementById('commandPattern').value,
         description: document.getElementById('commandDescription').value,
-        code: codeEditor.getValue()
+        code: document.getElementById('commandCode').value
     };
 
     try {
@@ -217,14 +174,12 @@ async function saveCommand() {
         }
 
         if (response.ok) {
-            alert('Command saved successfully!');
-            addToHistory('save', currentCommand);
+            alert('Command saved!');
             await loadCommands(currentBot.id);
         } else {
             alert('Failed to save command');
         }
     } catch (error) {
-        console.error('Save command error:', error);
         alert('Failed to save command');
     }
 }
@@ -232,38 +187,25 @@ async function saveCommand() {
 async function deleteCommand() {
     if (!currentCommand || currentCommand.id === 'new') return;
 
-    if (!confirm('Are you sure you want to delete this command?')) {
-        return;
-    }
+    if (!confirm('Delete this command?')) return;
 
     try {
         const token = localStorage.getItem('token');
         const response = await fetch(`/api/commands/${currentCommand.id}`, {
             method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
+            headers: { 'Authorization': `Bearer ${token}` }
         });
 
         if (response.ok) {
-            alert('Command deleted successfully');
-            addToHistory('delete', currentCommand);
+            alert('Command deleted');
             hideCommandEditor();
             await loadCommands(currentBot.id);
         } else {
             alert('Failed to delete command');
         }
     } catch (error) {
-        console.error('Delete command error:', error);
         alert('Failed to delete command');
     }
-}
-
-async function testCommand() {
-    if (!currentCommand) return;
-
-    // This would send a test message to your bot
-    alert('Test functionality would be implemented here. It would send a test message to your bot.');
 }
 
 function hideCommandEditor() {
@@ -271,11 +213,3 @@ function hideCommandEditor() {
     document.getElementById('commandEditor').style.display = 'none';
     currentCommand = null;
 }
-
-function updateCommandListSelection() {
-    document.querySelectorAll('.command-item').forEach(item => {
-        item.classList.remove('active');
-    });
-    
-    if (currentCommand) {
-        const selectedItem = document.querySelector(`[onclick="selectCommand('${currentCommand.id}')
