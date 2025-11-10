@@ -7,12 +7,30 @@ import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import morgan from 'morgan';
 import Database from 'better-sqlite3';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Resolve __dirname in ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // ---- Config ----
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || 'devsecret';
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
+
+// DB location (configurable)
+const DB_DIR = process.env.DB_DIR
+  ? path.resolve(process.env.DB_DIR)
+  : path.resolve(__dirname, '../..', 'db'); // project-root/db
+// Make sure directory exists
+fs.mkdirSync(DB_DIR, { recursive: true });
+
+const DB_FILE = process.env.DB_FILE
+  ? path.resolve(process.env.DB_FILE)
+  : path.join(DB_DIR, 'data.sqlite');
 
 // ---- App ----
 const app = express();
@@ -38,7 +56,7 @@ app.use(cors({
 app.use(rateLimit({ windowMs: 60 * 1000, limit: 120 }));
 
 // ---- DB ----
-const db = new Database('./db/data.sqlite');
+const db = new Database(DB_FILE);
 db.pragma('journal_mode = WAL');
 db.exec(`
   CREATE TABLE IF NOT EXISTS commands (
@@ -93,7 +111,7 @@ app.delete('/api/commands/:id', adminAuth, (req, res) => {
   res.json({ ok: true });
 });
 
-// Upsert (create or update) for convenience
+// Upsert (create or update)
 app.put('/api/commands', adminAuth, (req, res) => {
   const { command, reply } = req.body || {};
   if (!command || !reply) return res.status(400).json({ error: 'command and reply are required' });
@@ -110,7 +128,6 @@ app.put('/api/commands', adminAuth, (req, res) => {
 
 // ---- Telegram Webhook ----
 // Set your webhook at: https://api.telegram.org/bot<token>/setWebhook?url=https://yourdomain.com/webhook/<WEBHOOK_SECRET>
-// Then point your reverse proxy to this server.
 app.post(`/webhook/${WEBHOOK_SECRET}`, async (req, res) => {
   try {
     if (!TELEGRAM_BOT_TOKEN) {
@@ -132,7 +149,6 @@ app.post(`/webhook/${WEBHOOK_SECRET}`, async (req, res) => {
         }
       }
     }
-    // Always respond OK quickly to Telegram
     res.json({ ok: true });
   } catch (e) {
     console.error('webhook error', e);
@@ -141,7 +157,7 @@ app.post(`/webhook/${WEBHOOK_SECRET}`, async (req, res) => {
 });
 
 // Serve static client
-app.use('/', express.static('client'));
+app.use('/', express.static(path.resolve(__dirname, '../client')));
 
 // 404 handler
 app.use((req, res) => {
@@ -150,4 +166,5 @@ app.use((req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server listening on http://localhost:${PORT}`);
+  console.log(`DB file: ${DB_FILE}`);
 });
