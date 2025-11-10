@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bot Maker - Create Telegram Bots</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🤖 Bot Maker</h1>
+            <p>Create Telegram bots without coding</p>
+        </header>
+        
+        <div class="hero-section">
+            <div class="hero-content">
+                <h2>Build Powerful Bots</h2>
+                <p>Easy-to-use platform for creating and managing Telegram bots</p>
+                <div class="cta-buttons">
+                    <a href="login.html" class="btn btn-primary">Get Started</a>
+                    <a href="#features" class="btn btn-secondary">Learn More</a>
+                </div>
+            </div>
+        </div>
+
+        <section id="features" class="features">
+            <div class="feature-card">
+                <h3>🚀 Easy Setup</h3>
+                <p>Connect your bot with token</p>
+            </div>
+            <div class="feature-card">
+                <h3>⚡ Visual Editor</h3>
+                <p>Create commands easily</p>
+            </div>
+            <div class="feature-card">
+                <h3>🔧 Manage Bots</h3>
+                <p>Full control over your bots</p>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        if (localStorage.getItem('token')) {
+            window.location.href = 'dashboard.html';
+        }
+    </script>
+</body>
+</html>
