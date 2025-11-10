@@ -21,15 +21,17 @@ app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 // Serve static files
 app.use(express.static(path.join(__dirname, '../client')));
 
-// Import routes
+// Import and use routes CORRECTLY
 const authRoutes = require('./auth');
-const botRoutes = require('./bot-manager');
-const commandRoutes = require('./command-handler');
-
-// Use routes
 app.use('/api/auth', authRoutes);
-app.use('/api/bots', botRoutes);
-app.use('/api/commands', commandRoutes);
+
+// Import bot manager routes correctly
+const botManager = require('./bot-manager');
+app.use('/api/bots', botManager.router);
+
+// Import command handler routes correctly  
+const commandHandler = require('./command-handler');
+app.use('/api/commands', commandHandler);
 
 // Health check
 app.get('/health', (req, res) => {
@@ -49,8 +51,7 @@ app.post('/bot/:token', async (req, res) => {
         
         console.log(`Webhook received for token: ${token.substring(0, 10)}...`);
         
-        // Import and handle update
-        const botManager = require('./bot-manager');
+        // Handle update using bot manager
         if (botManager.handleBotUpdate) {
             await botManager.handleBotUpdate(token, update);
         }
