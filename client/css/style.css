@@ -459,3 +459,63 @@ header h1 {
         grid-template-columns: 1fr;
     }
 }
+
+
+/* Templates Section */
+.templates-section {
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.templates-section h4 {
+    margin-bottom: 10px;
+    color: #333;
+}
+
+.template-buttons {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.btn-outline {
+    background: transparent;
+    border: 1px solid #667eea;
+    color: #667eea;
+}
+
+.btn-outline:hover {
+    background: #667eea;
+    color: white;
+}
+
+.template-suggestions {
+    margin-top: 20px;
+    text-align: center;
+}
+
+.template-suggestions p {
+    margin-bottom: 15px;
+}
+
+.template-suggestions .btn {
+    margin: 5px;
+}
+
+/* Code Help */
+.code-help {
+    display: block;
+    margin-top: 8px;
+    padding: 10px;
+    background: #f1f5f9;
+    border-radius: 6px;
+    font-size: 0.85em;
+    color: #475569;
+    line-height: 1.4;
+}
+
+.code-help strong {
+    color: #334155;
+}
