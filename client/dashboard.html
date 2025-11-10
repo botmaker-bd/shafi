@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Bot Maker</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">🤖 Bot Maker</div>
+        <div class="nav-links">
+            <a href="dashboard.html" class="nav-link active">Dashboard</a>
+            <a href="bot-management.html" class="nav-link">My Bots</a>
+            <a href="#" id="logoutBtn" class="nav-link">Logout</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <header class="dashboard-header">
+            <h1>Welcome, <span id="userName">User</span>!</h1>
+            <p>Manage your Telegram bots</p>
+        </header>
+
+        <div class="dashboard-stats">
+            <div class="stat-card">
+                <h3>Total Bots</h3>
+                <p id="totalBots">0</p>
+            </div>
+            <div class="stat-card">
+                <h3>Active Commands</h3>
+                <p id="activeCommands">0</p>
+            </div>
+        </div>
+
+        <div class="quick-actions">
+            <h2>Quick Actions</h2>
+            <div class="action-grid">
+                <a href="bot-management.html" class="action-card">
+                    <h3>➕ Add Bot</h3>
+                    <p>Connect new Telegram bot</p>
+                </a>
+                <a href="bot-management.html" class="action-card">
+                    <h3>📋 Manage Bots</h3>
+                    <p>View your bots</p>
+                </a>
+            </div>
+        </div>
+
+        <div class="recent-bots">
+            <h2>Your Bots</h2>
+            <div id="botsList" class="bots-grid">
+                <!-- Bots will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="js/dashboard.js"></script>
+</body>
+</html>
