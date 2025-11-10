@@ -21,17 +21,15 @@ app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 // Serve static files
 app.use(express.static(path.join(__dirname, '../client')));
 
-// Import and use routes CORRECTLY
+// Import routes
 const authRoutes = require('./auth');
-app.use('/api/auth', authRoutes);
-
-// Import bot manager routes correctly
 const botManager = require('./bot-manager');
-app.use('/api/bots', botManager.router);
+const commandRoutes = require('./command-handler');
 
-// Import command handler routes correctly  
-const commandHandler = require('./command-handler');
-app.use('/api/commands', commandHandler);
+// Use routes
+app.use('/api/auth', authRoutes);
+app.use('/api/bots', botManager.router);
+app.use('/api/commands', commandRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
@@ -43,22 +41,30 @@ app.get('/health', (req, res) => {
     });
 });
 
-// Webhook endpoint for Telegram bots
+// Webhook endpoint for Telegram bots - FIXED VERSION
 app.post('/bot/:token', async (req, res) => {
     try {
         const { token } = req.params;
         const update = req.body;
         
-        console.log(`Webhook received for token: ${token.substring(0, 10)}...`);
+        console.log('🔔 Webhook received for token:', token.substring(0, 10) + '...');
+        console.log('Update type:', update.message ? 'message' : update.callback_query ? 'callback' : 'other');
+        
+        if (update.message) {
+            console.log('Message from:', update.message.from.username || update.message.from.first_name);
+            console.log('Message text:', update.message.text);
+        }
         
         // Handle update using bot manager
         if (botManager.handleBotUpdate) {
             await botManager.handleBotUpdate(token, update);
+        } else {
+            console.error('❌ handleBotUpdate function not found');
         }
         
         res.status(200).send('OK');
     } catch (error) {
-        console.error('Webhook error:', error);
+        console.error('❌ Webhook error:', error);
         res.status(500).send('Error');
     }
 });
