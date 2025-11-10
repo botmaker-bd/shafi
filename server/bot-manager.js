@@ -6,13 +6,12 @@ const router = express.Router();
 
 // Supabase configuration
 const supabaseUrl = 'https://tyoaazgsoqvubgfychmd.supabase.co';
-const supabaseKey = 'sb_secret_lXIB5ns2oYlInT7n7HrBhA_0UIIQYcs';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR5b2Fhemdzb3F2dWJnZnljaG1kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI3NTE0NDQsImV4cCI6MjA3ODMyNzQ0NH0.czWc-rOitmnn31iAvgTEvZj7bW-aJ2ysFymoWJ8UZCc';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Store active bot instances
 const activeBots = new Map();
 
-// Add new bot
+// Add bot endpoint
 router.post('/add', async (req, res) => {
     try {
         const { token, name, userId } = req.body;
@@ -24,32 +23,30 @@ router.post('/add', async (req, res) => {
         // Store bot in database
         const { data: botData, error } = await supabase
             .from('bots')
-            .insert([
-                {
-                    token,
-                    name: name || botInfo.first_name,
-                    username: botInfo.username,
-                    user_id: userId,
-                    webhook_url: `${process.env.RENDER_URL}/bot?token=${token}`,
-                    is_active: true,
-                    created_at: new Date().toISOString()
-                }
-            ])
+            .insert([{
+                token,
+                name: name || botInfo.first_name,
+                username: botInfo.username,
+                user_id: userId,
+                webhook_url: `https://bot-maker-jcch.onrender.com/bot?token=${token}`,
+                is_active: true
+            }])
             .select()
             .single();
 
         if (error) throw error;
 
         // Set webhook
-        await bot.setWebHook(`${process.env.RENDER_URL}/bot?token=${token}`);
+        await bot.setWebHook(`https://bot-maker-jcch.onrender.com/bot?token=${token}`);
 
-        // Initialize bot handler
+        // Initialize bot
         await initializeBot(token);
 
         res.json({
             message: 'Bot added successfully',
             bot: botData
         });
+
     } catch (error) {
         console.error('Add bot error:', error);
         res.status(500).json({ error: 'Failed to add bot' });
@@ -70,6 +67,7 @@ router.get('/user/:userId', async (req, res) => {
         if (error) throw error;
 
         res.json({ bots });
+
     } catch (error) {
         console.error('Get bots error:', error);
         res.status(500).json({ error: 'Failed to fetch bots' });
@@ -92,8 +90,6 @@ router.delete('/:botId', async (req, res) => {
             // Delete webhook
             const telegramBot = new TelegramBot(bot.token, { polling: false });
             await telegramBot.deleteWebHook();
-
-            // Remove from active bots
             activeBots.delete(bot.token);
         }
 
@@ -104,38 +100,37 @@ router.delete('/:botId', async (req, res) => {
             .eq('id', botId);
 
         res.json({ message: 'Bot removed successfully' });
+
     } catch (error) {
         console.error('Remove bot error:', error);
         res.status(500).json({ error: 'Failed to remove bot' });
     }
 });
 
-// Initialize bot handler
+// Initialize bot
 async function initializeBot(token) {
     try {
-        // Get bot commands from database
+        // Get commands
         const { data: commands } = await supabase
             .from('commands')
             .select('*')
             .eq('bot_token', token)
             .eq('is_active', true);
 
-        // Create bot instance
         const bot = new TelegramBot(token);
         
-        // Set up command handlers
-        commands.forEach(command => {
+        // Setup command handlers
+        commands?.forEach(command => {
             bot.onText(new RegExp(command.pattern), async (msg, match) => {
                 await handleCommand(bot, command, msg, match);
             });
         });
 
-        // Handle callback queries
+        // Handle callbacks
         bot.on('callback_query', async (callbackQuery) => {
             await handleCallbackQuery(bot, callbackQuery);
         });
 
-        // Store bot instance
         activeBots.set(token, bot);
         
     } catch (error) {
@@ -143,26 +138,7 @@ async function initializeBot(token) {
     }
 }
 
-// Handle Telegram updates from webhook
-async function handleBotUpdate(token, update) {
-    try {
-        const bot = activeBots.get(token);
-        if (bot) {
-            await bot.processUpdate(update);
-        } else {
-            // Initialize bot if not already active
-            await initializeBot(token);
-            const newBot = activeBots.get(token);
-            if (newBot) {
-                await newBot.processUpdate(update);
-            }
-        }
-    } catch (error) {
-        console.error('Handle bot update error:', error);
-    }
-}
-
-// Handle command execution
+// Handle commands
 async function handleCommand(bot, command, msg, match) {
     try {
         const chatId = msg.chat.id;
@@ -182,28 +158,25 @@ async function handleCommand(bot, command, msg, match) {
         }
     } catch (error) {
         console.error('Command execution error:', error);
-        await bot.sendMessage(msg.chat.id, 'An error occurred while processing your command.');
+        await bot.sendMessage(msg.chat.id, 'Error executing command');
     }
 }
 
 // Handle callback queries
 async function handleCallbackQuery(bot, callbackQuery) {
     try {
-        // Implement callback query handling
         await bot.answerCallbackQuery(callbackQuery.id);
-        // Add your callback query logic here
+        // Add callback logic here
     } catch (error) {
         console.error('Callback query error:', error);
     }
 }
 
-// Execute command code in a safe environment
+// Execute command code safely
 async function executeCommandCode(code, context) {
     try {
-        // Create a safe execution environment
         const { bot, msg, match, chatId, userId, username } = context;
         
-        // Define safe functions that can be used in command code
         const safeFunctions = {
             sendMessage: (text, options = {}) => bot.sendMessage(chatId, text, options),
             sendPhoto: (photo, options = {}) => bot.sendPhoto(chatId, photo, options),
@@ -213,26 +186,35 @@ async function executeCommandCode(code, context) {
             getMessage: () => msg
         };
 
-        // Wrap the code in an async function
         const wrappedCode = `
             return (async function() {
                 ${code}
             })();
         `;
 
-        // Create function with safe context
-        const func = new Function(
-            ...Object.keys(safeFunctions),
-            wrappedCode
-        );
-
-        // Execute with safe functions
+        const func = new Function(...Object.keys(safeFunctions), wrappedCode);
         const result = await func(...Object.values(safeFunctions));
         return result;
 
     } catch (error) {
         console.error('Code execution error:', error);
-        return 'Error executing command: ' + error.message;
+        return 'Error: ' + error.message;
+    }
+}
+
+// Handle bot updates from webhook
+async function handleBotUpdate(token, update) {
+    try {
+        let bot = activeBots.get(token);
+        if (!bot) {
+            await initializeBot(token);
+            bot = activeBots.get(token);
+        }
+        if (bot) {
+            await bot.processUpdate(update);
+        }
+    } catch (error) {
+        console.error('Handle bot update error:', error);
     }
 }
 
