@@ -21,11 +21,44 @@ router.get('/bot/:botToken', async (req, res) => {
 
         if (error) throw error;
 
-        res.json({ commands });
+        res.json({ 
+            success: true,
+            commands 
+        });
 
     } catch (error) {
         console.error('Get commands error:', error);
-        res.status(500).json({ error: 'Failed to fetch commands' });
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to fetch commands' 
+        });
+    }
+});
+
+// Get single command by ID
+router.get('/:commandId', async (req, res) => {
+    try {
+        const { commandId } = req.params;
+
+        const { data: command, error } = await supabase
+            .from('commands')
+            .select('*')
+            .eq('id', commandId)
+            .single();
+
+        if (error) throw error;
+
+        res.json({
+            success: true,
+            command
+        });
+
+    } catch (error) {
+        console.error('Get command error:', error);
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to fetch command' 
+        });
     }
 });
 
@@ -50,13 +83,17 @@ router.post('/', async (req, res) => {
         if (error) throw error;
 
         res.json({
+            success: true,
             message: 'Command added successfully',
             command
         });
 
     } catch (error) {
         console.error('Add command error:', error);
-        res.status(500).json({ error: 'Failed to add command' });
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to add command' 
+        });
     }
 });
 
@@ -82,13 +119,17 @@ router.put('/:commandId', async (req, res) => {
         if (error) throw error;
 
         res.json({
+            success: true,
             message: 'Command updated successfully',
             command
         });
 
     } catch (error) {
         console.error('Update command error:', error);
-        res.status(500).json({ error: 'Failed to update command' });
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to update command' 
+        });
     }
 });
 
@@ -102,13 +143,18 @@ router.delete('/:commandId', async (req, res) => {
             .delete()
             .eq('id', commandId);
 
-        res.json({ message: 'Command deleted successfully' });
+        res.json({ 
+            success: true,
+            message: 'Command deleted successfully' 
+        });
 
     } catch (error) {
         console.error('Delete command error:', error);
-        res.status(500).json({ error: 'Failed to delete command' });
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to delete command' 
+        });
     }
 });
 
-// Export router directly
 module.exports = router;
