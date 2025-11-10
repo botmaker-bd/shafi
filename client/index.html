@@ -41,8 +41,7 @@
     </div>
 
     <script>
-        // Check if user is already logged in
-        if (localStorage.getItem('user')) {
+        if (localStorage.getItem('token') && localStorage.getItem('user')) {
             window.location.href = 'dashboard.html';
         }
     </script>
