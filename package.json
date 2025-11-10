@@ -1,0 +1,22 @@
+{
+  "name": "bot-maker-pro",
+  "version": "2.0.0",
+  "description": "Advanced Telegram Bot Maker Platform",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "cd server && npm start",
+    "build": "echo 'No build process needed'",
+    "install-server": "cd server && npm install",
+    "install-client": "cd client && echo 'No client dependencies'",
+    "install-all": "npm run install-server && npm run install-client"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "maker",
+    "automation"
+  ]
+}
