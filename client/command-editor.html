@@ -5,8 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Command Editor - Bot Maker</title>
     <link rel="stylesheet" href="css/style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/monokai.min.css">
 </head>
 <body>
     <nav class="navbar">
@@ -25,7 +23,6 @@
         </header>
 
         <div class="editor-layout">
-            <!-- Commands List -->
             <div class="commands-sidebar">
                 <div class="sidebar-header">
                     <h3>Commands</h3>
@@ -36,7 +33,6 @@
                 </div>
             </div>
 
-            <!-- Command Editor -->
             <div class="editor-main">
                 <div id="noCommandSelected" class="no-selection">
                     <h3>Select a command to edit</h3>
@@ -47,8 +43,6 @@
                     <div class="editor-header">
                         <h3 id="currentCommandName">Command Name</h3>
                         <div class="editor-actions">
-                            <button id="undoBtn" class="btn btn-secondary btn-small">↶ Undo</button>
-                            <button id="redoBtn" class="btn btn-secondary btn-small">↷ Redo</button>
                             <button id="saveCommandBtn" class="btn btn-primary btn-small">💾 Save</button>
                             <button id="testCommandBtn" class="btn btn-success btn-small">🚀 Test</button>
                             <button id="deleteCommandBtn" class="btn btn-danger btn-small">🗑️ Delete</button>
@@ -64,7 +58,6 @@
                             <div class="form-group">
                                 <label for="commandPattern">Pattern (Regex)</label>
                                 <input type="text" id="commandPattern" placeholder="^/start$" required>
-                                <small>Use regex pattern to match messages</small>
                             </div>
                         </div>
 
@@ -75,31 +68,15 @@
 
                         <div class="form-group">
                             <label for="commandCode">Command Code</label>
-                            <div class="code-editor-container">
-                                <textarea id="commandCode" placeholder="// Write your bot command code here"></textarea>
-                            </div>
-                            <small>Use bot.sendMessage(), bot.sendPhoto() etc. functions</small>
+                            <textarea id="commandCode" placeholder="// Write your bot command code here" rows="10"></textarea>
+                            <small>Use bot.sendMessage(), bot.sendPhoto() etc.</small>
                         </div>
                     </form>
-
-                    <!-- Code Templates -->
-                    <div class="templates-section">
-                        <h4>💡 Quick Templates</h4>
-                        <div class="template-buttons">
-                            <button class="btn btn-small btn-outline" onclick="loadTemplate('welcome')">Welcome Message</button>
-                            <button class="btn btn-small btn-outline" onclick="loadTemplate('help')">Help Command</button>
-                            <button class="btn btn-small btn-outline" onclick="loadTemplate('echo')">Echo Message</button>
-                            <button class="btn btn-small btn-outline" onclick="loadTemplate('button')">Buttons Menu</button>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- CodeMirror JS -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js"></script>
     <script src="js/command-editor.js"></script>
 </body>
 </html>
