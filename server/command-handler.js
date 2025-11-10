@@ -110,4 +110,5 @@ router.delete('/:commandId', async (req, res) => {
     }
 });
 
+// Export router directly
 module.exports = router;
