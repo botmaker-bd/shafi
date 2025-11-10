@@ -9,33 +9,40 @@ const supabaseUrl = 'https://tyoaazgsoqvubgfychmd.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR5b2Fhemdzb3F2dWJnZnljaG1kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI3NTE0NDQsImV4cCI6MjA3ODMyNzQ0NH0.czWc-rOitmnn31iAvgTEvZj7bW-aJ2ysFymoWJ8UZCc';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Store active bot instances
+// Store active bot instances and their commands
 const activeBots = new Map();
+const botCommands = new Map();
 
 // Initialize all bots on server start
 async function initializeAllBots() {
     try {
-        console.log('Initializing all bots...');
+        console.log('🔄 Initializing all bots...');
         const { data: bots, error } = await supabase
             .from('bots')
-            .select('token')
+            .select('token, name')
             .eq('is_active', true);
 
         if (error) throw error;
 
+        let initializedCount = 0;
         for (const bot of bots) {
-            await initializeBot(bot.token);
+            try {
+                await initializeBot(bot.token);
+                initializedCount++;
+            } catch (botError) {
+                console.error(`❌ Failed to initialize bot ${bot.name}:`, botError.message);
+            }
         }
-        console.log(`Initialized ${bots.length} bots`);
+        console.log(`✅ Successfully initialized ${initializedCount}/${bots.length} bots`);
     } catch (error) {
-        console.error('Initialize all bots error:', error);
+        console.error('❌ Initialize all bots error:', error);
     }
 }
 
 // Initialize a single bot
 async function initializeBot(token) {
     try {
-        console.log(`Initializing bot with token: ${token.substring(0, 10)}...`);
+        console.log(`🔄 Initializing bot: ${token.substring(0, 10)}...`);
 
         // Get commands for this bot
         const { data: commands, error } = await supabase
@@ -44,7 +51,12 @@ async function initializeBot(token) {
             .eq('bot_token', token)
             .eq('is_active', true);
 
-        if (error) throw error;
+        if (error) {
+            console.error('❌ Error fetching commands:', error);
+            throw error;
+        }
+
+        console.log(`📝 Found ${commands.length} commands for bot`);
 
         // Create bot instance
         const bot = new TelegramBot(token);
@@ -52,23 +64,12 @@ async function initializeBot(token) {
         // Clear existing listeners
         bot.clearTextListeners();
         
-        // Setup command handlers for each command
-        commands.forEach(command => {
-            console.log(`Setting up command: ${command.name} with pattern: ${command.pattern}`);
-            
-            // Use exact text matching instead of regex for simple commands
-            if (command.pattern.startsWith('/')) {
-                bot.onText(new RegExp(`^${command.pattern}$`), async (msg, match) => {
-                    console.log(`Command received: ${command.pattern} from user: ${msg.from.id}`);
-                    await handleCommand(bot, command, msg, match);
-                });
-            } else {
-                // Fallback to regex for complex patterns
-                bot.onText(new RegExp(command.pattern), async (msg, match) => {
-                    console.log(`Pattern matched: ${command.pattern} from user: ${msg.from.id}`);
-                    await handleCommand(bot, command, msg, match);
-                });
-            }
+        // Store commands for this bot
+        botCommands.set(token, commands);
+        
+        // Setup message handler for ALL messages
+        bot.on('message', async (msg) => {
+            await handleMessage(bot, token, msg);
         });
 
         // Handle callback queries
@@ -78,34 +79,87 @@ async function initializeBot(token) {
 
         // Handle errors
         bot.on('error', (error) => {
-            console.error('Bot error:', error);
+            console.error('❌ Bot error:', error);
         });
 
         // Store bot instance
         activeBots.set(token, bot);
         
-        console.log(`Bot initialized successfully with ${commands.length} commands`);
+        console.log(`✅ Bot initialized successfully with ${commands.length} commands`);
+        
+        return true;
         
     } catch (error) {
-        console.error('Initialize bot error:', error);
+        console.error('❌ Initialize bot error:', error);
+        throw error;
     }
 }
 
-// Handle command execution
-async function handleCommand(bot, command, msg, match) {
+// Handle all messages
+async function handleMessage(bot, token, msg) {
+    try {
+        // Ignore non-text messages
+        if (!msg.text) {
+            console.log('📨 Non-text message received, ignoring');
+            return;
+        }
+
+        const chatId = msg.chat.id;
+        const user = msg.from;
+        const messageText = msg.text.trim();
+        
+        console.log(`📩 Message from ${user.first_name} (${user.id}): "${messageText}"`);
+
+        // Get commands for this bot
+        const commands = botCommands.get(token) || [];
+        
+        // Find matching command
+        const matchedCommand = commands.find(cmd => {
+            // Simple exact match for commands starting with /
+            if (messageText.startsWith('/')) {
+                return messageText === cmd.pattern;
+            }
+            // Regex match for other patterns
+            try {
+                const regex = new RegExp(cmd.pattern);
+                return regex.test(messageText);
+            } catch (e) {
+                return false;
+            }
+        });
+
+        if (matchedCommand) {
+            console.log(`🎯 Command matched: "${matchedCommand.name}"`);
+            await executeCommand(bot, matchedCommand, msg);
+        } else {
+            console.log('❌ No command matched');
+            // Send "command not found" message
+            await sendCommandNotFound(bot, chatId, msg.message_id);
+        }
+
+    } catch (error) {
+        console.error('❌ Handle message error:', error);
+        try {
+            await bot.sendMessage(msg.chat.id, '❌ Sorry, there was an error processing your message. Please try again.');
+        } catch (sendError) {
+            console.error('❌ Failed to send error message:', sendError);
+        }
+    }
+}
+
+// Execute command
+async function executeCommand(bot, command, msg) {
     let responseSent = false;
     
     try {
         const chatId = msg.chat.id;
         const user = msg.from;
         
-        console.log(`Executing command: "${command.name}" for user: ${user.first_name} (${user.id})`);
+        console.log(`🚀 Executing command: "${command.name}"`);
 
-        // Execute command code with error handling
-        const result = await executeCommandCode(command.code, {
-            bot,
+        // Execute command code
+        await executeCommandCode(bot, command.code, {
             msg,
-            match,
             chatId,
             userId: user.id,
             username: user.username,
@@ -113,15 +167,45 @@ async function handleCommand(bot, command, msg, match) {
         });
 
         responseSent = true;
-        console.log(`Command "${command.name}" executed successfully`);
+        console.log(`✅ Command "${command.name}" executed successfully`);
 
     } catch (error) {
-        console.error(`Error in command "${command.name}":`, error);
+        console.error(`❌ Error in command "${command.name}":`, error);
         
         if (!responseSent) {
-            try {
-                // Send error message to user
-                const errorMessage = `
+            await sendCommandError(bot, msg, command, error);
+        }
+    }
+}
+
+// Send "command not found" message
+async function sendCommandNotFound(bot, chatId, replyToMessageId) {
+    try {
+        const helpMessage = `
+❌ *Command Not Found*
+
+Sorry, I don't recognize that command. 
+
+Here are the available commands:
+• /start - Welcome message
+• /help - Get help
+
+Use /help to see all available commands.
+        `.trim();
+
+        await bot.sendMessage(chatId, helpMessage, {
+            parse_mode: 'Markdown',
+            reply_to_message_id: replyToMessageId
+        });
+    } catch (error) {
+        console.error('❌ Failed to send command not found message:', error);
+    }
+}
+
+// Send command error message
+async function sendCommandError(bot, msg, command, error) {
+    try {
+        const errorMessage = `
 ❌ *Command Error*
 
 *Command:* ${command.name}
@@ -129,32 +213,30 @@ async function handleCommand(bot, command, msg, match) {
 
 *Error Details:*
 \`\`\`
-${error.message}
+${error.message.substring(0, 500)}
 \`\`\`
 
 Please contact the bot administrator if this issue persists.
-                `.trim();
+        `.trim();
 
-                await bot.sendMessage(msg.chat.id, errorMessage, {
-                    parse_mode: 'Markdown',
-                    reply_to_message_id: msg.message_id
-                });
-            } catch (sendError) {
-                console.error('Failed to send error message:', sendError);
-            }
-        }
+        await bot.sendMessage(msg.chat.id, errorMessage, {
+            parse_mode: 'Markdown',
+            reply_to_message_id: msg.message_id
+        });
+    } catch (sendError) {
+        console.error('❌ Failed to send error message:', sendError);
     }
 }
 
 // Execute command code safely
-async function executeCommandCode(code, context) {
-    const { bot, msg, match, chatId, userId, username, first_name } = context;
+async function executeCommandCode(bot, code, context) {
+    const { msg, chatId, userId, username, first_name } = context;
     
     // Create safe execution environment
     const safeFunctions = {
         // Message sending functions
         sendMessage: (text, options = {}) => {
-            console.log('Sending message to chat:', chatId);
+            console.log('📤 Sending message to chat:', chatId);
             return bot.sendMessage(chatId, text, { 
                 parse_mode: 'Markdown',
                 ...options 
@@ -178,12 +260,11 @@ async function executeCommandCode(code, context) {
         // User information functions
         getUser: () => ({ 
             id: userId, 
-            username, 
-            first_name,
-            last_name: msg.from.last_name 
+            username: username || 'No username', 
+            first_name: first_name || 'User',
+            last_name: msg.from.last_name || ''
         }),
         
-        getMatch: () => match,
         getMessage: () => msg,
         getChatId: () => chatId,
         
@@ -217,7 +298,7 @@ async function executeCommandCode(code, context) {
         return result;
         
     } catch (error) {
-        console.error('Code execution error:', error);
+        console.error('❌ Code execution error:', error);
         throw error;
     }
 }
@@ -225,32 +306,66 @@ async function executeCommandCode(code, context) {
 // Handle callback queries
 async function handleCallbackQuery(bot, callbackQuery) {
     try {
+        console.log('🔄 Callback query received:', callbackQuery.data);
         await bot.answerCallbackQuery(callbackQuery.id);
-        // Add your callback query logic here
+        
+        // You can add callback-specific logic here
+        if (callbackQuery.data === 'help') {
+            await bot.sendMessage(callbackQuery.message.chat.id, '📚 *Help Section*\n\nAvailable commands:\n/start - Welcome message\n/help - This help message', {
+                parse_mode: 'Markdown'
+            });
+        }
+        
     } catch (error) {
-        console.error('Callback query error:', error);
+        console.error('❌ Callback query error:', error);
     }
 }
 
 // Handle bot updates from webhook
 async function handleBotUpdate(token, update) {
     try {
-        console.log('Webhook update received for token:', token.substring(0, 10));
+        console.log('🔔 Processing webhook update for token:', token.substring(0, 10));
         
         let bot = activeBots.get(token);
         if (!bot) {
-            console.log('Bot not active, initializing...');
+            console.log('🔄 Bot not active, initializing...');
             await initializeBot(token);
             bot = activeBots.get(token);
         }
         
         if (bot) {
             await bot.processUpdate(update);
+            console.log('✅ Webhook update processed successfully');
         } else {
-            console.error('Failed to initialize bot for token:', token.substring(0, 10));
+            console.error('❌ Failed to initialize bot for webhook');
         }
     } catch (error) {
-        console.error('Handle bot update error:', error);
+        console.error('❌ Handle bot update error:', error);
+    }
+}
+
+// Reload commands for a bot
+async function reloadBotCommands(token) {
+    try {
+        console.log('🔄 Reloading commands for bot:', token.substring(0, 10));
+        
+        const { data: commands, error } = await supabase
+            .from('commands')
+            .select('*')
+            .eq('bot_token', token)
+            .eq('is_active', true);
+
+        if (error) throw error;
+
+        // Update commands in memory
+        botCommands.set(token, commands);
+        
+        console.log(`✅ Reloaded ${commands.length} commands for bot`);
+        return commands;
+        
+    } catch (error) {
+        console.error('❌ Reload bot commands error:', error);
+        throw error;
     }
 }
 
@@ -261,11 +376,11 @@ router.post('/add', async (req, res) => {
     try {
         const { token, name, userId } = req.body;
 
-        console.log('Adding new bot:', name);
+        console.log('🔄 Adding new bot:', name);
 
         // Validate bot token
-        const bot = new TelegramBot(token, { polling: false });
-        const botInfo = await bot.getMe();
+        const testBot = new TelegramBot(token, { polling: false });
+        const botInfo = await testBot.getMe();
 
         // Store bot in database
         const { data: botData, error } = await supabase
@@ -284,8 +399,8 @@ router.post('/add', async (req, res) => {
         if (error) throw error;
 
         // Set webhook
-        await bot.setWebHook(`https://bot-maker-jcch.onrender.com/bot?token=${token}`);
-        console.log('Webhook set for bot:', botInfo.username);
+        await testBot.setWebHook(`https://bot-maker-jcch.onrender.com/bot?token=${token}`);
+        console.log('✅ Webhook set for bot:', botInfo.username);
 
         // Initialize bot
         await initializeBot(token);
@@ -297,7 +412,7 @@ router.post('/add', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Add bot error:', error);
+        console.error('❌ Add bot error:', error);
         res.status(500).json({ 
             success: false,
             error: 'Failed to add bot: ' + error.message 
@@ -324,7 +439,7 @@ router.get('/user/:userId', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Get bots error:', error);
+        console.error('❌ Get bots error:', error);
         res.status(500).json({ 
             success: false,
             error: 'Failed to fetch bots' 
@@ -349,6 +464,7 @@ router.delete('/:botId', async (req, res) => {
             const telegramBot = new TelegramBot(bot.token, { polling: false });
             await telegramBot.deleteWebHook();
             activeBots.delete(bot.token);
+            botCommands.delete(bot.token);
         }
 
         // Remove from database
@@ -363,7 +479,7 @@ router.delete('/:botId', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Remove bot error:', error);
+        console.error('❌ Remove bot error:', error);
         res.status(500).json({ 
             success: false,
             error: 'Failed to remove bot' 
@@ -384,7 +500,7 @@ router.post('/:botId/reload', async (req, res) => {
             .single();
 
         if (bot) {
-            await initializeBot(bot.token);
+            await reloadBotCommands(bot.token);
             res.json({ 
                 success: true,
                 message: 'Bot commands reloaded successfully' 
@@ -397,7 +513,7 @@ router.post('/:botId/reload', async (req, res) => {
         }
 
     } catch (error) {
-        console.error('Reload bot error:', error);
+        console.error('❌ Reload bot error:', error);
         res.status(500).json({ 
             success: false,
             error: 'Failed to reload bot' 
@@ -406,10 +522,13 @@ router.post('/:botId/reload', async (req, res) => {
 });
 
 // Initialize all bots when server starts
-initializeAllBots();
+setTimeout(() => {
+    initializeAllBots();
+}, 2000);
 
 module.exports = {
     router,
     handleBotUpdate,
-    initializeBot
+    initializeBot,
+    reloadBotCommands
 };
