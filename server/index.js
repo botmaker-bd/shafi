@@ -46,19 +46,28 @@ app.post('/bot', async (req, res) => {
     res.status(200).json({ ok: true });
   } catch (err) {
     console.error('Webhook error:', err);
-    res.status(200).json({ ok: true }); // still 200 to avoid retries storm
+    // Still return 200 to avoid Telegram retry storms
+    res.status(200).json({ ok: true });
   }
 });
 
-// Fallback to client (if any)
+// Optional: serve SPA client if exists
 app.get('*', (_req, res) => {
-  res.sendFile(path.join(__dirname, '../client/index.html'));
+  try {
+    res.sendFile(path.join(__dirname, '../client/index.html'));
+  } catch {
+    res.status(404).send('Not Found');
+  }
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n🚀 Bot Maker Server Started!\n📍 Port: ${PORT}\n📍 Env: ${process.env.NODE_ENV || 'development'}\n📍 Public URL: ${process.env.PUBLIC_URL || 'N/A'}\n`);
-  // Initialize all bots on boot
-  if (botManager.initializeAllBots) botManager.initializeAllBots();
+app.listen(PORT, '0.0.0.0', async () => {
+  console.log(`
+🚀 Bot Maker Server Started!
+📍 Port: ${PORT}
+📍 Env: ${process.env.NODE_ENV || 'development'}
+📍 Public URL: ${process.env.PUBLIC_URL || 'N/A'}
+`);
+  if (botManager.initializeAllBots) await botManager.initializeAllBots();
 });
 
 module.exports = app;
