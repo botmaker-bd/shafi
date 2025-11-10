@@ -218,8 +218,9 @@ async function handleBotUpdate(token, update) {
     }
 }
 
+// Export router and functions separately
 module.exports = {
-    router,
-    handleBotUpdate,
-    initializeBot
+    router: router,
+    handleBotUpdate: handleBotUpdate,
+    initializeBot: initializeBot
 };
