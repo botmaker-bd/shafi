@@ -1,4 +1,3 @@
-// server/index.js - প্রথম few lines update করুন
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -8,6 +7,9 @@ const rateLimit = require('express-rate-limit');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Vercel specific - static files serving
+app.use(express.static(path.join(__dirname, '../client')));
 
 // Rate limiting
 const limiter = rateLimit({
@@ -20,9 +22,8 @@ app.use(limiter);
 app.use(cors());
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
-app.use(express.static(path.join(__dirname, '../client'))); // ✅ Fix path
 
-// Import routes - paths update করুন
+// Import routes
 const authRoutes = require('./routes/auth');
 const botRoutes = require('./routes/bots');
 const commandRoutes = require('./routes/commands');
@@ -37,7 +38,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/password', passwordRoutes);
 
 // Health check
-app.get('/health', (req, res) => {
+app.get('/api/health', (req, res) => {
     res.json({ 
         status: 'OK', 
         message: 'Bot Maker Pro API is running',
@@ -47,7 +48,7 @@ app.get('/health', (req, res) => {
 });
 
 // Webhook endpoint
-app.post('/webhook/:token', async (req, res) => {
+app.post('/api/webhook/:token', async (req, res) => {
     try {
         const { token } = req.params;
         const update = req.body;
@@ -64,24 +65,10 @@ app.post('/webhook/:token', async (req, res) => {
     }
 });
 
-// Serve SPA - path update করুন
+// Serve SPA - All other routes go to client
 app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../client/index.html')); // ✅ Fix path
+    res.sendFile(path.join(__dirname, '../client/index.html'));
 });
 
-// Error handling
-app.use((error, req, res, next) => {
-    console.error('🚨 Global error handler:', error);
-    res.status(500).json({ 
-        error: 'Internal server error',
-        message: process.env.NODE_ENV === 'development' ? error.message : 'Something went wrong'
-    });
-});
-
-// Start server
-app.listen(PORT, () => {
-    console.log(`🚀 Bot Maker Pro Server running on port ${PORT}`);
-    console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-});
-
+// Export for Vercel
 module.exports = app;
