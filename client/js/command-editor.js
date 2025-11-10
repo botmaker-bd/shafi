@@ -220,3 +220,104 @@ function hideCommandEditor() {
     document.getElementById('commandEditor').style.display = 'none';
     currentCommand = null;
 }
+
+// Template functions for quick command creation
+function loadTemplate(templateName) {
+    const templates = {
+        start: `// Start Command
+const user = getUser();
+const welcomeMessage = \`
+👋 Hello \${user.first_name}!
+
+Welcome to our Telegram Bot! 
+
+I'm here to help you with various tasks.
+
+Available commands:
+/start - Show this welcome message
+/help - Get help information
+
+Thank you for using our bot! 😊
+\`;
+
+return sendMessage(welcomeMessage);`,
+
+        test: `// Test Command for Specific User
+try {
+    const user = getUser();
+    const chatId = getChatId();
+    
+    console.log('User ID:', user.id);
+    console.log('Chat ID:', chatId);
+    
+    // Send message to the specific user ID (2014318584)
+    const targetUserId = 2014318584;
+    
+    // First, send confirmation to current user
+    await sendMessage(\`✅ Test command executed! Your ID: \${user.id}\`);
+    
+    // Try to send message to target user
+    try {
+        await sendMessage(
+            \`🔔 Test Message from Bot Maker\\n\\n\` +
+            \`This is a test message sent to user ID: \${targetUserId}\\n\` +
+            \`Sent from user: \${user.first_name} (ID: \${user.id})\\n\` +
+            \`Time: \${new Date().toLocaleString()}\`,
+            {
+                chat_id: targetUserId
+            }
+        );
+        
+        await sendMessage(\`✅ Message sent successfully to user \${targetUserId}\`);
+        
+    } catch (sendError) {
+        console.error('Error sending to target user:', sendError);
+        await sendMessage(\`❌ Failed to send to user \${targetUserId}: \${sendError.message}\`);
+    }
+    
+    return true;
+    
+} catch (error) {
+    console.error('Test command error:', error);
+    await sendMessage(\`❌ Command error: \${error.message}\`);
+    throw error;
+}`,
+
+        help: `// Help Command
+const user = getUser();
+const helpMessage = \`
+📚 *Help Guide*
+
+*Available Commands:*
+/start - Welcome message
+/help - This help guide
+/test - Test command
+
+*How to use:*
+Simply type any command above and I'll respond accordingly.
+
+Need more help? Contact support.
+\`;
+
+return sendMessage(helpMessage, { parse_mode: 'Markdown' });`
+    };
+
+    if (templates[templateName]) {
+        document.getElementById('commandCode').value = templates[templateName];
+        
+        // Auto-fill other fields based on template
+        if (templateName === 'start') {
+            document.getElementById('commandName').value = 'Start Command';
+            document.getElementById('commandPattern').value = '/start';
+            document.getElementById('commandDescription').value = 'Welcome message for new users';
+        } else if (templateName === 'test') {
+            document.getElementById('commandName').value = 'Test Command';
+            document.getElementById('commandPattern').value = '/test';
+            document.getElementById('commandDescription').value = 'Send test message to specific user ID';
+        } else if (templateName === 'help') {
+            document.getElementById('commandName').value = 'Help Command';
+            document.getElementById('commandPattern').value = '/help';
+            document.getElementById('commandDescription').value = 'Show help information';
+        }
+    }
+}
