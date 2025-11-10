@@ -1,11 +1,11 @@
 {
   "name": "bot-maker-pro",
   "version": "2.0.0",
-  "description": "Advanced Telegram Bot Maker Platform with Dark Mode",
-  "main": "server.js",
+  "description": "Advanced Telegram Bot Maker Platform",
+  "main": "server/index.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js",
+    "start": "node server/index.js",
+    "dev": "nodemon server/index.js",
     "build": "echo 'No build process needed'",
     "vercel-build": "npm install"
   },
@@ -26,12 +26,5 @@
   },
   "engines": {
     "node": ">=18.0.0"
-  },
-  "keywords": [
-    "telegram",
-    "bot",
-    "maker",
-    "dark-mode",
-    "mobile"
-  ]
+  }
 }
