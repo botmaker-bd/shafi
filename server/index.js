@@ -7,67 +7,78 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// CORS
-app.use(
-  cors({
-    origin:
-      process.env.NODE_ENV === 'production'
-        ? [process.env.PUBLIC_URL]
+// Middleware
+app.use(cors({
+    origin: process.env.NODE_ENV === 'production' 
+        ? ['https://bot-maker-jcch.onrender.com']
         : ['http://localhost:3000', 'http://127.0.0.1:3000'],
-    credentials: true,
-  })
-);
+    credentials: true
+}));
 
-// Body parsers
-app.use(bodyParser.json({ limit: '1mb' }));
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json({ limit: '10mb' }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
-// --- Mount routers ---
+// Serve static files
+app.use(express.static(path.join(__dirname, '../client')));
+
+// Import and use routes CORRECTLY
+const authRoutes = require('./auth');
+app.use('/api/auth', authRoutes);
+
+// Import bot manager routes correctly
 const botManager = require('./bot-manager');
 app.use('/api/bots', botManager.router);
 
-// Health
-app.get('/', (_req, res) => res.status(200).send('OK'));
+// Import command handler routes correctly  
+const commandHandler = require('./command-handler');
+app.use('/api/commands', commandHandler);
 
-// Telegram webhook endpoint: /bot?token=xxxx
-app.post('/bot', async (req, res) => {
-  try {
-    const token = req.query.token;
-    if (!token) return res.status(400).json({ ok: false, error: 'token query missing' });
+// Health check
+app.get('/health', (req, res) => {
+    res.status(200).json({ 
+        status: 'OK', 
+        message: 'Bot Maker API is running',
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || 'development'
+    });
+});
 
-    const update = req.body;
-    console.log('🔔 Webhook received for token:', token.slice(0, 8) + '…');
-
-    if (botManager.handleBotUpdate) {
-      await botManager.handleBotUpdate(token, update);
+// Webhook endpoint for Telegram bots
+app.post('/bot/:token', async (req, res) => {
+    try {
+        const { token } = req.params;
+        const update = req.body;
+        
+        console.log(`Webhook received for token: ${token.substring(0, 10)}...`);
+        
+        // Handle update using bot manager
+        if (botManager.handleBotUpdate) {
+            await botManager.handleBotUpdate(token, update);
+        }
+        
+        res.status(200).send('OK');
+    } catch (error) {
+        console.error('Webhook error:', error);
+        res.status(500).send('Error');
     }
-
-    // Telegram requires a 200 fast response
-    res.status(200).json({ ok: true });
-  } catch (err) {
-    console.error('Webhook error:', err);
-    // Still return 200 to avoid Telegram retry storms
-    res.status(200).json({ ok: true });
-  }
 });
 
-// Optional: serve SPA client if exists
-app.get('*', (_req, res) => {
-  try {
+// Serve SPA
+app.get('*', (req, res) => {
+    if (req.path.startsWith('/api/')) {
+        return res.status(404).json({ error: 'API endpoint not found' });
+    }
     res.sendFile(path.join(__dirname, '../client/index.html'));
-  } catch {
-    res.status(404).send('Not Found');
-  }
 });
 
-app.listen(PORT, '0.0.0.0', async () => {
-  console.log(`
+// Start server
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`
 🚀 Bot Maker Server Started!
 📍 Port: ${PORT}
-📍 Env: ${process.env.NODE_ENV || 'development'}
-📍 Public URL: ${process.env.PUBLIC_URL || 'N/A'}
-`);
-  if (botManager.initializeAllBots) await botManager.initializeAllBots();
+📍 Environment: ${process.env.NODE_ENV || 'development'}
+📍 URL: ${process.env.RENDER_URL || `http://localhost:${PORT}`}
+    `);
 });
 
 module.exports = app;
