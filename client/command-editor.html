@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Command Editor - Bot Maker</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">🤖 Bot Maker</div>
+        <div class="nav-links">
+            <a href="dashboard.html" class="nav-link">Dashboard</a>
+            <a href="bot-management.html" class="nav-link">My Bots</a>
+            <a href="#" id="logoutBtn" class="nav-link">Logout</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <header class="page-header">
+            <h1 id="botName">Command Editor</h1>
+            <p id="botUsername">Manage commands for your bot</p>
+        </header>
+
+        <div class="editor-layout">
+            <div class="commands-sidebar">
+                <div class="sidebar-header">
+                    <h3>Commands</h3>
+                    <button id="addCommandBtn" class="btn btn-primary btn-small">+ Add Command</button>
+                </div>
+                <div id="commandsList" class="commands-list">
+                    <!-- Commands will be loaded here -->
+                </div>
+            </div>
+
+            <div class="editor-main">
+                <div id="noCommandSelected" class="no-selection">
+                    <h3>Select a command to edit</h3>
+                    <p>Choose a command from the sidebar or create a new one</p>
+                </div>
+
+                <div id="commandEditor" class="command-editor" style="display: none;">
+                    <div class="editor-header">
+                        <h3 id="currentCommandName">Command Name</h3>
+                        <div class="editor-actions">
+                            <button id="saveCommandBtn" class="btn btn-primary btn-small">💾 Save</button>
+                            <button id="testCommandBtn" class="btn btn-success btn-small">🚀 Test</button>
+                            <button id="deleteCommandBtn" class="btn btn-danger btn-small">🗑️ Delete</button>
+                        </div>
+                    </div>
+
+                    <form id="commandForm" class="command-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="commandName">Command Name</label>
+                                <input type="text" id="commandName" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="commandPattern">Pattern (Regex)</label>
+                                <input type="text" id="commandPattern" placeholder="^/start$" required>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="commandDescription">Description</label>
+                            <textarea id="commandDescription" placeholder="What does this command do?"></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="commandCode">Command Code</label>
+                            <textarea id="commandCode" placeholder="// Write your bot command code here" rows="10"></textarea>
+                            <small>Use bot.sendMessage(), bot.sendPhoto() etc.</small>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/command-editor.js"></script>
+</body>
+</html>
