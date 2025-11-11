@@ -5,6 +5,13 @@ const botManager = require('../core/bot-manager');
 
 const router = express.Router();
 
+// const express = require('express');
+// const TelegramBot = require('node-telegram-bot-api');
+// const supabase = require('../config/supabase');
+// const botManager = require('../core/bot-manager');
+
+// const router = express.Router();
+
 router.post('/add', async (req, res) => {
     try {
         const { token, name, userId } = req.body;
@@ -13,6 +20,7 @@ router.post('/add', async (req, res) => {
             return res.status(400).json({ error: 'Bot token and user ID are required' });
         }
 
+        // Validate bot token
         const testBot = new TelegramBot(token, { polling: false });
         let botInfo;
         try {
@@ -21,6 +29,7 @@ router.post('/add', async (req, res) => {
             return res.status(400).json({ error: 'Invalid bot token' });
         }
 
+        // Check if bot already exists for this user
         const { data: existingBot } = await supabase
             .from('bots')
             .select('id')
@@ -32,15 +41,21 @@ router.post('/add', async (req, res) => {
             return res.status(400).json({ error: 'This bot is already added to your account' });
         }
 
-        const webhookUrl = `${process.env.BASE_URL || 'https://your-app.onrender.com'}/api/webhook/${token}`;
+        // 🔥 Set webhook to our server
+        const baseUrl = process.env.BASE_URL || `https://${process.env.RENDER_EXTERNAL_HOSTNAME || 'localhost:' + (process.env.PORT || 3000)}`;
+        const webhookUrl = `${baseUrl}/api/webhook/${token}`;
+        
+        console.log('🔗 Setting webhook:', webhookUrl);
+        
         try {
             await testBot.setWebHook(webhookUrl);
-            console.log(`✅ Webhook set: ${webhookUrl}`);
+            console.log(`✅ Webhook set successfully: ${webhookUrl}`);
         } catch (webhookError) {
-            console.error('Webhook set error:', webhookError);
+            console.error('❌ Webhook set error:', webhookError);
             return res.status(400).json({ error: 'Failed to set webhook. Please check your bot token.' });
         }
 
+        // Save to database
         const { data: botData, error } = await supabase
             .from('bots')
             .insert([{
@@ -56,12 +71,14 @@ router.post('/add', async (req, res) => {
 
         if (error) throw error;
 
+        // Initialize bot in our system
         await botManager.initializeBot(token);
 
         res.json({
             success: true,
             message: 'Bot added successfully!',
-            bot: botData
+            bot: botData,
+            webhookUrl: webhookUrl
         });
 
     } catch (error) {
@@ -69,6 +86,8 @@ router.post('/add', async (req, res) => {
         res.status(500).json({ error: 'Failed to add bot. Please try again.' });
     }
 });
+
+// ... other routes remain same
 
 router.get('/user/:userId', async (req, res) => {
     try {
