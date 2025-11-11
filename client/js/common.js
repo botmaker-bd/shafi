@@ -19,22 +19,12 @@ class CommonApp {
             mobileMenuBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 navLinks.classList.toggle('mobile-open');
-                mobileMenuBtn.classList.toggle('active');
             });
 
             // Close mobile menu when clicking outside
             document.addEventListener('click', (e) => {
                 if (!mobileMenuBtn.contains(e.target) && !navLinks.contains(e.target)) {
                     navLinks.classList.remove('mobile-open');
-                    mobileMenuBtn.classList.remove('active');
-                }
-            });
-
-            // Close mobile menu when clicking on a link
-            navLinks.addEventListener('click', (e) => {
-                if (e.target.tagName === 'A' || e.target.closest('a')) {
-                    navLinks.classList.remove('mobile-open');
-                    mobileMenuBtn.classList.remove('active');
                 }
             });
         }
@@ -74,7 +64,7 @@ class CommonApp {
         
         navLinks.forEach(link => {
             const href = link.getAttribute('href');
-            if (href === currentPage || (currentPage.includes('?') && href === currentPage.split('?')[0])) {
+            if (href === currentPage) {
                 link.classList.add('active');
             } else {
                 link.classList.remove('active');
