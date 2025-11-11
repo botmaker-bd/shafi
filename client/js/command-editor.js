@@ -118,12 +118,6 @@ class EnhancedCommandEditor {
             this.openCodeEditor('answer');
         });
 
-        // Remove format button from main editor
-        const formatBtn = document.getElementById('formatCode');
-        if (formatBtn) {
-            formatBtn.style.display = 'none';
-        }
-
         // Modal events
         this.setupModalEvents();
     }
@@ -208,12 +202,21 @@ class EnhancedCommandEditor {
             this.selectAllCode();
         });
 
+        // New: Cut, Copy, Paste, Clear buttons
+        document.getElementById('cutBtn').addEventListener('click', () => {
+            this.cutSelectedCode();
+        });
+
         document.getElementById('copyBtn').addEventListener('click', () => {
             this.copySelectedCode();
         });
 
         document.getElementById('pasteBtn').addEventListener('click', () => {
             this.pasteCode();
+        });
+
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            this.clearAllCode();
         });
 
         document.getElementById('formatBtn').addEventListener('click', () => {
@@ -259,6 +262,10 @@ class EnhancedCommandEditor {
                     case 'a':
                         e.preventDefault();
                         this.selectAllCode();
+                        break;
+                    case 'x':
+                        e.preventDefault();
+                        this.cutSelectedCode();
                         break;
                     case 'c':
                         // Allow default copy behavior
@@ -342,6 +349,27 @@ class EnhancedCommandEditor {
     selectAllCode() {
         const editor = document.getElementById('advancedCodeEditor');
         editor.select();
+        this.showInfo('All code selected');
+    }
+
+    cutSelectedCode() {
+        const editor = document.getElementById('advancedCodeEditor');
+        const selectedText = editor.value.substring(editor.selectionStart, editor.selectionEnd);
+        
+        if (selectedText) {
+            navigator.clipboard.writeText(selectedText).then(() => {
+                const start = editor.selectionStart;
+                const end = editor.selectionEnd;
+                editor.value = editor.value.substring(0, start) + editor.value.substring(end);
+                editor.selectionStart = editor.selectionEnd = start;
+                editor.focus();
+                
+                this.saveToHistory(editor.value);
+                this.showSuccess('Selected code cut to clipboard!');
+            });
+        } else {
+            this.showInfo('No text selected to cut');
+        }
     }
 
     copySelectedCode() {
@@ -372,6 +400,17 @@ class EnhancedCommandEditor {
             this.showSuccess('Text pasted from clipboard!');
         } catch (err) {
             this.showError('Failed to paste from clipboard');
+        }
+    }
+
+    clearAllCode() {
+        if (confirm('Are you sure you want to clear all code? This action cannot be undone.')) {
+            const editor = document.getElementById('advancedCodeEditor');
+            editor.value = '';
+            editor.focus();
+            
+            this.saveToHistory('');
+            this.showSuccess('All code cleared!');
         }
     }
 
@@ -406,33 +445,33 @@ class EnhancedCommandEditor {
     }
 
     formatJavaScript(code) {
-    let formatted = code;
+        let formatted = code;
 
-    // Fix common formatting issues
-    formatted = formatted
-        .replace(/\$\s*{\s*/g, '${')
-        .replace(/\s*}\s*/g, '}')
-        .replace(/(\w+)\s*\(\s*/g, '$1(')
-        .replace(/\s*\)/g, ')')
-        .replace(/\s+/g, ' ')
-        .replace(/,(\S)/g, ', $1')
-        .replace(/;(\S)/g, '; $1')
-        .replace(/\s+/g, ' ')
-        .trim();
+        // Fix common formatting issues
+        formatted = formatted
+            .replace(/\$\s*{\s*/g, '${')
+            .replace(/\s*}\s*/g, '}')
+            .replace(/(\w+)\s*\(\s*/g, '$1(')
+            .replace(/\s*\)/g, ')')
+            .replace(/\s+/g, ' ')
+            .replace(/,(\S)/g, ', $1')
+            .replace(/;(\S)/g, '; $1')
+            .replace(/\s+/g, ' ')
+            .trim();
 
-    // Handle line breaks while preserving comments
-    const lines = formatted.split('\n');
-    const processedLines = lines.map(line => {
-        // Process each line separately for semicolons
-        if (line.includes(';') && !line.trim().startsWith('//')) {
-            const statements = line.split(';');
-            return statements.map(statement => statement.trim()).join(';\n');
-        }
-        return line;
-    });
-    
-    return processedLines.join('\n');
-}
+        // Handle line breaks while preserving comments
+        const lines = formatted.split('\n');
+        const processedLines = lines.map(line => {
+            // Process each line separately for semicolons
+            if (line.includes(';') && !line.trim().startsWith('//')) {
+                const statements = line.split(';');
+                return statements.map(statement => statement.trim()).join(';\n');
+            }
+            return line;
+        });
+        
+        return processedLines.join('\n');
+    }
 
     showRealTimeSuggestions(code, cursorPos) {
         clearTimeout(this.suggestionTimeout);
@@ -744,10 +783,13 @@ class EnhancedCommandEditor {
     displayCommands() {
         const commandsList = document.getElementById('commandsList');
         const emptyCommands = document.getElementById('emptyCommands');
+        const noCommandSelected = document.getElementById('noCommandSelected');
 
         if (!this.commands || this.commands.length === 0) {
             commandsList.style.display = 'none';
             emptyCommands.style.display = 'block';
+            noCommandSelected.style.display = 'block';
+            document.getElementById('commandEditor').style.display = 'none';
             return;
         }
 
@@ -809,7 +851,7 @@ class EnhancedCommandEditor {
         this.currentCommand = {
             id: 'new',
             name: 'New Command',
-            pattern: '/start,
+            pattern: '/start',
             code: '// Write your command code here\nconst user = getUser();\nreturn sendMessage(`Hello ${user.first_name}!`);',
             is_active: true,
             wait_for_answer: false,
