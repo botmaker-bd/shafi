@@ -8,6 +8,7 @@ class CommonApp {
         this.setupMobileMenu();
         this.setupUserMenu();
         this.setupActiveNav();
+        this.updateUserInfo();
     }
 
     setupMobileMenu() {
@@ -15,7 +16,8 @@ class CommonApp {
         const navLinks = document.getElementById('navLinks');
 
         if (mobileMenuBtn && navLinks) {
-            mobileMenuBtn.addEventListener('click', () => {
+            mobileMenuBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
                 navLinks.classList.toggle('mobile-open');
             });
 
@@ -39,8 +41,10 @@ class CommonApp {
             });
 
             // Close dropdown when clicking outside
-            document.addEventListener('click', () => {
-                userDropdown.classList.remove('show');
+            document.addEventListener('click', (e) => {
+                if (!userBtn.contains(e.target) && !userDropdown.contains(e.target)) {
+                    userDropdown.classList.remove('show');
+                }
             });
         }
 
@@ -52,9 +56,20 @@ class CommonApp {
                 this.logout();
             });
         }
+    }
 
-        // Update user info
-        this.updateUserInfo();
+    setupActiveNav() {
+        const currentPage = window.location.pathname.split('/').pop() || 'dashboard.html';
+        const navLinks = document.querySelectorAll('.nav-link');
+        
+        navLinks.forEach(link => {
+            const href = link.getAttribute('href');
+            if (href === currentPage) {
+                link.classList.add('active');
+            } else {
+                link.classList.remove('active');
+            }
+        });
     }
 
     updateUserInfo() {
@@ -73,11 +88,6 @@ class CommonApp {
                 console.error('Error parsing user data:', error);
             }
         }
-    }
-
-    setupActiveNav() {
-        // Active nav link is already set in HTML
-        // This function can be extended for dynamic active states
     }
 
     logout() {
