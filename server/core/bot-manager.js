@@ -40,6 +40,7 @@ async function initializeAllBots() {
         
         console.log(`✅ Bot initialization completed: ${initializedCount} successful, ${failedCount} failed`);
         
+        // If no bots to initialize, show message
         if (bots.length === 0) {
             console.log('💡 No active bots found. Add bots via the web interface.');
         }
@@ -101,7 +102,7 @@ async function initializeBot(token) {
     }
 }
 
-// Handle incoming messages - FIXED FOR MULTIPLE PATTERNS
+// Handle incoming messages
 async function handleMessage(bot, token, msg) {
     try {
         if (!msg.text) return;
@@ -123,19 +124,12 @@ async function handleMessage(bot, token, msg) {
         const commands = botCommands.get(token) || [];
         let matchedCommand = null;
 
-        // Find matching command with multiple patterns
+        // Find matching command
         for (const cmd of commands) {
-            const patterns = cmd.pattern.split(',').map(p => p.trim());
-            
-            for (const pattern of patterns) {
-                // Exact match or starts with pattern followed by space
-                if (text === pattern || text.startsWith(pattern + ' ')) {
-                    matchedCommand = cmd;
-                    console.log(`🎯 Matched pattern: "${pattern}" in command: ${cmd.name}`);
-                    break;
-                }
+            if (text === cmd.pattern || text.startsWith(cmd.pattern + ' ')) {
+                matchedCommand = cmd;
+                break;
             }
-            if (matchedCommand) break;
         }
 
         if (matchedCommand) {
@@ -155,7 +149,10 @@ async function handleMessage(bot, token, msg) {
             }
         } else {
             console.log('❌ No command matched');
-            // Don't send error message to avoid spam
+            await bot.sendMessage(chatId, 
+                '❌ Command not found. Use /start to see available commands.',
+                { reply_to_message_id: messageId }
+            );
         }
 
     } catch (error) {
@@ -250,10 +247,6 @@ async function handleTestCommand(bot, token, commandId, chatId, messageId) {
 
         const testChatId = adminSettings?.admin_chat_id || chatId;
 
-        // Use first pattern for testing
-        const patterns = command.pattern.split(',').map(p => p.trim());
-        const testPattern = patterns[0];
-
         // Create mock message object
         const mockMsg = {
             chat: { id: testChatId },
@@ -263,7 +256,7 @@ async function handleTestCommand(bot, token, commandId, chatId, messageId) {
                 username: 'testuser'
             },
             message_id: messageId,
-            text: testPattern
+            text: command.pattern
         };
 
         // Execute command
@@ -275,16 +268,20 @@ async function handleTestCommand(bot, token, commandId, chatId, messageId) {
     }
 }
 
-// Execute command - FIXED VERSION
+// Execute command with proper code formatting
 async function executeCommand(bot, command, msg, isTest = false) {
     try {
-        const result = await executeCommandCode(bot, command.code, {
+        // Format code before execution to fix formatting issues
+        const formattedCode = formatCommandCode(command.code);
+        
+        const result = await executeCommandCode(bot, formattedCode, {
             msg,
             chatId: msg.chat.id,
             userId: msg.from.id,
             username: msg.from.username,
             first_name: msg.from.first_name,
-            isTest
+            isTest,
+            botToken: command.bot_token
         });
 
         return result;
@@ -311,13 +308,46 @@ Please check your command code and try again.
         } catch (sendError) {
             console.error('❌ Failed to send error message:', sendError);
         }
+        
+        throw error; // Re-throw for test endpoints
     }
+}
+
+// Format command code to fix common formatting issues
+function formatCommandCode(code) {
+    if (!code) return '';
+    
+    let formatted = code;
+    
+    // Fix: Remove extra spaces in template literals
+    formatted = formatted.replace(/\$\s*{\s*([^}]+)\s*}/g, '${$1}');
+    
+    // Fix: Ensure proper spacing for function calls
+    formatted = formatted.replace(/(\w+)\s*\(\s*/g, '$1(');
+    formatted = formatted.replace(/\s*\)/g, ')');
+    
+    // Fix: Remove spaces before semicolons
+    formatted = formatted.replace(/\s*;/g, ';');
+    
+    // Fix: Ensure proper line breaks
+    formatted = formatted.replace(/\r\n/g, '\n');
+    formatted = formatted.replace(/\n+/g, '\n');
+    
+    // Fix: Remove comments that break code
+    formatted = formatted.replace(/\/\/.*$/gm, '');
+    
+    // Fix: Ensure return statements are proper
+    formatted = formatted.replace(/return\s+\(/g, 'return (');
+    
+    return formatted.trim();
 }
 
 // Execute answer handler
 async function executeAnswerHandler(bot, command, msg, answerText, context) {
     try {
-        const result = await executeCommandCode(bot, command.answer_handler, {
+        const formattedCode = formatCommandCode(command.answer_handler);
+        
+        const result = await executeCommandCode(bot, formattedCode, {
             msg,
             chatId: msg.chat.id,
             userId: msg.from.id,
@@ -334,9 +364,9 @@ async function executeAnswerHandler(bot, command, msg, answerText, context) {
     }
 }
 
-// Execute command code safely - IMPROVED VERSION
+// Execute command code safely with better formatting
 async function executeCommandCode(bot, code, context) {
-    const { msg, chatId, userId, username, first_name, isTest, answerText } = context;
+    const { msg, chatId, userId, username, first_name, isTest, answerText, botToken } = context;
     
     // Enhanced available functions for command code
     const safeFunctions = {
@@ -442,6 +472,9 @@ async function executeCommandCode(bot, code, context) {
         
         log: (message) => console.log(`[Command Log]: ${message}`),
         
+        // Bot token context
+        getBotToken: () => botToken,
+        
         // Alias functions for compatibility
         Api: {
             sendMessage: (options) => {
@@ -490,7 +523,7 @@ async function executeCommandCode(bot, code, context) {
     };
 
     try {
-        // Wrap the code in an async function with proper error handling
+        // Wrap the code in an async function with proper formatting
         const wrappedCode = `
             return (async function() {
                 const { 
@@ -511,18 +544,14 @@ async function executeCommandCode(bot, code, context) {
                     HTTP,
                     isTest, 
                     getAnswer,
+                    getBotToken,
                     wait,
                     log,
                     Api,
                     Bot
                 } = this;
                 
-                try {
-                    ${code}
-                } catch (error) {
-                    console.error('Command execution error:', error);
-                    throw error;
-                }
+                ${code}
             }).call(this);
         `;
 
