@@ -4,6 +4,8 @@ class EnhancedCommandEditor {
         this.currentBot = null;
         this.currentCommand = null;
         this.commands = [];
+        this.codeHistory = [];
+        this.historyIndex = -1;
         this.init();
     }
 
@@ -12,8 +14,7 @@ class EnhancedCommandEditor {
         await this.loadBotInfo();
         this.setupEventListeners();
         await this.loadCommands();
-        this.setupUserMenu();
-        this.setupQuickTemplates();
+        this.setupCodeEditor();
     }
 
     async checkAuth() {
@@ -37,20 +38,8 @@ class EnhancedCommandEditor {
             }
 
             this.user = JSON.parse(userData);
-            this.updateUI();
         } catch (error) {
             this.logout();
-        }
-    }
-
-    updateUI() {
-        if (this.user) {
-            document.getElementById('userEmail').textContent = this.user.email;
-            // Update user avatar with first letter
-            const userAvatar = document.querySelector('.user-avatar');
-            if (userAvatar) {
-                userAvatar.textContent = this.user.email.charAt(0).toUpperCase();
-            }
         }
     }
 
@@ -74,10 +63,19 @@ class EnhancedCommandEditor {
         });
 
         // Toggle switches
-        this.setupToggleSwitches();
+        document.getElementById('waitForAnswer').addEventListener('change', (e) => {
+            this.toggleAnswerHandler(e.target.checked);
+        });
 
-        // Quick templates
-        this.setupTemplateEvents();
+        document.getElementById('commandActive').addEventListener('change', (e) => {
+            if (this.currentCommand) {
+                this.currentCommand.is_active = e.target.checked;
+                const statusBadge = document.getElementById('commandStatus');
+                statusBadge.textContent = e.target.checked ? 'Active' : 'Inactive';
+                statusBadge.className = `status-badge ${e.target.checked ? 'active' : 'inactive'}`;
+                this.showSuccess(`Command ${e.target.checked ? 'activated' : 'deactivated'}`);
+            }
+        });
 
         // Save button
         document.getElementById('saveCommandBtn').addEventListener('click', (e) => {
@@ -93,11 +91,6 @@ class EnhancedCommandEditor {
             this.testCommand();
         });
 
-        // Form interactions
-        document.getElementById('waitForAnswer').addEventListener('change', (e) => {
-            this.toggleAnswerHandler(e.target.checked);
-        });
-
         // Command search
         let searchTimeout;
         document.getElementById('commandSearch').addEventListener('input', (e) => {
@@ -107,303 +100,236 @@ class EnhancedCommandEditor {
             }, 300);
         });
 
-        // Logout
-        document.getElementById('logoutBtn').addEventListener('click', (e) => {
-            e.preventDefault();
-            this.logout();
+        // Code editor buttons
+        document.getElementById('openEditor').addEventListener('click', () => {
+            this.openCodeEditor();
         });
 
-        // Keyboard shortcuts
-        document.addEventListener('keydown', (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-                e.preventDefault();
-                this.saveCommand();
-            }
+        document.getElementById('formatCode').addEventListener('click', () => {
+            this.formatCode();
         });
 
         // Modal events
         this.setupModalEvents();
     }
 
-    setupUserMenu() {
-        const userBtn = document.getElementById('userMenuBtn');
-        const userDropdown = document.getElementById('userDropdown');
+    setupCodeEditor() {
+        // Setup code editor modal functionality
+        document.getElementById('undoBtn').addEventListener('click', () => {
+            this.undoCode();
+        });
 
-        if (userBtn && userDropdown) {
-            userBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                userDropdown.classList.toggle('show');
-            });
+        document.getElementById('redoBtn').addEventListener('click', () => {
+            this.redoCode();
+        });
 
-            // Close dropdown when clicking outside
-            document.addEventListener('click', (e) => {
-                if (!userBtn.contains(e.target) && !userDropdown.contains(e.target)) {
-                    userDropdown.classList.remove('show');
-                }
-            });
+        document.getElementById('copyBtn').addEventListener('click', () => {
+            this.copyCode();
+        });
+
+        document.getElementById('pasteBtn').addEventListener('click', () => {
+            this.pasteCode();
+        });
+
+        document.getElementById('formatBtn').addEventListener('click', () => {
+            this.formatAdvancedCode();
+        });
+
+        document.getElementById('suggestBtn').addEventListener('click', () => {
+            this.showSuggestions();
+        });
+
+        document.getElementById('cancelEdit').addEventListener('click', () => {
+            this.closeCodeEditor();
+        });
+
+        document.getElementById('saveCode').addEventListener('click', () => {
+            this.saveCodeFromEditor();
+        });
+
+        // Track code changes for undo/redo
+        const advancedEditor = document.getElementById('advancedCodeEditor');
+        advancedEditor.addEventListener('input', () => {
+            this.saveToHistory(advancedEditor.value);
+        });
+    }
+
+    saveToHistory(code) {
+        this.codeHistory = this.codeHistory.slice(0, this.historyIndex + 1);
+        this.codeHistory.push(code);
+        this.historyIndex = this.codeHistory.length - 1;
+    }
+
+    undoCode() {
+        if (this.historyIndex > 0) {
+            this.historyIndex--;
+            document.getElementById('advancedCodeEditor').value = this.codeHistory[this.historyIndex];
         }
     }
 
-    setupToggleSwitches() {
-        // Setup all toggle switches in the command editor
-        const toggles = document.querySelectorAll('.toggle-switch input');
-        toggles.forEach(toggle => {
-            toggle.addEventListener('change', (e) => {
-                const isChecked = e.target.checked;
-                const toggleId = e.target.id;
-                
-                // Handle different toggle functionalities
-                switch (toggleId) {
-                    case 'waitForAnswer':
-                        this.toggleAnswerHandler(isChecked);
-                        break;
-                    case 'commandActive':
-                        this.toggleCommandStatus(isChecked);
-                        break;
-                    default:
-                        console.log(`Toggle ${toggleId} changed to:`, isChecked);
-                }
-                
-                this.showSuccess(`Setting ${isChecked ? 'enabled' : 'disabled'}`);
-            });
+    redoCode() {
+        if (this.historyIndex < this.codeHistory.length - 1) {
+            this.historyIndex++;
+            document.getElementById('advancedCodeEditor').value = this.codeHistory[this.historyIndex];
+        }
+    }
+
+    copyCode() {
+        const code = document.getElementById('advancedCodeEditor').value;
+        navigator.clipboard.writeText(code).then(() => {
+            this.showSuccess('Code copied to clipboard!');
         });
+    }
+
+    async pasteCode() {
+        try {
+            const text = await navigator.clipboard.readText();
+            const editor = document.getElementById('advancedCodeEditor');
+            const start = editor.selectionStart;
+            const end = editor.selectionEnd;
+            editor.value = editor.value.substring(0, start) + text + editor.value.substring(end);
+            editor.selectionStart = editor.selectionEnd = start + text.length;
+            editor.focus();
+            this.saveToHistory(editor.value);
+        } catch (err) {
+            this.showError('Failed to paste from clipboard');
+        }
+    }
+
+    formatAdvancedCode() {
+        const editor = document.getElementById('advancedCodeEditor');
+        const code = editor.value;
+        
+        try {
+            // Simple formatting - in a real app you might use a proper formatter
+            const formatted = code
+                .replace(/\n\s*\n/g, '\n\n')
+                .replace(/\{\s*\n/g, '{\n')
+                .replace(/\n\s*\}/g, '\n}')
+                .replace(/;\s*\n/g, ';\n')
+                .replace(/\s+/g, ' ')
+                .replace(/([{};])\s+/g, '$1\n')
+                .trim();
+            
+            editor.value = formatted;
+            this.saveToHistory(formatted);
+            this.showSuccess('Code formatted!');
+        } catch (error) {
+            this.showError('Formatting failed');
+        }
+    }
+
+    showSuggestions() {
+        const code = document.getElementById('advancedCodeEditor').value;
+        const suggestionsPanel = document.getElementById('suggestionsPanel');
+        const suggestionsList = document.getElementById('suggestionsList');
+        
+        // Simple suggestions based on common patterns
+        const suggestions = this.generateSuggestions(code);
+        
+        if (suggestions.length > 0) {
+            suggestionsList.innerHTML = suggestions.map(suggestion => `
+                <div class="suggestion-item" onclick="commandEditor.applySuggestion('${suggestion.code.replace(/'/g, "\\'")}')">
+                    <strong>${suggestion.title}</strong>
+                    <p>${suggestion.description}</p>
+                </div>
+            `).join('');
+            suggestionsPanel.style.display = 'block';
+        } else {
+            suggestionsPanel.style.display = 'none';
+            this.showInfo('No suggestions available for this code');
+        }
+    }
+
+    generateSuggestions(code) {
+        const suggestions = [];
+        
+        if (!code.includes('sendMessage')) {
+            suggestions.push({
+                title: 'Add sendMessage',
+                description: 'Send a message to the user',
+                code: 'sendMessage("Hello! This is your bot speaking.");'
+            });
+        }
+        
+        if (!code.includes('getUser')) {
+            suggestions.push({
+                title: 'Get user info',
+                description: 'Retrieve information about the user',
+                code: 'const user = getUser();\nsendMessage(`Hello ${user.first_name}!`);'
+            });
+        }
+        
+        if (code.includes('HTTP') && !code.includes('try')) {
+            suggestions.push({
+                title: 'Add error handling',
+                description: 'Wrap HTTP calls in try-catch',
+                code: 'try {\n  // Your HTTP code here\n} catch (error) {\n  sendMessage("Error: " + error.message);\n}'
+            });
+        }
+        
+        return suggestions;
+    }
+
+    applySuggestion(code) {
+        const editor = document.getElementById('advancedCodeEditor');
+        const currentCode = editor.value;
+        editor.value = currentCode + '\n\n' + code;
+        this.saveToHistory(editor.value);
+        document.getElementById('suggestionsPanel').style.display = 'none';
+    }
+
+    openCodeEditor() {
+        const code = document.getElementById('commandCode').value;
+        document.getElementById('advancedCodeEditor').value = code;
+        this.codeHistory = [code];
+        this.historyIndex = 0;
+        document.getElementById('codeEditorModal').style.display = 'flex';
+    }
+
+    closeCodeEditor() {
+        document.getElementById('codeEditorModal').style.display = 'none';
+        document.getElementById('suggestionsPanel').style.display = 'none';
+    }
+
+    saveCodeFromEditor() {
+        const code = document.getElementById('advancedCodeEditor').value;
+        document.getElementById('commandCode').value = code;
+        this.closeCodeEditor();
+        this.showSuccess('Code saved from editor!');
     }
 
     setupModalEvents() {
-        const modal = document.getElementById('testCommandModal');
-        const closeBtn = document.getElementById('closeTestCommand');
-        const modalClose = document.querySelector('.modal-close');
-
-        if (closeBtn) {
-            closeBtn.addEventListener('click', () => {
-                modal.style.display = 'none';
-            });
-        }
-
-        if (modalClose) {
-            modalClose.addEventListener('click', () => {
-                modal.style.display = 'none';
-            });
-        }
+        const modals = ['testCommandModal', 'codeEditorModal'];
+        
+        modals.forEach(modalId => {
+            const modal = document.getElementById(modalId);
+            const closeBtn = modal?.querySelector('.modal-close');
+            const closeActionBtn = modal?.querySelector(`#close${modalId.replace('Modal', '')}`);
+            
+            if (closeBtn) {
+                closeBtn.addEventListener('click', () => {
+                    modal.style.display = 'none';
+                });
+            }
+            
+            if (closeActionBtn) {
+                closeActionBtn.addEventListener('click', () => {
+                    modal.style.display = 'none';
+                });
+            }
+        });
 
         window.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                modal.style.display = 'none';
+            if (e.target.classList.contains('modal')) {
+                e.target.style.display = 'none';
             }
-        });
-    }
-
-    setupQuickTemplates() {
-        // Predefined quick templates
-        this.templates = {
-            welcome: {
-                name: "Welcome Message",
-                pattern: "/start",
-                description: "Send a welcome message to new users",
-                code: `// Welcome command template
-const user = getUser();
-const welcomeMessage = \`👋 Hello \${user.first_name}!
-
-Welcome to our bot! I'm here to help you with various tasks.
-
-🤖 *Available Commands:*
-/start - Show this welcome message
-/help - Get help information
-
-Thank you for using our bot! 😊\`;
-
-return sendMessage(welcomeMessage);`,
-                icon: "👋",
-                tags: ["welcome", "basic"]
-            },
-            echo: {
-                name: "Echo Command",
-                pattern: "/echo",
-                description: "Repeat user's message back",
-                code: `// Echo command - repeats user's message
-const message = getMessage();
-const text = message.text;
-
-// Remove command part and get the text to echo
-const echoText = text.replace('/echo', '').trim();
-
-if (!echoText) {
-    return sendMessage('Please provide some text after /echo command.\\\\nExample: /echo Hello World!');
-}
-
-return sendMessage(\`🔊 Echo: \${echoText}\`);`,
-                icon: "🔊",
-                tags: ["utility", "basic"]
-            },
-            buttons: {
-                name: "Inline Buttons",
-                pattern: "/menu",
-                description: "Show message with inline keyboard buttons",
-                code: `// Message with inline buttons
-const keyboard = {
-    inline_keyboard: [
-        [
-            { text: '✅ Option 1', callback_data: 'option_1' },
-            { text: '🔘 Option 2', callback_data: 'option_2' }
-        ],
-        [
-            { text: '🌐 Visit Website', url: 'https://example.com' }
-        ]
-    ]
-};
-
-return sendMessage('Please choose an option:', {
-    reply_markup: keyboard
-});`,
-                icon: "🔄",
-                tags: ["interactive", "buttons"]
-            },
-            interactive: {
-                name: "Wait for Answer",
-                pattern: "/survey",
-                description: "Ask question and wait for user response",
-                code: `// Command that waits for user answer
-const user = getUser();
-
-// Send initial message
-await sendMessage(\`Hello \${user.first_name}! Please tell me your favorite color:\`);
-
-// The bot will now wait for user's response
-// Answer handler will process the response`,
-                answerHandler: `// Handle user's answer
-const answer = getAnswer();
-const user = getUser();
-
-// Process the answer here
-return sendMessage(\`🎨 Great choice! \${answer} is a beautiful color, \${user.first_name}!\`);`,
-                icon: "⏳",
-                tags: ["interactive", "advanced"],
-                waitForAnswer: true
-            },
-            http: {
-                name: "HTTP Request",
-                pattern: "/http",
-                description: "Make HTTP requests to external APIs",
-                code: `// HTTP Request example
-try {
-    const response = await HTTP.get({
-        url: "https://jsonplaceholder.typicode.com/posts/1"
-    });
-    
-    return sendMessage(\`✅ HTTP Request Success! Response: \${JSON.stringify(response)}\`);
-} catch (error) {
-    return sendMessage(\`❌ Request failed: \${error.message}\`);
-}`,
-                icon: "🌐",
-                tags: ["advanced", "api"]
-            },
-            media: {
-                name: "Send Media",
-                pattern: "/media",
-                description: "Send photos, documents, and other media",
-                code: `// Send media files
-const user = getUser();
-
-// Send photo
-await sendPhoto("https://via.placeholder.com/150", {
-    caption: "This is a sample photo"
-});
-
-// Send document
-await sendDocument("https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf", {
-    caption: "Sample PDF document"
-});
-
-return sendMessage("Media files sent successfully!");`,
-                icon: "📷",
-                tags: ["media", "advanced"]
-            }
-        };
-
-        this.renderTemplates();
-    }
-
-    setupTemplateEvents() {
-        document.addEventListener('click', (e) => {
-            const templateCard = e.target.closest('.template-card');
-            if (templateCard) {
-                const templateName = templateCard.dataset.template;
-                this.applyTemplate(templateName);
-            }
-        });
-    }
-
-    renderTemplates() {
-        const templatesGrid = document.getElementById('templatesGrid');
-        if (!templatesGrid) return;
-
-        templatesGrid.innerHTML = Object.keys(this.templates).map(templateKey => {
-            const template = this.templates[templateKey];
-            return `
-                <div class="template-card" data-template="${templateKey}">
-                    <div class="template-icon">${template.icon}</div>
-                    <h4>${template.name}</h4>
-                    <p>${template.description}</p>
-                    <div class="template-tags">
-                        ${template.tags.map(tag => `<span class="template-tag">${tag}</span>`).join('')}
-                    </div>
-                </div>
-            `;
-        }).join('');
-    }
-
-    applyTemplate(templateName) {
-        const template = this.templates[templateName];
-        if (!template) return;
-
-        // Create new command with template
-        this.currentCommand = {
-            id: 'new',
-            name: template.name,
-            pattern: template.pattern,
-            description: template.description,
-            code: template.code,
-            is_active: true,
-            wait_for_answer: template.waitForAnswer || false,
-            answer_handler: template.answerHandler || ''
-        };
-
-        this.showCommandEditor();
-        this.populateCommandForm();
-        
-        // Show success message
-        this.showSuccess(`"${template.name}" template applied!`);
-        
-        // Scroll to editor
-        document.getElementById('commandEditor').scrollIntoView({ 
-            behavior: 'smooth',
-            block: 'start'
         });
     }
 
     toggleAnswerHandler(show) {
         const section = document.getElementById('answerHandlerSection');
-        if (show) {
-            section.style.display = 'block';
-            // Add default answer handler if empty
-            if (!document.getElementById('answerHandler').value.trim()) {
-                document.getElementById('answerHandler').value = `// Handle user's answer
-const answer = getAnswer();
-const user = getUser();
-
-// Process the answer here
-return sendMessage(\`✅ Thank you for your answer: "\${answer}"\`);`;
-            }
-        } else {
-            section.style.display = 'none';
-        }
-    }
-
-    toggleCommandStatus(isActive) {
-        if (this.currentCommand) {
-            this.currentCommand.is_active = isActive;
-            this.showSuccess(`Command ${isActive ? 'activated' : 'deactivated'}`);
-        }
+        section.style.display = show ? 'block' : 'none';
     }
 
     async loadBotInfo() {
@@ -506,14 +432,12 @@ return sendMessage(\`✅ Thank you for your answer: "\${answer}"\`);`;
                         <span class="command-name">${this.escapeHtml(command.name)}</span>
                         <span class="command-pattern">${this.escapeHtml(command.pattern)}</span>
                     </div>
-                    <p class="command-description">${this.escapeHtml(command.description || 'No description')}</p>
                     <div class="command-meta">
                         <span class="command-status ${isActive ? 'active' : 'inactive'}">
                             <i class="fas fa-circle"></i>
                             ${isActive ? 'Active' : 'Inactive'}
                         </span>
                         ${hasAnswerHandler ? '<span class="command-feature">⏳ Waits</span>' : ''}
-                        ${command.wait_for_answer ? '<span class="command-feature">💬 Interactive</span>' : ''}
                     </div>
                 </div>
             </div>
@@ -532,11 +456,9 @@ return sendMessage(\`✅ Thank you for your answer: "\${answer}"\`);`;
         commandItems.forEach(item => {
             const commandName = item.querySelector('.command-name').textContent.toLowerCase();
             const commandPattern = item.querySelector('.command-pattern').textContent.toLowerCase();
-            const commandDesc = item.querySelector('.command-description').textContent.toLowerCase();
             
             const isVisible = commandName.includes(lowerSearch) || 
-                            commandPattern.includes(lowerSearch) ||
-                            commandDesc.includes(lowerSearch);
+                            commandPattern.includes(lowerSearch);
             
             item.style.display = isVisible ? 'block' : 'none';
         });
@@ -547,7 +469,6 @@ return sendMessage(\`✅ Thank you for your answer: "\${answer}"\`);`;
             id: 'new',
             name: 'New Command',
             pattern: '/start',
-            description: '',
             code: '// Write your command code here\nconst user = getUser();\nreturn sendMessage(`Hello ${user.first_name}!`);',
             is_active: true,
             wait_for_answer: false,
@@ -557,14 +478,12 @@ return sendMessage(\`✅ Thank you for your answer: "\${answer}"\`);`;
         this.showCommandEditor();
         this.populateCommandForm();
         
-        // Focus on name field
         setTimeout(() => {
-            document.getElementById('commandName').focus();
+            document.getElementById('moreCommands').focus();
         }, 100);
     }
 
     async selectCommand(commandId) {
-        // Don't reload if already selected
         if (this.currentCommand?.id === commandId) return;
 
         this.showLoading(true);
@@ -584,7 +503,6 @@ return sendMessage(\`✅ Thank you for your answer: "\${answer}"\`);`;
                 this.showCommandEditor();
                 this.populateCommandForm();
                 
-                // Update active state in list
                 document.querySelectorAll('.command-item').forEach(item => {
                     item.classList.remove('active');
                 });
@@ -592,7 +510,6 @@ return sendMessage(\`✅ Thank you for your answer: "\${answer}"\`);`;
                 const selectedItem = document.querySelector(`[onclick*="${commandId}"]`);
                 if (selectedItem) {
                     selectedItem.classList.add('active');
-                    // Scroll into view
                     selectedItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 }
             } else {
@@ -619,34 +536,26 @@ return sendMessage(\`✅ Thank you for your answer: "\${answer}"\`);`;
     populateCommandForm() {
         if (!this.currentCommand) return;
 
-        // Basic fields
-        document.getElementById('commandName').value = this.currentCommand.name;
-        document.getElementById('commandPattern').value = this.currentCommand.pattern;
-        document.getElementById('commandDescription').value = this.currentCommand.description || '';
+        document.getElementById('moreCommands').value = this.currentCommand.pattern;
         document.getElementById('commandCode').value = this.currentCommand.code || '';
         
-        // Wait for answer toggle
         const waitToggle = document.getElementById('waitForAnswer');
         if (waitToggle) {
             waitToggle.checked = this.currentCommand.wait_for_answer || false;
             this.toggleAnswerHandler(waitToggle.checked);
         }
         
-        // Answer handler
         document.getElementById('answerHandler').value = this.currentCommand.answer_handler || '';
         
-        // Command active toggle
         const activeToggle = document.getElementById('commandActive');
         if (activeToggle) {
             activeToggle.checked = this.currentCommand.is_active !== false;
         }
         
-        // Update UI
         document.getElementById('currentCommandName').textContent = this.currentCommand.name;
         document.getElementById('commandStatus').textContent = this.currentCommand.is_active ? 'Active' : 'Inactive';
         document.getElementById('commandStatus').className = `status-badge ${this.currentCommand.is_active ? 'active' : 'inactive'}`;
         
-        // Update button states
         this.updateButtonStates();
     }
 
@@ -666,41 +575,50 @@ return sendMessage(\`✅ Thank you for your answer: "\${answer}"\`);`;
         }
     }
 
+    formatCode() {
+        const codeTextarea = document.getElementById('commandCode');
+        const code = codeTextarea.value;
+        
+        try {
+            // Simple formatting
+            const formatted = code
+                .replace(/\n\s*\n/g, '\n\n')
+                .replace(/\{\s*\n/g, '{\n')
+                .replace(/\n\s*\}/g, '\n}')
+                .replace(/;\s*\n/g, ';\n')
+                .trim();
+            
+            codeTextarea.value = formatted;
+            this.showSuccess('Code formatted!');
+        } catch (error) {
+            this.showError('Formatting failed');
+        }
+    }
+
     async saveCommand() {
         if (!this.currentCommand || !this.currentBot) {
             this.showError('No command selected or bot not loaded');
             return false;
         }
 
+        const moreCommands = document.getElementById('moreCommands').value.trim();
+        const commands = moreCommands.split(',').map(cmd => cmd.trim()).filter(cmd => cmd);
+        
+        if (commands.length === 0) {
+            this.showError('Please enter at least one command');
+            document.getElementById('moreCommands').focus();
+            return false;
+        }
+
         const formData = {
-            name: document.getElementById('commandName').value.trim(),
-            pattern: document.getElementById('commandPattern').value.trim(),
-            description: document.getElementById('commandDescription').value.trim(),
+            name: commands[0], // Use first command as name
+            pattern: commands.join(', '), // Join all commands
             code: document.getElementById('commandCode').value.trim(),
             waitForAnswer: document.getElementById('waitForAnswer').checked,
             answerHandler: document.getElementById('waitForAnswer').checked ? 
                           document.getElementById('answerHandler').value.trim() : '',
             botToken: this.currentBot.token
         };
-
-        // Enhanced Validation
-        if (!formData.name) {
-            this.showError('Command name is required');
-            document.getElementById('commandName').focus();
-            return false;
-        }
-
-        if (!formData.pattern) {
-            this.showError('Command pattern is required');
-            document.getElementById('commandPattern').focus();
-            return false;
-        }
-
-        if (!formData.pattern.startsWith('/')) {
-            this.showError('Command pattern should start with /');
-            document.getElementById('commandPattern').focus();
-            return false;
-        }
 
         if (!formData.code) {
             this.showError('Command code is required');
@@ -744,15 +662,12 @@ return sendMessage(\`✅ Thank you for your answer: "\${answer}"\`);`;
             if (response.ok) {
                 this.showSuccess('Command saved successfully!');
                 
-                // Reload commands to get updated list
                 await this.loadCommands();
                 
-                // Select the saved command
                 if (data.command) {
                     this.currentCommand = data.command;
                     this.populateCommandForm();
                     
-                    // Update the command in the list
                     const commandItem = document.querySelector(`[onclick*="${data.command.id}"]`);
                     if (commandItem) {
                         commandItem.outerHTML = this.getCommandItemHTML(data.command);
@@ -845,14 +760,6 @@ return sendMessage(\`✅ Thank you for your answer: "\${answer}"\`);`;
                             <p><strong>Bot:</strong> ${this.currentBot.name}</p>
                         </div>
                         <p class="test-message">Check your Telegram bot for the test results.</p>
-                        <div class="test-tips">
-                            <p><strong>💡 Tips:</strong></p>
-                            <ul>
-                                <li>Make sure your bot is active</li>
-                                <li>Check admin chat ID is set correctly</li>
-                                <li>Wait a few seconds for the response</li>
-                            </ul>
-                        </div>
                     </div>
                 `);
             } else {
@@ -860,15 +767,6 @@ return sendMessage(\`✅ Thank you for your answer: "\${answer}"\`);`;
                     <div class="test-error">
                         <h4>❌ Test Failed</h4>
                         <p><strong>Error:</strong> ${data.error || 'Unknown error occurred'}</p>
-                        <div class="troubleshooting">
-                            <p><strong>🔧 Troubleshooting:</strong></p>
-                            <ul>
-                                <li>Verify bot token is valid</li>
-                                <li>Check admin settings</li>
-                                <li>Review command code for errors</li>
-                                <li>Check server logs for details</li>
-                            </ul>
-                        </div>
                     </div>
                 `);
             }
@@ -877,7 +775,6 @@ return sendMessage(\`✅ Thank you for your answer: "\${answer}"\`);`;
                 <div class="test-error">
                     <h4>❌ Network Error</h4>
                     <p>Failed to connect to server: ${error.message}</p>
-                    <p>Please check your internet connection and try again.</p>
                 </div>
             `);
         } finally {
@@ -922,15 +819,18 @@ return sendMessage(\`✅ Thank you for your answer: "\${answer}"\`);`;
     }
 
     showError(message) {
-        this.showNotification(message, 'error');
+        commonApp?.showError(message) || this.showNotification(message, 'error');
     }
 
     showSuccess(message) {
-        this.showNotification(message, 'success');
+        commonApp?.showSuccess(message) || this.showNotification(message, 'success');
+    }
+
+    showInfo(message) {
+        this.showNotification(message, 'info');
     }
 
     showNotification(message, type = 'info') {
-        // Remove existing notifications
         const existing = document.querySelector('.notification');
         if (existing) existing.remove();
 
