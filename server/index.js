@@ -24,18 +24,19 @@ console.log('🌐 Base URL:', BASE_URL);
 // Enhanced CORS configuration for production
 app.use(cors({
     origin: function (origin, callback) {
-        // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin) return callback(null, true);
-        
         const allowedOrigins = [
             'https://bot-maker-bd.onrender.com',
             'http://localhost:3000',
             'http://localhost:8080'
         ];
         
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
         if (allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
+            console.log('🚫 CORS blocked origin:', origin);
             callback(new Error('Not allowed by CORS'));
         }
     },
@@ -118,49 +119,6 @@ app.post('/api/webhook/:token', async (req, res) => {
         console.error('❌ Webhook error:', error);
         // Still respond with 200 to prevent Telegram from retrying
         res.status(200).send('OK');
-    }
-});
-
-// 🔥 Test webhook endpoint (for debugging)
-app.get('/api/webhook/test/:token', async (req, res) => {
-    try {
-        const { token } = req.params;
-        
-        console.log('🧪 Testing webhook for bot:', token.substring(0, 10) + '...');
-        
-        // Create a test update
-        const testUpdate = {
-            update_id: 123456789,
-            message: {
-                message_id: 1,
-                from: {
-                    id: 123456789,
-                    is_bot: false,
-                    first_name: 'Test',
-                    username: 'testuser'
-                },
-                chat: {
-                    id: 123456789,
-                    first_name: 'Test',
-                    username: 'testuser',
-                    type: 'private'
-                },
-                date: Math.floor(Date.now() / 1000),
-                text: '/start'
-            }
-        };
-        
-        const botManager = require('./core/bot-manager');
-        await botManager.handleBotUpdate(token, testUpdate);
-        
-        res.json({
-            success: true,
-            message: 'Test webhook processed successfully'
-        });
-        
-    } catch (error) {
-        console.error('❌ Test webhook error:', error);
-        res.status(500).json({ error: error.message });
     }
 });
 
