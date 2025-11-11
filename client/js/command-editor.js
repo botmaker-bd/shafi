@@ -691,6 +691,9 @@ return sendMessage(\`🎨 Great choice! \${answer} is a beautiful color, \${user
         }
     }
 
+    // class CommandEditor {
+    // // ... previous code remains same ...
+
     getDefaultTemplate(templateName) {
         const templates = {
             welcome: `// Welcome command template
@@ -739,6 +742,102 @@ return sendMessage('Please choose an option:', {
     reply_markup: keyboard
 });`,
 
+            keyboard: `// Keyboard buttons
+const keyboard = {
+    resize_keyboard: true,
+    keyboard: [
+        [{ text: "BUTTON 1" }],
+        [{ text: "BUTTON 2" }, { text: "BUTTON 3" }]
+    ]
+};
+
+return sendMessage('Choose an option:', {
+    reply_markup: keyboard
+});`,
+
+            webapp: `// Web App button
+const LINK = "https://te.legra.ph/";
+return sendMessage('Open Web App:', {
+    reply_markup: {
+        inline_keyboard: [
+            [{ text: "WEB_APP", web_app: { url: LINK }}]
+        ]
+    }
+});`,
+
+            http_request: `// HTTP Request example
+const content = null; // Set your content here
+
+if (!content) {
+    // Make HTTP GET request
+    const response = await HTTP.get({
+        url: "https://jsonplaceholder.typicode.com/posts/1"
+    });
+    
+    return sendMessage(\`✅ HTTP Request Success! Response: \${JSON.stringify(response)}\`);
+} else {
+    return sendMessage(content);
+}`,
+
+            delete_message: `// Delete bot's previous message
+const chatId = getChatId();
+const messageId = getMessage().message_id;
+
+// Delete user's message
+await deleteMessage({
+    chat_id: chatId,
+    message_id: messageId
+});
+
+return sendMessage("Message deleted successfully!");`,
+
+            media: `// Send media files
+const user = getUser();
+
+// Send photo
+await sendPhoto("https://via.placeholder.com/150", {
+    caption: "This is a sample photo"
+});
+
+// Send document
+await sendDocument("https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf", {
+    caption: "Sample PDF document"
+});
+
+// Send sticker
+await sendSticker("https://www.gstatic.com/webp/gallery/1.sm.webp");
+
+return sendMessage("Media files sent successfully!");`,
+
+            typing: `// Show typing indicator
+const chatId = getChatId();
+
+// Show typing action
+await sendChatAction("typing");
+await wait(2000); // Wait 2 seconds
+
+return sendMessage("I was typing...");`,
+
+            dice: `// Send dice emoji
+await sendDice("🎯");
+await wait(2000);
+
+return sendMessage("Let's play a game!");`,
+
+            remove_keyboard: `// Remove keyboard
+return sendMessage('⌨️ Keyboard Removed', {
+    reply_markup: {
+        hide_keyboard: true
+    }
+});`,
+
+            channel_message: `// Send message to channel
+const channelUsername = "@yourchannel"; // Replace with your channel username
+
+return sendMessage("Hello Channel!", {
+    chat_id: channelUsername
+});`,
+
             wait: `// Command that waits for user answer
 const user = getUser();
 
@@ -746,13 +845,33 @@ const user = getUser();
 await sendMessage(\`Hello \${user.first_name}! Please tell me your favorite color:\`);
 
 // The bot will now wait for user's response
-// Make sure "Wait for Answer" is enabled and answer handler is set
+// Answer handler will process the response`,
 
-// Note: User's response will be processed by the answer handler code`
+            advanced_http: `// Advanced HTTP POST request
+try {
+    const response = await HTTP.post({
+        url: 'https://jsonplaceholder.typicode.com/posts',
+        data: {
+            title: 'foo',
+            body: 'bar',
+            userId: 1
+        },
+        headers: {
+            'Content-type': 'application/json'
+        }
+    });
+    
+    return sendMessage(\`✅ POST Request Success! ID: \${response.id}\`);
+} catch (error) {
+    return sendMessage(\`❌ Request failed: \${error.message}\`);
+}`
         };
 
         return templates[templateName] || templates.welcome;
     }
+
+    // ... rest of the code remains same ...
+// }
 
     formatCode() {
         const codeTextarea = document.getElementById('commandCode');
