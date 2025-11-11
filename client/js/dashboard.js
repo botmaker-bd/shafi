@@ -9,7 +9,6 @@ class DashboardManager {
         await this.checkAuth();
         this.setupEventListeners();
         await this.loadDashboardData();
-        this.setupUserMenu();
     }
 
     async checkAuth() {
@@ -41,13 +40,16 @@ class DashboardManager {
 
     updateUI() {
         if (this.user) {
-            document.getElementById('userName').textContent = this.user.email.split('@')[0];
-            document.getElementById('userEmail').textContent = this.user.email;
+            const userName = document.getElementById('userName');
+            const userEmail = document.getElementById('userEmail');
+            
+            if (userName) userName.textContent = this.user.email.split('@')[0];
+            if (userEmail) userEmail.textContent = this.user.email;
         }
     }
 
     setupEventListeners() {
-        document.getElementById('logoutBtn').addEventListener('click', (e) => {
+        document.getElementById('logoutBtn')?.addEventListener('click', (e) => {
             e.preventDefault();
             this.logout();
         });
@@ -57,25 +59,9 @@ class DashboardManager {
             this.testAllBots();
         });
 
-        document.getElementById('refreshBots')?.addEventListener('click', () => {
+        document.getElementById('refreshDashboard')?.addEventListener('click', () => {
             this.loadDashboardData();
         });
-    }
-
-    setupUserMenu() {
-        const userBtn = document.getElementById('userMenuBtn');
-        const userDropdown = document.getElementById('userDropdown');
-
-        if (userBtn && userDropdown) {
-            userBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                userDropdown.classList.toggle('show');
-            });
-
-            document.addEventListener('click', () => {
-                userDropdown.classList.remove('show');
-            });
-        }
     }
 
     async loadDashboardData() {
@@ -191,13 +177,19 @@ class DashboardManager {
         const totalBots = this.bots.length;
         const activeBots = this.bots.filter(bot => bot.is_active).length;
         
-        document.getElementById('totalBots').textContent = totalBots;
-        document.getElementById('activeBots').textContent = activeBots;
+        const totalBotsEl = document.getElementById('totalBots');
+        const activeBotsEl = document.getElementById('activeBots');
+        
+        if (totalBotsEl) totalBotsEl.textContent = totalBots;
+        if (activeBotsEl) activeBotsEl.textContent = activeBots;
     }
 
     updateStats(stats) {
-        document.getElementById('totalCommands').textContent = stats.totalCommands || 0;
-        document.getElementById('todayMessages').textContent = stats.todayMessages || 0;
+        const totalCommandsEl = document.getElementById('totalCommands');
+        const todayMessagesEl = document.getElementById('todayMessages');
+        
+        if (totalCommandsEl) totalCommandsEl.textContent = stats.totalCommands || 0;
+        if (todayMessagesEl) todayMessagesEl.textContent = stats.todayMessages || 0;
     }
 
     async removeBot(botId) {
@@ -279,11 +271,11 @@ class DashboardManager {
     }
 
     showError(message) {
-        this.showNotification(message, 'error');
+        commonApp?.showError(message) || this.showNotification(message, 'error');
     }
 
     showSuccess(message) {
-        this.showNotification(message, 'success');
+        commonApp?.showSuccess(message) || this.showNotification(message, 'success');
     }
 
     showNotification(message, type = 'info') {
