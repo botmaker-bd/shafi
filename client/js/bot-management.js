@@ -46,29 +46,24 @@ class BotManager {
     }
 
     setupEventListeners() {
-        // Add bot form
         document.getElementById('addBotForm').addEventListener('submit', (e) => {
             e.preventDefault();
             this.addNewBot();
         });
 
-        // Test token button
         document.getElementById('testToken').addEventListener('click', () => {
             this.testBotToken();
         });
 
-        // Refresh bots
         document.getElementById('refreshBots').addEventListener('click', () => {
             this.loadBots();
         });
 
-        // Logout
         document.getElementById('logoutBtn').addEventListener('click', (e) => {
             e.preventDefault();
             this.logout();
         });
 
-        // Modal events
         this.setupModalEvents();
     }
 
@@ -105,7 +100,6 @@ class BotManager {
             });
         }
 
-        // Close modal when clicking outside
         window.addEventListener('click', (e) => {
             if (e.target === modal) {
                 modal.style.display = 'none';
@@ -464,7 +458,6 @@ class BotManager {
     }
 }
 
-// Initialize bot manager
 let botManager;
 document.addEventListener('DOMContentLoaded', () => {
     botManager = new BotManager();
