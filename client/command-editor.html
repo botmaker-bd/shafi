@@ -106,16 +106,6 @@
             </div>
 
             <div class="editor-main">
-                <div id="noCommandSelected" class="no-selection">
-                    <div class="no-selection-icon">
-                        <i class="fas fa-code"></i>
-                    </div>
-                    <h3>Select a Command</h3>
-                    <p>Choose a command from the sidebar or create a new one to start editing</p>
-                    <button class="btn btn-primary" id="createFirstCommand">
-                        <i class="fas fa-plus"></i> Create New Command
-                    </button>
-                </div>
 
                 <div id="commandEditor" class="command-editor" style="display: none;">
                     <div class="editor-header">
@@ -166,16 +156,6 @@
                                 </div>
                             </label>
                             
-                            <label class="toggle-label">
-                                <div class="toggle-text">
-                                    <span class="toggle-title">Command Active</span>
-                                    <span class="toggle-description">Enable or disable this command</span>
-                                </div>
-                                <div class="toggle-switch">
-                                    <input type="checkbox" id="commandActive" checked>
-                                    <span class="toggle-slider"></span>
-                                </div>
-                            </label>
                         </div>
 
                         <div class="form-group">
@@ -215,15 +195,15 @@
                                     <button type="button" class="btn-code" id="openEditor">
                                         <i class="fas fa-edit"></i> Open Editor
                                     </button>
-                                    <button type="button" class="btn-code" id="formatCode">
-                                        <i class="fas fa-indent"></i> Format
-                                    </button>
+                                    <!-- <button type="button" class="btn-code" id="formatCode"> -->
+                                        <!-- <i class="fas fa-indent"></i> Format -->
+                                    <!-- </button> -->
                                 </div>
                             </div>
                             <textarea id="commandCode" 
                                       placeholder="Write your command code here..."></textarea>
                             <div class="code-help">
-                                <strong>Available functions:</strong> sendMessage(), sendPhoto(), getUser(), getChatId(), isTest(), wait()
+                                <strong>Available functions:</strong> sendMessage(), sendPhoto(), getUser(), getChatId(), isTest(), wait() etc..
                             </div>
                         </div>
                     </form>
@@ -254,7 +234,7 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" id="closeTestCommand">Close</button>
-                <button class="btn btn-primary" id="runAnotherTest">Run Another Test</button>
+                <!-- <button class="btn btn-primary" id="runAnotherTest">Run Another Test</button> -->
             </div>
         </div>
     </div>
