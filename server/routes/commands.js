@@ -4,7 +4,6 @@ const botManager = require('../core/bot-manager');
 
 const router = express.Router();
 
-// Get commands for bot
 router.get('/bot/:botToken', async (req, res) => {
     try {
         const { botToken } = req.params;
@@ -28,7 +27,6 @@ router.get('/bot/:botToken', async (req, res) => {
     }
 });
 
-// Get single command
 router.get('/:commandId', async (req, res) => {
     try {
         const { commandId } = req.params;
@@ -54,7 +52,6 @@ router.get('/:commandId', async (req, res) => {
     }
 });
 
-// Add new command
 router.post('/', async (req, res) => {
     try {
         const { botToken, name, pattern, code, description, waitForAnswer, answerHandler } = req.body;
@@ -63,7 +60,6 @@ router.post('/', async (req, res) => {
             return res.status(400).json({ error: 'Bot token, name, pattern and code are required' });
         }
 
-        // Check for duplicate command pattern
         const { data: existingCommand } = await supabase
             .from('commands')
             .select('id')
@@ -75,7 +71,6 @@ router.post('/', async (req, res) => {
             return res.status(400).json({ error: 'A command with this pattern already exists' });
         }
 
-        // Insert command
         const { data: command, error } = await supabase
             .from('commands')
             .insert([{
@@ -93,7 +88,6 @@ router.post('/', async (req, res) => {
 
         if (error) throw error;
 
-        // Update command cache
         await botManager.updateCommandCache(botToken);
 
         res.json({
@@ -108,7 +102,6 @@ router.post('/', async (req, res) => {
     }
 });
 
-// Update command
 router.put('/:commandId', async (req, res) => {
     try {
         const { commandId } = req.params;
@@ -118,7 +111,6 @@ router.put('/:commandId', async (req, res) => {
             return res.status(400).json({ error: 'Name, pattern and code are required' });
         }
 
-        // Check for duplicate command pattern (excluding current command)
         const { data: existingCommand } = await supabase
             .from('commands')
             .select('id')
@@ -131,7 +123,6 @@ router.put('/:commandId', async (req, res) => {
             return res.status(400).json({ error: 'Another command with this pattern already exists' });
         }
 
-        // Update command
         const { data: command, error } = await supabase
             .from('commands')
             .update({
@@ -149,7 +140,6 @@ router.put('/:commandId', async (req, res) => {
 
         if (error) throw error;
 
-        // Update command cache
         if (botToken) {
             await botManager.updateCommandCache(botToken);
         }
@@ -166,25 +156,21 @@ router.put('/:commandId', async (req, res) => {
     }
 });
 
-// Delete command
 router.delete('/:commandId', async (req, res) => {
     try {
         const { commandId } = req.params;
 
-        // Get command details for cache update
         const { data: command } = await supabase
             .from('commands')
             .select('bot_token')
             .eq('id', commandId)
             .single();
 
-        // Delete command
         await supabase
             .from('commands')
             .delete()
             .eq('id', commandId);
 
-        // Update command cache
         if (command?.bot_token) {
             await botManager.updateCommandCache(command.bot_token);
         }
@@ -200,7 +186,6 @@ router.delete('/:commandId', async (req, res) => {
     }
 });
 
-// Test command execution
 router.post('/:commandId/test', async (req, res) => {
     try {
         const { commandId } = req.params;
@@ -210,7 +195,6 @@ router.post('/:commandId/test', async (req, res) => {
             return res.status(400).json({ error: 'Bot token is required for testing' });
         }
 
-        // Get command details
         const { data: command, error } = await supabase
             .from('commands')
             .select('*')
@@ -221,13 +205,11 @@ router.post('/:commandId/test', async (req, res) => {
             return res.status(404).json({ error: 'Command not found' });
         }
 
-        // Get bot instance
         const bot = botManager.getBotInstance(botToken);
         if (!bot) {
             return res.status(400).json({ error: 'Bot is not active. Please check if bot is properly initialized.' });
         }
 
-        // Get admin chat ID for testing
         const { data: adminSettings } = await supabase
             .from('admin_settings')
             .select('admin_chat_id')
@@ -237,7 +219,6 @@ router.post('/:commandId/test', async (req, res) => {
             return res.status(400).json({ error: 'Admin chat ID not set. Please set admin settings first.' });
         }
 
-        // Create test message
         const testMessage = {
             chat: { id: adminSettings.admin_chat_id },
             from: {
@@ -249,7 +230,6 @@ router.post('/:commandId/test', async (req, res) => {
             text: command.pattern
         };
 
-        // Execute command
         await botManager.executeCommand(bot, command, testMessage, true);
 
         res.json({
@@ -263,13 +243,11 @@ router.post('/:commandId/test', async (req, res) => {
     }
 });
 
-// Toggle command status
 router.patch('/:commandId/toggle', async (req, res) => {
     try {
         const { commandId } = req.params;
         const { isActive, botToken } = req.body;
 
-        // Update command status
         const { data: command, error } = await supabase
             .from('commands')
             .update({
@@ -282,7 +260,6 @@ router.patch('/:commandId/toggle', async (req, res) => {
 
         if (error) throw error;
 
-        // Update command cache
         if (botToken) {
             await botManager.updateCommandCache(botToken);
         }
