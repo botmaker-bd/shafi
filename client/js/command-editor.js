@@ -8,7 +8,7 @@ class EnhancedCommandEditor {
         this.historyIndex = -1;
         this.suggestionTimeout = null;
         this.suggestionsEnabled = true;
-        this.currentEditorType = null; // 'main' or 'answer'
+        this.currentEditorType = null;
         this.init();
     }
 
@@ -113,9 +113,11 @@ class EnhancedCommandEditor {
             this.openCodeEditor('answer');
         });
 
-        document.getElementById('formatCode').addEventListener('click', () => {
-            this.formatCode();
-        });
+        // Remove format button from main editor
+        const formatBtn = document.getElementById('formatCode');
+        if (formatBtn) {
+            formatBtn.style.display = 'none';
+        }
 
         // Modal events
         this.setupModalEvents();
@@ -128,37 +130,32 @@ class EnhancedCommandEditor {
         moreCommandsInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ',') {
                 e.preventDefault();
-                this.addCommandTag(moreCommandsInput.value.trim());
-                moreCommandsInput.value = '';
+                const command = moreCommandsInput.value.trim();
+                if (command) {
+                    this.addCommandTag(command);
+                    moreCommandsInput.value = '';
+                }
             }
         });
 
         moreCommandsInput.addEventListener('blur', () => {
-            if (moreCommandsInput.value.trim()) {
-                this.addCommandTag(moreCommandsInput.value.trim());
+            const command = moreCommandsInput.value.trim();
+            if (command) {
+                this.addCommandTag(command);
                 moreCommandsInput.value = '';
             }
+        });
+
+        // Allow any character for commands (not just starting with /)
+        moreCommandsInput.addEventListener('input', (e) => {
+            // Remove any validation that requires starting with /
         });
     }
 
     addCommandTag(command) {
         if (!command) return;
 
-        // Validate command format
-        if (!command.startsWith('/')) {
-            this.showError('Commands must start with /');
-            return;
-        }
-
-        // Check for duplicates
-        const existingTags = Array.from(document.querySelectorAll('.command-tag .tag-text'))
-            .map(tag => tag.textContent.trim());
-        
-        if (existingTags.includes(command)) {
-            this.showError(`Command "${command}" already exists`);
-            return;
-        }
-
+        // Remove duplicate check - allow any command format
         const commandsTags = document.getElementById('commandsTags');
         const tag = document.createElement('div');
         tag.className = 'command-tag';
@@ -265,10 +262,6 @@ class EnhancedCommandEditor {
                     case 'v':
                         // Allow default paste behavior
                         break;
-                    case 'f':
-                        e.preventDefault();
-                        this.formatAdvancedCode();
-                        break;
                 }
             }
             
@@ -276,7 +269,50 @@ class EnhancedCommandEditor {
             if (e.key === 'Escape') {
                 this.hideSuggestionList();
             }
+
+            // Tab key for indentation
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                this.insertTab();
+            }
         });
+
+        // Keep toolbar visible when scrolling
+        this.setupStickyToolbar();
+    }
+
+    setupStickyToolbar() {
+        const modalContent = document.querySelector('.fullscreen-content');
+        const toolbar = document.querySelector('.compact-header');
+        
+        if (modalContent && toolbar) {
+            modalContent.addEventListener('scroll', () => {
+                const scrollTop = modalContent.scrollTop;
+                if (scrollTop > 10) {
+                    toolbar.style.position = 'sticky';
+                    toolbar.style.top = '0';
+                    toolbar.style.zIndex = '1000';
+                    toolbar.style.background = 'var(--bg-primary)';
+                    toolbar.style.borderBottom = '1px solid var(--border-color)';
+                } else {
+                    toolbar.style.position = 'relative';
+                    toolbar.style.background = 'var(--bg-tertiary)';
+                }
+            });
+        }
+    }
+
+    insertTab() {
+        const editor = document.getElementById('advancedCodeEditor');
+        const start = editor.selectionStart;
+        const end = editor.selectionEnd;
+        
+        // Insert tab character
+        editor.value = editor.value.substring(0, start) + '  ' + editor.value.substring(end);
+        editor.selectionStart = editor.selectionEnd = start + 2;
+        editor.focus();
+        
+        this.saveToHistory(editor.value);
     }
 
     saveToHistory(code) {
@@ -366,47 +402,41 @@ class EnhancedCommandEditor {
     }
 
     formatJavaScript(code) {
-        // Enhanced JavaScript formatting
+        // Simple formatting that preserves existing structure
         let formatted = code;
-        
-        // Remove extra whitespace
-        formatted = formatted.replace(/\s+/g, ' ');
-        
-        // Add newlines after braces and semicolons
-        formatted = formatted.replace(/\{/g, ' {\n  ');
-        formatted = formatted.replace(/\}/g, '\n}\n');
-        formatted = formatted.replace(/;/g, ';\n');
-        
-        // Fix indentation
-        let lines = formatted.split('\n');
-        let indentLevel = 0;
-        
-        lines = lines.map(line => {
-            line = line.trim();
-            if (!line) return '';
-            
-            // Decrease indent for closing braces
-            if (line.startsWith('}') || line.startsWith(')')) {
-                indentLevel = Math.max(0, indentLevel - 1);
-            }
-            
-            const indentedLine = '  '.repeat(indentLevel) + line;
-            
-            // Increase indent for opening braces
-            if (line.endsWith('{') || line.endsWith('(')) {
-                indentLevel++;
-            }
-            
-            return indentedLine;
-        });
-        
-        // Remove empty lines at start and end
-        formatted = lines.filter(line => line.trim()).join('\n');
-        
-        // Clean up extra newlines
-        formatted = formatted.replace(/\n\s*\n/g, '\n\n');
-        
-        return formatted.trim();
+
+        // Preserve template literals and strings
+        formatted = formatted
+            // Ensure proper spacing around operators
+            .replace(/([=!<>]=?|&&|\|\|)/g, ' $1 ')
+            // Fix multiple spaces
+            .replace(/\s+/g, ' ')
+            // Add space after commas
+            .replace(/,(\S)/g, ', $1')
+            // Add space after semicolons
+            .replace(/;(\S)/g, '; $1')
+            // Ensure proper spacing for function parameters
+            .replace(/(\w)\(/g, '$1 (')
+            // Fix spacing around curly braces
+            .replace(/\s*{\s*/g, ' { ')
+            .replace(/\s*}\s*/g, ' } ')
+            // Clean up extra spaces
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        // Handle line breaks for better readability
+        const lines = formatted.split(';');
+        if (lines.length > 1) {
+            formatted = lines.map(line => line.trim()).join(';\n');
+        }
+
+        // Handle block statements
+        formatted = formatted
+            .replace(/{/g, ' {\n')
+            .replace(/}/g, '\n}\n')
+            .replace(/\n\s*\n/g, '\n');
+
+        return formatted;
     }
 
     showRealTimeSuggestions(code, cursorPos) {
@@ -435,26 +465,72 @@ class EnhancedCommandEditor {
         const words = currentLine.trim().split(/\s+/);
         const lastWord = words[words.length - 1].toLowerCase();
 
-        // Function suggestions
+        // Complete function suggestions with ready-to-use code
         const functions = [
-            { name: 'sendMessage', desc: 'Send a text message', example: 'sendMessage("Hello!");' },
-            { name: 'sendPhoto', desc: 'Send a photo', example: 'sendPhoto("https://example.com/photo.jpg");' },
-            { name: 'sendDocument', desc: 'Send a document', example: 'sendDocument("https://example.com/file.pdf");' },
-            { name: 'getUser', desc: 'Get user information', example: 'const user = getUser();' },
-            { name: 'getChatId', desc: 'Get chat ID', example: 'const chatId = getChatId();' },
-            { name: 'isTest', desc: 'Check if running in test mode', example: 'if (isTest()) { ... }' },
-            { name: 'wait', desc: 'Wait for specified milliseconds', example: 'await wait(1000);' },
-            { name: 'getAnswer', desc: 'Get user answer (in answer handler)', example: 'const answer = getAnswer();' }
+            { 
+                name: 'sendMessage', 
+                desc: 'Send a text message to user', 
+                code: 'sendMessage("Hello!");' 
+            },
+            { 
+                name: 'sendPhoto', 
+                desc: 'Send a photo to user', 
+                code: 'sendPhoto("https://example.com/photo.jpg");' 
+            },
+            { 
+                name: 'sendDocument', 
+                desc: 'Send a document to user', 
+                code: 'sendDocument("https://example.com/file.pdf");' 
+            },
+            { 
+                name: 'getUser', 
+                desc: 'Get current user information', 
+                code: 'const user = getUser();\n// user.id, user.first_name, user.username' 
+            },
+            { 
+                name: 'getChatId', 
+                desc: 'Get current chat ID', 
+                code: 'const chatId = getChatId();' 
+            },
+            { 
+                name: 'isTest', 
+                desc: 'Check if running in test mode', 
+                code: 'if (isTest()) {\n  // Test mode code\n}' 
+            },
+            { 
+                name: 'wait', 
+                desc: 'Wait for specified milliseconds', 
+                code: 'await wait(1000); // Wait 1 second' 
+            },
+            { 
+                name: 'getAnswer', 
+                desc: 'Get user answer in wait_for_answer mode', 
+                code: 'const answer = getAnswer();' 
+            }
         ];
 
-        // Text-based suggestions
+        // Text message suggestions
         const textSuggestions = [
-            { text: 'Hello! Welcome to our bot! 👋', desc: 'Welcome message' },
-            { text: 'Please provide more information.', desc: 'Request more info' },
-            { text: 'Thank you for using our bot!', desc: 'Thank you message' },
-            { text: 'Error occurred while processing your request.', desc: 'Error message' },
-            { text: 'Please wait...', desc: 'Loading message' },
-            { text: 'Operation completed successfully!', desc: 'Success message' }
+            { 
+                text: 'Hello! Welcome to our bot! 👋', 
+                desc: 'Welcome message',
+                code: 'sendMessage("Hello! Welcome to our bot! 👋");'
+            },
+            { 
+                text: 'আসসালামু আলাইকুম!', 
+                desc: 'Arabic greeting',
+                code: 'sendMessage("আসসালামু আলাইকুম!");'
+            },
+            { 
+                text: 'Thank you for using our bot!', 
+                desc: 'Thank you message',
+                code: 'sendMessage("Thank you for using our bot!");'
+            },
+            { 
+                text: 'Please wait...', 
+                desc: 'Loading message',
+                code: 'sendMessage("Please wait...");'
+            }
         ];
 
         // Match functions
@@ -464,8 +540,7 @@ class EnhancedCommandEditor {
                     type: 'function',
                     content: func.name,
                     description: func.desc,
-                    example: func.example,
-                    template: this.getFunctionTemplate(func.name)
+                    code: func.code
                 });
             }
         });
@@ -473,33 +548,19 @@ class EnhancedCommandEditor {
         // Match text suggestions
         if (lastWord.length > 0) {
             textSuggestions.forEach(suggestion => {
-                if (suggestion.text.toLowerCase().includes(lastWord)) {
+                if (suggestion.text.toLowerCase().includes(lastWord) || 
+                    suggestion.desc.toLowerCase().includes(lastWord)) {
                     suggestions.push({
                         type: 'text',
                         content: suggestion.text,
                         description: suggestion.desc,
-                        example: suggestion.text,
-                        template: `"${suggestion.text}"`
+                        code: suggestion.code
                     });
                 }
             });
         }
 
-        return suggestions.slice(0, 8); // Limit to 8 suggestions
-    }
-
-    getFunctionTemplate(funcName) {
-        const templates = {
-            'sendMessage': 'text, options',
-            'sendPhoto': 'photo, options',
-            'sendDocument': 'document, options',
-            'getUser': '',
-            'getChatId': '',
-            'isTest': '',
-            'wait': 'milliseconds',
-            'getAnswer': ''
-        };
-        return templates[funcName] || '';
+        return suggestions.slice(0, 6); // Limit to 6 suggestions
     }
 
     showSuggestionList(suggestions) {
@@ -507,12 +568,14 @@ class EnhancedCommandEditor {
         const suggestionsList = document.getElementById('suggestionsList');
         
         suggestionsList.innerHTML = suggestions.map(suggestion => `
-            <div class="suggestion-item" onclick="commandEditor.applySuggestion('${suggestion.template.replace(/'/g, "\\'")}')">
+            <div class="suggestion-item" onclick="commandEditor.applySuggestionCode('${this.escapeHtml(suggestion.code).replace(/'/g, "\\'")}')">
                 <div class="suggestion-content">
-                    <strong>${suggestion.content}</strong>
-                    <span class="suggestion-type">${suggestion.type}</span>
+                    <div class="suggestion-header">
+                        <strong>${suggestion.content}</strong>
+                        <span class="suggestion-type">${suggestion.type}</span>
+                    </div>
                     <div class="suggestion-desc">${suggestion.description}</div>
-                    <div class="suggestion-example">${suggestion.example}</div>
+                    <div class="suggestion-code">${this.escapeHtml(suggestion.code)}</div>
                 </div>
             </div>
         `).join('');
@@ -525,32 +588,17 @@ class EnhancedCommandEditor {
         suggestionsPanel.style.display = 'none';
     }
 
-    applySuggestion(template) {
+    applySuggestionCode(fullCode) {
         const editor = document.getElementById('advancedCodeEditor');
         const currentCode = editor.value;
         const cursorPos = editor.selectionStart;
         
-        // Find the current word and replace it with the template
+        // Insert the complete code at cursor position
         const textBeforeCursor = currentCode.substring(0, cursorPos);
         const textAfterCursor = currentCode.substring(cursorPos);
         
-        const lines = textBeforeCursor.split('\n');
-        const currentLine = lines[lines.length - 1];
-        const words = currentLine.trim().split(/\s+/);
-        
-        let newLine;
-        if (words.length > 0) {
-            words.pop(); // Remove the last incomplete word
-            newLine = words.join(' ') + ' ' + template;
-        } else {
-            newLine = template;
-        }
-        
-        lines[lines.length - 1] = newLine;
-        
-        const newTextBeforeCursor = lines.join('\n');
-        const newCode = newTextBeforeCursor + textAfterCursor;
-        const newCursorPos = newTextBeforeCursor.length;
+        const newCode = textBeforeCursor + '\n' + fullCode + '\n' + textAfterCursor;
+        const newCursorPos = textBeforeCursor.length + fullCode.length + 2;
         
         editor.value = newCode;
         editor.setSelectionRange(newCursorPos, newCursorPos);
@@ -583,10 +631,16 @@ class EnhancedCommandEditor {
             suggestBtn.classList.remove('active');
         }
         
-        // Focus and select all
+        // Focus and ensure toolbar is visible
         setTimeout(() => {
             const editor = document.getElementById('advancedCodeEditor');
             editor.focus();
+            
+            // Ensure modal content is scrolled to top
+            const modalContent = document.querySelector('.fullscreen-content');
+            if (modalContent) {
+                modalContent.scrollTop = 0;
+            }
         }, 100);
     }
 
@@ -775,7 +829,7 @@ class EnhancedCommandEditor {
         this.currentCommand = {
             id: 'new',
             name: 'New Command',
-            pattern: '/start',
+            pattern: 'start',
             code: '// Write your command code here\nconst user = getUser();\nreturn sendMessage(`Hello ${user.first_name}!`);',
             is_active: true,
             wait_for_answer: false,
@@ -882,19 +936,6 @@ class EnhancedCommandEditor {
         if (testBtn) {
             testBtn.disabled = false;
             testBtn.title = 'Test current command code';
-        }
-    }
-
-    formatCode() {
-        const codeTextarea = document.getElementById('commandCode');
-        const code = codeTextarea.value;
-        
-        try {
-            const formatted = this.formatJavaScript(code);
-            codeTextarea.value = formatted;
-            this.showSuccess('Code formatted successfully!');
-        } catch (error) {
-            this.showError('Formatting failed: ' + error.message);
         }
     }
 
