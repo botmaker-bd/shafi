@@ -7,70 +7,36 @@ const activeBots = new Map();
 const botCommands = new Map();
 const waitingForAnswer = new Map();
 
-// IMPROVED: Initialize all bots - No crash if no bots or invalid tokens
+// Initialize all bots on startup
 async function initializeAllBots() {
     try {
-        console.log('🔄 Checking for active bots...');
+        console.log('🔄 Initializing all bots...');
         const { data: bots, error } = await supabase
             .from('bots')
-            .select('token, name, id')
+            .select('token, name')
             .eq('is_active', true);
 
-        if (error) {
-            console.error('❌ Database error fetching bots:', error);
-            console.log('✅ Server continues without bots');
-            return;
-        }
-
-        if (!bots || bots.length === 0) {
-            console.log('ℹ️ No active bots found - Users can add bots later');
-            console.log('✅ Server running normally without bots');
-            return;
-        }
-
-        console.log(`🔄 Found ${bots.length} active bots, initializing...`);
+        if (error) throw error;
 
         let initializedCount = 0;
-        let failedCount = 0;
-
         for (const bot of bots) {
             try {
-                const success = await initializeBot(bot.token);
-                if (success) {
-                    initializedCount++;
-                    console.log(`✅ Bot initialized: ${bot.name}`);
-                } else {
-                    failedCount++;
-                    console.log(`❌ Failed to initialize bot: ${bot.name}`);
-                }
+                await initializeBot(bot.token);
+                initializedCount++;
             } catch (botError) {
-                failedCount++;
-                console.error(`❌ Error initializing bot ${bot.name}:`, botError.message);
+                console.error(`❌ Failed to initialize bot ${bot.name}:`, botError.message);
             }
-            
-            // Small delay between bot initializations
-            await new Promise(resolve => setTimeout(resolve, 100));
         }
         
-        console.log(`✅ Bot initialization complete: ${initializedCount} successful, ${failedCount} failed`);
-        console.log('🚀 Server is fully operational');
-        
+        console.log(`✅ Successfully initialized ${initializedCount}/${bots.length} bots`);
     } catch (error) {
-        console.error('❌ Bot initialization error:', error);
-        console.log('✅ Server continues running despite bot errors');
+        console.error('❌ Initialize all bots error:', error);
     }
 }
 
-// IMPROVED: Initialize a single bot - Never throw errors
+// Initialize a single bot
 async function initializeBot(token) {
     try {
-        if (!token || token.length < 10) {
-            console.error('❌ Invalid bot token format');
-            return false;
-        }
-
-        console.log(`🔄 Initializing bot: ${token.substring(0, 15)}...`);
-
         // Get commands from database
         const { data: commands, error } = await supabase
             .from('commands')
@@ -79,10 +45,7 @@ async function initializeBot(token) {
             .eq('is_active', true)
             .order('created_at', { ascending: true });
 
-        if (error) {
-            console.error('❌ Database error fetching commands:', error);
-            // Continue without commands
-        }
+        if (error) throw error;
 
         // Create bot instance
         const bot = new TelegramBot(token, { 
@@ -96,57 +59,31 @@ async function initializeBot(token) {
             }
         });
 
-        // Test bot token with timeout and error handling
-        try {
-            const botInfo = await Promise.race([
-                bot.getMe(),
-                new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Bot token test timeout')), 10000)
-                )
-            ]);
-
-            if (!botInfo) {
-                console.error('❌ Failed to get bot info');
-                return false;
-            }
-            
-            console.log(`✅ Bot token valid: ${botInfo.first_name} (@${botInfo.username})`);
-        } catch (tokenError) {
-            console.error(`❌ Invalid bot token: ${tokenError.message}`);
-            return false;
-        }
+        // Test bot token
+        await bot.getMe();
 
         // Store commands
         botCommands.set(token, commands || []);
         
         // Setup message handler
         bot.on('message', async (msg) => {
-            try {
-                await handleMessage(bot, token, msg);
-            } catch (error) {
-                console.error('❌ Message handler error:', error);
-            }
+            await handleMessage(bot, token, msg);
         });
 
         // Setup callback query handler for buttons
         bot.on('callback_query', async (callbackQuery) => {
-            try {
-                await handleCallbackQuery(bot, token, callbackQuery);
-            } catch (error) {
-                console.error('❌ Callback query error:', error);
-            }
+            await handleCallbackQuery(bot, token, callbackQuery);
         });
 
         // Store bot instance
         activeBots.set(token, bot);
         
-        console.log(`✅ Bot initialized successfully with ${commands?.length || 0} commands`);
+        console.log(`✅ Bot initialized: ${token.substring(0, 15)}... with ${commands?.length || 0} commands`);
         
         return true;
-        
     } catch (error) {
-        console.error(`❌ Initialize bot error:`, error.message);
-        return false;
+        console.error(`❌ Initialize bot error for ${token.substring(0, 15)}...:`, error.message);
+        throw error;
     }
 }
 
@@ -182,16 +119,43 @@ async function handleMessage(bot, token, msg) {
 
         if (matchedCommand) {
             console.log(`🎯 Executing command: ${matchedCommand.name}`);
-            await executeCommand(bot, matchedCommand, msg);
-        } else if (text.startsWith('/')) {
+            
+            if (matchedCommand.wait_for_answer) {
+                // Store context for answer handling
+                waitingForAnswer.set(waitKey, {
+                    command: matchedCommand,
+                    context: { chatId, userId, messageId }
+                });
+                
+                await bot.sendMessage(chatId, 
+                    '⏳ Please wait for the response...',
+                    { reply_to_message_id: messageId }
+                );
+                
+                // Execute command that will wait for answer
+                await executeCommand(bot, matchedCommand, msg);
+            } else {
+                // Execute normal command
+                await executeCommand(bot, matchedCommand, msg);
+            }
+        } else {
             console.log('❌ No command matched');
             await bot.sendMessage(chatId, 
                 '❌ Command not found. Use /start to see available commands.',
                 { reply_to_message_id: messageId }
             );
         }
+
     } catch (error) {
         console.error('❌ Handle message error:', error);
+        try {
+            await bot.sendMessage(msg.chat.id, 
+                '❌ An error occurred while processing your command.',
+                { reply_to_message_id: msg.message_id }
+            );
+        } catch (sendError) {
+            console.error('❌ Failed to send error message:', sendError);
+        }
     }
 }
 
@@ -206,13 +170,11 @@ async function handleAnswer(bot, token, msg) {
         const { command, context } = waitData;
         const answerText = msg.text;
         
-        console.log(`💬 Answer received: "${answerText}" for command: ${command.name}`);
-        
         // Remove from waiting list
         waitingForAnswer.delete(waitKey);
         
         // Execute answer handler if exists
-        if (command.answer_handler && command.answer_handler.trim()) {
+        if (command.answer_handler) {
             await executeAnswerHandler(bot, command, msg, answerText, context);
         } else {
             // Default answer handling
@@ -223,31 +185,40 @@ async function handleAnswer(bot, token, msg) {
         }
     } catch (error) {
         console.error('❌ Handle answer error:', error);
+        await bot.sendMessage(msg.chat.id, 
+            '❌ Error processing your answer.',
+            { reply_to_message_id: msg.message_id }
+        );
     }
 }
 
-// Handle callback queries
+// Handle callback queries (for buttons)
 async function handleCallbackQuery(bot, token, callbackQuery) {
     try {
         const chatId = callbackQuery.message.chat.id;
         const data = callbackQuery.data;
+        const messageId = callbackQuery.message.message_id;
 
         console.log(`🔘 Callback query: ${data}`);
 
+        // Handle test command callback
         if (data.startsWith('test_')) {
             const commandId = data.split('_')[1];
-            await handleTestCommand(bot, token, commandId, chatId);
+            await handleTestCommand(bot, token, commandId, chatId, messageId);
         }
 
+        // Answer callback query to remove loading state
         await bot.answerCallbackQuery(callbackQuery.id);
+
     } catch (error) {
         console.error('❌ Handle callback query error:', error);
     }
 }
 
 // Handle test command execution
-async function handleTestCommand(bot, token, commandId, chatId) {
+async function handleTestCommand(bot, token, commandId, chatId, messageId) {
     try {
+        // Get command details
         const { data: command, error } = await supabase
             .from('commands')
             .select('*')
@@ -259,6 +230,7 @@ async function handleTestCommand(bot, token, commandId, chatId) {
             return;
         }
 
+        // Get admin chat ID
         const { data: adminSettings } = await supabase
             .from('admin_settings')
             .select('admin_chat_id')
@@ -266,17 +238,21 @@ async function handleTestCommand(bot, token, commandId, chatId) {
 
         const testChatId = adminSettings?.admin_chat_id || chatId;
 
+        // Create mock message object
         const mockMsg = {
             chat: { id: testChatId },
             from: { 
                 id: testChatId, 
-                first_name: 'Test User'
+                first_name: 'Test User',
+                username: 'testuser'
             },
-            message_id: Date.now(),
+            message_id: messageId,
             text: command.pattern
         };
 
+        // Execute command
         await executeCommand(bot, command, mockMsg, true);
+
     } catch (error) {
         console.error('❌ Test command error:', error);
         await bot.sendMessage(chatId, '❌ Failed to test command');
@@ -286,23 +262,6 @@ async function handleTestCommand(bot, token, commandId, chatId) {
 // Execute command
 async function executeCommand(bot, command, msg, isTest = false) {
     try {
-        // If command has wait_for_answer, set up the waiting state
-        if (command.wait_for_answer && !isTest) {
-            const waitKey = `${command.bot_token}_${msg.from.id}`;
-            
-            waitingForAnswer.set(waitKey, {
-                command,
-                context: {
-                    chatId: msg.chat.id,
-                    userId: msg.from.id,
-                    messageId: msg.message_id,
-                    originalMessage: msg
-                }
-            });
-            
-            console.log(`⏳ Waiting for answer for command: ${command.name}`);
-        }
-
         const result = await executeCommandCode(bot, command.code, {
             msg,
             chatId: msg.chat.id,
@@ -313,14 +272,26 @@ async function executeCommand(bot, command, msg, isTest = false) {
         });
 
         return result;
+
     } catch (error) {
         console.error(`❌ Command "${command.name}" execution error:`, error);
         
+        const errorMessage = `
+❌ *Command Execution Error*
+
+*Command:* ${command.name}
+*Pattern:* ${command.pattern}
+
+*Error:* \`${error.message}\`
+
+Please check your command code and try again.
+        `.trim();
+
         try {
-            await bot.sendMessage(msg.chat.id, 
-                '❌ An error occurred while executing this command.',
-                { reply_to_message_id: msg.message_id }
-            );
+            await bot.sendMessage(msg.chat.id, errorMessage, {
+                parse_mode: 'Markdown',
+                reply_to_message_id: msg.message_id
+            });
         } catch (sendError) {
             console.error('❌ Failed to send error message:', sendError);
         }
@@ -343,18 +314,17 @@ async function executeAnswerHandler(bot, command, msg, answerText, context) {
         return result;
     } catch (error) {
         console.error(`❌ Answer handler execution error:`, error);
-        await bot.sendMessage(msg.chat.id, 
-            `✅ Received: "${answerText}"`,
-            { reply_to_message_id: msg.message_id }
-        );
+        throw error;
     }
 }
 
 // Execute command code safely
 async function executeCommandCode(bot, code, context) {
-    const { msg, chatId, userId, username, first_name, isTest, answerText } = context;
+    const { msg, chatId, userId, username, first_name, isTest, answerText, originalContext } = context;
     
+    // Safe functions available in command code
     const safeFunctions = {
+        // Message functions
         sendMessage: (text, options = {}) => {
             return bot.sendMessage(chatId, text, {
                 parse_mode: 'Markdown',
@@ -364,6 +334,8 @@ async function executeCommandCode(bot, code, context) {
         sendPhoto: (photo, options = {}) => bot.sendPhoto(chatId, photo, options),
         sendDocument: (doc, options = {}) => bot.sendDocument(chatId, doc, options),
         sendChatAction: (action) => bot.sendChatAction(chatId, action),
+        
+        // User info
         getUser: () => ({ 
             id: userId, 
             username: username || 'No username', 
@@ -371,12 +343,26 @@ async function executeCommandCode(bot, code, context) {
         }),
         getMessage: () => msg,
         getChatId: () => chatId,
+        
+        // Context info
         isTest: () => isTest || false,
         getAnswer: () => answerText || '',
+        
+        // Admin functions
+        isAdmin: async () => {
+            const { data: adminSettings } = await supabase
+                .from('admin_settings')
+                .select('admin_chat_id')
+                .single();
+            return adminSettings?.admin_chat_id == userId;
+        },
+        
+        // Utility functions
         wait: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
         log: (message) => console.log(`[Command Log]: ${message}`)
     };
 
+    // Wrap code in try-catch and async function
     const wrappedCode = `
         return (async function() {
             try {
@@ -403,6 +389,8 @@ async function handleBotUpdate(token, update) {
         
         if (bot) {
             await bot.processUpdate(update);
+        } else {
+            console.error(`❌ Failed to initialize bot for update: ${token.substring(0, 15)}...`);
         }
     } catch (error) {
         console.error('❌ Handle bot update error:', error);
@@ -421,7 +409,7 @@ async function updateCommandCache(token) {
         if (error) throw error;
 
         botCommands.set(token, commands || []);
-        console.log(`✅ Command cache updated: ${commands?.length || 0} commands`);
+        console.log(`✅ Command cache updated for ${token.substring(0, 15)}...: ${commands?.length || 0} commands`);
         
         return commands;
     } catch (error) {
@@ -439,14 +427,12 @@ function getBotInstance(token) {
 function removeBot(token) {
     activeBots.delete(token);
     botCommands.delete(token);
-    console.log(`🗑️ Removed bot from active bots`);
+    console.log(`🗑️ Removed bot from active: ${token.substring(0, 15)}...`);
 }
 
-// Initialize on startup - No crash guarantee
+// Initialize on startup
 setTimeout(() => {
-    initializeAllBots().catch(error => {
-        console.error('❌ Bot initialization failed, but server continues:', error);
-    });
+    initializeAllBots();
 }, 3000);
 
 module.exports = {
