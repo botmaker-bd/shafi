@@ -120,6 +120,9 @@ class EnhancedCommandEditor {
                 this.saveCommand();
             }
         });
+
+        // Modal events
+        this.setupModalEvents();
     }
 
     setupUserMenu() {
@@ -163,6 +166,30 @@ class EnhancedCommandEditor {
                 
                 this.showSuccess(`Setting ${isChecked ? 'enabled' : 'disabled'}`);
             });
+        });
+    }
+
+    setupModalEvents() {
+        const modal = document.getElementById('testCommandModal');
+        const closeBtn = document.getElementById('closeTestCommand');
+        const modalClose = document.querySelector('.modal-close');
+
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                modal.style.display = 'none';
+            });
+        }
+
+        if (modalClose) {
+            modalClose.addEventListener('click', () => {
+                modal.style.display = 'none';
+            });
+        }
+
+        window.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+            }
         });
     }
 
