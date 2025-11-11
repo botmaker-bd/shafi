@@ -231,37 +231,37 @@
         </div>
     </div>
 
-    <!-- Code Editor Modal -->
-    <div id="codeEditorModal" class="modal">
-        <div class="modal-content" style="max-width: 800px; height: 80vh;">
-            <div class="modal-header">
-                <h3>Code Editor</h3>
-                <button class="modal-close">&times;</button>
-            </div>
-            <div class="modal-body" style="flex: 1; display: flex; flex-direction: column;">
-                <div class="editor-toolbar">
-                    <button class="btn-code" id="undoBtn" title="Undo">
-                        <i class="fas fa-undo"></i> Undo
+    <!-- Full Screen Code Editor Modal -->
+    <div id="codeEditorModal" class="modal fullscreen-modal">
+        <div class="modal-content fullscreen-content">
+            <div class="modal-header compact-header">
+                <div class="editor-toolbar-icons">
+                    <button class="btn-icon" id="undoBtn" title="Undo">
+                        <i class="fas fa-undo"></i>
                     </button>
-                    <button class="btn-code" id="redoBtn" title="Redo">
-                        <i class="fas fa-redo"></i> Redo
+                    <button class="btn-icon" id="redoBtn" title="Redo">
+                        <i class="fas fa-redo"></i>
                     </button>
-                    <button class="btn-code" id="copyBtn" title="Copy">
-                        <i class="fas fa-copy"></i> Copy
+                    <button class="btn-icon" id="selectAllBtn" title="Select All">
+                        <i class="fas fa-expand-arrows-alt"></i>
                     </button>
-                    <button class="btn-code" id="pasteBtn" title="Paste">
-                        <i class="fas fa-paste"></i> Paste
+                    <button class="btn-icon" id="copyBtn" title="Copy Selected">
+                        <i class="fas fa-copy"></i>
                     </button>
-                    <button class="btn-code" id="formatBtn" title="Format Code">
-                        <i class="fas fa-indent"></i> Format
+                    <button class="btn-icon" id="formatBtn" title="Format Code">
+                        <i class="fas fa-indent"></i>
                     </button>
-                    <button class="btn-code" id="suggestBtn" title="Get Suggestions">
-                        <i class="fas fa-lightbulb"></i> Suggest
+                    <button class="btn-icon" id="suggestBtn" title="Get Suggestions">
+                        <i class="fas fa-lightbulb"></i>
                     </button>
                 </div>
-                <textarea id="advancedCodeEditor" style="flex: 1; width: 100%; font-family: 'Courier New', monospace; font-size: 14px; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; resize: none;"></textarea>
-                <div class="suggestions-panel" id="suggestionsPanel" style="display: none; margin-top: 1rem; padding: 1rem; background: var(--bg-tertiary); border-radius: var(--radius-md);">
-                    <h4>Code Suggestions</h4>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body fullscreen-body">
+                <textarea id="advancedCodeEditor" class="fullscreen-editor" 
+                         placeholder="Write your code here..."></textarea>
+                <div class="suggestions-panel" id="suggestionsPanel" style="display: none;">
+                    <h4>Suggestions</h4>
                     <div id="suggestionsList"></div>
                 </div>
             </div>
@@ -274,5 +274,98 @@
 
     <script src="js/common.js"></script>
     <script src="js/command-editor.js"></script>
+
+    <style>
+        .fullscreen-modal {
+            align-items: stretch;
+            padding: 0;
+        }
+
+        .fullscreen-content {
+            max-width: none;
+            width: 100%;
+            height: 100vh;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .compact-header {
+            padding: 0.5rem 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .editor-toolbar-icons {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn-icon {
+            background: none;
+            border: none;
+            padding: 0.5rem;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: var(--transition);
+        }
+
+        .btn-icon:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .fullscreen-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .fullscreen-editor {
+            flex: 1;
+            width: 100%;
+            border: none;
+            border-radius: 0;
+            padding: 1rem;
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            line-height: 1.5;
+            resize: none;
+            outline: none;
+        }
+
+        .suggestion-item {
+            padding: 0.75rem;
+            border-bottom: 1px solid var(--border-light);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .suggestion-item:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+
+        .suggestion-item strong {
+            color: var(--text-primary);
+            display: block;
+            margin-bottom: 0.25rem;
+        }
+
+        .suggestion-item code {
+            background: var(--bg-secondary);
+            padding: 0.125rem 0.25rem;
+            border-radius: var(--radius-sm);
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+        }
+    </style>
 </body>
 </html>
