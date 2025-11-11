@@ -13,6 +13,40 @@ class CommandEditor {
         this.setupEventListeners();
         await this.loadCommands();
         this.setupUserMenu();
+        this.setupAutoSave();
+    }
+
+    // NEW: Auto-save functionality
+    setupAutoSave() {
+        let saveTimeout;
+        const autoSaveElements = [
+            'commandName', 'commandPattern', 'commandDescription', 
+            'commandCode', 'answerHandler'
+        ];
+
+        autoSaveElements.forEach(elementId => {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.addEventListener('input', () => {
+                    clearTimeout(saveTimeout);
+                    if (this.currentCommand && this.currentCommand.id !== 'new') {
+                        saveTimeout = setTimeout(() => {
+                            this.autoSave();
+                        }, 2000);
+                    }
+                });
+            }
+        });
+    }
+
+    async autoSave() {
+        if (!this.currentCommand || this.currentCommand.id === 'new') return;
+        
+        try {
+            await this.saveCommand(false); // silent save
+        } catch (error) {
+            console.log('Auto-save failed:', error);
+        }
     }
 
     async checkAuth() {
@@ -69,7 +103,7 @@ class CommandEditor {
                 window.location.href = 'bot-management.html';
             }
         } catch (error) {
-            this.showError('Failed to load bot info');
+            this.showError('Failed to load bot info: ' + error.message);
         }
     }
 
@@ -100,7 +134,9 @@ class CommandEditor {
             this.addNewCommand();
         });
 
-        document.getElementById('saveCommandBtn').addEventListener('click', () => {
+        // FIXED: Use form submission instead of button click
+        document.getElementById('commandForm').addEventListener('submit', (e) => {
+            e.preventDefault();
             this.saveCommand();
         });
 
@@ -134,15 +170,27 @@ class CommandEditor {
             this.showTemplateSelector();
         });
 
-        // Command search
+        // Command search with debounce
+        let searchTimeout;
         document.getElementById('commandSearch').addEventListener('input', (e) => {
-            this.filterCommands(e.target.value);
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                this.filterCommands(e.target.value);
+            }, 300);
         });
 
         // Logout
         document.getElementById('logoutBtn').addEventListener('click', (e) => {
             e.preventDefault();
             this.logout();
+        });
+
+        // FIXED: Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                this.saveCommand();
+            }
         });
 
         // Modal events
@@ -208,10 +256,10 @@ class CommandEditor {
                 this.commands = data.commands || [];
                 this.displayCommands();
             } else {
-                this.showError('Failed to load commands');
+                this.showError('Failed to load commands: ' + (data.error || 'Unknown error'));
             }
         } catch (error) {
-            this.showError('Network error while loading commands');
+            this.showError('Network error while loading commands: ' + error.message);
         } finally {
             this.showLoading(false);
         }
@@ -236,9 +284,10 @@ class CommandEditor {
     getCommandItemHTML(command) {
         const isActive = command.is_active;
         const hasAnswerHandler = command.wait_for_answer && command.answer_handler;
+        const isSelected = this.currentCommand?.id === command.id;
         
         return `
-            <div class="command-item ${this.currentCommand?.id === command.id ? 'active' : ''}" 
+            <div class="command-item ${isSelected ? 'active' : ''}" 
                  onclick="commandEditor.selectCommand('${command.id}')">
                 <div class="command-header">
                     <h4>${this.escapeHtml(command.name)}</h4>
@@ -247,9 +296,10 @@ class CommandEditor {
                 <p class="command-desc">${this.escapeHtml(command.description || 'No description')}</p>
                 <div class="command-meta">
                     <span class="command-status ${isActive ? 'active' : 'inactive'}">
-                        ${isActive ? 'Active' : 'Inactive'}
+                        ${isActive ? '✅ Active' : '❌ Inactive'}
                     </span>
                     ${hasAnswerHandler ? '<span class="command-feature">⏳ Waits</span>' : ''}
+                    ${command.wait_for_answer ? '<span class="command-feature">💬 Interactive</span>' : ''}
                 </div>
             </div>
         `;
@@ -257,12 +307,21 @@ class CommandEditor {
 
     filterCommands(searchTerm) {
         const commandItems = document.querySelectorAll('.command-item');
-        const lowerSearch = searchTerm.toLowerCase();
+        const lowerSearch = searchTerm.toLowerCase().trim();
+
+        if (!lowerSearch) {
+            commandItems.forEach(item => item.style.display = 'block');
+            return;
+        }
 
         commandItems.forEach(item => {
             const commandName = item.querySelector('h4').textContent.toLowerCase();
             const commandPattern = item.querySelector('.command-pattern').textContent.toLowerCase();
-            const isVisible = commandName.includes(lowerSearch) || commandPattern.includes(lowerSearch);
+            const commandDesc = item.querySelector('.command-desc').textContent.toLowerCase();
+            
+            const isVisible = commandName.includes(lowerSearch) || 
+                            commandPattern.includes(lowerSearch) ||
+                            commandDesc.includes(lowerSearch);
             
             item.style.display = isVisible ? 'block' : 'none';
         });
@@ -282,9 +341,17 @@ class CommandEditor {
 
         this.showCommandEditor();
         this.populateCommandForm();
+        
+        // Focus on name field
+        setTimeout(() => {
+            document.getElementById('commandName').focus();
+        }, 100);
     }
 
     async selectCommand(commandId) {
+        // Don't reload if already selected
+        if (this.currentCommand?.id === commandId) return;
+
         this.showLoading(true);
 
         try {
@@ -306,12 +373,18 @@ class CommandEditor {
                 document.querySelectorAll('.command-item').forEach(item => {
                     item.classList.remove('active');
                 });
-                document.querySelector(`.command-item[onclick*="${commandId}"]`)?.classList.add('active');
+                
+                const selectedItem = document.querySelector(`[onclick*="${commandId}"]`);
+                if (selectedItem) {
+                    selectedItem.classList.add('active');
+                    // Scroll into view
+                    selectedItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
             } else {
-                this.showError('Failed to load command');
+                this.showError('Failed to load command: ' + (data.error || 'Unknown error'));
             }
         } catch (error) {
-            this.showError('Network error while loading command');
+            this.showError('Network error while loading command: ' + error.message);
         } finally {
             this.showLoading(false);
         }
@@ -331,8 +404,6 @@ class CommandEditor {
     populateCommandForm() {
         if (!this.currentCommand) return;
 
-        const form = document.getElementById('commandForm');
-        
         // Basic fields
         document.getElementById('commandName').value = this.currentCommand.name;
         document.getElementById('commandPattern').value = this.currentCommand.pattern;
@@ -345,25 +416,55 @@ class CommandEditor {
         this.toggleAnswerHandler(waitCheckbox.checked);
         
         // Answer handler
-        if (this.currentCommand.answer_handler) {
-            document.getElementById('answerHandler').value = this.currentCommand.answer_handler;
-        }
+        document.getElementById('answerHandler').value = this.currentCommand.answer_handler || '';
         
         // Update UI
         document.getElementById('currentCommandName').textContent = this.currentCommand.name;
         document.getElementById('commandStatus').textContent = this.currentCommand.is_active ? 'Active' : 'Inactive';
         document.getElementById('commandStatus').className = `status-badge ${this.currentCommand.is_active ? 'active' : 'inactive'}`;
+        
+        // Update button states
+        this.updateButtonStates();
     }
 
     toggleAnswerHandler(show) {
         const section = document.getElementById('answerHandlerSection');
-        section.style.display = show ? 'block' : 'none';
+        if (show) {
+            section.style.display = 'block';
+            // Add default answer handler if empty
+            if (!document.getElementById('answerHandler').value.trim()) {
+                document.getElementById('answerHandler').value = `// Handle user's answer
+const answer = getAnswer();
+const user = getUser();
+
+// Process the answer here
+return sendMessage(\`✅ Thank you for your answer: "\${answer}"\`);`;
+            }
+        } else {
+            section.style.display = 'none';
+        }
     }
 
-    async saveCommand() {
+    updateButtonStates() {
+        const isNew = this.currentCommand?.id === 'new';
+        const deleteBtn = document.getElementById('deleteCommandBtn');
+        const testBtn = document.getElementById('testCommandBtn');
+        
+        if (deleteBtn) {
+            deleteBtn.disabled = isNew;
+            deleteBtn.title = isNew ? 'Save command first to enable delete' : 'Delete command';
+        }
+        
+        if (testBtn) {
+            testBtn.disabled = isNew;
+            testBtn.title = isNew ? 'Save command first to test' : 'Test command';
+        }
+    }
+
+    async saveCommand(showNotification = true) {
         if (!this.currentCommand || !this.currentBot) {
-            this.showError('No command selected');
-            return;
+            this.showError('No command selected or bot not loaded');
+            return false;
         }
 
         const formData = {
@@ -377,10 +478,35 @@ class CommandEditor {
             botToken: this.currentBot.token
         };
 
-        // Validation
-        if (!formData.name || !formData.pattern || !formData.code) {
-            this.showError('Name, pattern and code are required');
-            return;
+        // Enhanced Validation
+        if (!formData.name) {
+            this.showError('Command name is required');
+            document.getElementById('commandName').focus();
+            return false;
+        }
+
+        if (!formData.pattern) {
+            this.showError('Command pattern is required');
+            document.getElementById('commandPattern').focus();
+            return false;
+        }
+
+        if (!formData.pattern.startsWith('/')) {
+            this.showError('Command pattern should start with /');
+            document.getElementById('commandPattern').focus();
+            return false;
+        }
+
+        if (!formData.code) {
+            this.showError('Command code is required');
+            document.getElementById('commandCode').focus();
+            return false;
+        }
+
+        if (formData.waitForAnswer && !formData.answerHandler) {
+            this.showError('Answer handler code is required when "Wait for Answer" is enabled');
+            document.getElementById('answerHandler').focus();
+            return false;
         }
 
         this.showLoading(true);
@@ -405,26 +531,43 @@ class CommandEditor {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${token}`
                     },
-                    body: JSON.stringify(formData)
+                    body: JSON.stringify({
+                        ...formData,
+                        botToken: this.currentBot.token
+                    })
                 });
             }
 
             const data = await response.json();
 
             if (response.ok) {
-                this.showSuccess('Command saved successfully!');
+                if (showNotification) {
+                    this.showSuccess('Command saved successfully!');
+                }
+                
+                // Reload commands to get updated list
                 await this.loadCommands();
                 
                 // Select the saved command
                 if (data.command) {
                     this.currentCommand = data.command;
                     this.populateCommandForm();
+                    
+                    // Update the command in the list
+                    const commandItem = document.querySelector(`[onclick*="${data.command.id}"]`);
+                    if (commandItem) {
+                        commandItem.outerHTML = this.getCommandItemHTML(data.command);
+                    }
                 }
+                
+                return true;
             } else {
                 this.showError(data.error || 'Failed to save command');
+                return false;
             }
         } catch (error) {
-            this.showError('Network error while saving command');
+            this.showError('Network error while saving command: ' + error.message);
+            return false;
         } finally {
             this.showLoading(false);
         }
@@ -435,7 +578,7 @@ class CommandEditor {
             return;
         }
 
-        if (!confirm('Are you sure you want to delete this command? This action cannot be undone.')) {
+        if (!confirm('Are you sure you want to delete this command?\n\nThis action cannot be undone and will remove the command from your bot.')) {
             return;
         }
 
@@ -459,7 +602,7 @@ class CommandEditor {
                 this.showError(data.error || 'Failed to delete command');
             }
         } catch (error) {
-            this.showError('Network error while deleting command');
+            this.showError('Network error while deleting command: ' + error.message);
         } finally {
             this.showLoading(false);
         }
@@ -468,6 +611,11 @@ class CommandEditor {
     async testCommand() {
         if (!this.currentCommand || this.currentCommand.id === 'new') {
             this.showError('Please save the command before testing');
+            return;
+        }
+
+        if (!this.currentBot) {
+            this.showError('Bot information not loaded');
             return;
         }
 
@@ -491,24 +639,46 @@ class CommandEditor {
             if (response.ok) {
                 this.showTestResult(`
                     <div class="test-success">
-                        <h4>✅ Test Command Sent</h4>
-                        <p>Command execution test has been sent to your admin Telegram account.</p>
-                        <p>Check your bot for the test results.</p>
+                        <h4>✅ Test Command Sent Successfully!</h4>
+                        <div class="test-details">
+                            <p><strong>Command:</strong> ${this.currentCommand.name}</p>
+                            <p><strong>Pattern:</strong> ${this.currentCommand.pattern}</p>
+                            <p><strong>Bot:</strong> ${this.currentBot.name}</p>
+                        </div>
+                        <p class="test-message">Check your Telegram bot for the test results.</p>
+                        <div class="test-tips">
+                            <p><strong>💡 Tips:</strong></p>
+                            <ul>
+                                <li>Make sure your bot is active</li>
+                                <li>Check admin chat ID is set correctly</li>
+                                <li>Wait a few seconds for the response</li>
+                            </ul>
+                        </div>
                     </div>
                 `);
             } else {
                 this.showTestResult(`
                     <div class="test-error">
                         <h4>❌ Test Failed</h4>
-                        <p>${data.error || 'Failed to execute test command'}</p>
+                        <p><strong>Error:</strong> ${data.error || 'Unknown error occurred'}</p>
+                        <div class="troubleshooting">
+                            <p><strong>🔧 Troubleshooting:</strong></p>
+                            <ul>
+                                <li>Verify bot token is valid</li>
+                                <li>Check admin settings</li>
+                                <li>Review command code for errors</li>
+                                <li>Check server logs for details</li>
+                            </ul>
+                        </div>
                     </div>
                 `);
             }
         } catch (error) {
             this.showTestResult(`
                 <div class="test-error">
-                    <h4>❌ Test Failed</h4>
-                    <p>Network error: ${error.message}</p>
+                    <h4>❌ Network Error</h4>
+                    <p>Failed to connect to server: ${error.message}</p>
+                    <p>Please check your internet connection and try again.</p>
                 </div>
             `);
         } finally {
@@ -520,14 +690,38 @@ class CommandEditor {
         const modal = document.getElementById('testCommandModal');
         const resultDiv = document.getElementById('testCommandResult');
         
-        resultDiv.innerHTML = html;
-        modal.style.display = 'flex';
+        if (modal && resultDiv) {
+            resultDiv.innerHTML = html;
+            modal.style.display = 'flex';
+        }
     }
 
     insertTemplate(templateName) {
         const template = this.getDefaultTemplate(templateName);
-        document.getElementById('commandCode').value = template;
-        this.showSuccess(`"${templateName}" template inserted`);
+        const codeTextarea = document.getElementById('commandCode');
+        
+        if (codeTextarea) {
+            codeTextarea.value = template;
+            
+            // Special handling for wait template
+            if (templateName === 'wait') {
+                document.getElementById('waitForAnswer').checked = true;
+                this.toggleAnswerHandler(true);
+                
+                // Set answer handler template
+                const answerHandler = document.getElementById('answerHandler');
+                if (answerHandler) {
+                    answerHandler.value = `// Handle user's answer
+const answer = getAnswer();
+const user = getUser();
+
+// Process the answer here
+return sendMessage(\`🎨 Great choice! \${answer} is a beautiful color, \${user.first_name}!\`);`;
+                }
+            }
+            
+            this.showSuccess(`"${templateName}" template inserted successfully!`);
+        }
     }
 
     getDefaultTemplate(templateName) {
@@ -539,12 +733,9 @@ const welcomeMessage = \`
 
 Welcome to our bot! I'm here to help you with various tasks.
 
-🤖 *Bot Features:*
-• Command responses
-• User interactions
-• Custom workflows
-
-Type /help to see all available commands.
+🤖 *Available Commands:*
+/start - Show this welcome message
+/help - Get help information
 
 Thank you for using our bot! 😊
 \`;
@@ -555,11 +746,11 @@ return sendMessage(welcomeMessage);`,
 const message = getMessage();
 const text = message.text;
 
-// Remove command part
+// Remove command part and get the text to echo
 const echoText = text.replace('/echo', '').trim();
 
 if (!echoText) {
-    return sendMessage('Please provide some text after /echo command.\\nExample: /echo Hello World!');
+    return sendMessage('Please provide some text after /echo command.\\\\nExample: /echo Hello World!');
 }
 
 return sendMessage(\`🔊 Echo: \${echoText}\`);`,
@@ -568,11 +759,11 @@ return sendMessage(\`🔊 Echo: \${echoText}\`);`,
 const keyboard = {
     inline_keyboard: [
         [
-            { text: '✅ Button 1', callback_data: 'btn1' },
-            { text: '🔘 Button 2', callback_data: 'btn2' }
+            { text: '✅ Option 1', callback_data: 'option_1' },
+            { text: '🔘 Option 2', callback_data: 'option_2' }
         ],
         [
-            { text: '🌐 Website', url: 'https://example.com' }
+            { text: '🌐 Visit Website', url: 'https://example.com' }
         ]
     ]
 };
@@ -588,15 +779,9 @@ const user = getUser();
 await sendMessage(\`Hello \${user.first_name}! Please tell me your favorite color:\`);
 
 // The bot will now wait for user's response
-// The answer handler will process the response
+// Make sure "Wait for Answer" is enabled and answer handler is set
 
-// Answer handler code (will be executed when user responds):
-/*
-const answer = getAnswer();
-const user = getUser();
-
-return sendMessage(\`🎨 Great choice! \${answer} is a beautiful color, \${user.first_name}!\`);
-*/`
+// Note: User's response will be processed by the answer handler code`
         };
 
         return templates[templateName] || templates.welcome;
@@ -604,53 +789,80 @@ return sendMessage(\`🎨 Great choice! \${answer} is a beautiful color, \${user
 
     formatCode() {
         const codeTextarea = document.getElementById('commandCode');
-        const code = codeTextarea.value;
+        if (!codeTextarea) return;
+
+        let code = codeTextarea.value;
         
         try {
-            // Simple formatting - indent lines properly
-            const formatted = code
-                .split('\n')
-                .map(line => {
-                    // Remove existing whitespace and add proper indentation
-                    const trimmed = line.trim();
-                    if (trimmed === '') return '';
-                    // Basic indentation logic (can be improved)
-                    if (trimmed.endsWith('{') || trimmed.startsWith('}') || trimmed.startsWith(']')) {
-                        return '    ' + trimmed;
-                    }
-                    return '        ' + trimmed;
-                })
-                .join('\n');
+            // Improved code formatting
+            const lines = code.split('\n');
+            let indentLevel = 0;
+            const formattedLines = [];
+            const indentSize = 4;
             
-            codeTextarea.value = formatted;
-            this.showSuccess('Code formatted');
+            for (let line of lines) {
+                let trimmed = line.trim();
+                if (!trimmed) {
+                    formattedLines.push('');
+                    continue;
+                }
+                
+                // Decrease indent for closing braces
+                if (trimmed.startsWith('}') || trimmed.startsWith(']') || trimmed.startsWith(')')) {
+                    indentLevel = Math.max(0, indentLevel - 1);
+                }
+                
+                // Add current line with proper indentation
+                formattedLines.push(' '.repeat(indentLevel * indentSize) + trimmed);
+                
+                // Increase indent for opening braces
+                if (trimmed.endsWith('{') || trimmed.endsWith('[') || trimmed.endsWith('(') || 
+                    trimmed.endsWith('=>') || trimmed.includes(' function')) {
+                    indentLevel++;
+                }
+            }
+            
+            codeTextarea.value = formattedLines.join('\n');
+            this.showSuccess('Code formatted successfully!');
         } catch (error) {
-            this.showError('Formatting failed');
+            this.showError('Formatting failed: ' + error.message);
         }
     }
 
     showTemplateSelector() {
-        // Simple template selector - could be enhanced with a modal
         const templates = ['welcome', 'echo', 'buttons', 'wait'];
-        const templateList = templates.map(tpl => 
-            `<button onclick="commandEditor.insertTemplate('${tpl}')" class="btn btn-secondary btn-small">${tpl}</button>`
-        ).join(' ');
+        const templateHTML = templates.map(tpl => 
+            `<button type="button" onclick="commandEditor.insertTemplate('${tpl}')" 
+                    class="btn btn-secondary btn-small" style="margin: 2px;">
+                ${tpl}
+            </button>`
+        ).join('');
         
-        this.showNotification('Select template: ' + templateList, 'info');
+        this.showNotification(
+            `<div style="text-align: center;">
+                <p style="margin-bottom: 8px; font-weight: bold;">Select Template:</p>
+                <div style="display: flex; gap: 4px; flex-wrap: wrap; justify-content: center;">
+                    ${templateHTML}
+                </div>
+            </div>`, 
+            'info',
+            8000
+        );
     }
 
     logout() {
         const sessionId = localStorage.getItem('sessionId');
+        const token = localStorage.getItem('token');
         
-        if (sessionId) {
+        if (sessionId && token) {
             fetch('/api/auth/logout', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({ sessionId })
-            }).catch(() => {});
+            }).catch(() => {}); // Ignore errors during logout
         }
 
         localStorage.clear();
@@ -672,20 +884,28 @@ return sendMessage(\`🎨 Great choice! \${answer} is a beautiful color, \${user
         this.showNotification(message, 'success');
     }
 
-    showNotification(message, type = 'info') {
-        const existing = document.querySelector('.notification');
-        if (existing) existing.remove();
+    showNotification(message, type = 'info', duration = 5000) {
+        // Remove existing notifications
+        const existing = document.querySelectorAll('.notification');
+        existing.forEach(notif => notif.remove());
 
         const notification = document.createElement('div');
         notification.className = `notification notification-${type}`;
-        notification.innerHTML = `
-            <div class="notification-content">
-                <i class="fas fa-${type === 'error' ? 'exclamation-triangle' : type === 'success' ? 'check-circle' : 'info-circle'}"></i>
-                <span class="notification-message">${message}</span>
-                <button class="notification-close">&times;</button>
-            </div>
-        `;
+        
+        // Check if message contains HTML
+        if (message.includes('<')) {
+            notification.innerHTML = message;
+        } else {
+            notification.innerHTML = `
+                <div class="notification-content">
+                    <i class="fas fa-${type === 'error' ? 'exclamation-triangle' : type === 'success' ? 'check-circle' : 'info-circle'}"></i>
+                    <span class="notification-message">${message}</span>
+                    <button class="notification-close">&times;</button>
+                </div>
+            `;
+        }
 
+        // Apply styles
         Object.assign(notification.style, {
             position: 'fixed',
             top: '20px',
@@ -702,18 +922,26 @@ return sendMessage(\`🎨 Great choice! \${answer} is a beautiful color, \${user
             gap: '0.75rem'
         });
 
-        notification.querySelector('.notification-close').addEventListener('click', () => {
-            notification.remove();
-        });
+        // Add close button functionality
+        const closeBtn = notification.querySelector('.notification-close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                notification.remove();
+            });
+        }
 
         document.body.appendChild(notification);
 
+        // Auto remove after duration
         setTimeout(() => {
-            notification.remove();
-        }, 5000);
+            if (notification.parentNode) {
+                notification.remove();
+            }
+        }, duration);
     }
 
     escapeHtml(unsafe) {
+        if (!unsafe) return '';
         return unsafe
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
