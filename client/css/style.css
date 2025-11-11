@@ -1264,3 +1264,125 @@ body {
 .mb-4 { margin-bottom: 2rem; }
 
 .hidden { display: none; }
+
+
+/* Add these styles to your existing CSS file */
+
+/* Code Editor Modal Styles */
+.editor-toolbar {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+    flex-wrap: wrap;
+}
+
+.btn-code {
+    padding: 0.5rem 1rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-code:hover {
+    background: var(--border-color);
+    border-color: var(--primary-color);
+}
+
+.suggestions-panel {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+}
+
+.suggestion-item {
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--border-light);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.suggestion-item:hover {
+    background: var(--bg-tertiary);
+}
+
+.suggestion-item:last-child {
+    border-bottom: none;
+}
+
+.suggestion-item strong {
+    color: var(--text-primary);
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+.suggestion-item p {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    margin: 0;
+}
+
+/* Command Features */
+.command-feature {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    background: rgba(37, 99, 235, 0.1);
+    color: var(--primary-color);
+    border-radius: var(--radius-sm);
+    font-weight: 500;
+}
+
+/* Test Results */
+.test-success, .test-error {
+    padding: 1rem;
+    border-radius: var(--radius-md);
+    margin-bottom: 1rem;
+}
+
+.test-success {
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.test-error {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.test-details {
+    margin: 1rem 0;
+}
+
+.test-details p {
+    margin: 0.5rem 0;
+}
+
+.test-message {
+    font-style: italic;
+    color: var(--text-secondary);
+}
+
+/* Mobile Responsive for Code Editor */
+@media (max-width: 768px) {
+    .editor-toolbar {
+        justify-content: center;
+    }
+    
+    .btn-code {
+        flex: 1;
+        min-width: 120px;
+        justify-content: center;
+    }
+    
+    .modal-content {
+        width: 95%;
+        margin: 1rem;
+    }
+}
