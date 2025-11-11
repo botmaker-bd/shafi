@@ -7,36 +7,64 @@ const activeBots = new Map();
 const botCommands = new Map();
 const waitingForAnswer = new Map();
 
-// Initialize all bots on startup
+// IMPROVED: Initialize all bots with better error handling
 async function initializeAllBots() {
     try {
         console.log('🔄 Initializing all bots...');
         const { data: bots, error } = await supabase
             .from('bots')
-            .select('token, name')
+            .select('token, name, id')
             .eq('is_active', true);
 
-        if (error) throw error;
+        if (error) {
+            console.error('❌ Database error fetching bots:', error);
+            return;
+        }
+
+        if (!bots || bots.length === 0) {
+            console.log('ℹ️ No active bots found in database');
+            return;
+        }
 
         let initializedCount = 0;
+        let failedCount = 0;
+
         for (const bot of bots) {
             try {
-                await initializeBot(bot.token);
-                initializedCount++;
+                const success = await initializeBot(bot.token);
+                if (success) {
+                    initializedCount++;
+                    console.log(`✅ Bot initialized: ${bot.name}`);
+                } else {
+                    failedCount++;
+                    console.log(`❌ Failed to initialize bot: ${bot.name}`);
+                }
             } catch (botError) {
-                console.error(`❌ Failed to initialize bot ${bot.name}:`, botError.message);
+                failedCount++;
+                console.error(`❌ Error initializing bot ${bot.name}:`, botError.message);
             }
+            
+            // Small delay between bot initializations
+            await new Promise(resolve => setTimeout(resolve, 100));
         }
         
-        console.log(`✅ Successfully initialized ${initializedCount}/${bots.length} bots`);
+        console.log(`✅ Bot initialization complete: ${initializedCount} successful, ${failedCount} failed`);
+        
     } catch (error) {
         console.error('❌ Initialize all bots error:', error);
     }
 }
 
-// Initialize a single bot
+// IMPROVED: Initialize a single bot with better error handling
 async function initializeBot(token) {
     try {
+        if (!token || token.length < 10) {
+            console.error('❌ Invalid bot token format');
+            return false;
+        }
+
+        console.log(`🔄 Initializing bot: ${token.substring(0, 15)}...`);
+
         // Get commands from database
         const { data: commands, error } = await supabase
             .from('commands')
@@ -45,7 +73,10 @@ async function initializeBot(token) {
             .eq('is_active', true)
             .order('created_at', { ascending: true });
 
-        if (error) throw error;
+        if (error) {
+            console.error('❌ Database error fetching commands:', error);
+            // Continue without commands
+        }
 
         // Create bot instance
         const bot = new TelegramBot(token, { 
@@ -59,8 +90,22 @@ async function initializeBot(token) {
             }
         });
 
-        // Test bot token
-        await bot.getMe();
+        // Test bot token with timeout
+        try {
+            const botInfo = await Promise.race([
+                bot.getMe(),
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Bot token test timeout')), 10000)
+                )
+            ]);
+
+            if (!botInfo) {
+                throw new Error('Failed to get bot info');
+            }
+        } catch (tokenError) {
+            console.error(`❌ Invalid bot token: ${tokenError.message}`);
+            return false;
+        }
 
         // Store commands
         botCommands.set(token, commands || []);
@@ -78,17 +123,17 @@ async function initializeBot(token) {
         // Store bot instance
         activeBots.set(token, bot);
         
-        console.log(`✅ Bot initialized: ${token.substring(0, 15)}... with ${commands?.length || 0} commands`);
+        console.log(`✅ Bot initialized successfully: ${token.substring(0, 15)}... with ${commands?.length || 0} commands`);
         
         return true;
+        
     } catch (error) {
         console.error(`❌ Initialize bot error for ${token.substring(0, 15)}...:`, error.message);
-        throw error;
+        return false;
     }
 }
 
-// Handle incoming messages
-// Handle incoming messages - FIXED VERSION
+// FIXED: Handle incoming messages
 async function handleMessage(bot, token, msg) {
     try {
         if (!msg.text) return;
@@ -110,14 +155,14 @@ async function handleMessage(bot, token, msg) {
         const commands = botCommands.get(token) || [];
         let matchedCommand = null;
 
-        // IMPROVED: Find matching command with better pattern matching
+        // Find matching command
         for (const cmd of commands) {
             // Exact match
             if (text === cmd.pattern) {
                 matchedCommand = cmd;
                 break;
             }
-            // Match with parameters (e.g., /start param1 param2)
+            // Match with parameters
             if (text.startsWith(cmd.pattern + ' ')) {
                 matchedCommand = cmd;
                 break;
@@ -134,28 +179,9 @@ async function handleMessage(bot, token, msg) {
 
         if (matchedCommand) {
             console.log(`🎯 Executing command: ${matchedCommand.name}`);
-            
-            if (matchedCommand.wait_for_answer) {
-                // Store context for answer handling
-                waitingForAnswer.set(waitKey, {
-                    command: matchedCommand,
-                    context: { 
-                        chatId, 
-                        userId, 
-                        messageId,
-                        originalMessage: msg
-                    }
-                });
-                
-                // Execute command that will wait for answer
-                await executeCommand(bot, matchedCommand, msg);
-            } else {
-                // Execute normal command immediately
-                await executeCommand(bot, matchedCommand, msg);
-            }
+            await executeCommand(bot, matchedCommand, msg);
         } else {
             console.log('❌ No command matched');
-            // Only send error if it's a command (starts with /)
             if (text.startsWith('/')) {
                 await bot.sendMessage(chatId, 
                     '❌ Command not found. Use /start to see available commands.',
@@ -177,7 +203,7 @@ async function handleMessage(bot, token, msg) {
     }
 }
 
-// IMPROVED: Handle answer for wait_for_answer commands
+// FIXED: Handle answer for wait_for_answer commands
 async function handleAnswer(bot, token, msg) {
     const waitKey = `${token}_${msg.from.id}`;
     const waitData = waitingForAnswer.get(waitKey);
@@ -185,24 +211,13 @@ async function handleAnswer(bot, token, msg) {
     if (!waitData) return;
 
     try {
-        const { command, context, resolve } = waitData;
+        const { command, context } = waitData;
         const answerText = msg.text;
         
         console.log(`💬 Answer received: "${answerText}" for command: ${command.name}`);
         
-        // Clear timeout
-        if (context.timeout) {
-            clearTimeout(context.timeout);
-        }
-        
         // Remove from waiting list immediately
         waitingForAnswer.delete(waitKey);
-        
-        // If there's a resolve function (for async wait), call it
-        if (resolve) {
-            resolve(answerText);
-            return;
-        }
         
         // Execute answer handler if exists
         if (command.answer_handler && command.answer_handler.trim()) {
@@ -223,8 +238,7 @@ async function handleAnswer(bot, token, msg) {
     }
 }
 
-
-// Handle callback queries (for buttons)
+// Handle callback queries
 async function handleCallbackQuery(bot, token, callbackQuery) {
     try {
         const chatId = callbackQuery.message.chat.id;
@@ -233,13 +247,11 @@ async function handleCallbackQuery(bot, token, callbackQuery) {
 
         console.log(`🔘 Callback query: ${data}`);
 
-        // Handle test command callback
         if (data.startsWith('test_')) {
             const commandId = data.split('_')[1];
             await handleTestCommand(bot, token, commandId, chatId, messageId);
         }
 
-        // Answer callback query to remove loading state
         await bot.answerCallbackQuery(callbackQuery.id);
 
     } catch (error) {
@@ -250,7 +262,6 @@ async function handleCallbackQuery(bot, token, callbackQuery) {
 // Handle test command execution
 async function handleTestCommand(bot, token, commandId, chatId, messageId) {
     try {
-        // Get command details
         const { data: command, error } = await supabase
             .from('commands')
             .select('*')
@@ -262,7 +273,6 @@ async function handleTestCommand(bot, token, commandId, chatId, messageId) {
             return;
         }
 
-        // Get admin chat ID
         const { data: adminSettings } = await supabase
             .from('admin_settings')
             .select('admin_chat_id')
@@ -270,7 +280,6 @@ async function handleTestCommand(bot, token, commandId, chatId, messageId) {
 
         const testChatId = adminSettings?.admin_chat_id || chatId;
 
-        // Create mock message object
         const mockMsg = {
             chat: { id: testChatId },
             from: { 
@@ -282,7 +291,6 @@ async function handleTestCommand(bot, token, commandId, chatId, messageId) {
             text: command.pattern
         };
 
-        // Execute command
         await executeCommand(bot, command, mockMsg, true);
 
     } catch (error) {
@@ -291,16 +299,55 @@ async function handleTestCommand(bot, token, commandId, chatId, messageId) {
     }
 }
 
-// Execute command
+// FIXED: Single executeCommand function
 async function executeCommand(bot, command, msg, isTest = false) {
     try {
+        // If command has wait_for_answer, set up the waiting state
+        if (command.wait_for_answer && !isTest) {
+            const waitKey = `${command.bot_token}_${msg.from.id}`;
+            
+            waitingForAnswer.set(waitKey, {
+                command,
+                context: {
+                    chatId: msg.chat.id,
+                    userId: msg.from.id,
+                    messageId: msg.message_id,
+                    originalMessage: msg
+                }
+            });
+            
+            console.log(`⏳ Waiting for answer for command: ${command.name}`);
+        }
+
         const result = await executeCommandCode(bot, command.code, {
             msg,
             chatId: msg.chat.id,
             userId: msg.from.id,
             username: msg.from.username,
             first_name: msg.from.first_name,
-            isTest
+            isTest,
+            waitForAnswer: command.wait_for_answer ? async (timeoutMs = 30000) => {
+                return new Promise((resolve) => {
+                    const waitKey = `${command.bot_token}_${msg.from.id}`;
+                    const waitData = waitingForAnswer.get(waitKey);
+                    
+                    if (waitData) {
+                        waitData.resolve = resolve;
+                        
+                        // Set timeout to auto-remove
+                        waitData.timeout = setTimeout(() => {
+                            if (waitingForAnswer.has(waitKey)) {
+                                waitingForAnswer.delete(waitKey);
+                                bot.sendMessage(msg.chat.id, 
+                                    '⏰ Response timeout. Please try again.',
+                                    { reply_to_message_id: msg.message_id }
+                                );
+                                resolve(null);
+                            }
+                        }, timeoutMs);
+                    }
+                });
+            } : undefined
         });
 
         return result;
@@ -340,8 +387,7 @@ async function executeAnswerHandler(bot, command, msg, answerText, context) {
             username: msg.from.username,
             first_name: msg.from.first_name,
             answerText,
-            originalContext: context,
-            originalMessage: context.originalMessage
+            originalContext: context
         });
 
         return result;
@@ -356,80 +402,55 @@ async function executeAnswerHandler(bot, command, msg, answerText, context) {
 }
 
 // Execute command code safely
-// IMPROVED Wait for Answer System
-async function executeCommand(bot, command, msg, isTest = false) {
-    try {
-        const result = await executeCommandCode(bot, command.code, {
-            msg,
-            chatId: msg.chat.id,
-            userId: msg.from.id,
-            username: msg.from.username,
-            first_name: msg.from.first_name,
-            isTest,
-            // Add context for wait_for_answer commands
-            waitForAnswer: command.wait_for_answer ? async (timeoutMs = 30000) => {
-                const waitKey = `${command.bot_token}_${msg.from.id}`;
-                
-                // Set waiting state
-                waitingForAnswer.set(waitKey, {
-                    command,
-                    context: {
-                        chatId: msg.chat.id,
-                        userId: msg.from.id,
-                        messageId: msg.message_id,
-                        originalMessage: msg,
-                        timeout: setTimeout(() => {
-                            // Auto-remove after timeout
-                            if (waitingForAnswer.has(waitKey)) {
-                                waitingForAnswer.delete(waitKey);
-                                bot.sendMessage(msg.chat.id, 
-                                    '⏰ Response timeout. Please try again.',
-                                    { reply_to_message_id: msg.message_id }
-                                );
-                            }
-                        }, timeoutMs)
-                    }
-                });
-                
-                return new Promise((resolve) => {
-                    // Store resolve function to call when answer comes
-                    const waitData = waitingForAnswer.get(waitKey);
-                    if (waitData) {
-                        waitData.resolve = resolve;
-                    }
-                });
-            } : undefined
-        });
-
-        return result;
-
-    } catch (error) {
-        console.error(`❌ Command "${command.name}" execution error:`, error);
-        
-        const errorMessage = `
-❌ *Command Execution Error*
-
-*Command:* ${command.name}
-*Pattern:* ${command.pattern}
-
-*Error:* \`${error.message}\`
-
-Please check your command code and try again.
-        `.trim();
-
-        try {
-            await bot.sendMessage(msg.chat.id, errorMessage, {
+async function executeCommandCode(bot, code, context) {
+    const { msg, chatId, userId, username, first_name, isTest, answerText, waitForAnswer } = context;
+    
+    const safeFunctions = {
+        // Message functions
+        sendMessage: (text, options = {}) => {
+            return bot.sendMessage(chatId, text, {
                 parse_mode: 'Markdown',
-                reply_to_message_id: msg.message_id
+                ...options
             });
-        } catch (sendError) {
-            console.error('❌ Failed to send error message:', sendError);
-        }
-    }
+        },
+        sendPhoto: (photo, options = {}) => bot.sendPhoto(chatId, photo, options),
+        sendDocument: (doc, options = {}) => bot.sendDocument(chatId, doc, options),
+        sendChatAction: (action) => bot.sendChatAction(chatId, action),
+        
+        // User info
+        getUser: () => ({ 
+            id: userId, 
+            username: username || 'No username', 
+            first_name: first_name || 'User'
+        }),
+        getMessage: () => msg,
+        getChatId: () => chatId,
+        
+        // Context info
+        isTest: () => isTest || false,
+        getAnswer: () => answerText || '',
+        
+        // Wait for answer function
+        waitForAnswer: waitForAnswer,
+        
+        // Utility functions
+        wait: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
+        log: (message) => console.log(`[Command Log]: ${message}`)
+    };
+
+    const wrappedCode = `
+        return (async function() {
+            try {
+                ${code}
+            } catch (error) {
+                throw new Error('Command execution failed: ' + error.message);
+            }
+        })();
+    `;
+
+    const func = new Function(...Object.keys(safeFunctions), wrappedCode);
+    return await func(...Object.values(safeFunctions));
 }
-
-// IMPROVED Answer Handler
-
 
 // Handle bot updates from webhook
 async function handleBotUpdate(token, update) {
@@ -484,9 +505,11 @@ function removeBot(token) {
     console.log(`🗑️ Removed bot from active: ${token.substring(0, 15)}...`);
 }
 
-// Initialize on startup
+// Initialize on startup with error handling
 setTimeout(() => {
-    initializeAllBots();
+    initializeAllBots().catch(error => {
+        console.error('❌ Bot initialization failed, but server continues:', error);
+    });
 }, 3000);
 
 module.exports = {
