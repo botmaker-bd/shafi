@@ -18,31 +18,58 @@ const SECURITY_QUESTIONS = [
 
 // Get security questions
 router.get('/security-questions', (req, res) => {
-    res.json({ questions: SECURITY_QUESTIONS });
+    res.json({ 
+        success: true,
+        questions: SECURITY_QUESTIONS 
+    });
 });
 
-// Signup endpoint
+// Signup endpoint - FIXED VERSION
 router.post('/signup', async (req, res) => {
     try {
         const { email, password, securityQuestion, securityAnswer } = req.body;
 
+        console.log('🔄 Signup attempt for:', email);
+
+        // Validation
         if (!email || !password || !securityQuestion || !securityAnswer) {
-            return res.status(400).json({ error: 'All fields are required' });
+            return res.status(400).json({ 
+                success: false,
+                error: 'All fields are required' 
+            });
         }
 
         if (password.length < 6) {
-            return res.status(400).json({ error: 'Password must be at least 6 characters' });
+            return res.status(400).json({ 
+                success: false,
+                error: 'Password must be at least 6 characters' 
+            });
+        }
+
+        if (!SECURITY_QUESTIONS.includes(securityQuestion)) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Invalid security question' 
+            });
         }
 
         // Check if user exists
-        const { data: existingUser } = await supabase
+        const { data: existingUser, error: userCheckError } = await supabase
             .from('users')
             .select('id')
             .eq('email', email.toLowerCase().trim())
             .single();
 
+        if (userCheckError && userCheckError.code !== 'PGRST116') {
+            console.error('❌ Database error checking user:', userCheckError);
+            throw userCheckError;
+        }
+
         if (existingUser) {
-            return res.status(400).json({ error: 'User already exists with this email' });
+            return res.status(400).json({ 
+                success: false,
+                error: 'User already exists with this email' 
+            });
         }
 
         // Hash password and security answer
@@ -50,7 +77,7 @@ router.post('/signup', async (req, res) => {
         const hashedSecurityAnswer = await bcrypt.hash(securityAnswer.trim(), 12);
 
         // Create user
-        const { data: user, error } = await supabase
+        const { data: user, error: createError } = await supabase
             .from('users')
             .insert([{
                 email: email.toLowerCase().trim(),
@@ -59,10 +86,13 @@ router.post('/signup', async (req, res) => {
                 security_answer: hashedSecurityAnswer,
                 is_admin: false
             }])
-            .select('id, email, created_at')
+            .select('id, email, created_at, is_admin')
             .single();
 
-        if (error) throw error;
+        if (createError) {
+            console.error('❌ Database error creating user:', createError);
+            throw createError;
+        }
 
         // Generate token
         const token = jwt.sign({ 
@@ -74,13 +104,20 @@ router.post('/signup', async (req, res) => {
         const sessionId = uuidv4();
         const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
-        await supabase
+        const { error: sessionError } = await supabase
             .from('user_sessions')
             .insert([{
                 user_id: user.id,
                 token: sessionId,
                 expires_at: expiresAt.toISOString()
             }]);
+
+        if (sessionError) {
+            console.error('❌ Session creation error:', sessionError);
+            // Continue without session - user can still login
+        }
+
+        console.log('✅ User created successfully:', user.email);
 
         res.json({
             success: true,
@@ -90,40 +127,68 @@ router.post('/signup', async (req, res) => {
             user: { 
                 id: user.id, 
                 email: user.email,
-                isAdmin: false
+                isAdmin: user.is_admin 
             }
         });
 
     } catch (error) {
-        console.error('Signup error:', error);
-        res.status(500).json({ error: 'Internal server error during signup' });
+        console.error('❌ Signup error:', error);
+        
+        // Better error messages based on error type
+        let errorMessage = 'Internal server error during signup';
+        
+        if (error.code === '23505') { // Unique violation
+            errorMessage = 'User already exists with this email';
+        } else if (error.code === '22P02') { // Invalid input syntax
+            errorMessage = 'Invalid input data';
+        } else if (error.message && error.message.includes('connection')) {
+            errorMessage = 'Database connection failed. Please try again.';
+        }
+
+        res.status(500).json({ 
+            success: false,
+            error: errorMessage 
+        });
     }
 });
 
-// Login endpoint
+// Login endpoint - FIXED VERSION
 router.post('/login', async (req, res) => {
     try {
         const { email, password, remember } = req.body;
 
+        console.log('🔄 Login attempt for:', email);
+
         if (!email || !password) {
-            return res.status(400).json({ error: 'Email and password are required' });
+            return res.status(400).json({ 
+                success: false,
+                error: 'Email and password are required' 
+            });
         }
 
         // Find user
-        const { data: user, error } = await supabase
+        const { data: user, error: userError } = await supabase
             .from('users')
             .select('*')
             .eq('email', email.toLowerCase().trim())
             .single();
 
-        if (error || !user) {
-            return res.status(400).json({ error: 'Invalid email or password' });
+        if (userError || !user) {
+            console.log('❌ User not found:', email);
+            return res.status(400).json({ 
+                success: false,
+                error: 'Invalid email or password' 
+            });
         }
 
         // Check password
         const validPassword = await bcrypt.compare(password, user.password);
         if (!validPassword) {
-            return res.status(400).json({ error: 'Invalid email or password' });
+            console.log('❌ Invalid password for:', email);
+            return res.status(400).json({ 
+                success: false,
+                error: 'Invalid email or password' 
+            });
         }
 
         // Generate token with appropriate expiry
@@ -142,7 +207,7 @@ router.post('/login', async (req, res) => {
         const sessionId = uuidv4();
         const expiresAt = new Date(Date.now() + (remember ? 30 : 7) * 24 * 60 * 60 * 1000);
 
-        await supabase
+        const { error: sessionError } = await supabase
             .from('user_sessions')
             .insert([{
                 user_id: user.id,
@@ -150,11 +215,18 @@ router.post('/login', async (req, res) => {
                 expires_at: expiresAt.toISOString()
             }]);
 
+        if (sessionError) {
+            console.error('❌ Session creation error:', sessionError);
+            // Continue without session
+        }
+
         // Update last login
         await supabase
             .from('users')
             .update({ last_login: new Date().toISOString() })
             .eq('id', user.id);
+
+        console.log('✅ Login successful for:', user.email);
 
         res.json({
             success: true,
@@ -169,8 +241,11 @@ router.post('/login', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Login error:', error);
-        res.status(500).json({ error: 'Internal server error during login' });
+        console.error('❌ Login error:', error);
+        res.status(500).json({ 
+            success: false,
+            error: 'Internal server error during login' 
+        });
     }
 });
 
@@ -180,7 +255,10 @@ router.get('/verify', async (req, res) => {
         const token = req.headers.authorization?.split(' ')[1];
         
         if (!token) {
-            return res.status(401).json({ error: 'Authentication token required' });
+            return res.status(401).json({ 
+                success: false,
+                error: 'Authentication token required' 
+            });
         }
 
         const decoded = jwt.verify(token, JWT_SECRET);
@@ -193,10 +271,14 @@ router.get('/verify', async (req, res) => {
             .single();
 
         if (!user) {
-            return res.status(401).json({ error: 'User account not found' });
+            return res.status(401).json({ 
+                success: false,
+                error: 'User account not found' 
+            });
         }
 
         res.json({ 
+            success: true,
             valid: true, 
             user: {
                 id: user.id,
@@ -205,7 +287,11 @@ router.get('/verify', async (req, res) => {
             }
         });
     } catch (error) {
-        res.status(401).json({ error: 'Invalid or expired token' });
+        console.error('❌ Token verification error:', error);
+        res.status(401).json({ 
+            success: false,
+            error: 'Invalid or expired token' 
+        });
     }
 });
 
@@ -221,10 +307,16 @@ router.post('/logout', async (req, res) => {
                 .eq('token', sessionId);
         }
 
-        res.json({ success: true, message: 'Logged out successfully' });
+        res.json({ 
+            success: true, 
+            message: 'Logged out successfully' 
+        });
     } catch (error) {
-        console.error('Logout error:', error);
-        res.status(500).json({ error: 'Logout failed' });
+        console.error('❌ Logout error:', error);
+        res.status(500).json({ 
+            success: false,
+            error: 'Logout failed' 
+        });
     }
 });
 
@@ -233,36 +325,48 @@ router.post('/change-password', async (req, res) => {
     try {
         const { currentPassword, newPassword, userId } = req.body;
 
-        if (!currentPassword || !newPassword) {
-            return res.status(400).json({ error: 'Current and new password are required' });
+        if (!currentPassword || !newPassword || !userId) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Current password, new password and user ID are required' 
+            });
         }
 
         if (newPassword.length < 6) {
-            return res.status(400).json({ error: 'New password must be at least 6 characters' });
+            return res.status(400).json({ 
+                success: false,
+                error: 'New password must be at least 6 characters' 
+            });
         }
 
         // Get user current password
-        const { data: user } = await supabase
+        const { data: user, error: userError } = await supabase
             .from('users')
             .select('password')
             .eq('id', userId)
             .single();
 
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
+        if (userError || !user) {
+            return res.status(404).json({ 
+                success: false,
+                error: 'User not found' 
+            });
         }
 
         // Verify current password
         const validCurrentPassword = await bcrypt.compare(currentPassword, user.password);
         if (!validCurrentPassword) {
-            return res.status(400).json({ error: 'Current password is incorrect' });
+            return res.status(400).json({ 
+                success: false,
+                error: 'Current password is incorrect' 
+            });
         }
 
         // Hash new password
         const hashedNewPassword = await bcrypt.hash(newPassword, 12);
 
         // Update password
-        await supabase
+        const { error: updateError } = await supabase
             .from('users')
             .update({ 
                 password: hashedNewPassword,
@@ -270,11 +374,21 @@ router.post('/change-password', async (req, res) => {
             })
             .eq('id', userId);
 
-        res.json({ success: true, message: 'Password changed successfully' });
+        if (updateError) {
+            throw updateError;
+        }
+
+        res.json({ 
+            success: true, 
+            message: 'Password changed successfully' 
+        });
 
     } catch (error) {
-        console.error('Change password error:', error);
-        res.status(500).json({ error: 'Failed to change password' });
+        console.error('❌ Change password error:', error);
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to change password' 
+        });
     }
 });
 
