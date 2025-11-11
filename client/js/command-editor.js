@@ -406,35 +406,33 @@ class EnhancedCommandEditor {
     }
 
     formatJavaScript(code) {
-        // Simple formatting that preserves existing structure
-        let formatted = code;
+    let formatted = code;
 
-        // Fix common formatting issues
-        formatted = formatted
-            // Fix template literals spacing
-            .replace(/\$\s*{\s*/g, '${')
-            .replace(/\s*}\s*/g, '}')
-            // Fix function call spacing
-            .replace(/(\w+)\s*\(\s*/g, '$1(')
-            .replace(/\s*\)/g, ')')
-            // Fix multiple spaces
-            .replace(/\s+/g, ' ')
-            // Add space after commas
-            .replace(/,(\S)/g, ', $1')
-            // Add space after semicolons
-            .replace(/;(\S)/g, '; $1')
-            // Clean up extra spaces
-            .replace(/\s+/g, ' ')
-            .trim();
+    // Fix common formatting issues
+    formatted = formatted
+        .replace(/\$\s*{\s*/g, '${')
+        .replace(/\s*}\s*/g, '}')
+        .replace(/(\w+)\s*\(\s*/g, '$1(')
+        .replace(/\s*\)/g, ')')
+        .replace(/\s+/g, ' ')
+        .replace(/,(\S)/g, ', $1')
+        .replace(/;(\S)/g, '; $1')
+        .replace(/\s+/g, ' ')
+        .trim();
 
-        // Handle line breaks for better readability
-        const lines = formatted.split(';');
-        if (lines.length > 1) {
-            formatted = lines.map(line => line.trim()).join(';\n');
+    // Handle line breaks while preserving comments
+    const lines = formatted.split('\n');
+    const processedLines = lines.map(line => {
+        // Process each line separately for semicolons
+        if (line.includes(';') && !line.trim().startsWith('//')) {
+            const statements = line.split(';');
+            return statements.map(statement => statement.trim()).join(';\n');
         }
-
-        return formatted;
-    }
+        return line;
+    });
+    
+    return processedLines.join('\n');
+}
 
     showRealTimeSuggestions(code, cursorPos) {
         clearTimeout(this.suggestionTimeout);
@@ -512,21 +510,6 @@ class EnhancedCommandEditor {
                 text: 'Hello! Welcome to our bot! 👋', 
                 desc: 'Welcome message',
                 code: 'sendMessage("Hello! Welcome to our bot! 👋");'
-            },
-            { 
-                text: 'আসসালামু আলাইকুম!', 
-                desc: 'Arabic greeting',
-                code: 'sendMessage("আসসালামু আলাইকুম!");'
-            },
-            { 
-                text: 'Thank you for using our bot!', 
-                desc: 'Thank you message',
-                code: 'sendMessage("Thank you for using our bot!");'
-            },
-            { 
-                text: 'Please wait...', 
-                desc: 'Loading message',
-                code: 'sendMessage("Please wait...");'
             }
         ];
 
@@ -826,7 +809,7 @@ class EnhancedCommandEditor {
         this.currentCommand = {
             id: 'new',
             name: 'New Command',
-            pattern: 'start',
+            pattern: '/start,
             code: '// Write your command code here\nconst user = getUser();\nreturn sendMessage(`Hello ${user.first_name}!`);',
             is_active: true,
             wait_for_answer: false,
@@ -1308,7 +1291,7 @@ class EnhancedCommandEditor {
 
         setTimeout(() => {
             notification.remove();
-        }, 5000);
+        }, 2000);
     }
 
     escapeHtml(unsafe) {
