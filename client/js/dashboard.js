@@ -40,7 +40,6 @@ class DashboardManager {
     }
 
     updateUI() {
-        // Update user info
         if (this.user) {
             document.getElementById('userName').textContent = this.user.email.split('@')[0];
             document.getElementById('userEmail').textContent = this.user.email;
@@ -48,19 +47,16 @@ class DashboardManager {
     }
 
     setupEventListeners() {
-        // Logout
         document.getElementById('logoutBtn').addEventListener('click', (e) => {
             e.preventDefault();
             this.logout();
         });
 
-        // Test all bots
         document.getElementById('testAllBots')?.addEventListener('click', (e) => {
             e.preventDefault();
             this.testAllBots();
         });
 
-        // Refresh dashboard
         document.getElementById('refreshBots')?.addEventListener('click', () => {
             this.loadDashboardData();
         });
@@ -76,7 +72,6 @@ class DashboardManager {
                 userDropdown.classList.toggle('show');
             });
 
-            // Close dropdown when clicking outside
             document.addEventListener('click', () => {
                 userDropdown.classList.remove('show');
             });
@@ -93,7 +88,7 @@ class DashboardManager {
             ]);
 
             if (botsResponse.success) {
-                this.bots = botsResponse.bots;
+                this.bots = botsResponse.bots || [];
                 this.displayBots();
                 this.updateBotStats();
             }
@@ -110,23 +105,31 @@ class DashboardManager {
     }
 
     async fetchBots() {
-        const token = localStorage.getItem('token');
-        const response = await fetch(`/api/bots/user/${this.user.id}`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-        return await response.json();
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/bots/user/${this.user.id}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            return await response.json();
+        } catch (error) {
+            return { success: false, bots: [] };
+        }
     }
 
     async fetchStats() {
-        const token = localStorage.getItem('token');
-        const response = await fetch('/api/admin/stats', {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-        return await response.json();
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch('/api/admin/stats', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            return await response.json();
+        } catch (error) {
+            return { success: false, stats: {} };
+        }
     }
 
     displayBots() {
@@ -137,7 +140,7 @@ class DashboardManager {
             return;
         }
 
-        const recentBots = this.bots.slice(0, 4); // Show only 4 recent bots
+        const recentBots = this.bots.slice(0, 4);
         botsList.innerHTML = recentBots.map(bot => this.getBotCardHTML(bot)).join('');
     }
 
@@ -194,7 +197,7 @@ class DashboardManager {
 
     updateStats(stats) {
         document.getElementById('totalCommands').textContent = stats.totalCommands || 0;
-        document.getElementById('todayMessages').textContent = '0'; // Placeholder
+        document.getElementById('todayMessages').textContent = stats.todayMessages || 0;
     }
 
     async removeBot(botId) {
@@ -258,10 +261,10 @@ class DashboardManager {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
                 },
                 body: JSON.stringify({ sessionId })
-            }).catch(() => {}); // Ignore errors during logout
+            }).catch(() => {});
         }
 
         localStorage.clear();
@@ -284,7 +287,6 @@ class DashboardManager {
     }
 
     showNotification(message, type = 'info') {
-        // Remove existing notifications
         const existing = document.querySelector('.notification');
         if (existing) existing.remove();
 
@@ -298,7 +300,6 @@ class DashboardManager {
             </div>
         `;
 
-        // Add styles
         Object.assign(notification.style, {
             position: 'fixed',
             top: '20px',
@@ -321,7 +322,6 @@ class DashboardManager {
 
         document.body.appendChild(notification);
 
-        // Auto remove after 5 seconds
         setTimeout(() => {
             notification.remove();
         }, 5000);
@@ -337,7 +337,6 @@ class DashboardManager {
     }
 }
 
-// Initialize dashboard when DOM is loaded
 let dashboard;
 document.addEventListener('DOMContentLoaded', () => {
     dashboard = new DashboardManager();
