@@ -7,7 +7,6 @@ const supabase = require('../config/supabase');
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'bot-maker-pro-secret-key-2024';
 
-// Forgot password - Step 1: Request reset
 router.post('/forgot', async (req, res) => {
     try {
         const { email } = req.body;
@@ -16,7 +15,6 @@ router.post('/forgot', async (req, res) => {
             return res.status(400).json({ error: 'Email is required' });
         }
 
-        // Find user
         const { data: user, error } = await supabase
             .from('users')
             .select('id, email, security_question')
@@ -24,7 +22,6 @@ router.post('/forgot', async (req, res) => {
             .single();
 
         if (error || !user) {
-            // Don't reveal if user exists or not
             return res.json({ 
                 success: true, 
                 message: 'If the email exists, you will receive security question'
@@ -44,7 +41,6 @@ router.post('/forgot', async (req, res) => {
     }
 });
 
-// Forgot password - Step 2: Verify security answer
 router.post('/verify-answer', async (req, res) => {
     try {
         const { userId, securityAnswer } = req.body;
@@ -53,7 +49,6 @@ router.post('/verify-answer', async (req, res) => {
             return res.status(400).json({ error: 'User ID and security answer are required' });
         }
 
-        // Get user security answer
         const { data: user, error } = await supabase
             .from('users')
             .select('security_answer')
@@ -64,17 +59,14 @@ router.post('/verify-answer', async (req, res) => {
             return res.status(400).json({ error: 'Invalid request' });
         }
 
-        // Verify security answer
         const validAnswer = await bcrypt.compare(securityAnswer.trim(), user.security_answer);
         if (!validAnswer) {
             return res.status(400).json({ error: 'Incorrect security answer' });
         }
 
-        // Generate reset token
         const resetToken = uuidv4();
-        const resetExpires = new Date(Date.now() + 1 * 60 * 60 * 1000); // 1 hour
+        const resetExpires = new Date(Date.now() + 1 * 60 * 60 * 1000);
 
-        // Store reset token
         await supabase
             .from('users')
             .update({
@@ -95,7 +87,6 @@ router.post('/verify-answer', async (req, res) => {
     }
 });
 
-// Forgot password - Step 3: Reset password
 router.post('/reset', async (req, res) => {
     try {
         const { resetToken, newPassword, userId } = req.body;
@@ -108,7 +99,6 @@ router.post('/reset', async (req, res) => {
             return res.status(400).json({ error: 'Password must be at least 6 characters' });
         }
 
-        // Verify reset token
         const { data: user, error } = await supabase
             .from('users')
             .select('reset_token, reset_expires')
@@ -127,10 +117,8 @@ router.post('/reset', async (req, res) => {
             return res.status(400).json({ error: 'Reset token has expired' });
         }
 
-        // Hash new password
         const hashedPassword = await bcrypt.hash(newPassword, 12);
 
-        // Update password and clear reset token
         await supabase
             .from('users')
             .update({
