@@ -106,12 +106,13 @@
             </div>
 
             <div class="editor-main">
-                <div id="noCommandSelected" class="no-selection">
-                    <div class="no-selection-icon">
+                <!-- No Command Selected State -->
+                <div id="noCommandSelected" class="empty-state">
+                    <div class="empty-icon">
                         <i class="fas fa-code"></i>
                     </div>
-                    <h3>Select a Command</h3>
-                    <p>Choose a command from the sidebar or create a new one to start editing</p>
+                    <h3>No Command Selected</h3>
+                    <p>Select a command from the list or create a new one to start editing</p>
                     <button class="btn btn-primary" id="createFirstCommand">
                         <i class="fas fa-plus"></i> Create New Command
                     </button>
@@ -215,15 +216,12 @@
                                     <button type="button" class="btn-code" id="openEditor">
                                         <i class="fas fa-edit"></i> Open Editor
                                     </button>
-                                    <button type="button" class="btn-code" id="formatCode">
-                                        <i class="fas fa-indent"></i> Format
-                                    </button>
                                 </div>
                             </div>
                             <textarea id="commandCode" 
                                       placeholder="Write your command code here..."></textarea>
                             <div class="code-help">
-                                <strong>Available functions:</strong> sendMessage(), sendPhoto(), getUser(), getChatId(), isTest(), wait()
+                                <strong>Available functions:</strong> sendMessage(), sendPhoto(), getUser(), getChatId(), isTest(), wait() etc..
                             </div>
                         </div>
                     </form>
@@ -254,7 +252,6 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" id="closeTestCommand">Close</button>
-                <button class="btn btn-primary" id="runAnotherTest">Run Another Test</button>
             </div>
         </div>
     </div>
@@ -273,11 +270,17 @@
                     <button class="btn-icon" id="selectAllBtn" title="Select All">
                         <i class="fas fa-expand-arrows-alt"></i>
                     </button>
+                    <button class="btn-icon" id="cutBtn" title="Cut Selected">
+                        <i class="fas fa-cut"></i>
+                    </button>
                     <button class="btn-icon" id="copyBtn" title="Copy Selected">
                         <i class="fas fa-copy"></i>
                     </button>
                     <button class="btn-icon" id="pasteBtn" title="Paste">
                         <i class="fas fa-paste"></i>
+                    </button>
+                    <button class="btn-icon" id="clearBtn" title="Clear All">
+                        <i class="fas fa-eraser"></i>
                     </button>
                     <button class="btn-icon" id="formatBtn" title="Format Code">
                         <i class="fas fa-indent"></i>
@@ -433,10 +436,16 @@
             flex: 1;
         }
 
+        .suggestion-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.25rem;
+        }
+
         .suggestion-item strong {
             color: var(--text-primary);
             display: block;
-            margin-bottom: 0.25rem;
             font-size: 0.875rem;
         }
 
@@ -444,6 +453,17 @@
             color: var(--text-secondary);
             font-size: 0.75rem;
             line-height: 1.4;
+            margin-bottom: 0.25rem;
+        }
+
+        .suggestion-code {
+            color: var(--text-secondary);
+            font-size: 0.7rem;
+            font-family: monospace;
+            background: var(--bg-tertiary);
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            margin-top: 0.25rem;
         }
 
         .suggestion-type {
