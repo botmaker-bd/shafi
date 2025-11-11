@@ -1275,3 +1275,297 @@ p {
 .mb-4 { margin-bottom: 2rem; }
 
 .hidden { display: none; }
+
+
+
+/* Command Editor Specific Styles */
+.commands-container {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+}
+
+.command-item {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.command-item:hover {
+    border-color: var(--primary-color);
+    box-shadow: var(--shadow-sm);
+}
+
+.command-item.active {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+.command-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.5rem;
+}
+
+.command-header h4 {
+    margin: 0;
+    font-size: 1rem;
+}
+
+.command-pattern {
+    font-family: 'Courier New', monospace;
+    font-size: 0.75rem;
+    background: rgba(0, 0, 0, 0.1);
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-sm);
+}
+
+.command-item.active .command-pattern {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.command-desc {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+}
+
+.command-item.active .command-desc {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.command-meta {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.command-status {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-sm);
+    font-weight: 500;
+}
+
+.command-status.active {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--success-color);
+}
+
+.command-item.active .command-status.active {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+.command-status.inactive {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--error-color);
+}
+
+.command-item.active .command-status.inactive {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+.command-feature {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    background: rgba(99, 102, 241, 0.1);
+    color: var(--primary-color);
+    border-radius: var(--radius-sm);
+}
+
+.command-item.active .command-feature {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+/* Templates Section */
+.templates-section {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.templates-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.template-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 1.5rem;
+    cursor: pointer;
+    transition: var(--transition);
+    text-align: center;
+}
+
+.template-card:hover {
+    border-color: var(--primary-color);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.template-icon {
+    width: 3rem;
+    height: 3rem;
+    border-radius: var(--radius-lg);
+    background: rgba(99, 102, 241, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1rem;
+    font-size: 1.25rem;
+    color: var(--primary-color);
+}
+
+.template-card h5 {
+    margin-bottom: 0.5rem;
+    font-size: 1rem;
+}
+
+.template-card p {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+/* Code Editor Styles */
+.code-editor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+
+.code-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-code {
+    padding: 0.25rem 0.75rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.btn-code:hover {
+    background: var(--border-color);
+}
+
+.code-help {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+}
+
+/* Toggle Group */
+.toggle-group {
+    background: var(--bg-tertiary);
+    padding: 1rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+}
+
+/* Answer Handler Section */
+#answerHandlerSection {
+    background: var(--bg-tertiary);
+    padding: 1.5rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+}
+
+/* Test Results */
+.test-success, .test-error {
+    padding: 1rem;
+    border-radius: var(--radius-md);
+    margin-bottom: 1rem;
+}
+
+.test-success {
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.test-error {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.test-details {
+    margin: 1rem 0;
+}
+
+.test-details p {
+    margin-bottom: 0.5rem;
+}
+
+.test-tips, .troubleshooting {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.test-tips ul, .troubleshooting ul {
+    margin: 0.5rem 0 0 1rem;
+    padding: 0;
+}
+
+.test-tips li, .troubleshooting li {
+    margin-bottom: 0.25rem;
+    font-size: 0.875rem;
+}
+
+/* Responsive Design for Command Editor */
+@media (max-width: 768px) {
+    .editor-layout {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .commands-sidebar {
+        order: 2;
+    }
+    
+    .editor-main {
+        order: 1;
+    }
+    
+    .editor-header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: flex-start;
+    }
+    
+    .editor-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    .editor-actions .btn {
+        flex: 1;
+        justify-content: center;
+    }
+    
+    .templates-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .command-header {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+}
