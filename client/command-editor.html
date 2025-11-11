@@ -11,61 +11,59 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
-    <!-- Enhanced Navigation -->
-<nav class="navbar">
-    <div class="container">
-        <a href="dashboard.html" class="nav-brand">
-            <span class="brand-icon">🤖</span>
-            <span class="brand-text">Bot Maker Pro</span>
-        </a>
-        
-        <button class="mobile-menu-btn" id="mobileMenuBtn">
-            <i class="fas fa-bars"></i>
-        </button>
-        
-        <div class="nav-links" id="navLinks">
-            <a href="dashboard.html" class="nav-link">
-                <i class="fas fa-home"></i>
-                <span>Dashboard</span>
-            </a>
-            <a href="bot-management.html" class="nav-link">
-                <i class="fas fa-robot"></i>
-                <span>My Bots</span>
-            </a>
-            <a href="command-editor.html" class="nav-link active">
-                <i class="fas fa-code"></i>
-                <span>Commands</span>
-            </a>
-            <a href="admin-settings.html" class="nav-link">
-                <i class="fas fa-cog"></i>
-                <span>Settings</span>
+    <nav class="navbar">
+        <div class="container">
+            <a href="dashboard.html" class="nav-brand">
+                <span class="brand-icon">🤖</span>
+                <span class="brand-text">Bot Maker Pro</span>
             </a>
             
-            <div class="user-menu">
-                <button class="user-btn" id="userMenuBtn">
-                    <div class="user-avatar" id="userAvatar">U</div>
-                    <span id="userEmail">user@example.com</span>
-                    <i class="fas fa-chevron-down"></i>
-                </button>
-                <div class="user-dropdown" id="userDropdown">
-                    <a href="profile.html" class="dropdown-item">
-                        <i class="fas fa-user-edit"></i> Edit Profile
-                    </a>
-                    <a href="change-password.html" class="dropdown-item">
-                        <i class="fas fa-key"></i> Change Password
-                    </a>
-                    <div class="dropdown-divider"></div>
-                    <a href="#" id="logoutBtn" class="dropdown-item">
-                        <i class="fas fa-sign-out-alt"></i> Logout
-                    </a>
+            <button class="mobile-menu-btn" id="mobileMenuBtn">
+                <i class="fas fa-bars"></i>
+            </button>
+            
+            <div class="nav-links" id="navLinks">
+                <a href="dashboard.html" class="nav-link">
+                    <i class="fas fa-home"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="bot-management.html" class="nav-link">
+                    <i class="fas fa-robot"></i>
+                    <span>My Bots</span>
+                </a>
+                <a href="command-editor.html" class="nav-link active">
+                    <i class="fas fa-code"></i>
+                    <span>Commands</span>
+                </a>
+                <a href="admin-settings.html" class="nav-link">
+                    <i class="fas fa-cog"></i>
+                    <span>Settings</span>
+                </a>
+                
+                <div class="user-menu">
+                    <button class="user-btn" id="userMenuBtn">
+                        <div class="user-avatar" id="userAvatar">U</div>
+                        <span id="userEmail">user@example.com</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <div class="user-dropdown" id="userDropdown">
+                        <a href="profile.html" class="dropdown-item">
+                            <i class="fas fa-user-edit"></i> Edit Profile
+                        </a>
+                        <a href="change-password.html" class="dropdown-item">
+                            <i class="fas fa-key"></i> Change Password
+                        </a>
+                        <div class="dropdown-divider"></div>
+                        <a href="#" id="logoutBtn" class="dropdown-item">
+                            <i class="fas fa-sign-out-alt"></i> Logout
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-</nav>
+    </nav>
 
     <div class="container">
-        <!-- Page Header -->
         <div class="page-header">
             <div class="header-content">
                 <h1 id="botName">Command Editor</h1>
@@ -78,21 +76,7 @@
             </div>
         </div>
 
-        <!-- Quick Templates Section -->
-        <div class="quick-templates">
-            <div class="templates-section">
-                <div class="templates-header">
-                    <h3>Quick Templates</h3>
-                    <p>Get started quickly with pre-built templates</p>
-                </div>
-                <div class="templates-grid" id="templatesGrid">
-                    <!-- Templates will be loaded here by JavaScript -->
-                </div>
-            </div>
-        </div>
-
         <div class="editor-layout">
-            <!-- Sidebar -->
             <div class="commands-sidebar">
                 <div class="sidebar-header">
                     <h3>Commands</h3>
@@ -121,9 +105,7 @@
                 </div>
             </div>
 
-            <!-- Main Editor -->
             <div class="editor-main">
-                <!-- No Selection State -->
                 <div id="noCommandSelected" class="no-selection">
                     <div class="no-selection-icon">
                         <i class="fas fa-code"></i>
@@ -135,7 +117,6 @@
                     </button>
                 </div>
 
-                <!-- Command Editor -->
                 <div id="commandEditor" class="command-editor" style="display: none;">
                     <div class="editor-header">
                         <div class="command-title">
@@ -158,7 +139,6 @@
                     </div>
 
                     <form id="commandForm" class="command-form">
-                        <!-- Enhanced Toggle Switches -->
                         <div class="toggle-group">
                             <label class="toggle-label">
                                 <div class="toggle-text">
@@ -183,29 +163,15 @@
                             </label>
                         </div>
 
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="commandName">Command Name *</label>
-                                <input type="text" id="commandName" required 
-                                       placeholder="e.g., Start Command">
-                            </div>
-                            <div class="form-group">
-                                <label for="commandPattern">Pattern *</label>
-                                <input type="text" id="commandPattern" required 
-                                       placeholder="e.g., /start">
-                                <div class="form-help">
-                                    This is what users will type to trigger the command
-                                </div>
-                            </div>
-                        </div>
-
                         <div class="form-group">
-                            <label for="commandDescription">Description</label>
-                            <textarea id="commandDescription" 
-                                      placeholder="Describe what this command does..."></textarea>
+                            <label for="moreCommands">More Commands *</label>
+                            <input type="text" id="moreCommands" required 
+                                   placeholder="e.g., /start, /help, /info">
+                            <div class="form-help">
+                                Separate multiple commands with commas. All commands will execute the same code.
+                            </div>
                         </div>
 
-                        <!-- Answer Handler (Visible when wait for answer is enabled) -->
                         <div id="answerHandlerSection" class="form-group" style="display: none;">
                             <label for="answerHandler">Answer Handler Code</label>
                             <textarea id="answerHandler" 
@@ -215,16 +181,15 @@
                             </div>
                         </div>
 
-                        <!-- Main Command Code -->
                         <div class="form-group">
                             <div class="code-editor-header">
                                 <label for="commandCode">Command Code *</label>
                                 <div class="code-actions">
+                                    <button type="button" class="btn-code" id="openEditor">
+                                        <i class="fas fa-edit"></i> Open Editor
+                                    </button>
                                     <button type="button" class="btn-code" id="formatCode">
                                         <i class="fas fa-indent"></i> Format
-                                    </button>
-                                    <button type="button" class="btn-code" id="insertTemplate">
-                                        <i class="fas fa-magic"></i> Template
                                     </button>
                                 </div>
                             </div>
@@ -266,6 +231,48 @@
         </div>
     </div>
 
+    <!-- Code Editor Modal -->
+    <div id="codeEditorModal" class="modal">
+        <div class="modal-content" style="max-width: 800px; height: 80vh;">
+            <div class="modal-header">
+                <h3>Code Editor</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body" style="flex: 1; display: flex; flex-direction: column;">
+                <div class="editor-toolbar">
+                    <button class="btn-code" id="undoBtn" title="Undo">
+                        <i class="fas fa-undo"></i> Undo
+                    </button>
+                    <button class="btn-code" id="redoBtn" title="Redo">
+                        <i class="fas fa-redo"></i> Redo
+                    </button>
+                    <button class="btn-code" id="copyBtn" title="Copy">
+                        <i class="fas fa-copy"></i> Copy
+                    </button>
+                    <button class="btn-code" id="pasteBtn" title="Paste">
+                        <i class="fas fa-paste"></i> Paste
+                    </button>
+                    <button class="btn-code" id="formatBtn" title="Format Code">
+                        <i class="fas fa-indent"></i> Format
+                    </button>
+                    <button class="btn-code" id="suggestBtn" title="Get Suggestions">
+                        <i class="fas fa-lightbulb"></i> Suggest
+                    </button>
+                </div>
+                <textarea id="advancedCodeEditor" style="flex: 1; width: 100%; font-family: 'Courier New', monospace; font-size: 14px; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; resize: none;"></textarea>
+                <div class="suggestions-panel" id="suggestionsPanel" style="display: none; margin-top: 1rem; padding: 1rem; background: var(--bg-tertiary); border-radius: var(--radius-md);">
+                    <h4>Code Suggestions</h4>
+                    <div id="suggestionsList"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelEdit">Cancel</button>
+                <button class="btn btn-primary" id="saveCode">Save Code</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/common.js"></script>
     <script src="js/command-editor.js"></script>
 </body>
 </html>
