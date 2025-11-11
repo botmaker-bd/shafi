@@ -128,10 +128,10 @@ async function handleMessage(bot, token, msg) {
                     context: { chatId, userId, messageId }
                 });
                 
-                await bot.sendMessage(chatId, 
-                    '⏳ Please wait for the response...',
-                    { reply_to_message_id: messageId }
-                );
+                // await bot.sendMessage(chatId, 
+                    // '⏳ Please wait for the response...',
+                    // { reply_to_message_id: messageId }
+                // );
                 
                 // Execute command that will wait for answer
                 await executeCommand(bot, matchedCommand, msg);
