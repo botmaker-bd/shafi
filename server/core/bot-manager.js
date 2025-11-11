@@ -9,6 +9,7 @@ const botCommands = new Map();
 const waitingForAnswer = new Map();
 
 // Initialize all bots on startup
+// Initialize all bots on startup
 async function initializeAllBots() {
     try {
         console.log('🔄 Initializing all bots...');
@@ -20,16 +21,30 @@ async function initializeAllBots() {
         if (error) throw error;
 
         let initializedCount = 0;
+        let failedCount = 0;
+        
         for (const bot of bots) {
             try {
+                // Skip initialization for demo tokens
+                if (bot.token.includes('123456789') || bot.token.includes('987654321')) {
+                    console.log(`⏭️ Skipping demo bot: ${bot.name}`);
+                    continue;
+                }
+                
                 await initializeBot(bot.token);
                 initializedCount++;
             } catch (botError) {
                 console.error(`❌ Failed to initialize bot ${bot.name}:`, botError.message);
+                failedCount++;
             }
         }
         
-        console.log(`✅ Successfully initialized ${initializedCount}/${bots.length} bots`);
+        console.log(`✅ Bot initialization completed: ${initializedCount} successful, ${failedCount} failed`);
+        
+        // If no bots to initialize, show message
+        if (bots.length === 0) {
+            console.log('💡 No active bots found. Add bots via the web interface.');
+        }
     } catch (error) {
         console.error('❌ Initialize all bots error:', error);
     }
