@@ -6,6 +6,7 @@ class EnhancedCommandEditor {
         this.commands = [];
         this.codeHistory = [];
         this.historyIndex = -1;
+        this.suggestionTimeout = null;
         this.init();
     }
 
@@ -109,12 +110,31 @@ class EnhancedCommandEditor {
             this.formatCode();
         });
 
+        // More commands validation
+        document.getElementById('moreCommands').addEventListener('blur', (e) => {
+            this.validateMoreCommands(e.target.value);
+        });
+
         // Modal events
         this.setupModalEvents();
     }
 
+    validateMoreCommands(value) {
+        const commands = value.split(',').map(cmd => cmd.trim()).filter(cmd => cmd);
+        const uniqueCommands = [...new Set(commands)];
+        
+        if (commands.length !== uniqueCommands.length) {
+            this.showError('Duplicate commands found. Please remove duplicates.');
+            return false;
+        }
+        
+        return true;
+    }
+
     setupCodeEditor() {
-        // Setup code editor modal functionality
+        const advancedEditor = document.getElementById('advancedCodeEditor');
+        
+        // Setup editor functionality
         document.getElementById('undoBtn').addEventListener('click', () => {
             this.undoCode();
         });
@@ -123,12 +143,12 @@ class EnhancedCommandEditor {
             this.redoCode();
         });
 
-        document.getElementById('copyBtn').addEventListener('click', () => {
-            this.copyCode();
+        document.getElementById('selectAllBtn').addEventListener('click', () => {
+            this.selectAllCode();
         });
 
-        document.getElementById('pasteBtn').addEventListener('click', () => {
-            this.pasteCode();
+        document.getElementById('copyBtn').addEventListener('click', () => {
+            this.copySelectedCode();
         });
 
         document.getElementById('formatBtn').addEventListener('click', () => {
@@ -147,10 +167,37 @@ class EnhancedCommandEditor {
             this.saveCodeFromEditor();
         });
 
-        // Track code changes for undo/redo
-        const advancedEditor = document.getElementById('advancedCodeEditor');
-        advancedEditor.addEventListener('input', () => {
-            this.saveToHistory(advancedEditor.value);
+        // Real-time suggestions
+        advancedEditor.addEventListener('input', (e) => {
+            this.saveToHistory(e.target.value);
+            this.showRealTimeSuggestions(e.target.value, e.target.selectionStart);
+        });
+
+        // Keyboard shortcuts
+        advancedEditor.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                switch(e.key) {
+                    case 'z':
+                        e.preventDefault();
+                        this.undoCode();
+                        break;
+                    case 'y':
+                        e.preventDefault();
+                        this.redoCode();
+                        break;
+                    case 'a':
+                        e.preventDefault();
+                        this.selectAllCode();
+                        break;
+                    case 'c':
+                        // Allow default copy behavior
+                        break;
+                    case 'f':
+                        e.preventDefault();
+                        this.formatAdvancedCode();
+                        break;
+                }
+            }
         });
     }
 
@@ -174,25 +221,21 @@ class EnhancedCommandEditor {
         }
     }
 
-    copyCode() {
-        const code = document.getElementById('advancedCodeEditor').value;
-        navigator.clipboard.writeText(code).then(() => {
-            this.showSuccess('Code copied to clipboard!');
-        });
+    selectAllCode() {
+        const editor = document.getElementById('advancedCodeEditor');
+        editor.select();
     }
 
-    async pasteCode() {
-        try {
-            const text = await navigator.clipboard.readText();
-            const editor = document.getElementById('advancedCodeEditor');
-            const start = editor.selectionStart;
-            const end = editor.selectionEnd;
-            editor.value = editor.value.substring(0, start) + text + editor.value.substring(end);
-            editor.selectionStart = editor.selectionEnd = start + text.length;
-            editor.focus();
-            this.saveToHistory(editor.value);
-        } catch (err) {
-            this.showError('Failed to paste from clipboard');
+    copySelectedCode() {
+        const editor = document.getElementById('advancedCodeEditor');
+        const selectedText = editor.value.substring(editor.selectionStart, editor.selectionEnd);
+        
+        if (selectedText) {
+            navigator.clipboard.writeText(selectedText).then(() => {
+                this.showSuccess('Selected code copied to clipboard!');
+            });
+        } else {
+            this.showInfo('No text selected to copy');
         }
     }
 
@@ -201,16 +244,7 @@ class EnhancedCommandEditor {
         const code = editor.value;
         
         try {
-            // Simple formatting - in a real app you might use a proper formatter
-            const formatted = code
-                .replace(/\n\s*\n/g, '\n\n')
-                .replace(/\{\s*\n/g, '{\n')
-                .replace(/\n\s*\}/g, '\n}')
-                .replace(/;\s*\n/g, ';\n')
-                .replace(/\s+/g, ' ')
-                .replace(/([{};])\s+/g, '$1\n')
-                .trim();
-            
+            const formatted = this.formatJavaScript(code);
             editor.value = formatted;
             this.saveToHistory(formatted);
             this.showSuccess('Code formatted!');
@@ -219,64 +253,157 @@ class EnhancedCommandEditor {
         }
     }
 
-    showSuggestions() {
-        const code = document.getElementById('advancedCodeEditor').value;
+    formatJavaScript(code) {
+        // Simple JavaScript formatting
+        return code
+            .replace(/\n\s*\n/g, '\n\n')
+            .replace(/\{\s*\n/g, '{\n  ')
+            .replace(/\n\s*\}/g, '\n}')
+            .replace(/;\s*\n/g, ';\n')
+            .replace(/\s+/g, ' ')
+            .replace(/([{};])\s+/g, '$1\n')
+            .replace(/\n\s+/g, '\n  ')
+            .trim();
+    }
+
+    showRealTimeSuggestions(code, cursorPos) {
+        clearTimeout(this.suggestionTimeout);
+        
+        this.suggestionTimeout = setTimeout(() => {
+            const currentLine = this.getCurrentLine(code, cursorPos);
+            const suggestions = this.generateRealTimeSuggestions(currentLine);
+            
+            if (suggestions.length > 0) {
+                this.showSuggestionList(suggestions);
+            } else {
+                this.hideSuggestionList();
+            }
+        }, 300);
+    }
+
+    getCurrentLine(code, cursorPos) {
+        const textUpToCursor = code.substring(0, cursorPos);
+        const lines = textUpToCursor.split('\n');
+        return lines[lines.length - 1];
+    }
+
+    generateRealTimeSuggestions(currentLine) {
+        const suggestions = [];
+        const words = currentLine.trim().split(/\s+/);
+        const lastWord = words[words.length - 1].toLowerCase();
+
+        // Function suggestions
+        const functions = [
+            { name: 'sendMessage', desc: 'Send a text message' },
+            { name: 'sendPhoto', desc: 'Send a photo' },
+            { name: 'sendDocument', desc: 'Send a document' },
+            { name: 'getUser', desc: 'Get user information' },
+            { name: 'getChatId', desc: 'Get chat ID' },
+            { name: 'isTest', desc: 'Check if running in test mode' },
+            { name: 'wait', desc: 'Wait for specified milliseconds' },
+            { name: 'getAnswer', desc: 'Get user answer (in answer handler)' }
+        ];
+
+        // Text-based suggestions
+        const textSuggestions = [
+            { text: 'Hello! Welcome to our bot! 👋', desc: 'Welcome message' },
+            { text: 'Please provide more information.', desc: 'Request more info' },
+            { text: 'Thank you for using our bot!', desc: 'Thank you message' },
+            { text: 'Error occurred while processing your request.', desc: 'Error message' }
+        ];
+
+        // Match functions
+        functions.forEach(func => {
+            if (func.name.toLowerCase().includes(lastWord) || lastWord.length < 2) {
+                suggestions.push({
+                    type: 'function',
+                    content: func.name,
+                    description: func.desc,
+                    template: `${func.name}(${this.getFunctionTemplate(func.name)})`
+                });
+            }
+        });
+
+        // Match text suggestions
+        if (lastWord.length > 0) {
+            textSuggestions.forEach(suggestion => {
+                if (suggestion.text.toLowerCase().includes(lastWord)) {
+                    suggestions.push({
+                        type: 'text',
+                        content: suggestion.text,
+                        description: suggestion.desc,
+                        template: `"${suggestion.text}"`
+                    });
+                }
+            });
+        }
+
+        return suggestions.slice(0, 5); // Limit to 5 suggestions
+    }
+
+    getFunctionTemplate(funcName) {
+        const templates = {
+            'sendMessage': 'text, options',
+            'sendPhoto': 'photo, options',
+            'sendDocument': 'document, options',
+            'getUser': '',
+            'getChatId': '',
+            'isTest': '',
+            'wait': 'milliseconds',
+            'getAnswer': ''
+        };
+        return templates[funcName] || '';
+    }
+
+    showSuggestionList(suggestions) {
         const suggestionsPanel = document.getElementById('suggestionsPanel');
         const suggestionsList = document.getElementById('suggestionsList');
         
-        // Simple suggestions based on common patterns
-        const suggestions = this.generateSuggestions(code);
-        
-        if (suggestions.length > 0) {
-            suggestionsList.innerHTML = suggestions.map(suggestion => `
-                <div class="suggestion-item" onclick="commandEditor.applySuggestion('${suggestion.code.replace(/'/g, "\\'")}')">
-                    <strong>${suggestion.title}</strong>
-                    <p>${suggestion.description}</p>
+        suggestionsList.innerHTML = suggestions.map(suggestion => `
+            <div class="suggestion-item" onclick="commandEditor.applySuggestion('${suggestion.template.replace(/'/g, "\\'")}')">
+                <div class="suggestion-content">
+                    <strong>${suggestion.content}</strong>
+                    <span class="suggestion-type">${suggestion.type}</span>
                 </div>
-            `).join('');
-            suggestionsPanel.style.display = 'block';
-        } else {
-            suggestionsPanel.style.display = 'none';
-            this.showInfo('No suggestions available for this code');
-        }
+                <div class="suggestion-desc">${suggestion.description}</div>
+            </div>
+        `).join('');
+        
+        suggestionsPanel.style.display = 'block';
     }
 
-    generateSuggestions(code) {
-        const suggestions = [];
-        
-        if (!code.includes('sendMessage')) {
-            suggestions.push({
-                title: 'Add sendMessage',
-                description: 'Send a message to the user',
-                code: 'sendMessage("Hello! This is your bot speaking.");'
-            });
-        }
-        
-        if (!code.includes('getUser')) {
-            suggestions.push({
-                title: 'Get user info',
-                description: 'Retrieve information about the user',
-                code: 'const user = getUser();\nsendMessage(`Hello ${user.first_name}!`);'
-            });
-        }
-        
-        if (code.includes('HTTP') && !code.includes('try')) {
-            suggestions.push({
-                title: 'Add error handling',
-                description: 'Wrap HTTP calls in try-catch',
-                code: 'try {\n  // Your HTTP code here\n} catch (error) {\n  sendMessage("Error: " + error.message);\n}'
-            });
-        }
-        
-        return suggestions;
+    hideSuggestionList() {
+        const suggestionsPanel = document.getElementById('suggestionsPanel');
+        suggestionsPanel.style.display = 'none';
     }
 
-    applySuggestion(code) {
+    applySuggestion(template) {
         const editor = document.getElementById('advancedCodeEditor');
         const currentCode = editor.value;
-        editor.value = currentCode + '\n\n' + code;
-        this.saveToHistory(editor.value);
-        document.getElementById('suggestionsPanel').style.display = 'none';
+        const cursorPos = editor.selectionStart;
+        
+        // Find the current word and replace it with the template
+        const textBeforeCursor = currentCode.substring(0, cursorPos);
+        const textAfterCursor = currentCode.substring(cursorPos);
+        
+        const lines = textBeforeCursor.split('\n');
+        const currentLine = lines[lines.length - 1];
+        const words = currentLine.split(/\s+/);
+        words.pop(); // Remove the last incomplete word
+        
+        const newLine = words.join(' ') + ' ' + template;
+        lines[lines.length - 1] = newLine;
+        
+        const newTextBeforeCursor = lines.join('\n');
+        const newCode = newTextBeforeCursor + textAfterCursor;
+        const newCursorPos = newTextBeforeCursor.length;
+        
+        editor.value = newCode;
+        editor.setSelectionRange(newCursorPos, newCursorPos);
+        editor.focus();
+        
+        this.saveToHistory(newCode);
+        this.hideSuggestionList();
     }
 
     openCodeEditor() {
@@ -285,11 +412,17 @@ class EnhancedCommandEditor {
         this.codeHistory = [code];
         this.historyIndex = 0;
         document.getElementById('codeEditorModal').style.display = 'flex';
+        
+        // Focus and select all
+        setTimeout(() => {
+            const editor = document.getElementById('advancedCodeEditor');
+            editor.focus();
+        }, 100);
     }
 
     closeCodeEditor() {
         document.getElementById('codeEditorModal').style.display = 'none';
-        document.getElementById('suggestionsPanel').style.display = 'none';
+        this.hideSuggestionList();
     }
 
     saveCodeFromEditor() {
@@ -305,19 +438,17 @@ class EnhancedCommandEditor {
         modals.forEach(modalId => {
             const modal = document.getElementById(modalId);
             const closeBtn = modal?.querySelector('.modal-close');
-            const closeActionBtn = modal?.querySelector(`#close${modalId.replace('Modal', '')}`);
             
             if (closeBtn) {
                 closeBtn.addEventListener('click', () => {
                     modal.style.display = 'none';
                 });
             }
-            
-            if (closeActionBtn) {
-                closeActionBtn.addEventListener('click', () => {
-                    modal.style.display = 'none';
-                });
-            }
+        });
+
+        // Close test command modal
+        document.getElementById('closeTestCommand')?.addEventListener('click', () => {
+            document.getElementById('testCommandModal').style.display = 'none';
         });
 
         window.addEventListener('click', (e) => {
@@ -580,14 +711,7 @@ class EnhancedCommandEditor {
         const code = codeTextarea.value;
         
         try {
-            // Simple formatting
-            const formatted = code
-                .replace(/\n\s*\n/g, '\n\n')
-                .replace(/\{\s*\n/g, '{\n')
-                .replace(/\n\s*\}/g, '\n}')
-                .replace(/;\s*\n/g, ';\n')
-                .trim();
-            
+            const formatted = this.formatJavaScript(code);
             codeTextarea.value = formatted;
             this.showSuccess('Code formatted!');
         } catch (error) {
@@ -602,17 +726,24 @@ class EnhancedCommandEditor {
         }
 
         const moreCommands = document.getElementById('moreCommands').value.trim();
-        const commands = moreCommands.split(',').map(cmd => cmd.trim()).filter(cmd => cmd);
         
-        if (commands.length === 0) {
+        if (!moreCommands) {
             this.showError('Please enter at least one command');
             document.getElementById('moreCommands').focus();
             return false;
         }
 
+        // Validate for duplicates
+        if (!this.validateMoreCommands(moreCommands)) {
+            document.getElementById('moreCommands').focus();
+            return false;
+        }
+
+        const commands = moreCommands.split(',').map(cmd => cmd.trim()).filter(cmd => cmd);
+        
         const formData = {
-            name: commands[0], // Use first command as name
-            pattern: commands.join(', '), // Join all commands
+            name: commands[0],
+            pattern: moreCommands,
             code: document.getElementById('commandCode').value.trim(),
             waitForAnswer: document.getElementById('waitForAnswer').checked,
             answerHandler: document.getElementById('waitForAnswer').checked ? 
@@ -646,6 +777,7 @@ class EnhancedCommandEditor {
             } else {
                 url = `/api/commands/${this.currentCommand.id}`;
                 method = 'PUT';
+                formData.commandId = this.currentCommand.id;
             }
 
             response = await fetch(url, {
@@ -665,13 +797,8 @@ class EnhancedCommandEditor {
                 await this.loadCommands();
                 
                 if (data.command) {
-                    this.currentCommand = data.command;
+                    this.currentCommand = Array.isArray(data.command) ? data.command[0] : data.command;
                     this.populateCommandForm();
-                    
-                    const commandItem = document.querySelector(`[onclick*="${data.command.id}"]`);
-                    if (commandItem) {
-                        commandItem.outerHTML = this.getCommandItemHTML(data.command);
-                    }
                 }
                 
                 return true;
