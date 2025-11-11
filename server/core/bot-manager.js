@@ -1,5 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 const TelegramBot = require('node-telegram-bot-api');
+const axios = require('axios'); // Add axios for HTTP requests
 const supabase = require('../config/supabase');
 
 // Store active bots and their commands
@@ -320,61 +321,200 @@ async function executeAnswerHandler(bot, command, msg, answerText, context) {
 
 // Execute command code safely
 async function executeCommandCode(bot, code, context) {
-    const { msg, chatId, userId, username, first_name, isTest, answerText, originalContext } = context;
+    const { msg, chatId, userId, username, first_name, isTest, answerText } = context;
     
-    // Safe functions available in command code
+    // Enhanced available functions for command code
     const safeFunctions = {
-        // Message functions
+        // Basic messaging
         sendMessage: (text, options = {}) => {
             return bot.sendMessage(chatId, text, {
                 parse_mode: 'Markdown',
                 ...options
             });
         },
-        sendPhoto: (photo, options = {}) => bot.sendPhoto(chatId, photo, options),
-        sendDocument: (doc, options = {}) => bot.sendDocument(chatId, doc, options),
-        sendChatAction: (action) => bot.sendChatAction(chatId, action),
+        
+        sendPhoto: (photo, options = {}) => {
+            return bot.sendPhoto(chatId, photo, options);
+        },
+        
+        sendDocument: (doc, options = {}) => {
+            return bot.sendDocument(chatId, doc, options);
+        },
+        
+        sendVideo: (video, options = {}) => {
+            return bot.sendVideo(chatId, video, options);
+        },
+        
+        sendAudio: (audio, options = {}) => {
+            return bot.sendAudio(chatId, audio, options);
+        },
+        
+        sendSticker: (sticker, options = {}) => {
+            return bot.sendSticker(chatId, sticker, options);
+        },
+        
+        sendAnimation: (animation, options = {}) => {
+            return bot.sendAnimation(chatId, animation, options);
+        },
+        
+        sendDice: (emoji = "🎲", options = {}) => {
+            return bot.sendDice(chatId, { emoji, ...options });
+        },
+        
+        // Message management
+        deleteMessage: (options = {}) => {
+            const messageId = options.message_id || msg.message_id;
+            return bot.deleteMessage(chatId, messageId);
+        },
+        
+        editMessageText: (text, options = {}) => {
+            const messageId = options.message_id || msg.message_id;
+            return bot.editMessageText(text, {
+                chat_id: chatId,
+                message_id: messageId,
+                ...options
+            });
+        },
+        
+        // Chat actions
+        sendChatAction: (action) => {
+            return bot.sendChatAction(chatId, action);
+        },
         
         // User info
         getUser: () => ({ 
             id: userId, 
             username: username || 'No username', 
-            first_name: first_name || 'User'
+            first_name: first_name || 'User',
+            telegramid: userId
         }),
+        
         getMessage: () => msg,
+        
         getChatId: () => chatId,
         
-        // Context info
-        isTest: () => isTest || false,
-        getAnswer: () => answerText || '',
-        
-        // Admin functions
-        isAdmin: async () => {
-            const { data: adminSettings } = await supabase
-                .from('admin_settings')
-                .select('admin_chat_id')
-                .single();
-            return adminSettings?.admin_chat_id == userId;
+        // HTTP requests
+        HTTP: {
+            get: async (options) => {
+                try {
+                    const response = await axios.get(options.url, {
+                        headers: options.headers || {}
+                    });
+                    return response.data;
+                } catch (error) {
+                    throw new Error(`HTTP GET failed: ${error.message}`);
+                }
+            },
+            
+            post: async (options) => {
+                try {
+                    const response = await axios.post(options.url, options.data || {}, {
+                        headers: options.headers || {}
+                    });
+                    return response.data;
+                } catch (error) {
+                    throw new Error(`HTTP POST failed: ${error.message}`);
+                }
+            }
         },
         
         // Utility functions
+        isTest: () => isTest || false,
+        
+        getAnswer: () => answerText || '',
+        
         wait: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
-        log: (message) => console.log(`[Command Log]: ${message}`)
+        
+        log: (message) => console.log(`[Command Log]: ${message}`),
+        
+        // Alias functions for compatibility
+        Api: {
+            sendMessage: (options) => {
+                return bot.sendMessage(options.chat_id || chatId, options.text, {
+                    reply_markup: options.reply_markup,
+                    parse_mode: options.parse_mode
+                });
+            },
+            
+            sendPhoto: (options) => {
+                return bot.sendPhoto(options.chat_id || chatId, options.photo, {
+                    caption: options.caption
+                });
+            },
+            
+            sendDocument: (options) => {
+                return bot.sendDocument(options.chat_id || chatId, options.document, {
+                    caption: options.caption
+                });
+            },
+            
+            deleteMessage: (options) => {
+                return bot.deleteMessage(options.chat_id || chatId, options.message_id);
+            },
+            
+            sendChatAction: (options) => {
+                return bot.sendChatAction(options.chat_id || chatId, options.action);
+            },
+            
+            sendDice: (options) => {
+                return bot.sendDice(options.chat_id || chatId, { 
+                    emoji: options.emoji || "🎲" 
+                });
+            }
+        },
+        
+        // Bot functions alias
+        Bot: {
+            sendMessage: (text, options = {}) => {
+                return bot.sendMessage(chatId, text, {
+                    parse_mode: 'Markdown',
+                    ...options
+                });
+            }
+        }
     };
 
-    // Wrap code in try-catch and async function
-    const wrappedCode = `
-        return (async function() {
-            try {
+    try {
+        // Wrap the code in an async function
+        const wrappedCode = `
+            return (async function() {
+                const { 
+                    sendMessage, 
+                    sendPhoto, 
+                    sendDocument,
+                    sendVideo,
+                    sendAudio,
+                    sendSticker,
+                    sendAnimation,
+                    sendDice,
+                    deleteMessage,
+                    editMessageText,
+                    sendChatAction,
+                    getUser, 
+                    getMessage, 
+                    getChatId,
+                    HTTP,
+                    isTest, 
+                    getAnswer,
+                    wait,
+                    log,
+                    Api,
+                    Bot
+                } = this;
+                
                 ${code}
-            } catch (error) {
-                throw new Error('Command execution failed: ' + error.message);
-            }
-        })();
-    `;
+            }).call(this);
+        `;
 
-    const func = new Function(...Object.keys(safeFunctions), wrappedCode);
-    return await func(...Object.values(safeFunctions));
+        // Create and execute the function
+        const func = new Function(wrappedCode);
+        const result = await func.call(safeFunctions);
+        
+        return result;
+    } catch (error) {
+        console.error('❌ Command code execution error:', error);
+        throw new Error(`Command execution failed: ${error.message}`);
+    }
 }
 
 // Handle bot updates from webhook
