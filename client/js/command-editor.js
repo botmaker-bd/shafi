@@ -1,4 +1,4 @@
-class CommandEditor {
+class EnhancedCommandEditor {
     constructor() {
         this.user = null;
         this.currentBot = null;
@@ -13,6 +13,7 @@ class CommandEditor {
         this.setupEventListeners();
         await this.loadCommands();
         this.setupUserMenu();
+        this.setupQuickTemplates();
     }
 
     async checkAuth() {
@@ -45,6 +46,336 @@ class CommandEditor {
     updateUI() {
         if (this.user) {
             document.getElementById('userEmail').textContent = this.user.email;
+            // Update user avatar with first letter
+            const userAvatar = document.querySelector('.user-avatar');
+            if (userAvatar) {
+                userAvatar.textContent = this.user.email.charAt(0).toUpperCase();
+            }
+        }
+    }
+
+    setupEventListeners() {
+        // Navigation
+        document.getElementById('backToBots').addEventListener('click', () => {
+            window.location.href = 'bot-management.html';
+        });
+
+        // Command actions
+        document.getElementById('addCommandBtn').addEventListener('click', () => {
+            this.addNewCommand();
+        });
+
+        document.getElementById('createFirstCommand').addEventListener('click', () => {
+            this.addNewCommand();
+        });
+
+        document.getElementById('addFirstCommand').addEventListener('click', () => {
+            this.addNewCommand();
+        });
+
+        // Toggle switches
+        this.setupToggleSwitches();
+
+        // Quick templates
+        this.setupTemplateEvents();
+
+        // Save button
+        document.getElementById('saveCommandBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.saveCommand();
+        });
+
+        document.getElementById('deleteCommandBtn').addEventListener('click', () => {
+            this.deleteCommand();
+        });
+
+        document.getElementById('testCommandBtn').addEventListener('click', () => {
+            this.testCommand();
+        });
+
+        // Form interactions
+        document.getElementById('waitForAnswer').addEventListener('change', (e) => {
+            this.toggleAnswerHandler(e.target.checked);
+        });
+
+        // Command search
+        let searchTimeout;
+        document.getElementById('commandSearch').addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                this.filterCommands(e.target.value);
+            }, 300);
+        });
+
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.logout();
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                this.saveCommand();
+            }
+        });
+    }
+
+    setupUserMenu() {
+        const userBtn = document.getElementById('userMenuBtn');
+        const userDropdown = document.getElementById('userDropdown');
+
+        if (userBtn && userDropdown) {
+            userBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                userDropdown.classList.toggle('show');
+            });
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!userBtn.contains(e.target) && !userDropdown.contains(e.target)) {
+                    userDropdown.classList.remove('show');
+                }
+            });
+        }
+    }
+
+    setupToggleSwitches() {
+        // Setup all toggle switches in the command editor
+        const toggles = document.querySelectorAll('.toggle-switch input');
+        toggles.forEach(toggle => {
+            toggle.addEventListener('change', (e) => {
+                const isChecked = e.target.checked;
+                const toggleId = e.target.id;
+                
+                // Handle different toggle functionalities
+                switch (toggleId) {
+                    case 'waitForAnswer':
+                        this.toggleAnswerHandler(isChecked);
+                        break;
+                    case 'commandActive':
+                        this.toggleCommandStatus(isChecked);
+                        break;
+                    default:
+                        console.log(`Toggle ${toggleId} changed to:`, isChecked);
+                }
+                
+                this.showSuccess(`Setting ${isChecked ? 'enabled' : 'disabled'}`);
+            });
+        });
+    }
+
+    setupQuickTemplates() {
+        // Predefined quick templates
+        this.templates = {
+            welcome: {
+                name: "Welcome Message",
+                pattern: "/start",
+                description: "Send a welcome message to new users",
+                code: `// Welcome command template
+const user = getUser();
+const welcomeMessage = \`👋 Hello \${user.first_name}!
+
+Welcome to our bot! I'm here to help you with various tasks.
+
+🤖 *Available Commands:*
+/start - Show this welcome message
+/help - Get help information
+
+Thank you for using our bot! 😊\`;
+
+return sendMessage(welcomeMessage);`,
+                icon: "👋",
+                tags: ["welcome", "basic"]
+            },
+            echo: {
+                name: "Echo Command",
+                pattern: "/echo",
+                description: "Repeat user's message back",
+                code: `// Echo command - repeats user's message
+const message = getMessage();
+const text = message.text;
+
+// Remove command part and get the text to echo
+const echoText = text.replace('/echo', '').trim();
+
+if (!echoText) {
+    return sendMessage('Please provide some text after /echo command.\\\\nExample: /echo Hello World!');
+}
+
+return sendMessage(\`🔊 Echo: \${echoText}\`);`,
+                icon: "🔊",
+                tags: ["utility", "basic"]
+            },
+            buttons: {
+                name: "Inline Buttons",
+                pattern: "/menu",
+                description: "Show message with inline keyboard buttons",
+                code: `// Message with inline buttons
+const keyboard = {
+    inline_keyboard: [
+        [
+            { text: '✅ Option 1', callback_data: 'option_1' },
+            { text: '🔘 Option 2', callback_data: 'option_2' }
+        ],
+        [
+            { text: '🌐 Visit Website', url: 'https://example.com' }
+        ]
+    ]
+};
+
+return sendMessage('Please choose an option:', {
+    reply_markup: keyboard
+});`,
+                icon: "🔄",
+                tags: ["interactive", "buttons"]
+            },
+            interactive: {
+                name: "Wait for Answer",
+                pattern: "/survey",
+                description: "Ask question and wait for user response",
+                code: `// Command that waits for user answer
+const user = getUser();
+
+// Send initial message
+await sendMessage(\`Hello \${user.first_name}! Please tell me your favorite color:\`);
+
+// The bot will now wait for user's response
+// Answer handler will process the response`,
+                answerHandler: `// Handle user's answer
+const answer = getAnswer();
+const user = getUser();
+
+// Process the answer here
+return sendMessage(\`🎨 Great choice! \${answer} is a beautiful color, \${user.first_name}!\`);`,
+                icon: "⏳",
+                tags: ["interactive", "advanced"],
+                waitForAnswer: true
+            },
+            http: {
+                name: "HTTP Request",
+                pattern: "/http",
+                description: "Make HTTP requests to external APIs",
+                code: `// HTTP Request example
+try {
+    const response = await HTTP.get({
+        url: "https://jsonplaceholder.typicode.com/posts/1"
+    });
+    
+    return sendMessage(\`✅ HTTP Request Success! Response: \${JSON.stringify(response)}\`);
+} catch (error) {
+    return sendMessage(\`❌ Request failed: \${error.message}\`);
+}`,
+                icon: "🌐",
+                tags: ["advanced", "api"]
+            },
+            media: {
+                name: "Send Media",
+                pattern: "/media",
+                description: "Send photos, documents, and other media",
+                code: `// Send media files
+const user = getUser();
+
+// Send photo
+await sendPhoto("https://via.placeholder.com/150", {
+    caption: "This is a sample photo"
+});
+
+// Send document
+await sendDocument("https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf", {
+    caption: "Sample PDF document"
+});
+
+return sendMessage("Media files sent successfully!");`,
+                icon: "📷",
+                tags: ["media", "advanced"]
+            }
+        };
+
+        this.renderTemplates();
+    }
+
+    setupTemplateEvents() {
+        document.addEventListener('click', (e) => {
+            const templateCard = e.target.closest('.template-card');
+            if (templateCard) {
+                const templateName = templateCard.dataset.template;
+                this.applyTemplate(templateName);
+            }
+        });
+    }
+
+    renderTemplates() {
+        const templatesGrid = document.getElementById('templatesGrid');
+        if (!templatesGrid) return;
+
+        templatesGrid.innerHTML = Object.keys(this.templates).map(templateKey => {
+            const template = this.templates[templateKey];
+            return `
+                <div class="template-card" data-template="${templateKey}">
+                    <div class="template-icon">${template.icon}</div>
+                    <h4>${template.name}</h4>
+                    <p>${template.description}</p>
+                    <div class="template-tags">
+                        ${template.tags.map(tag => `<span class="template-tag">${tag}</span>`).join('')}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    applyTemplate(templateName) {
+        const template = this.templates[templateName];
+        if (!template) return;
+
+        // Create new command with template
+        this.currentCommand = {
+            id: 'new',
+            name: template.name,
+            pattern: template.pattern,
+            description: template.description,
+            code: template.code,
+            is_active: true,
+            wait_for_answer: template.waitForAnswer || false,
+            answer_handler: template.answerHandler || ''
+        };
+
+        this.showCommandEditor();
+        this.populateCommandForm();
+        
+        // Show success message
+        this.showSuccess(`"${template.name}" template applied!`);
+        
+        // Scroll to editor
+        document.getElementById('commandEditor').scrollIntoView({ 
+            behavior: 'smooth',
+            block: 'start'
+        });
+    }
+
+    toggleAnswerHandler(show) {
+        const section = document.getElementById('answerHandlerSection');
+        if (show) {
+            section.style.display = 'block';
+            // Add default answer handler if empty
+            if (!document.getElementById('answerHandler').value.trim()) {
+                document.getElementById('answerHandler').value = `// Handle user's answer
+const answer = getAnswer();
+const user = getUser();
+
+// Process the answer here
+return sendMessage(\`✅ Thank you for your answer: "\${answer}"\`);`;
+            }
+        } else {
+            section.style.display = 'none';
+        }
+    }
+
+    toggleCommandStatus(isActive) {
+        if (this.currentCommand) {
+            this.currentCommand.is_active = isActive;
+            this.showSuccess(`Command ${isActive ? 'activated' : 'deactivated'}`);
         }
     }
 
@@ -86,128 +417,6 @@ class CommandEditor {
             document.getElementById('botUsername').textContent = `@${this.currentBot.username}`;
             document.title = `Commands - ${this.currentBot.name} - Bot Maker Pro`;
         }
-    }
-
-    setupEventListeners() {
-        // Navigation
-        document.getElementById('backToBots').addEventListener('click', () => {
-            window.location.href = 'bot-management.html';
-        });
-
-        // Command actions
-        document.getElementById('addCommandBtn').addEventListener('click', () => {
-            this.addNewCommand();
-        });
-
-        document.getElementById('createFirstCommand').addEventListener('click', () => {
-            this.addNewCommand();
-        });
-
-        document.getElementById('addFirstCommand').addEventListener('click', () => {
-            this.addNewCommand();
-        });
-
-        // Save button
-        document.getElementById('saveCommandBtn').addEventListener('click', (e) => {
-            e.preventDefault();
-            this.saveCommand();
-        });
-
-        document.getElementById('deleteCommandBtn').addEventListener('click', () => {
-            this.deleteCommand();
-        });
-
-        document.getElementById('testCommandBtn').addEventListener('click', () => {
-            this.testCommand();
-        });
-
-        // Form interactions
-        document.getElementById('waitForAnswer').addEventListener('change', (e) => {
-            this.toggleAnswerHandler(e.target.checked);
-        });
-
-        // Code templates
-        document.querySelectorAll('.template-card').forEach(card => {
-            card.addEventListener('click', () => {
-                const template = card.dataset.template;
-                this.insertTemplate(template);
-            });
-        });
-
-        // Code formatting
-        document.getElementById('formatCode').addEventListener('click', () => {
-            this.formatCode();
-        });
-
-        document.getElementById('insertTemplate').addEventListener('click', () => {
-            this.showTemplateSelector();
-        });
-
-        // Command search
-        let searchTimeout;
-        document.getElementById('commandSearch').addEventListener('input', (e) => {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                this.filterCommands(e.target.value);
-            }, 300);
-        });
-
-        // Logout
-        document.getElementById('logoutBtn').addEventListener('click', (e) => {
-            e.preventDefault();
-            this.logout();
-        });
-
-        // Keyboard shortcuts
-        document.addEventListener('keydown', (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-                e.preventDefault();
-                this.saveCommand();
-            }
-        });
-
-        // Modal events
-        this.setupModalEvents();
-    }
-
-    setupUserMenu() {
-        const userBtn = document.getElementById('userMenuBtn');
-        const userDropdown = document.getElementById('userDropdown');
-
-        if (userBtn && userDropdown) {
-            userBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                userDropdown.classList.toggle('show');
-            });
-
-            document.addEventListener('click', () => {
-                userDropdown.classList.remove('show');
-            });
-        }
-    }
-
-    setupModalEvents() {
-        const modal = document.getElementById('testCommandModal');
-        const closeBtn = document.getElementById('closeTestCommand');
-        const modalClose = document.querySelector('.modal-close');
-
-        if (closeBtn) {
-            closeBtn.addEventListener('click', () => {
-                modal.style.display = 'none';
-            });
-        }
-
-        if (modalClose) {
-            modalClose.addEventListener('click', () => {
-                modal.style.display = 'none';
-            });
-        }
-
-        window.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                modal.style.display = 'none';
-            }
-        });
     }
 
     async loadCommands() {
@@ -262,17 +471,23 @@ class CommandEditor {
         return `
             <div class="command-item ${isSelected ? 'active' : ''}" 
                  onclick="commandEditor.selectCommand('${command.id}')">
-                <div class="command-header">
-                    <h4>${this.escapeHtml(command.name)}</h4>
-                    <span class="command-pattern">${this.escapeHtml(command.pattern)}</span>
+                <div class="command-icon">
+                    <i class="fas fa-code"></i>
                 </div>
-                <p class="command-desc">${this.escapeHtml(command.description || 'No description')}</p>
-                <div class="command-meta">
-                    <span class="command-status ${isActive ? 'active' : 'inactive'}">
-                        ${isActive ? '✅ Active' : '❌ Inactive'}
-                    </span>
-                    ${hasAnswerHandler ? '<span class="command-feature">⏳ Waits</span>' : ''}
-                    ${command.wait_for_answer ? '<span class="command-feature">💬 Interactive</span>' : ''}
+                <div class="command-content">
+                    <div class="command-header">
+                        <span class="command-name">${this.escapeHtml(command.name)}</span>
+                        <span class="command-pattern">${this.escapeHtml(command.pattern)}</span>
+                    </div>
+                    <p class="command-description">${this.escapeHtml(command.description || 'No description')}</p>
+                    <div class="command-meta">
+                        <span class="command-status ${isActive ? 'active' : 'inactive'}">
+                            <i class="fas fa-circle"></i>
+                            ${isActive ? 'Active' : 'Inactive'}
+                        </span>
+                        ${hasAnswerHandler ? '<span class="command-feature">⏳ Waits</span>' : ''}
+                        ${command.wait_for_answer ? '<span class="command-feature">💬 Interactive</span>' : ''}
+                    </div>
                 </div>
             </div>
         `;
@@ -288,9 +503,9 @@ class CommandEditor {
         }
 
         commandItems.forEach(item => {
-            const commandName = item.querySelector('h4').textContent.toLowerCase();
+            const commandName = item.querySelector('.command-name').textContent.toLowerCase();
             const commandPattern = item.querySelector('.command-pattern').textContent.toLowerCase();
-            const commandDesc = item.querySelector('.command-desc').textContent.toLowerCase();
+            const commandDesc = item.querySelector('.command-description').textContent.toLowerCase();
             
             const isVisible = commandName.includes(lowerSearch) || 
                             commandPattern.includes(lowerSearch) ||
@@ -306,7 +521,7 @@ class CommandEditor {
             name: 'New Command',
             pattern: '/start',
             description: '',
-            code: this.getDefaultTemplate('welcome'),
+            code: '// Write your command code here\nconst user = getUser();\nreturn sendMessage(`Hello ${user.first_name}!`);',
             is_active: true,
             wait_for_answer: false,
             answer_handler: ''
@@ -383,13 +598,21 @@ class CommandEditor {
         document.getElementById('commandDescription').value = this.currentCommand.description || '';
         document.getElementById('commandCode').value = this.currentCommand.code || '';
         
-        // Wait for answer
-        const waitCheckbox = document.getElementById('waitForAnswer');
-        waitCheckbox.checked = this.currentCommand.wait_for_answer || false;
-        this.toggleAnswerHandler(waitCheckbox.checked);
+        // Wait for answer toggle
+        const waitToggle = document.getElementById('waitForAnswer');
+        if (waitToggle) {
+            waitToggle.checked = this.currentCommand.wait_for_answer || false;
+            this.toggleAnswerHandler(waitToggle.checked);
+        }
         
         // Answer handler
         document.getElementById('answerHandler').value = this.currentCommand.answer_handler || '';
+        
+        // Command active toggle
+        const activeToggle = document.getElementById('commandActive');
+        if (activeToggle) {
+            activeToggle.checked = this.currentCommand.is_active !== false;
+        }
         
         // Update UI
         document.getElementById('currentCommandName').textContent = this.currentCommand.name;
@@ -398,24 +621,6 @@ class CommandEditor {
         
         // Update button states
         this.updateButtonStates();
-    }
-
-    toggleAnswerHandler(show) {
-        const section = document.getElementById('answerHandlerSection');
-        if (show) {
-            section.style.display = 'block';
-            // Add default answer handler if empty
-            if (!document.getElementById('answerHandler').value.trim()) {
-                document.getElementById('answerHandler').value = `// Handle user's answer
-const answer = getAnswer();
-const user = getUser();
-
-// Process the answer here
-return sendMessage(\`✅ Thank you for your answer: "\${answer}"\`);`;
-            }
-        } else {
-            section.style.display = 'none';
-        }
     }
 
     updateButtonStates() {
@@ -663,279 +868,6 @@ return sendMessage(\`✅ Thank you for your answer: "\${answer}"\`);`;
         }
     }
 
-    insertTemplate(templateName) {
-        const template = this.getDefaultTemplate(templateName);
-        const codeTextarea = document.getElementById('commandCode');
-        
-        if (codeTextarea) {
-            codeTextarea.value = template;
-            
-            // Special handling for wait template
-            if (templateName === 'wait') {
-                document.getElementById('waitForAnswer').checked = true;
-                this.toggleAnswerHandler(true);
-                
-                // Set answer handler template
-                const answerHandler = document.getElementById('answerHandler');
-                if (answerHandler) {
-                    answerHandler.value = `// Handle user's answer
-const answer = getAnswer();
-const user = getUser();
-
-// Process the answer here
-return sendMessage(\`🎨 Great choice! \${answer} is a beautiful color, \${user.first_name}!\`);`;
-                }
-            }
-            
-            this.showSuccess(`"${templateName}" template inserted successfully!`);
-        }
-    }
-
-    // class CommandEditor {
-    // // ... previous code remains same ...
-
-    getDefaultTemplate(templateName) {
-        const templates = {
-            welcome: `// Welcome command template
-const user = getUser();
-const welcomeMessage = \`
-👋 Hello \${user.first_name}!
-
-Welcome to our bot! I'm here to help you with various tasks.
-
-🤖 *Available Commands:*
-/start - Show this welcome message
-/help - Get help information
-
-Thank you for using our bot! 😊
-\`;
-
-return sendMessage(welcomeMessage);`,
-
-            echo: `// Echo command - repeats user's message
-const message = getMessage();
-const text = message.text;
-
-// Remove command part and get the text to echo
-const echoText = text.replace('/echo', '').trim();
-
-if (!echoText) {
-    return sendMessage('Please provide some text after /echo command.\\\\nExample: /echo Hello World!');
-}
-
-return sendMessage(\`🔊 Echo: \${echoText}\`);`,
-
-            buttons: `// Message with inline buttons
-const keyboard = {
-    inline_keyboard: [
-        [
-            { text: '✅ Option 1', callback_data: 'option_1' },
-            { text: '🔘 Option 2', callback_data: 'option_2' }
-        ],
-        [
-            { text: '🌐 Visit Website', url: 'https://example.com' }
-        ]
-    ]
-};
-
-return sendMessage('Please choose an option:', {
-    reply_markup: keyboard
-});`,
-
-            keyboard: `// Keyboard buttons
-const keyboard = {
-    resize_keyboard: true,
-    keyboard: [
-        [{ text: "BUTTON 1" }],
-        [{ text: "BUTTON 2" }, { text: "BUTTON 3" }]
-    ]
-};
-
-return sendMessage('Choose an option:', {
-    reply_markup: keyboard
-});`,
-
-            webapp: `// Web App button
-const LINK = "https://te.legra.ph/";
-return sendMessage('Open Web App:', {
-    reply_markup: {
-        inline_keyboard: [
-            [{ text: "WEB_APP", web_app: { url: LINK }}]
-        ]
-    }
-});`,
-
-            http_request: `// HTTP Request example
-const content = null; // Set your content here
-
-if (!content) {
-    // Make HTTP GET request
-    const response = await HTTP.get({
-        url: "https://jsonplaceholder.typicode.com/posts/1"
-    });
-    
-    return sendMessage(\`✅ HTTP Request Success! Response: \${JSON.stringify(response)}\`);
-} else {
-    return sendMessage(content);
-}`,
-
-            delete_message: `// Delete bot's previous message
-const chatId = getChatId();
-const messageId = getMessage().message_id;
-
-// Delete user's message
-await deleteMessage({
-    chat_id: chatId,
-    message_id: messageId
-});
-
-return sendMessage("Message deleted successfully!");`,
-
-            media: `// Send media files
-const user = getUser();
-
-// Send photo
-await sendPhoto("https://via.placeholder.com/150", {
-    caption: "This is a sample photo"
-});
-
-// Send document
-await sendDocument("https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf", {
-    caption: "Sample PDF document"
-});
-
-// Send sticker
-await sendSticker("https://www.gstatic.com/webp/gallery/1.sm.webp");
-
-return sendMessage("Media files sent successfully!");`,
-
-            typing: `// Show typing indicator
-const chatId = getChatId();
-
-// Show typing action
-await sendChatAction("typing");
-await wait(2000); // Wait 2 seconds
-
-return sendMessage("I was typing...");`,
-
-            dice: `// Send dice emoji
-await sendDice("🎯");
-await wait(2000);
-
-return sendMessage("Let's play a game!");`,
-
-            remove_keyboard: `// Remove keyboard
-return sendMessage('⌨️ Keyboard Removed', {
-    reply_markup: {
-        hide_keyboard: true
-    }
-});`,
-
-            channel_message: `// Send message to channel
-const channelUsername = "@yourchannel"; // Replace with your channel username
-
-return sendMessage("Hello Channel!", {
-    chat_id: channelUsername
-});`,
-
-            wait: `// Command that waits for user answer
-const user = getUser();
-
-// Send initial message
-await sendMessage(\`Hello \${user.first_name}! Please tell me your favorite color:\`);
-
-// The bot will now wait for user's response
-// Answer handler will process the response`,
-
-            advanced_http: `// Advanced HTTP POST request
-try {
-    const response = await HTTP.post({
-        url: 'https://jsonplaceholder.typicode.com/posts',
-        data: {
-            title: 'foo',
-            body: 'bar',
-            userId: 1
-        },
-        headers: {
-            'Content-type': 'application/json'
-        }
-    });
-    
-    return sendMessage(\`✅ POST Request Success! ID: \${response.id}\`);
-} catch (error) {
-    return sendMessage(\`❌ Request failed: \${error.message}\`);
-}`
-        };
-
-        return templates[templateName] || templates.welcome;
-    }
-
-    // ... rest of the code remains same ...
-// }
-
-    formatCode() {
-        const codeTextarea = document.getElementById('commandCode');
-        if (!codeTextarea) return;
-
-        let code = codeTextarea.value;
-        
-        try {
-            // Improved code formatting
-            const lines = code.split('\n');
-            let indentLevel = 0;
-            const formattedLines = [];
-            const indentSize = 4;
-            
-            for (let line of lines) {
-                let trimmed = line.trim();
-                if (!trimmed) {
-                    formattedLines.push('');
-                    continue;
-                }
-                
-                // Decrease indent for closing braces
-                if (trimmed.startsWith('}') || trimmed.startsWith(']') || trimmed.startsWith(')')) {
-                    indentLevel = Math.max(0, indentLevel - 1);
-                }
-                
-                // Add current line with proper indentation
-                formattedLines.push(' '.repeat(indentLevel * indentSize) + trimmed);
-                
-                // Increase indent for opening braces
-                if (trimmed.endsWith('{') || trimmed.endsWith('[') || trimmed.endsWith('(') || 
-                    trimmed.endsWith('=>') || trimmed.includes(' function')) {
-                    indentLevel++;
-                }
-            }
-            
-            codeTextarea.value = formattedLines.join('\n');
-            this.showSuccess('Code formatted successfully!');
-        } catch (error) {
-            this.showError('Formatting failed: ' + error.message);
-        }
-    }
-
-    showTemplateSelector() {
-        const templates = ['welcome', 'echo', 'buttons', 'wait'];
-        const templateHTML = templates.map(tpl => 
-            `<button type="button" onclick="commandEditor.insertTemplate('${tpl}')" 
-                    class="btn btn-secondary btn-small" style="margin: 2px;">
-                ${tpl}
-            </button>`
-        ).join('');
-        
-        this.showNotification(
-            `<div style="text-align: center;">
-                <p style="margin-bottom: 8px; font-weight: bold;">Select Template:</p>
-                <div style="display: flex; gap: 4px; flex-wrap: wrap; justify-content: center;">
-                    ${templateHTML}
-                </div>
-            </div>`, 
-            'info',
-            8000
-        );
-    }
-
     logout() {
         const sessionId = localStorage.getItem('sessionId');
         const token = localStorage.getItem('token');
@@ -948,7 +880,7 @@ try {
                     'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({ sessionId })
-            }).catch(() => {}); // Ignore errors during logout
+            }).catch(() => {});
         }
 
         localStorage.clear();
@@ -970,28 +902,21 @@ try {
         this.showNotification(message, 'success');
     }
 
-    showNotification(message, type = 'info', duration = 5000) {
+    showNotification(message, type = 'info') {
         // Remove existing notifications
-        const existing = document.querySelectorAll('.notification');
-        existing.forEach(notif => notif.remove());
+        const existing = document.querySelector('.notification');
+        if (existing) existing.remove();
 
         const notification = document.createElement('div');
         notification.className = `notification notification-${type}`;
-        
-        // Check if message contains HTML
-        if (message.includes('<')) {
-            notification.innerHTML = message;
-        } else {
-            notification.innerHTML = `
-                <div class="notification-content">
-                    <i class="fas fa-${type === 'error' ? 'exclamation-triangle' : type === 'success' ? 'check-circle' : 'info-circle'}"></i>
-                    <span class="notification-message">${message}</span>
-                    <button class="notification-close">&times;</button>
-                </div>
-            `;
-        }
+        notification.innerHTML = `
+            <div class="notification-content">
+                <i class="fas fa-${type === 'error' ? 'exclamation-triangle' : type === 'success' ? 'check-circle' : 'info-circle'}"></i>
+                <span class="notification-message">${message}</span>
+                <button class="notification-close">&times;</button>
+            </div>
+        `;
 
-        // Apply styles
         Object.assign(notification.style, {
             position: 'fixed',
             top: '20px',
@@ -1008,26 +933,18 @@ try {
             gap: '0.75rem'
         });
 
-        // Add close button functionality
-        const closeBtn = notification.querySelector('.notification-close');
-        if (closeBtn) {
-            closeBtn.addEventListener('click', () => {
-                notification.remove();
-            });
-        }
+        notification.querySelector('.notification-close').addEventListener('click', () => {
+            notification.remove();
+        });
 
         document.body.appendChild(notification);
 
-        // Auto remove after duration
         setTimeout(() => {
-            if (notification.parentNode) {
-                notification.remove();
-            }
-        }, duration);
+            notification.remove();
+        }, 5000);
     }
 
     escapeHtml(unsafe) {
-        if (!unsafe) return '';
         return unsafe
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
@@ -1037,8 +954,8 @@ try {
     }
 }
 
-// Initialize command editor
+// Initialize enhanced command editor
 let commandEditor;
 document.addEventListener('DOMContentLoaded', () => {
-    commandEditor = new CommandEditor();
+    commandEditor = new EnhancedCommandEditor();
 });
