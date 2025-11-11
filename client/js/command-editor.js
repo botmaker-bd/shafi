@@ -95,6 +95,11 @@ class EnhancedCommandEditor {
             this.testCommand();
         });
 
+        // Enhanced test with input
+        document.getElementById('runTestBtn').addEventListener('click', () => {
+            this.runCustomTest();
+        });
+
         // Command search
         let searchTimeout;
         document.getElementById('commandSearch').addEventListener('input', (e) => {
@@ -113,21 +118,14 @@ class EnhancedCommandEditor {
             this.openCodeEditor('answer');
         });
 
-        // Quick test button in commands list
-        this.setupQuickTestButtons();
+        // Remove format button from main editor
+        const formatBtn = document.getElementById('formatCode');
+        if (formatBtn) {
+            formatBtn.style.display = 'none';
+        }
 
         // Modal events
         this.setupModalEvents();
-    }
-
-    setupQuickTestButtons() {
-        // Add quick test buttons to command items
-        document.addEventListener('click', (e) => {
-            if (e.target.classList.contains('quick-test-btn')) {
-                const commandId = e.target.dataset.commandId;
-                this.quickTestCommand(commandId);
-            }
-        });
     }
 
     setupCommandsTags() {
@@ -151,6 +149,11 @@ class EnhancedCommandEditor {
                 this.addCommandTag(command);
                 moreCommandsInput.value = '';
             }
+        });
+
+        // Allow any character for commands (not just starting with /)
+        moreCommandsInput.addEventListener('input', (e) => {
+            // Remove any validation that requires starting with /
         });
     }
 
@@ -257,19 +260,28 @@ class EnhancedCommandEditor {
                         e.preventDefault();
                         this.selectAllCode();
                         break;
+                    case 'c':
+                        // Allow default copy behavior
+                        break;
+                    case 'v':
+                        // Allow default paste behavior
+                        break;
                 }
             }
             
+            // Escape key to close suggestions
             if (e.key === 'Escape') {
                 this.hideSuggestionList();
             }
 
+            // Tab key for indentation
             if (e.key === 'Tab') {
                 e.preventDefault();
                 this.insertTab();
             }
         });
 
+        // Keep toolbar visible when scrolling
         this.setupStickyToolbar();
     }
 
@@ -299,6 +311,7 @@ class EnhancedCommandEditor {
         const start = editor.selectionStart;
         const end = editor.selectionEnd;
         
+        // Insert tab character
         editor.value = editor.value.substring(0, start) + '  ' + editor.value.substring(end);
         editor.selectionStart = editor.selectionEnd = start + 2;
         editor.focus();
@@ -393,18 +406,25 @@ class EnhancedCommandEditor {
     }
 
     formatJavaScript(code) {
-        // Simple formatting that preserves structure
+        // Simple formatting that preserves existing structure
         let formatted = code;
 
-        // Basic formatting rules
+        // Fix common formatting issues
         formatted = formatted
+            // Fix template literals spacing
+            .replace(/\$\s*{\s*/g, '${')
+            .replace(/\s*}\s*/g, '}')
+            // Fix function call spacing
+            .replace(/(\w+)\s*\(\s*/g, '$1(')
+            .replace(/\s*\)/g, ')')
+            // Fix multiple spaces
             .replace(/\s+/g, ' ')
-            .replace(/\(\s+/g, '(')
-            .replace(/\s+\)/g, ')')
-            .replace(/\{\s+/g, '{ ')
-            .replace(/\s+\}/g, ' }')
-            .replace(/\,\s+/g, ', ')
-            .replace(/\s+\;/g, ';')
+            // Add space after commas
+            .replace(/,(\S)/g, ', $1')
+            // Add space after semicolons
+            .replace(/;(\S)/g, '; $1')
+            // Clean up extra spaces
+            .replace(/\s+/g, ' ')
             .trim();
 
         // Handle line breaks for better readability
@@ -442,6 +462,7 @@ class EnhancedCommandEditor {
         const words = currentLine.trim().split(/\s+/);
         const lastWord = words[words.length - 1].toLowerCase();
 
+        // Complete function suggestions with ready-to-use code
         const functions = [
             { 
                 name: 'sendMessage', 
@@ -461,7 +482,7 @@ class EnhancedCommandEditor {
             { 
                 name: 'getUser', 
                 desc: 'Get current user information', 
-                code: 'const user = getUser();' 
+                code: 'const user = getUser();\n// user.id, user.first_name, user.username' 
             },
             { 
                 name: 'getChatId', 
@@ -476,7 +497,7 @@ class EnhancedCommandEditor {
             { 
                 name: 'wait', 
                 desc: 'Wait for specified milliseconds', 
-                code: 'await wait(1000);' 
+                code: 'await wait(1000); // Wait 1 second' 
             },
             { 
                 name: 'getAnswer', 
@@ -485,6 +506,31 @@ class EnhancedCommandEditor {
             }
         ];
 
+        // Text message suggestions
+        const textSuggestions = [
+            { 
+                text: 'Hello! Welcome to our bot! 👋', 
+                desc: 'Welcome message',
+                code: 'sendMessage("Hello! Welcome to our bot! 👋");'
+            },
+            { 
+                text: 'আসসালামু আলাইকুম!', 
+                desc: 'Arabic greeting',
+                code: 'sendMessage("আসসালামু আলাইকুম!");'
+            },
+            { 
+                text: 'Thank you for using our bot!', 
+                desc: 'Thank you message',
+                code: 'sendMessage("Thank you for using our bot!");'
+            },
+            { 
+                text: 'Please wait...', 
+                desc: 'Loading message',
+                code: 'sendMessage("Please wait...");'
+            }
+        ];
+
+        // Match functions
         functions.forEach(func => {
             if (func.name.toLowerCase().includes(lastWord) || lastWord.length < 2) {
                 suggestions.push({
@@ -496,7 +542,22 @@ class EnhancedCommandEditor {
             }
         });
 
-        return suggestions.slice(0, 6);
+        // Match text suggestions
+        if (lastWord.length > 0) {
+            textSuggestions.forEach(suggestion => {
+                if (suggestion.text.toLowerCase().includes(lastWord) || 
+                    suggestion.desc.toLowerCase().includes(lastWord)) {
+                    suggestions.push({
+                        type: 'text',
+                        content: suggestion.text,
+                        description: suggestion.desc,
+                        code: suggestion.code
+                    });
+                }
+            });
+        }
+
+        return suggestions.slice(0, 6); // Limit to 6 suggestions
     }
 
     showSuggestionList(suggestions) {
@@ -511,6 +572,7 @@ class EnhancedCommandEditor {
                         <span class="suggestion-type">${suggestion.type}</span>
                     </div>
                     <div class="suggestion-desc">${suggestion.description}</div>
+                    <div class="suggestion-code">${this.escapeHtml(suggestion.code)}</div>
                 </div>
             </div>
         `).join('');
@@ -528,6 +590,7 @@ class EnhancedCommandEditor {
         const currentCode = editor.value;
         const cursorPos = editor.selectionStart;
         
+        // Insert the complete code at cursor position
         const textBeforeCursor = currentCode.substring(0, cursorPos);
         const textAfterCursor = currentCode.substring(cursorPos);
         
@@ -557,6 +620,7 @@ class EnhancedCommandEditor {
         this.historyIndex = 0;
         document.getElementById('codeEditorModal').style.display = 'flex';
         
+        // Update suggestions button state
         const suggestBtn = document.getElementById('suggestBtn');
         if (this.suggestionsEnabled) {
             suggestBtn.classList.add('active');
@@ -564,10 +628,12 @@ class EnhancedCommandEditor {
             suggestBtn.classList.remove('active');
         }
         
+        // Focus and ensure toolbar is visible
         setTimeout(() => {
             const editor = document.getElementById('advancedCodeEditor');
             editor.focus();
             
+            // Ensure modal content is scrolled to top
             const modalContent = document.querySelector('.fullscreen-content');
             if (modalContent) {
                 modalContent.scrollTop = 0;
@@ -607,17 +673,9 @@ class EnhancedCommandEditor {
             }
         });
 
+        // Close test command modal
         document.getElementById('closeTestCommand')?.addEventListener('click', () => {
             document.getElementById('testCommandModal').style.display = 'none';
-        });
-
-        // Quick test modal
-        document.getElementById('runQuickTest')?.addEventListener('click', () => {
-            this.runQuickTest();
-        });
-
-        document.getElementById('closeQuickTest')?.addEventListener('click', () => {
-            document.getElementById('quickTestModal').style.display = 'none';
         });
 
         window.addEventListener('click', (e) => {
@@ -687,531 +745,580 @@ class EnhancedCommandEditor {
 
             const data = await response.json();
 
-        if (data.success) {
-            this.commands = data.commands || [];
-            this.displayCommands();
-        } else {
-            this.showError('Failed to load commands: ' + (data.error || 'Unknown error'));
+            if (data.success) {
+                this.commands = data.commands || [];
+                this.displayCommands();
+            } else {
+                this.showError('Failed to load commands: ' + (data.error || 'Unknown error'));
+            }
+        } catch (error) {
+            this.showError('Network error while loading commands: ' + error.message);
+        } finally {
+            this.showLoading(false);
         }
-    } catch (error) {
-        this.showError('Network error while loading commands: ' + error.message);
-    } finally {
-        this.showLoading(false);
-    }
-}
-
-displayCommands() {
-    const commandsList = document.getElementById('commandsList');
-    const emptyCommands = document.getElementById('emptyCommands');
-
-    if (!this.commands || this.commands.length === 0) {
-        commandsList.style.display = 'none';
-        emptyCommands.style.display = 'block';
-        return;
     }
 
-    commandsList.style.display = 'block';
-    emptyCommands.style.display = 'none';
+    displayCommands() {
+        const commandsList = document.getElementById('commandsList');
+        const emptyCommands = document.getElementById('emptyCommands');
 
-    commandsList.innerHTML = this.commands.map(command => this.getCommandItemHTML(command)).join('');
-}
+        if (!this.commands || this.commands.length === 0) {
+            commandsList.style.display = 'none';
+            emptyCommands.style.display = 'block';
+            return;
+        }
 
-getCommandItemHTML(command) {
-    const isActive = command.is_active;
-    const hasAnswerHandler = command.wait_for_answer && command.answer_handler;
-    const isSelected = this.currentCommand?.id === command.id;
-    const patterns = command.pattern.split(',').map(p => p.trim());
-    
-    return `
-        <div class="command-item ${isSelected ? 'active' : ''}">
-            <div class="command-icon">
-                <i class="fas fa-code"></i>
-            </div>
-            <div class="command-content">
-                <div class="command-header">
-                    <span class="command-name">${this.escapeHtml(command.name)}</span>
-                    <span class="command-pattern">${patterns.slice(0, 2).join(', ')}${patterns.length > 2 ? '...' : ''}</span>
+        commandsList.style.display = 'block';
+        emptyCommands.style.display = 'none';
+
+        commandsList.innerHTML = this.commands.map(command => this.getCommandItemHTML(command)).join('');
+    }
+
+    getCommandItemHTML(command) {
+        const isActive = command.is_active;
+        const hasAnswerHandler = command.wait_for_answer && command.answer_handler;
+        const isSelected = this.currentCommand?.id === command.id;
+        
+        return `
+            <div class="command-item ${isSelected ? 'active' : ''}" 
+                 onclick="commandEditor.selectCommand('${command.id}')">
+                <div class="command-icon">
+                    <i class="fas fa-code"></i>
                 </div>
-                <div class="command-meta">
-                    <span class="command-status ${isActive ? 'active' : 'inactive'}">
-                        <i class="fas fa-circle"></i>
-                        ${isActive ? 'Active' : 'Inactive'}
-                    </span>
-                    ${hasAnswerHandler ? '<span class="command-feature">⏳ Waits</span>' : ''}
+                <div class="command-content">
+                    <div class="command-header">
+                        <span class="command-name">${this.escapeHtml(command.name)}</span>
+                        <span class="command-pattern">${this.escapeHtml(command.pattern)}</span>
+                    </div>
+                    <div class="command-meta">
+                        <span class="command-status ${isActive ? 'active' : 'inactive'}">
+                            <i class="fas fa-circle"></i>
+                            ${isActive ? 'Active' : 'Inactive'}
+                        </span>
+                        ${hasAnswerHandler ? '<span class="command-feature">⏳ Waits</span>' : ''}
+                    </div>
                 </div>
             </div>
-            <div class="command-actions">
-                <button class="quick-test-btn" data-command-id="${command.id}" title="Quick Test">
-                    <i class="fas fa-bolt"></i>
-                </button>
-            </div>
-        </div>
-    `;
-}
-
-filterCommands(searchTerm) {
-    const commandItems = document.querySelectorAll('.command-item');
-    const lowerSearch = searchTerm.toLowerCase().trim();
-
-    if (!lowerSearch) {
-        commandItems.forEach(item => item.style.display = 'flex');
-        return;
+        `;
     }
 
-    commandItems.forEach(item => {
-        const commandName = item.querySelector('.command-name').textContent.toLowerCase();
-        const commandPattern = item.querySelector('.command-pattern').textContent.toLowerCase();
-        
-        const isVisible = commandName.includes(lowerSearch) || 
-                        commandPattern.includes(lowerSearch);
-        
-        item.style.display = isVisible ? 'flex' : 'none';
-    });
-}
+    filterCommands(searchTerm) {
+        const commandItems = document.querySelectorAll('.command-item');
+        const lowerSearch = searchTerm.toLowerCase().trim();
 
-addNewCommand() {
-    this.currentCommand = {
-        id: 'new',
-        name: 'New Command',
-        pattern: 'start',
-        code: '// Write your command code here\nconst user = getUser();\nreturn sendMessage(`Hello ${user.first_name}!`);',
-        is_active: true,
-        wait_for_answer: false,
-        answer_handler: ''
-    };
+        if (!lowerSearch) {
+            commandItems.forEach(item => item.style.display = 'block');
+            return;
+        }
 
-    this.showCommandEditor();
-    this.populateCommandForm();
-    
-    setTimeout(() => {
-        document.getElementById('moreCommands').focus();
-    }, 100);
-}
-
-async selectCommand(commandId) {
-    if (this.currentCommand?.id === commandId) return;
-
-    this.showLoading(true);
-
-    try {
-        const token = localStorage.getItem('token');
-        const response = await fetch(`/api/commands/${commandId}`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
+        commandItems.forEach(item => {
+            const commandName = item.querySelector('.command-name').textContent.toLowerCase();
+            const commandPattern = item.querySelector('.command-pattern').textContent.toLowerCase();
+            
+            const isVisible = commandName.includes(lowerSearch) || 
+                            commandPattern.includes(lowerSearch);
+            
+            item.style.display = isVisible ? 'block' : 'none';
         });
-
-        const data = await response.json();
-
-        if (data.success) {
-            this.currentCommand = data.command;
-            this.showCommandEditor();
-            this.populateCommandForm();
-            
-            document.querySelectorAll('.command-item').forEach(item => {
-                item.classList.remove('active');
-            });
-            
-            const selectedItem = document.querySelector(`[data-command-id="${commandId}"]`)?.closest('.command-item');
-            if (selectedItem) {
-                selectedItem.classList.add('active');
-                selectedItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            }
-        } else {
-            this.showError('Failed to load command: ' + (data.error || 'Unknown error'));
-        }
-    } catch (error) {
-        this.showError('Network error while loading command: ' + error.message);
-    } finally {
-        this.showLoading(false);
-    }
-}
-
-showCommandEditor() {
-    document.getElementById('noCommandSelected').style.display = 'none';
-    document.getElementById('commandEditor').style.display = 'block';
-}
-
-hideCommandEditor() {
-    document.getElementById('noCommandSelected').style.display = 'block';
-    document.getElementById('commandEditor').style.display = 'none';
-    this.currentCommand = null;
-}
-
-populateCommandForm() {
-    if (!this.currentCommand) return;
-
-    // Set commands tags
-    this.setCommandsToTags(this.currentCommand.pattern);
-    
-    document.getElementById('commandCode').value = this.currentCommand.code || '';
-    
-    const waitToggle = document.getElementById('waitForAnswer');
-    if (waitToggle) {
-        waitToggle.checked = this.currentCommand.wait_for_answer || false;
-        this.toggleAnswerHandler(waitToggle.checked);
-    }
-    
-    document.getElementById('answerHandler').value = this.currentCommand.answer_handler || '';
-    
-    const activeToggle = document.getElementById('commandActive');
-    if (activeToggle) {
-        activeToggle.checked = this.currentCommand.is_active !== false;
-    }
-    
-    document.getElementById('currentCommandName').textContent = this.currentCommand.name;
-    document.getElementById('commandStatus').textContent = this.currentCommand.is_active ? 'Active' : 'Inactive';
-    document.getElementById('commandStatus').className = `status-badge ${this.currentCommand.is_active ? 'active' : 'inactive'}`;
-    
-    this.updateButtonStates();
-}
-
-updateButtonStates() {
-    const isNew = this.currentCommand?.id === 'new';
-    const deleteBtn = document.getElementById('deleteCommandBtn');
-    
-    if (deleteBtn) {
-        deleteBtn.disabled = isNew;
-        deleteBtn.title = isNew ? 'Save command first to enable delete' : 'Delete command';
-    }
-    
-    const testBtn = document.getElementById('testCommandBtn');
-    if (testBtn) {
-        testBtn.disabled = false;
-        testBtn.title = 'Test current command code';
-    }
-}
-
-async saveCommand() {
-    if (!this.currentCommand || !this.currentBot) {
-        this.showError('No command selected or bot not loaded');
-        return false;
     }
 
-    const commands = this.getCommandsFromTags();
-    
-    if (commands.length === 0) {
-        this.showError('Please add at least one command');
-        document.getElementById('moreCommands').focus();
-        return false;
-    }
-
-    const commandPattern = commands.join(', ');
-    
-    const formData = {
-        name: commands[0],
-        pattern: commandPattern,
-        code: document.getElementById('commandCode').value.trim(),
-        waitForAnswer: document.getElementById('waitForAnswer').checked,
-        answerHandler: document.getElementById('waitForAnswer').checked ? 
-                      document.getElementById('answerHandler').value.trim() : '',
-        botToken: this.currentBot.token
-    };
-
-    if (!formData.code) {
-        this.showError('Command code is required');
-        document.getElementById('commandCode').focus();
-        return false;
-    }
-
-    if (formData.waitForAnswer && !formData.answerHandler) {
-        this.showError('Answer handler code is required when "Wait for Answer" is enabled');
-        document.getElementById('answerHandler').focus();
-        return false;
-    }
-
-    this.showLoading(true);
-
-    try {
-        const token = localStorage.getItem('token');
-        let response;
-        let url;
-        let method;
-
-        if (this.currentCommand.id === 'new') {
-            url = '/api/commands';
-            method = 'POST';
-        } else {
-            url = `/api/commands/${this.currentCommand.id}`;
-            method = 'PUT';
-            formData.commandId = this.currentCommand.id;
-        }
-
-        response = await fetch(url, {
-            method: method,
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(formData)
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-            this.showSuccess('Command saved successfully!');
-            
-            await this.loadCommands();
-            
-            if (data.command) {
-                this.currentCommand = Array.isArray(data.command) ? data.command[0] : data.command;
-                this.populateCommandForm();
-            }
-            
-            return true;
-        } else {
-            this.showError(data.error || 'Failed to save command');
-            return false;
-        }
-    } catch (error) {
-        this.showError('Network error while saving command: ' + error.message);
-        return false;
-    } finally {
-        this.showLoading(false);
-    }
-}
-
-async deleteCommand() {
-    if (!this.currentCommand || this.currentCommand.id === 'new') {
-        return;
-    }
-
-    if (!confirm('Are you sure you want to delete this command?\n\nThis action cannot be undone and will remove the command from your bot.')) {
-        return;
-    }
-
-    this.showLoading(true);
-
-    try {
-        const token = localStorage.getItem('token');
-        const response = await fetch(`/api/commands/${this.currentCommand.id}`, {
-            method: 'DELETE',
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-
-        if (response.ok) {
-            this.showSuccess('Command deleted successfully');
-            this.hideCommandEditor();
-            await this.loadCommands();
-        } else {
-            const data = await response.json();
-            this.showError(data.error || 'Failed to delete command');
-        }
-    } catch (error) {
-        this.showError('Network error while deleting command: ' + error.message);
-    } finally {
-        this.showLoading(false);
-    }
-}
-
-async testCommand() {
-    if (!this.currentBot) {
-        this.showError('Bot information not loaded');
-        return;
-    }
-
-    const commands = this.getCommandsFromTags();
-    if (commands.length === 0) {
-        this.showError('Please add at least one command to test');
-        return;
-    }
-
-    const commandCode = document.getElementById('commandCode').value.trim();
-    if (!commandCode) {
-        this.showError('Please add command code to test');
-        return;
-    }
-
-    this.showLoading(true);
-
-    try {
-        const token = localStorage.getItem('token');
-        
-        // Create a temporary command object for testing
-        const tempCommand = {
-            name: commands[0],
-            pattern: commands.join(', '),
-            code: commandCode,
-            waitForAnswer: document.getElementById('waitForAnswer').checked,
-            answerHandler: document.getElementById('answerHandler').value || ''
+    addNewCommand() {
+        this.currentCommand = {
+            id: 'new',
+            name: 'New Command',
+            pattern: 'start',
+            code: '// Write your command code here\nconst user = getUser();\nreturn sendMessage(`Hello ${user.first_name}!`);',
+            is_active: true,
+            wait_for_answer: false,
+            answer_handler: ''
         };
 
-        const response = await fetch('/api/commands/test-temp', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-                command: tempCommand,
-                botToken: this.currentBot.token
-            })
-        });
+        this.showCommandEditor();
+        this.populateCommandForm();
+        
+        setTimeout(() => {
+            document.getElementById('moreCommands').focus();
+        }, 100);
+    }
 
-        const data = await response.json();
+    async selectCommand(commandId) {
+        if (this.currentCommand?.id === commandId) return;
 
-        if (response.ok) {
-            this.showTestResult(`
-                <div class="test-success">
-                    <h4>✅ Test Command Sent Successfully!</h4>
-                    <div class="test-details">
-                        <p><strong>Commands:</strong> ${commands.join(', ')}</p>
-                        <p><strong>Bot:</strong> ${this.currentBot.name}</p>
+        this.showLoading(true);
+
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/commands/${commandId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                this.currentCommand = data.command;
+                this.showCommandEditor();
+                this.populateCommandForm();
+                
+                document.querySelectorAll('.command-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+                
+                const selectedItem = document.querySelector(`[onclick*="${commandId}"]`);
+                if (selectedItem) {
+                    selectedItem.classList.add('active');
+                    selectedItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            } else {
+                this.showError('Failed to load command: ' + (data.error || 'Unknown error'));
+            }
+        } catch (error) {
+            this.showError('Network error while loading command: ' + error.message);
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    showCommandEditor() {
+        document.getElementById('noCommandSelected').style.display = 'none';
+        document.getElementById('commandEditor').style.display = 'block';
+    }
+
+    hideCommandEditor() {
+        document.getElementById('noCommandSelected').style.display = 'block';
+        document.getElementById('commandEditor').style.display = 'none';
+        this.currentCommand = null;
+    }
+
+    populateCommandForm() {
+        if (!this.currentCommand) return;
+
+        // Set commands tags
+        this.setCommandsToTags(this.currentCommand.pattern);
+        
+        document.getElementById('commandCode').value = this.currentCommand.code || '';
+        
+        const waitToggle = document.getElementById('waitForAnswer');
+        if (waitToggle) {
+            waitToggle.checked = this.currentCommand.wait_for_answer || false;
+            this.toggleAnswerHandler(waitToggle.checked);
+        }
+        
+        document.getElementById('answerHandler').value = this.currentCommand.answer_handler || '';
+        
+        const activeToggle = document.getElementById('commandActive');
+        if (activeToggle) {
+            activeToggle.checked = this.currentCommand.is_active !== false;
+        }
+        
+        document.getElementById('currentCommandName').textContent = this.currentCommand.name;
+        document.getElementById('commandStatus').textContent = this.currentCommand.is_active ? 'Active' : 'Inactive';
+        document.getElementById('commandStatus').className = `status-badge ${this.currentCommand.is_active ? 'active' : 'inactive'}`;
+        
+        this.updateButtonStates();
+    }
+
+    updateButtonStates() {
+        const isNew = this.currentCommand?.id === 'new';
+        const deleteBtn = document.getElementById('deleteCommandBtn');
+        
+        if (deleteBtn) {
+            deleteBtn.disabled = isNew;
+            deleteBtn.title = isNew ? 'Save command first to enable delete' : 'Delete command';
+        }
+        
+        // Test button is always enabled
+        const testBtn = document.getElementById('testCommandBtn');
+        if (testBtn) {
+            testBtn.disabled = false;
+            testBtn.title = 'Test current command code';
+        }
+    }
+
+    async saveCommand() {
+        if (!this.currentCommand || !this.currentBot) {
+            this.showError('No command selected or bot not loaded');
+            return false;
+        }
+
+        const commands = this.getCommandsFromTags();
+        
+        if (commands.length === 0) {
+            this.showError('Please add at least one command');
+            document.getElementById('moreCommands').focus();
+            return false;
+        }
+
+        const commandPattern = commands.join(', ');
+        
+        const formData = {
+            name: commands[0],
+            pattern: commandPattern,
+            code: document.getElementById('commandCode').value.trim(),
+            waitForAnswer: document.getElementById('waitForAnswer').checked,
+            answerHandler: document.getElementById('waitForAnswer').checked ? 
+                          document.getElementById('answerHandler').value.trim() : '',
+            botToken: this.currentBot.token
+        };
+
+        if (!formData.code) {
+            this.showError('Command code is required');
+            document.getElementById('commandCode').focus();
+            return false;
+        }
+
+        if (formData.waitForAnswer && !formData.answerHandler) {
+            this.showError('Answer handler code is required when "Wait for Answer" is enabled');
+            document.getElementById('answerHandler').focus();
+            return false;
+        }
+
+        this.showLoading(true);
+
+        try {
+            const token = localStorage.getItem('token');
+            let response;
+            let url;
+            let method;
+
+            if (this.currentCommand.id === 'new') {
+                url = '/api/commands';
+                method = 'POST';
+            } else {
+                url = `/api/commands/${this.currentCommand.id}`;
+                method = 'PUT';
+                formData.commandId = this.currentCommand.id;
+            }
+
+            response = await fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.showSuccess('Command saved successfully!');
+                
+                await this.loadCommands();
+                
+                if (data.command) {
+                    this.currentCommand = Array.isArray(data.command) ? data.command[0] : data.command;
+                    this.populateCommandForm();
+                }
+                
+                return true;
+            } else {
+                this.showError(data.error || 'Failed to save command');
+                return false;
+            }
+        } catch (error) {
+            this.showError('Network error while saving command: ' + error.message);
+            return false;
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    async deleteCommand() {
+        if (!this.currentCommand || this.currentCommand.id === 'new') {
+            return;
+        }
+
+        if (!confirm('Are you sure you want to delete this command?\n\nThis action cannot be undone and will remove the command from your bot.')) {
+            return;
+        }
+
+        this.showLoading(true);
+
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/commands/${this.currentCommand.id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (response.ok) {
+                this.showSuccess('Command deleted successfully');
+                this.hideCommandEditor();
+                await this.loadCommands();
+            } else {
+                const data = await response.json();
+                this.showError(data.error || 'Failed to delete command');
+            }
+        } catch (error) {
+            this.showError('Network error while deleting command: ' + error.message);
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    async testCommand() {
+        if (!this.currentBot) {
+            this.showError('Bot information not loaded');
+            return;
+        }
+
+        const commands = this.getCommandsFromTags();
+        if (commands.length === 0) {
+            this.showError('Please add at least one command to test');
+            return;
+        }
+
+        const commandCode = document.getElementById('commandCode').value.trim();
+        if (!commandCode) {
+            this.showError('Please add command code to test');
+            return;
+        }
+
+        this.showLoading(true);
+
+        try {
+            const token = localStorage.getItem('token');
+            
+            // Create a temporary command object for testing
+            const tempCommand = {
+                name: commands[0],
+                pattern: commands.join(', '),
+                code: commandCode,
+                wait_for_answer: document.getElementById('waitForAnswer').checked,
+                answer_handler: document.getElementById('answerHandler').value || ''
+            };
+
+            const response = await fetch('/api/commands/test-temp', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    command: tempCommand,
+                    botToken: this.currentBot.token
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.showTestResult(`
+                    <div class="test-success">
+                        <h4>✅ Test Command Sent Successfully!</h4>
+                        <div class="test-details">
+                            <p><strong>Commands:</strong> ${commands.join(', ')}</p>
+                            <p><strong>Bot:</strong> ${this.currentBot.name}</p>
+                        </div>
+                        <p class="test-message">Check your Telegram bot for the test results.</p>
                     </div>
-                    <p class="test-message">Check your Telegram bot for the test results.</p>
-                </div>
-            `);
-        } else {
+                `);
+            } else {
+                this.showTestResult(`
+                    <div class="test-error">
+                        <h4>❌ Test Failed</h4>
+                        <p><strong>Error:</strong> ${data.error || 'Unknown error occurred'}</p>
+                    </div>
+                `);
+            }
+        } catch (error) {
             this.showTestResult(`
                 <div class="test-error">
-                    <h4>❌ Test Failed</h4>
-                    <p><strong>Error:</strong> ${data.error || 'Unknown error occurred'}</p>
+                    <h4>❌ Network Error</h4>
+                    <p>Failed to connect to server: ${error.message}</p>
                 </div>
             `);
+        } finally {
+            this.showLoading(false);
         }
-    } catch (error) {
-        this.showTestResult(`
-            <div class="test-error">
-                <h4>❌ Network Error</h4>
-                <p>Failed to connect to server: ${error.message}</p>
-            </div>
-        `);
-    } finally {
-        this.showLoading(false);
     }
-}
 
-async quickTestCommand(commandId) {
-    if (!this.currentBot) return;
+    // Enhanced test with custom input
+    async runCustomTest() {
+        if (!this.currentBot) {
+            this.showError('Bot information not loaded');
+            return;
+        }
 
-    this.showLoading(true);
+        const testInput = document.getElementById('testInput').value.trim();
+        const commands = this.getCommandsFromTags();
+        
+        if (!testInput && commands.length === 0) {
+            this.showError('Please add commands or enter test input');
+            return;
+        }
 
-    try {
+        const commandCode = document.getElementById('commandCode').value.trim();
+        if (!commandCode) {
+            this.showError('Please add command code to test');
+            return;
+        }
+
+        this.showLoading(true);
+
+        try {
+            const token = localStorage.getItem('token');
+            
+            // Create a temporary command object for testing
+            const tempCommand = {
+                name: commands[0] || 'Test Command',
+                pattern: testInput || commands.join(', '),
+                code: commandCode,
+                wait_for_answer: document.getElementById('waitForAnswer').checked,
+                answer_handler: document.getElementById('answerHandler').value || ''
+            };
+
+            const response = await fetch('/api/commands/test-temp', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    command: tempCommand,
+                    botToken: this.currentBot.token,
+                    testInput: testInput
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.showTestResult(`
+                    <div class="test-success">
+                        <h4>✅ Test Command Executed Successfully!</h4>
+                        <div class="test-details">
+                            <p><strong>Test Input:</strong> ${testInput || commands.join(', ')}</p>
+                            <p><strong>Bot:</strong> ${this.currentBot.name}</p>
+                            <p><strong>Result:</strong> ${data.result || 'Command executed successfully'}</p>
+                        </div>
+                        <p class="test-message">Command executed without errors.</p>
+                    </div>
+                `);
+            } else {
+                this.showTestResult(`
+                    <div class="test-error">
+                        <h4>❌ Test Failed</h4>
+                        <div class="error-details">
+                            <p><strong>Error:</strong> ${data.error || 'Unknown error occurred'}</p>
+                            ${data.details ? `<p><strong>Details:</strong> ${data.details}</p>` : ''}
+                        </div>
+                    </div>
+                `);
+            }
+        } catch (error) {
+            this.showTestResult(`
+                <div class="test-error">
+                    <h4>❌ Network Error</h4>
+                    <p>Failed to connect to server: ${error.message}</p>
+                </div>
+            `);
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    showTestResult(html) {
+        const modal = document.getElementById('testCommandModal');
+        const resultDiv = document.getElementById('testCommandResult');
+        
+        if (modal && resultDiv) {
+            resultDiv.innerHTML = html;
+            modal.style.display = 'flex';
+        }
+    }
+
+    logout() {
+        const sessionId = localStorage.getItem('sessionId');
         const token = localStorage.getItem('token');
-        const response = await fetch(`/api/commands/${commandId}/test`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-                botToken: this.currentBot.token
-            })
+        
+        if (sessionId && token) {
+            fetch('/api/auth/logout', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ sessionId })
+            }).catch(() => {});
+        }
+
+        localStorage.clear();
+        window.location.href = 'index.html';
+    }
+
+    showLoading(show) {
+        const overlay = document.getElementById('loadingOverlay');
+        if (overlay) {
+            overlay.style.display = show ? 'flex' : 'none';
+        }
+    }
+
+    showError(message) {
+        commonApp?.showError(message) || this.showNotification(message, 'error');
+    }
+
+    showSuccess(message) {
+        commonApp?.showSuccess(message) || this.showNotification(message, 'success');
+    }
+
+    showInfo(message) {
+        this.showNotification(message, 'info');
+    }
+
+    showNotification(message, type = 'info') {
+        const existing = document.querySelector('.notification');
+        if (existing) existing.remove();
+
+        const notification = document.createElement('div');
+        notification.className = `notification notification-${type}`;
+        notification.innerHTML = `
+            <div class="notification-content">
+                <i class="fas fa-${type === 'error' ? 'exclamation-triangle' : type === 'success' ? 'check-circle' : 'info-circle'}"></i>
+                <span class="notification-message">${message}</span>
+                <button class="notification-close">&times;</button>
+            </div>
+        `;
+
+        Object.assign(notification.style, {
+            position: 'fixed',
+            top: '20px',
+            right: '20px',
+            background: type === 'error' ? '#ef4444' : type === 'success' ? '#10b981' : '#3b82f6',
+            color: 'white',
+            padding: '1rem 1.5rem',
+            borderRadius: '0.5rem',
+            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+            zIndex: '10000',
+            maxWidth: '400px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem'
         });
 
-        const data = await response.json();
+        notification.querySelector('.notification-close').addEventListener('click', () => {
+            notification.remove();
+        });
 
-        if (response.ok) {
-            this.showSuccess('Quick test sent successfully! Check your Telegram bot.');
-        } else {
-            this.showError(data.error || 'Quick test failed');
-        }
-    } catch (error) {
-        this.showError('Network error during quick test: ' + error.message);
-    } finally {
-        this.showLoading(false);
-    }
-}
+        document.body.appendChild(notification);
 
-showTestResult(html) {
-    const modal = document.getElementById('testCommandModal');
-    const resultDiv = document.getElementById('testCommandResult');
-    
-    if (modal && resultDiv) {
-        resultDiv.innerHTML = html;
-        modal.style.display = 'flex';
-    }
-}
-
-logout() {
-    const sessionId = localStorage.getItem('sessionId');
-    const token = localStorage.getItem('token');
-    
-    if (sessionId && token) {
-        fetch('/api/auth/logout', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ sessionId })
-        }).catch(() => {});
+        setTimeout(() => {
+            notification.remove();
+        }, 5000);
     }
 
-    localStorage.clear();
-    window.location.href = 'index.html';
-}
-
-showLoading(show) {
-    const overlay = document.getElementById('loadingOverlay');
-    if (overlay) {
-        overlay.style.display = show ? 'flex' : 'none';
+    escapeHtml(unsafe) {
+        return unsafe
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
     }
-}
-
-showError(message) {
-    commonApp?.showError(message) || this.showNotification(message, 'error');
-}
-
-showSuccess(message) {
-    commonApp?.showSuccess(message) || this.showNotification(message, 'success');
-}
-
-showInfo(message) {
-    this.showNotification(message, 'info');
-}
-
-showNotification(message, type = 'info') {
-    const existing = document.querySelector('.notification');
-    if (existing) existing.remove();
-
-    const notification = document.createElement('div');
-    notification.className = `notification notification-${type}`;
-    notification.innerHTML = `
-        <div class="notification-content">
-            <i class="fas fa-${type === 'error' ? 'exclamation-triangle' : type === 'success' ? 'check-circle' : 'info-circle'}"></i>
-            <span class="notification-message">${message}</span>
-            <button class="notification-close">&times;</button>
-        </div>
-    `;
-
-    Object.assign(notification.style, {
-        position: 'fixed',
-        top: '20px',
-        right: '20px',
-        background: type === 'error' ? '#ef4444' : type === 'success' ? '#10b981' : '#3b82f6',
-        color: 'white',
-        padding: '1rem 1.5rem',
-        borderRadius: '0.5rem',
-        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-        zIndex: '10000',
-        maxWidth: '400px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.75rem'
-    });
-
-    notification.querySelector('.notification-close').addEventListener('click', () => {
-        notification.remove();
-    });
-
-    document.body.appendChild(notification);
-
-    setTimeout(() => {
-        notification.remove();
-    }, 5000);
-}
-
-escapeHtml(unsafe) {
-    return unsafe
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
 }
 
 // Initialize enhanced command editor
