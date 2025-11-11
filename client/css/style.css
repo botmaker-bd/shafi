@@ -54,9 +54,10 @@ body {
 }
 
 /* Enhanced Navigation */
+/* Enhanced Compact Navigation */
 .navbar {
     background: var(--bg-primary);
-    padding: 1rem 0;
+    padding: 0.75rem 0;
     border-bottom: 1px solid var(--border-color);
     position: sticky;
     top: 0;
@@ -77,16 +78,18 @@ body {
     font-size: 1.25rem;
     font-weight: 700;
     color: var(--text-primary);
+    text-decoration: none;
 }
 
 .brand-icon {
     font-size: 1.5rem;
 }
 
+/* Compact Navigation Links */
 .nav-links {
     display: flex;
     align-items: center;
-    gap: 1.5rem;
+    gap: 0.5rem;
 }
 
 .nav-link {
@@ -96,10 +99,11 @@ body {
     text-decoration: none;
     color: var(--text-secondary);
     font-weight: 500;
-    padding: 0.5rem 0.75rem;
+    padding: 0.5rem 1rem;
     border-radius: var(--radius-md);
     transition: var(--transition);
     position: relative;
+    font-size: 0.875rem;
 }
 
 .nav-link:hover {
@@ -116,15 +120,32 @@ body {
 .nav-link.active::after {
     content: '';
     position: absolute;
-    bottom: -1px;
-    left: 0.75rem;
-    right: 0.75rem;
-    height: 2px;
+    bottom: -0.75rem;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 4px;
     background: var(--primary-color);
-    border-radius: 1px;
+    border-radius: 50%;
 }
 
-/* Enhanced User Menu */
+/* Mobile Menu Button */
+.mobile-menu-btn {
+    display: none;
+    background: none;
+    border: none;
+    font-size: 1.25rem;
+    color: var(--text-primary);
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: var(--radius-md);
+}
+
+.mobile-menu-btn:hover {
+    background: var(--bg-tertiary);
+}
+
+/* Enhanced User Menu - Compact */
 .user-menu {
     position: relative;
 }
@@ -140,6 +161,7 @@ body {
     cursor: pointer;
     transition: var(--transition);
     color: var(--text-primary);
+    font-size: 0.875rem;
 }
 
 .user-btn:hover {
@@ -167,7 +189,7 @@ body {
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-lg);
-    min-width: 200px;
+    min-width: 180px;
     display: none;
     z-index: 1000;
     margin-top: 0.5rem;
@@ -176,6 +198,72 @@ body {
 .user-dropdown.show {
     display: block;
     animation: dropdownFade 0.2s ease;
+}
+
+/* Responsive Design for Compact Nav */
+@media (max-width: 1024px) {
+    .nav-links {
+        gap: 0.25rem;
+    }
+    
+    .nav-link {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.8rem;
+    }
+    
+    .nav-link span:not(.fas) {
+        display: none;
+    }
+    
+    .nav-link .fas {
+        font-size: 1rem;
+        margin-right: 0;
+    }
+}
+
+@media (max-width: 768px) {
+    .mobile-menu-btn {
+        display: block;
+    }
+    
+    .nav-links {
+        position: fixed;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: var(--bg-primary);
+        border-top: 1px solid var(--border-color);
+        padding: 1rem;
+        display: none;
+        flex-direction: column;
+        gap: 0.5rem;
+        box-shadow: var(--shadow-lg);
+        z-index: 999;
+    }
+    
+    .nav-links.mobile-open {
+        display: flex;
+    }
+    
+    .nav-link {
+        padding: 0.75rem 1rem;
+        justify-content: flex-start;
+        border-radius: var(--radius-md);
+    }
+    
+    .nav-link span:not(.fas) {
+        display: block;
+    }
+    
+    .nav-link.active::after {
+        bottom: 50%;
+        left: 0.5rem;
+        transform: translateY(50%);
+    }
+    
+    .user-btn span:not(.user-avatar) {
+        display: none;
+    }
 }
 
 @keyframes dropdownFade {
