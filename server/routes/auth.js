@@ -7,7 +7,6 @@ const supabase = require('../config/supabase');
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'bot-maker-pro-secret-key-2024';
 
-// Security questions
 const SECURITY_QUESTIONS = [
     "What city were you born in?",
     "What is your mother's maiden name?",
@@ -16,7 +15,6 @@ const SECURITY_QUESTIONS = [
     "What was the model of your first car?"
 ];
 
-// Get security questions
 router.get('/security-questions', (req, res) => {
     res.json({ 
         success: true,
@@ -24,14 +22,12 @@ router.get('/security-questions', (req, res) => {
     });
 });
 
-// Signup endpoint - FIXED VERSION
 router.post('/signup', async (req, res) => {
     try {
         const { email, password, securityQuestion, securityAnswer } = req.body;
 
         console.log('🔄 Signup attempt for:', email);
 
-        // Validation
         if (!email || !password || !securityQuestion || !securityAnswer) {
             return res.status(400).json({ 
                 success: false,
@@ -53,7 +49,6 @@ router.post('/signup', async (req, res) => {
             });
         }
 
-        // Check if user exists
         const { data: existingUser, error: userCheckError } = await supabase
             .from('users')
             .select('id')
@@ -72,11 +67,9 @@ router.post('/signup', async (req, res) => {
             });
         }
 
-        // Hash password and security answer
         const hashedPassword = await bcrypt.hash(password, 12);
         const hashedSecurityAnswer = await bcrypt.hash(securityAnswer.trim(), 12);
 
-        // Create user
         const { data: user, error: createError } = await supabase
             .from('users')
             .insert([{
@@ -94,15 +87,13 @@ router.post('/signup', async (req, res) => {
             throw createError;
         }
 
-        // Generate token
         const token = jwt.sign({ 
             userId: user.id, 
             email: user.email 
         }, JWT_SECRET, { expiresIn: '7d' });
 
-        // Create session
         const sessionId = uuidv4();
-        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
         const { error: sessionError } = await supabase
             .from('user_sessions')
@@ -114,7 +105,6 @@ router.post('/signup', async (req, res) => {
 
         if (sessionError) {
             console.error('❌ Session creation error:', sessionError);
-            // Continue without session - user can still login
         }
 
         console.log('✅ User created successfully:', user.email);
@@ -134,12 +124,11 @@ router.post('/signup', async (req, res) => {
     } catch (error) {
         console.error('❌ Signup error:', error);
         
-        // Better error messages based on error type
         let errorMessage = 'Internal server error during signup';
         
-        if (error.code === '23505') { // Unique violation
+        if (error.code === '23505') {
             errorMessage = 'User already exists with this email';
-        } else if (error.code === '22P02') { // Invalid input syntax
+        } else if (error.code === '22P02') {
             errorMessage = 'Invalid input data';
         } else if (error.message && error.message.includes('connection')) {
             errorMessage = 'Database connection failed. Please try again.';
@@ -152,7 +141,6 @@ router.post('/signup', async (req, res) => {
     }
 });
 
-// Login endpoint - FIXED VERSION
 router.post('/login', async (req, res) => {
     try {
         const { email, password, remember } = req.body;
@@ -166,7 +154,6 @@ router.post('/login', async (req, res) => {
             });
         }
 
-        // Find user
         const { data: user, error: userError } = await supabase
             .from('users')
             .select('*')
@@ -181,7 +168,6 @@ router.post('/login', async (req, res) => {
             });
         }
 
-        // Check password
         const validPassword = await bcrypt.compare(password, user.password);
         if (!validPassword) {
             console.log('❌ Invalid password for:', email);
@@ -191,7 +177,6 @@ router.post('/login', async (req, res) => {
             });
         }
 
-        // Generate token with appropriate expiry
         const tokenExpiry = remember ? '30d' : '7d';
         const token = jwt.sign(
             { 
@@ -203,7 +188,6 @@ router.post('/login', async (req, res) => {
             { expiresIn: tokenExpiry }
         );
 
-        // Create session
         const sessionId = uuidv4();
         const expiresAt = new Date(Date.now() + (remember ? 30 : 7) * 24 * 60 * 60 * 1000);
 
@@ -217,10 +201,8 @@ router.post('/login', async (req, res) => {
 
         if (sessionError) {
             console.error('❌ Session creation error:', sessionError);
-            // Continue without session
         }
 
-        // Update last login
         await supabase
             .from('users')
             .update({ last_login: new Date().toISOString() })
@@ -249,7 +231,6 @@ router.post('/login', async (req, res) => {
     }
 });
 
-// Verify token endpoint
 router.get('/verify', async (req, res) => {
     try {
         const token = req.headers.authorization?.split(' ')[1];
@@ -263,7 +244,6 @@ router.get('/verify', async (req, res) => {
 
         const decoded = jwt.verify(token, JWT_SECRET);
         
-        // Check if user exists and is active
         const { data: user } = await supabase
             .from('users')
             .select('id, email, is_admin')
@@ -295,7 +275,6 @@ router.get('/verify', async (req, res) => {
     }
 });
 
-// Logout endpoint
 router.post('/logout', async (req, res) => {
     try {
         const { sessionId } = req.body;
@@ -320,7 +299,6 @@ router.post('/logout', async (req, res) => {
     }
 });
 
-// Change password endpoint
 router.post('/change-password', async (req, res) => {
     try {
         const { currentPassword, newPassword, userId } = req.body;
@@ -339,7 +317,6 @@ router.post('/change-password', async (req, res) => {
             });
         }
 
-        // Get user current password
         const { data: user, error: userError } = await supabase
             .from('users')
             .select('password')
@@ -353,7 +330,6 @@ router.post('/change-password', async (req, res) => {
             });
         }
 
-        // Verify current password
         const validCurrentPassword = await bcrypt.compare(currentPassword, user.password);
         if (!validCurrentPassword) {
             return res.status(400).json({ 
@@ -362,10 +338,8 @@ router.post('/change-password', async (req, res) => {
             });
         }
 
-        // Hash new password
         const hashedNewPassword = await bcrypt.hash(newPassword, 12);
 
-        // Update password
         const { error: updateError } = await supabase
             .from('users')
             .update({ 
