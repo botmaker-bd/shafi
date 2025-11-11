@@ -3,7 +3,6 @@ const supabase = require('../config/supabase');
 
 const router = express.Router();
 
-// Get admin settings
 router.get('/settings', async (req, res) => {
     try {
         const { data: settings, error } = await supabase
@@ -26,7 +25,6 @@ router.get('/settings', async (req, res) => {
     }
 });
 
-// Update admin settings
 router.post('/settings', async (req, res) => {
     try {
         const { adminChatId, userId } = req.body;
@@ -35,7 +33,6 @@ router.post('/settings', async (req, res) => {
             return res.status(400).json({ error: 'Admin chat ID is required' });
         }
 
-        // Check if settings exist
         const { data: existingSettings } = await supabase
             .from('admin_settings')
             .select('id')
@@ -43,7 +40,6 @@ router.post('/settings', async (req, res) => {
 
         let result;
         if (existingSettings) {
-            // Update existing
             result = await supabase
                 .from('admin_settings')
                 .update({
@@ -55,7 +51,6 @@ router.post('/settings', async (req, res) => {
                 .select('*')
                 .single();
         } else {
-            // Insert new
             result = await supabase
                 .from('admin_settings')
                 .insert([{
@@ -80,25 +75,20 @@ router.post('/settings', async (req, res) => {
     }
 });
 
-// Get admin statistics
 router.get('/stats', async (req, res) => {
     try {
-        // Get total users
         const { data: users, error: usersError } = await supabase
             .from('users')
             .select('id');
 
-        // Get total bots
         const { data: bots, error: botsError } = await supabase
             .from('bots')
             .select('id');
 
-        // Get total commands
         const { data: commands, error: commandsError } = await supabase
             .from('commands')
             .select('id');
 
-        // Get active bots
         const { data: activeBots, error: activeBotsError } = await supabase
             .from('bots')
             .select('id')
@@ -114,7 +104,8 @@ router.get('/stats', async (req, res) => {
                 totalUsers: users?.length || 0,
                 totalBots: bots?.length || 0,
                 totalCommands: commands?.length || 0,
-                activeBots: activeBots?.length || 0
+                activeBots: activeBots?.length || 0,
+                todayMessages: 0
             }
         });
 
