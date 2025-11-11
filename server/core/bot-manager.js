@@ -261,6 +261,7 @@ async function handleTestCommand(bot, token, commandId, chatId, messageId) {
 }
 
 // Execute command
+// Add this function to bot-manager.js
 async function executeCommand(bot, command, msg, isTest = false) {
     try {
         const result = await executeCommandCode(bot, command.code, {
@@ -299,6 +300,18 @@ Please check your command code and try again.
     }
 }
 
+// // Make sure to export it
+// module.exports = {
+    // initializeAllBots,
+    // initializeBot,
+    // handleBotUpdate,
+    // updateCommandCache,
+    // getBotInstance,
+    // removeBot,
+    // executeCommand, // Add this line
+    // activeBots,
+    // botCommands
+// };
 // Execute answer handler
 async function executeAnswerHandler(bot, command, msg, answerText, context) {
     try {
@@ -582,6 +595,7 @@ module.exports = {
     updateCommandCache,
     getBotInstance,
     removeBot,
+    executeCommand, // Add this line
     activeBots,
     botCommands
 };
