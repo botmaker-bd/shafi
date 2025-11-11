@@ -57,7 +57,7 @@ router.get('/:commandId', async (req, res) => {
     }
 });
 
-// Add new command
+// Add new command - FIXED MULTIPLE PATTERNS
 router.post('/', async (req, res) => {
     try {
         const { botToken, name, pattern, code, description, waitForAnswer, answerHandler } = req.body;
@@ -68,58 +68,66 @@ router.post('/', async (req, res) => {
             return res.status(400).json({ error: 'Bot token, name, pattern and code are required' });
         }
 
-        // Check for duplicate command patterns
-        const patterns = pattern.split(',').map(p => p.trim());
+        // Process multiple patterns
+        const patterns = pattern.split(',').map(p => p.trim()).filter(p => p.length > 0);
         
-        for (const singlePattern of patterns) {
-            const { data: existingCommand } = await supabase
-                .from('commands')
-                .select('id')
-                .eq('bot_token', botToken)
-                .eq('pattern', singlePattern)
-                .single();
+        if (patterns.length === 0) {
+            return res.status(400).json({ error: 'At least one command pattern is required' });
+        }
 
-            if (existingCommand) {
-                return res.status(400).json({ 
-                    error: `Command pattern "${singlePattern}" already exists for this bot` 
-                });
+        // Check for duplicate command patterns
+        for (const singlePattern of patterns) {
+            const { data: existingCommands } = await supabase
+                .from('commands')
+                .select('id, pattern')
+                .eq('bot_token', botToken)
+                .eq('is_active', true);
+
+            if (existingCommands) {
+                for (const existingCmd of existingCommands) {
+                    const existingPatterns = existingCmd.pattern.split(',').map(p => p.trim());
+                    if (existingPatterns.includes(singlePattern)) {
+                        return res.status(400).json({ 
+                            error: `Command pattern "${singlePattern}" already exists for this bot` 
+                        });
+                    }
+                }
             }
         }
 
-        // Insert command for each pattern
-        const commandPromises = patterns.map(singlePattern => 
-            supabase
-                .from('commands')
-                .insert([{
-                    bot_token: botToken,
-                    name: name.trim(),
-                    pattern: singlePattern,
-                    code: code.trim(),
-                    description: description?.trim() || '',
-                    wait_for_answer: waitForAnswer || false,
-                    answer_handler: answerHandler?.trim() || null,
-                    is_active: true
-                }])
-                .select('*')
-                .single()
-        );
+        // Format code properly
+        const formattedCode = this.formatCode(code);
 
-        const results = await Promise.all(commandPromises);
-        const commands = results.map(result => result.data).filter(cmd => cmd);
+        // Insert command with all patterns
+        const { data: command, error } = await supabase
+            .from('commands')
+            .insert([{
+                bot_token: botToken,
+                name: name.trim(),
+                pattern: patterns.join(', '),
+                code: formattedCode,
+                description: description?.trim() || '',
+                wait_for_answer: waitForAnswer || false,
+                answer_handler: answerHandler?.trim() || null,
+                is_active: true
+            }])
+            .select('*')
+            .single();
 
-        if (commands.length === 0) {
-            throw new Error('Failed to create any commands');
+        if (error) {
+            console.error('Create command error:', error);
+            throw error;
         }
 
         // Update command cache
         await botManager.updateCommandCache(botToken);
 
-        console.log('✅ Commands created successfully:', commands.length);
+        console.log('✅ Command created successfully with patterns:', patterns.length);
 
         res.json({
             success: true,
-            message: `Commands created successfully! (${commands.length} patterns)`,
-            commands
+            message: `Command created successfully with ${patterns.length} patterns!`,
+            command
         });
 
     } catch (error) {
@@ -140,35 +148,48 @@ router.put('/:commandId', async (req, res) => {
             return res.status(400).json({ error: 'Name, pattern and code are required' });
         }
 
-        // Check for duplicate command patterns (excluding current command)
-        const patterns = pattern.split(',').map(p => p.trim());
+        // Process multiple patterns
+        const patterns = pattern.split(',').map(p => p.trim()).filter(p => p.length > 0);
         
-        for (const singlePattern of patterns) {
-            const { data: existingCommand } = await supabase
-                .from('commands')
-                .select('id')
-                .eq('bot_token', botToken)
-                .eq('pattern', singlePattern)
-                .neq('id', commandId)
-                .single();
+        if (patterns.length === 0) {
+            return res.status(400).json({ error: 'At least one command pattern is required' });
+        }
 
-            if (existingCommand) {
-                return res.status(400).json({ 
-                    error: `Another command with pattern "${singlePattern}" already exists` 
-                });
+        // Check for duplicate command patterns (excluding current command)
+        const { data: existingCommands } = await supabase
+            .from('commands')
+            .select('id, pattern')
+            .eq('bot_token', botToken)
+            .eq('is_active', true)
+            .neq('id', commandId);
+
+        if (existingCommands) {
+            for (const singlePattern of patterns) {
+                for (const existingCmd of existingCommands) {
+                    const existingPatterns = existingCmd.pattern.split(',').map(p => p.trim());
+                    if (existingPatterns.includes(singlePattern)) {
+                        return res.status(400).json({ 
+                            error: `Another command with pattern "${singlePattern}" already exists` 
+                        });
+                    }
+                }
             }
         }
+
+        // Format code properly
+        const formattedCode = this.formatCode(code);
+        const formattedAnswerHandler = answerHandler ? this.formatCode(answerHandler) : null;
 
         // Update command
         const { data: command, error: updateError } = await supabase
             .from('commands')
             .update({
                 name: name.trim(),
-                pattern: pattern,
-                code: code.trim(),
+                pattern: patterns.join(', '),
+                code: formattedCode,
                 description: description?.trim() || '',
                 wait_for_answer: waitForAnswer || false,
-                answer_handler: answerHandler?.trim() || null,
+                answer_handler: formattedAnswerHandler,
                 updated_at: new Date().toISOString()
             })
             .eq('id', commandId)
@@ -242,7 +263,7 @@ router.delete('/:commandId', async (req, res) => {
     }
 });
 
-// Test command execution
+// Test command execution - FIXED VERSION
 router.post('/:commandId/test', async (req, res) => {
     try {
         const { commandId } = req.params;
@@ -281,6 +302,10 @@ router.post('/:commandId/test', async (req, res) => {
             return res.status(400).json({ error: 'Admin chat ID not set. Please set admin settings first.' });
         }
 
+        // Use first pattern for testing
+        const patterns = command.pattern.split(',').map(p => p.trim());
+        const testPattern = patterns[0];
+
         // Create test message
         const testMessage = {
             chat: { id: adminSettings.admin_chat_id },
@@ -290,11 +315,11 @@ router.post('/:commandId/test', async (req, res) => {
                 username: 'testuser'
             },
             message_id: Math.floor(Math.random() * 1000000),
-            text: command.pattern.split(',')[0] // Use first pattern for testing
+            text: testPattern
         };
 
-        // Execute command using the correct function
-        await executeCommandTest(bot, command, testMessage);
+        // Execute command
+        await botManager.executeCommand(bot, command, testMessage, true);
 
         console.log('✅ Command test executed successfully:', commandId);
 
@@ -309,137 +334,7 @@ router.post('/:commandId/test', async (req, res) => {
     }
 });
 
-// Helper function to execute command for testing
-async function executeCommandTest(bot, command, msg) {
-    try {
-        const result = await executeCommandCode(bot, command.code, {
-            msg,
-            chatId: msg.chat.id,
-            userId: msg.from.id,
-            username: msg.from.username,
-            first_name: msg.from.first_name,
-            isTest: true
-        });
-
-        return result;
-    } catch (error) {
-        console.error(`❌ Command "${command.name}" execution error:`, error);
-        
-        const errorMessage = `
-❌ *Command Execution Error*
-
-*Command:* ${command.name}
-*Pattern:* ${command.pattern}
-
-*Error:* \`${error.message}\`
-
-Please check your command code and try again.
-        `.trim();
-
-        try {
-            await bot.sendMessage(msg.chat.id, errorMessage, {
-                parse_mode: 'Markdown',
-                reply_to_message_id: msg.message_id
-            });
-        } catch (sendError) {
-            console.error('❌ Failed to send error message:', sendError);
-        }
-    }
-}
-
-// Execute command code safely (same as in bot-manager)
-async function executeCommandCode(bot, code, context) {
-    const { msg, chatId, userId, username, first_name, isTest } = context;
-    
-    const safeFunctions = {
-        sendMessage: (text, options = {}) => {
-            return bot.sendMessage(chatId, text, {
-                parse_mode: 'Markdown',
-                ...options
-            });
-        },
-        
-        sendPhoto: (photo, options = {}) => {
-            return bot.sendPhoto(chatId, photo, options);
-        },
-        
-        sendDocument: (doc, options = {}) => {
-            return bot.sendDocument(chatId, doc, options);
-        },
-        
-        getUser: () => ({ 
-            id: userId, 
-            username: username || 'No username', 
-            first_name: first_name || 'User'
-        }),
-        
-        getMessage: () => msg,
-        
-        getChatId: () => chatId,
-        
-        HTTP: {
-            get: async (options) => {
-                try {
-                    const response = await axios.get(options.url, {
-                        headers: options.headers || {}
-                    });
-                    return response.data;
-                } catch (error) {
-                    throw new Error(`HTTP GET failed: ${error.message}`);
-                }
-            },
-            
-            post: async (options) => {
-                try {
-                    const response = await axios.post(options.url, options.data || {}, {
-                        headers: options.headers || {}
-                    });
-                    return response.data;
-                } catch (error) {
-                    throw new Error(`HTTP POST failed: ${error.message}`);
-                }
-            }
-        },
-        
-        isTest: () => isTest || false,
-        
-        wait: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
-        
-        log: (message) => console.log(`[Command Log]: ${message}`)
-    };
-
-    try {
-        const wrappedCode = `
-            return (async function() {
-                const { 
-                    sendMessage, 
-                    sendPhoto, 
-                    sendDocument,
-                    getUser, 
-                    getMessage, 
-                    getChatId,
-                    HTTP,
-                    isTest, 
-                    wait,
-                    log
-                } = this;
-                
-                ${code}
-            }).call(this);
-        `;
-
-        const func = new Function(wrappedCode);
-        const result = await func.call(safeFunctions);
-        
-        return result;
-    } catch (error) {
-        console.error('❌ Command code execution error:', error);
-        throw new Error(`Command execution failed: ${error.message}`);
-    }
-}
-
-
-// Test temporary command without saving
+// Test temporary command without saving - FIXED VERSION
 router.post('/test-temp', async (req, res) => {
     try {
         const { command, botToken } = req.body;
@@ -464,6 +359,10 @@ router.post('/test-temp', async (req, res) => {
             return res.status(400).json({ error: 'Admin chat ID not set. Please set admin settings first.' });
         }
 
+        // Use first pattern for testing
+        const patterns = command.pattern.split(',').map(p => p.trim());
+        const testPattern = patterns[0];
+
         // Create test message
         const testMessage = {
             chat: { id: adminSettings.admin_chat_id },
@@ -473,11 +372,20 @@ router.post('/test-temp', async (req, res) => {
                 username: 'testuser'
             },
             message_id: Math.floor(Math.random() * 1000000),
-            text: command.pattern.split(',')[0] // Use first pattern for testing
+            text: testPattern
         };
 
-        // Execute command using the correct function
-        await executeCommandTest(bot, command, testMessage);
+        // Create temporary command object
+        const tempCommand = {
+            name: command.name,
+            pattern: command.pattern,
+            code: command.code,
+            wait_for_answer: command.waitForAnswer || false,
+            answer_handler: command.answerHandler || ''
+        };
+
+        // Execute command
+        await botManager.executeCommand(bot, tempCommand, testMessage, true);
 
         res.json({
             success: true,
@@ -525,5 +433,21 @@ router.patch('/:commandId/toggle', async (req, res) => {
         res.status(500).json({ error: 'Failed to toggle command status' });
     }
 });
+
+// Helper function to format code properly
+function formatCode(code) {
+    if (!code) return code;
+    
+    // Remove extra spaces and fix formatting
+    return code
+        .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+        .replace(/\(\s+/g, '(') // Remove spaces after (
+        .replace(/\s+\)/g, ')') // Remove spaces before )
+        .replace(/\{\s+/g, '{ ') // Standardize { spacing
+        .replace(/\s+\}/g, ' }') // Standardize } spacing
+        .replace(/\,\s+/g, ', ') // Standardize , spacing
+        .replace(/\s+\;/g, ';') // Remove spaces before ;
+        .trim();
+}
 
 module.exports = router;
