@@ -1,6 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 const TelegramBot = require('node-telegram-bot-api');
-const axios = require('axios'); // Add axios for HTTP requests
+const axios = require('axios');
 const supabase = require('../config/supabase');
 
 // Store active bots and their commands
@@ -8,7 +8,6 @@ const activeBots = new Map();
 const botCommands = new Map();
 const waitingForAnswer = new Map();
 
-// Initialize all bots on startup
 // Initialize all bots on startup
 async function initializeAllBots() {
     try {
@@ -41,7 +40,6 @@ async function initializeAllBots() {
         
         console.log(`✅ Bot initialization completed: ${initializedCount} successful, ${failedCount} failed`);
         
-        // If no bots to initialize, show message
         if (bots.length === 0) {
             console.log('💡 No active bots found. Add bots via the web interface.');
         }
@@ -103,7 +101,7 @@ async function initializeBot(token) {
     }
 }
 
-// Handle incoming messages
+// Handle incoming messages - FIXED FOR MULTIPLE PATTERNS
 async function handleMessage(bot, token, msg) {
     try {
         if (!msg.text) return;
@@ -125,12 +123,19 @@ async function handleMessage(bot, token, msg) {
         const commands = botCommands.get(token) || [];
         let matchedCommand = null;
 
-        // Find matching command
+        // Find matching command with multiple patterns
         for (const cmd of commands) {
-            if (text === cmd.pattern || text.startsWith(cmd.pattern + ' ')) {
-                matchedCommand = cmd;
-                break;
+            const patterns = cmd.pattern.split(',').map(p => p.trim());
+            
+            for (const pattern of patterns) {
+                // Exact match or starts with pattern followed by space
+                if (text === pattern || text.startsWith(pattern + ' ')) {
+                    matchedCommand = cmd;
+                    console.log(`🎯 Matched pattern: "${pattern}" in command: ${cmd.name}`);
+                    break;
+                }
             }
+            if (matchedCommand) break;
         }
 
         if (matchedCommand) {
@@ -143,12 +148,6 @@ async function handleMessage(bot, token, msg) {
                     context: { chatId, userId, messageId }
                 });
                 
-                // await bot.sendMessage(chatId, 
-                    // '⏳ Please wait for the response...',
-                    // { reply_to_message_id: messageId }
-                // );
-                
-                // Execute command that will wait for answer
                 await executeCommand(bot, matchedCommand, msg);
             } else {
                 // Execute normal command
@@ -156,10 +155,7 @@ async function handleMessage(bot, token, msg) {
             }
         } else {
             console.log('❌ No command matched');
-            await bot.sendMessage(chatId, 
-                '❌ Command not found. Use /start to see available commands.',
-                { reply_to_message_id: messageId }
-            );
+            // Don't send error message to avoid spam
         }
 
     } catch (error) {
@@ -254,6 +250,10 @@ async function handleTestCommand(bot, token, commandId, chatId, messageId) {
 
         const testChatId = adminSettings?.admin_chat_id || chatId;
 
+        // Use first pattern for testing
+        const patterns = command.pattern.split(',').map(p => p.trim());
+        const testPattern = patterns[0];
+
         // Create mock message object
         const mockMsg = {
             chat: { id: testChatId },
@@ -263,7 +263,7 @@ async function handleTestCommand(bot, token, commandId, chatId, messageId) {
                 username: 'testuser'
             },
             message_id: messageId,
-            text: command.pattern
+            text: testPattern
         };
 
         // Execute command
@@ -275,8 +275,7 @@ async function handleTestCommand(bot, token, commandId, chatId, messageId) {
     }
 }
 
-// Execute command
-// Add this function to bot-manager.js
+// Execute command - FIXED VERSION
 async function executeCommand(bot, command, msg, isTest = false) {
     try {
         const result = await executeCommandCode(bot, command.code, {
@@ -315,18 +314,6 @@ Please check your command code and try again.
     }
 }
 
-// // Make sure to export it
-// module.exports = {
-    // initializeAllBots,
-    // initializeBot,
-    // handleBotUpdate,
-    // updateCommandCache,
-    // getBotInstance,
-    // removeBot,
-    // executeCommand, // Add this line
-    // activeBots,
-    // botCommands
-// };
 // Execute answer handler
 async function executeAnswerHandler(bot, command, msg, answerText, context) {
     try {
@@ -347,7 +334,7 @@ async function executeAnswerHandler(bot, command, msg, answerText, context) {
     }
 }
 
-// Execute command code safely
+// Execute command code safely - IMPROVED VERSION
 async function executeCommandCode(bot, code, context) {
     const { msg, chatId, userId, username, first_name, isTest, answerText } = context;
     
@@ -503,7 +490,7 @@ async function executeCommandCode(bot, code, context) {
     };
 
     try {
-        // Wrap the code in an async function
+        // Wrap the code in an async function with proper error handling
         const wrappedCode = `
             return (async function() {
                 const { 
@@ -530,7 +517,12 @@ async function executeCommandCode(bot, code, context) {
                     Bot
                 } = this;
                 
-                ${code}
+                try {
+                    ${code}
+                } catch (error) {
+                    console.error('Command execution error:', error);
+                    throw error;
+                }
             }).call(this);
         `;
 
@@ -610,7 +602,7 @@ module.exports = {
     updateCommandCache,
     getBotInstance,
     removeBot,
-    executeCommand, // Add this line
+    executeCommand,
     activeBots,
     botCommands
 };
