@@ -13,40 +13,6 @@ class CommandEditor {
         this.setupEventListeners();
         await this.loadCommands();
         this.setupUserMenu();
-        this.setupAutoSave();
-    }
-
-    // NEW: Auto-save functionality
-    setupAutoSave() {
-        let saveTimeout;
-        const autoSaveElements = [
-            'commandName', 'commandPattern', 'commandDescription', 
-            'commandCode', 'answerHandler'
-        ];
-
-        autoSaveElements.forEach(elementId => {
-            const element = document.getElementById(elementId);
-            if (element) {
-                element.addEventListener('input', () => {
-                    clearTimeout(saveTimeout);
-                    if (this.currentCommand && this.currentCommand.id !== 'new') {
-                        saveTimeout = setTimeout(() => {
-                            this.autoSave();
-                        }, 2000);
-                    }
-                });
-            }
-        });
-    }
-
-    async autoSave() {
-        if (!this.currentCommand || this.currentCommand.id === 'new') return;
-        
-        try {
-            await this.saveCommand(false); // silent save
-        } catch (error) {
-            console.log('Auto-save failed:', error);
-        }
     }
 
     async checkAuth() {
@@ -103,7 +69,7 @@ class CommandEditor {
                 window.location.href = 'bot-management.html';
             }
         } catch (error) {
-            this.showError('Failed to load bot info: ' + error.message);
+            this.showError('Failed to load bot info');
         }
     }
 
@@ -111,45 +77,54 @@ class CommandEditor {
         if (this.currentBot) {
             document.getElementById('botName').textContent = `Commands - ${this.currentBot.name}`;
             document.getElementById('botUsername').textContent = `@${this.currentBot.username}`;
-            document.title = `Commands - ${this.currentBot.name} - Bot Maker Pro`;
         }
     }
 
     setupEventListeners() {
+        console.log('🔄 Setting up event listeners...');
+        
         // Navigation
-        document.getElementById('backToBots').addEventListener('click', () => {
+        document.getElementById('backToBots')?.addEventListener('click', () => {
             window.location.href = 'bot-management.html';
         });
 
-        // Command actions
-        document.getElementById('addCommandBtn').addEventListener('click', () => {
-            this.addNewCommand();
-        });
-
-        document.getElementById('createFirstCommand').addEventListener('click', () => {
-            this.addNewCommand();
-        });
-
-        document.getElementById('addFirstCommand').addEventListener('click', () => {
-            this.addNewCommand();
-        });
-
-        // FIXED: Use form submission instead of button click
-        document.getElementById('commandForm').addEventListener('submit', (e) => {
+        // Command actions - FIXED: Proper event listeners
+        document.getElementById('addCommandBtn')?.addEventListener('click', (e) => {
             e.preventDefault();
+            this.addNewCommand();
+        });
+
+        document.getElementById('createFirstCommand')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.addNewCommand();
+        });
+
+        document.getElementById('addFirstCommand')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.addNewCommand();
+        });
+
+        // FIXED: Save button with proper form submission
+        document.getElementById('saveCommandBtn')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('💾 Save button clicked');
             this.saveCommand();
         });
 
-        document.getElementById('deleteCommandBtn').addEventListener('click', () => {
+        // FIXED: Delete button
+        document.getElementById('deleteCommandBtn')?.addEventListener('click', (e) => {
+            e.preventDefault();
             this.deleteCommand();
         });
 
-        document.getElementById('testCommandBtn').addEventListener('click', () => {
+        // FIXED: Test button
+        document.getElementById('testCommandBtn')?.addEventListener('click', (e) => {
+            e.preventDefault();
             this.testCommand();
         });
 
         // Form interactions
-        document.getElementById('waitForAnswer').addEventListener('change', (e) => {
+        document.getElementById('waitForAnswer')?.addEventListener('change', (e) => {
             this.toggleAnswerHandler(e.target.checked);
         });
 
@@ -162,39 +137,35 @@ class CommandEditor {
         });
 
         // Code formatting
-        document.getElementById('formatCode').addEventListener('click', () => {
+        document.getElementById('formatCode')?.addEventListener('click', (e) => {
+            e.preventDefault();
             this.formatCode();
         });
 
-        document.getElementById('insertTemplate').addEventListener('click', () => {
+        document.getElementById('insertTemplate')?.addEventListener('click', (e) => {
+            e.preventDefault();
             this.showTemplateSelector();
         });
 
-        // Command search with debounce
-        let searchTimeout;
-        document.getElementById('commandSearch').addEventListener('input', (e) => {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                this.filterCommands(e.target.value);
-            }, 300);
-        });
+        // Command search
+        const searchInput = document.getElementById('commandSearch');
+        if (searchInput) {
+            let searchTimeout;
+            searchInput.addEventListener('input', (e) => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    this.filterCommands(e.target.value);
+                }, 300);
+            });
+        }
 
         // Logout
-        document.getElementById('logoutBtn').addEventListener('click', (e) => {
+        document.getElementById('logoutBtn')?.addEventListener('click', (e) => {
             e.preventDefault();
             this.logout();
         });
 
-        // FIXED: Keyboard shortcuts
-        document.addEventListener('keydown', (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-                e.preventDefault();
-                this.saveCommand();
-            }
-        });
-
-        // Modal events
-        this.setupModalEvents();
+        console.log('✅ Event listeners setup complete');
     }
 
     setupUserMenu() {
@@ -211,30 +182,6 @@ class CommandEditor {
                 userDropdown.classList.remove('show');
             });
         }
-    }
-
-    setupModalEvents() {
-        const modal = document.getElementById('testCommandModal');
-        const closeBtn = document.getElementById('closeTestCommand');
-        const modalClose = document.querySelector('.modal-close');
-
-        if (closeBtn) {
-            closeBtn.addEventListener('click', () => {
-                modal.style.display = 'none';
-            });
-        }
-
-        if (modalClose) {
-            modalClose.addEventListener('click', () => {
-                modal.style.display = 'none';
-            });
-        }
-
-        window.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                modal.style.display = 'none';
-            }
-        });
     }
 
     async loadCommands() {
@@ -256,10 +203,10 @@ class CommandEditor {
                 this.commands = data.commands || [];
                 this.displayCommands();
             } else {
-                this.showError('Failed to load commands: ' + (data.error || 'Unknown error'));
+                this.showError('Failed to load commands');
             }
         } catch (error) {
-            this.showError('Network error while loading commands: ' + error.message);
+            this.showError('Network error while loading commands');
         } finally {
             this.showLoading(false);
         }
@@ -270,25 +217,23 @@ class CommandEditor {
         const emptyCommands = document.getElementById('emptyCommands');
 
         if (!this.commands || this.commands.length === 0) {
-            commandsList.style.display = 'none';
-            emptyCommands.style.display = 'block';
+            if (commandsList) commandsList.style.display = 'none';
+            if (emptyCommands) emptyCommands.style.display = 'block';
             return;
         }
 
-        commandsList.style.display = 'block';
-        emptyCommands.style.display = 'none';
-
-        commandsList.innerHTML = this.commands.map(command => this.getCommandItemHTML(command)).join('');
+        if (commandsList) {
+            commandsList.style.display = 'block';
+            commandsList.innerHTML = this.commands.map(command => this.getCommandItemHTML(command)).join('');
+        }
+        if (emptyCommands) emptyCommands.style.display = 'none';
     }
 
     getCommandItemHTML(command) {
         const isActive = command.is_active;
-        const hasAnswerHandler = command.wait_for_answer && command.answer_handler;
-        const isSelected = this.currentCommand?.id === command.id;
         
         return `
-            <div class="command-item ${isSelected ? 'active' : ''}" 
-                 onclick="commandEditor.selectCommand('${command.id}')">
+            <div class="command-item" data-command-id="${command.id}">
                 <div class="command-header">
                     <h4>${this.escapeHtml(command.name)}</h4>
                     <span class="command-pattern">${this.escapeHtml(command.pattern)}</span>
@@ -296,38 +241,46 @@ class CommandEditor {
                 <p class="command-desc">${this.escapeHtml(command.description || 'No description')}</p>
                 <div class="command-meta">
                     <span class="command-status ${isActive ? 'active' : 'inactive'}">
-                        ${isActive ? '✅ Active' : '❌ Inactive'}
+                        ${isActive ? 'Active' : 'Inactive'}
                     </span>
-                    ${hasAnswerHandler ? '<span class="command-feature">⏳ Waits</span>' : ''}
-                    ${command.wait_for_answer ? '<span class="command-feature">💬 Interactive</span>' : ''}
+                    ${command.wait_for_answer ? '<span class="command-feature">⏳ Waits</span>' : ''}
                 </div>
             </div>
         `;
     }
 
+    // FIXED: Add click event listeners to command items
+    attachCommandClickEvents() {
+        document.querySelectorAll('.command-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const commandId = item.dataset.commandId;
+                this.selectCommand(commandId);
+                
+                // Update active state
+                document.querySelectorAll('.command-item').forEach(i => {
+                    i.classList.remove('active');
+                });
+                item.classList.add('active');
+            });
+        });
+    }
+
     filterCommands(searchTerm) {
         const commandItems = document.querySelectorAll('.command-item');
-        const lowerSearch = searchTerm.toLowerCase().trim();
-
-        if (!lowerSearch) {
-            commandItems.forEach(item => item.style.display = 'block');
-            return;
-        }
+        const lowerSearch = searchTerm.toLowerCase();
 
         commandItems.forEach(item => {
             const commandName = item.querySelector('h4').textContent.toLowerCase();
             const commandPattern = item.querySelector('.command-pattern').textContent.toLowerCase();
-            const commandDesc = item.querySelector('.command-desc').textContent.toLowerCase();
-            
-            const isVisible = commandName.includes(lowerSearch) || 
-                            commandPattern.includes(lowerSearch) ||
-                            commandDesc.includes(lowerSearch);
+            const isVisible = commandName.includes(lowerSearch) || commandPattern.includes(lowerSearch);
             
             item.style.display = isVisible ? 'block' : 'none';
         });
     }
 
     addNewCommand() {
+        console.log('➕ Creating new command...');
+        
         this.currentCommand = {
             id: 'new',
             name: 'New Command',
@@ -344,14 +297,11 @@ class CommandEditor {
         
         // Focus on name field
         setTimeout(() => {
-            document.getElementById('commandName').focus();
+            document.getElementById('commandName')?.focus();
         }, 100);
     }
 
     async selectCommand(commandId) {
-        // Don't reload if already selected
-        if (this.currentCommand?.id === commandId) return;
-
         this.showLoading(true);
 
         try {
@@ -368,36 +318,30 @@ class CommandEditor {
                 this.currentCommand = data.command;
                 this.showCommandEditor();
                 this.populateCommandForm();
-                
-                // Update active state in list
-                document.querySelectorAll('.command-item').forEach(item => {
-                    item.classList.remove('active');
-                });
-                
-                const selectedItem = document.querySelector(`[onclick*="${commandId}"]`);
-                if (selectedItem) {
-                    selectedItem.classList.add('active');
-                    // Scroll into view
-                    selectedItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                }
             } else {
-                this.showError('Failed to load command: ' + (data.error || 'Unknown error'));
+                this.showError('Failed to load command');
             }
         } catch (error) {
-            this.showError('Network error while loading command: ' + error.message);
+            this.showError('Network error while loading command');
         } finally {
             this.showLoading(false);
         }
     }
 
     showCommandEditor() {
-        document.getElementById('noCommandSelected').style.display = 'none';
-        document.getElementById('commandEditor').style.display = 'block';
+        const noSelection = document.getElementById('noCommandSelected');
+        const editor = document.getElementById('commandEditor');
+        
+        if (noSelection) noSelection.style.display = 'none';
+        if (editor) editor.style.display = 'block';
     }
 
     hideCommandEditor() {
-        document.getElementById('noCommandSelected').style.display = 'block';
-        document.getElementById('commandEditor').style.display = 'none';
+        const noSelection = document.getElementById('noCommandSelected');
+        const editor = document.getElementById('commandEditor');
+        
+        if (noSelection) noSelection.style.display = 'block';
+        if (editor) editor.style.display = 'none';
         this.currentCommand = null;
     }
 
@@ -412,59 +356,39 @@ class CommandEditor {
         
         // Wait for answer
         const waitCheckbox = document.getElementById('waitForAnswer');
-        waitCheckbox.checked = this.currentCommand.wait_for_answer || false;
-        this.toggleAnswerHandler(waitCheckbox.checked);
+        if (waitCheckbox) {
+            waitCheckbox.checked = this.currentCommand.wait_for_answer || false;
+            this.toggleAnswerHandler(waitCheckbox.checked);
+        }
         
         // Answer handler
-        document.getElementById('answerHandler').value = this.currentCommand.answer_handler || '';
+        if (this.currentCommand.answer_handler) {
+            document.getElementById('answerHandler').value = this.currentCommand.answer_handler;
+        }
         
         // Update UI
         document.getElementById('currentCommandName').textContent = this.currentCommand.name;
-        document.getElementById('commandStatus').textContent = this.currentCommand.is_active ? 'Active' : 'Inactive';
-        document.getElementById('commandStatus').className = `status-badge ${this.currentCommand.is_active ? 'active' : 'inactive'}`;
-        
-        // Update button states
-        this.updateButtonStates();
+        const statusElement = document.getElementById('commandStatus');
+        if (statusElement) {
+            statusElement.textContent = this.currentCommand.is_active ? 'Active' : 'Inactive';
+            statusElement.className = `status-badge ${this.currentCommand.is_active ? 'active' : 'inactive'}`;
+        }
     }
 
     toggleAnswerHandler(show) {
         const section = document.getElementById('answerHandlerSection');
-        if (show) {
-            section.style.display = 'block';
-            // Add default answer handler if empty
-            if (!document.getElementById('answerHandler').value.trim()) {
-                document.getElementById('answerHandler').value = `// Handle user's answer
-const answer = getAnswer();
-const user = getUser();
-
-// Process the answer here
-return sendMessage(\`✅ Thank you for your answer: "\${answer}"\`);`;
-            }
-        } else {
-            section.style.display = 'none';
+        if (section) {
+            section.style.display = show ? 'block' : 'none';
         }
     }
 
-    updateButtonStates() {
-        const isNew = this.currentCommand?.id === 'new';
-        const deleteBtn = document.getElementById('deleteCommandBtn');
-        const testBtn = document.getElementById('testCommandBtn');
+    // FIXED: Save command with better validation and feedback
+    async saveCommand() {
+        console.log('💾 Starting save command process...');
         
-        if (deleteBtn) {
-            deleteBtn.disabled = isNew;
-            deleteBtn.title = isNew ? 'Save command first to enable delete' : 'Delete command';
-        }
-        
-        if (testBtn) {
-            testBtn.disabled = isNew;
-            testBtn.title = isNew ? 'Save command first to test' : 'Test command';
-        }
-    }
-
-    async saveCommand(showNotification = true) {
         if (!this.currentCommand || !this.currentBot) {
             this.showError('No command selected or bot not loaded');
-            return false;
+            return;
         }
 
         const formData = {
@@ -478,35 +402,37 @@ return sendMessage(\`✅ Thank you for your answer: "\${answer}"\`);`;
             botToken: this.currentBot.token
         };
 
-        // Enhanced Validation
+        console.log('📦 Form data:', formData);
+
+        // Validation
         if (!formData.name) {
             this.showError('Command name is required');
             document.getElementById('commandName').focus();
-            return false;
+            return;
         }
 
         if (!formData.pattern) {
             this.showError('Command pattern is required');
             document.getElementById('commandPattern').focus();
-            return false;
+            return;
         }
 
         if (!formData.pattern.startsWith('/')) {
             this.showError('Command pattern should start with /');
             document.getElementById('commandPattern').focus();
-            return false;
+            return;
         }
 
         if (!formData.code) {
             this.showError('Command code is required');
             document.getElementById('commandCode').focus();
-            return false;
+            return;
         }
 
         if (formData.waitForAnswer && !formData.answerHandler) {
             this.showError('Answer handler code is required when "Wait for Answer" is enabled');
             document.getElementById('answerHandler').focus();
-            return false;
+            return;
         }
 
         this.showLoading(true);
@@ -514,60 +440,46 @@ return sendMessage(\`✅ Thank you for your answer: "\${answer}"\`);`;
         try {
             const token = localStorage.getItem('token');
             let response;
+            let url;
+            let method;
 
             if (this.currentCommand.id === 'new') {
-                response = await fetch('/api/commands', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify(formData)
-                });
+                method = 'POST';
+                url = '/api/commands';
+                console.log('🆕 Creating new command...');
             } else {
-                response = await fetch(`/api/commands/${this.currentCommand.id}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({
-                        ...formData,
-                        botToken: this.currentBot.token
-                    })
-                });
+                method = 'PUT';
+                url = `/api/commands/${this.currentCommand.id}`;
+                console.log('✏️ Updating existing command...');
             }
+
+            response = await fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(formData)
+            });
 
             const data = await response.json();
+            console.log('📨 Server response:', data);
 
             if (response.ok) {
-                if (showNotification) {
-                    this.showSuccess('Command saved successfully!');
-                }
-                
-                // Reload commands to get updated list
+                this.showSuccess('Command saved successfully!');
                 await this.loadCommands();
                 
-                // Select the saved command
-                if (data.command) {
-                    this.currentCommand = data.command;
-                    this.populateCommandForm();
-                    
-                    // Update the command in the list
-                    const commandItem = document.querySelector(`[onclick*="${data.command.id}"]`);
-                    if (commandItem) {
-                        commandItem.outerHTML = this.getCommandItemHTML(data.command);
-                    }
-                }
+                // Re-attach click events after loading commands
+                setTimeout(() => {
+                    this.attachCommandClickEvents();
+                }, 100);
                 
-                return true;
             } else {
                 this.showError(data.error || 'Failed to save command');
-                return false;
             }
         } catch (error) {
+            console.error('❌ Save command error:', error);
             this.showError('Network error while saving command: ' + error.message);
-            return false;
         } finally {
             this.showLoading(false);
         }
@@ -578,7 +490,7 @@ return sendMessage(\`✅ Thank you for your answer: "\${answer}"\`);`;
             return;
         }
 
-        if (!confirm('Are you sure you want to delete this command?\n\nThis action cannot be undone and will remove the command from your bot.')) {
+        if (!confirm('Are you sure you want to delete this command? This action cannot be undone.')) {
             return;
         }
 
@@ -602,7 +514,7 @@ return sendMessage(\`✅ Thank you for your answer: "\${answer}"\`);`;
                 this.showError(data.error || 'Failed to delete command');
             }
         } catch (error) {
-            this.showError('Network error while deleting command: ' + error.message);
+            this.showError('Network error while deleting command');
         } finally {
             this.showLoading(false);
         }
@@ -637,90 +549,23 @@ return sendMessage(\`✅ Thank you for your answer: "\${answer}"\`);`;
             const data = await response.json();
 
             if (response.ok) {
-                this.showTestResult(`
-                    <div class="test-success">
-                        <h4>✅ Test Command Sent Successfully!</h4>
-                        <div class="test-details">
-                            <p><strong>Command:</strong> ${this.currentCommand.name}</p>
-                            <p><strong>Pattern:</strong> ${this.currentCommand.pattern}</p>
-                            <p><strong>Bot:</strong> ${this.currentBot.name}</p>
-                        </div>
-                        <p class="test-message">Check your Telegram bot for the test results.</p>
-                        <div class="test-tips">
-                            <p><strong>💡 Tips:</strong></p>
-                            <ul>
-                                <li>Make sure your bot is active</li>
-                                <li>Check admin chat ID is set correctly</li>
-                                <li>Wait a few seconds for the response</li>
-                            </ul>
-                        </div>
-                    </div>
-                `);
+                this.showSuccess('Test command sent successfully! Check your Telegram bot.');
             } else {
-                this.showTestResult(`
-                    <div class="test-error">
-                        <h4>❌ Test Failed</h4>
-                        <p><strong>Error:</strong> ${data.error || 'Unknown error occurred'}</p>
-                        <div class="troubleshooting">
-                            <p><strong>🔧 Troubleshooting:</strong></p>
-                            <ul>
-                                <li>Verify bot token is valid</li>
-                                <li>Check admin settings</li>
-                                <li>Review command code for errors</li>
-                                <li>Check server logs for details</li>
-                            </ul>
-                        </div>
-                    </div>
-                `);
+                this.showError(data.error || 'Failed to execute test command');
             }
         } catch (error) {
-            this.showTestResult(`
-                <div class="test-error">
-                    <h4>❌ Network Error</h4>
-                    <p>Failed to connect to server: ${error.message}</p>
-                    <p>Please check your internet connection and try again.</p>
-                </div>
-            `);
+            this.showError('Network error while testing command');
         } finally {
             this.showLoading(false);
-        }
-    }
-
-    showTestResult(html) {
-        const modal = document.getElementById('testCommandModal');
-        const resultDiv = document.getElementById('testCommandResult');
-        
-        if (modal && resultDiv) {
-            resultDiv.innerHTML = html;
-            modal.style.display = 'flex';
         }
     }
 
     insertTemplate(templateName) {
         const template = this.getDefaultTemplate(templateName);
         const codeTextarea = document.getElementById('commandCode');
-        
         if (codeTextarea) {
             codeTextarea.value = template;
-            
-            // Special handling for wait template
-            if (templateName === 'wait') {
-                document.getElementById('waitForAnswer').checked = true;
-                this.toggleAnswerHandler(true);
-                
-                // Set answer handler template
-                const answerHandler = document.getElementById('answerHandler');
-                if (answerHandler) {
-                    answerHandler.value = `// Handle user's answer
-const answer = getAnswer();
-const user = getUser();
-
-// Process the answer here
-return sendMessage(\`🎨 Great choice! \${answer} is a beautiful color, \${user.first_name}!\`);`;
-                }
-            }
-            
-            this.showSuccess(`"${templateName}" template inserted successfully!`);
+            this.showSuccess(`"${templateName}" template inserted`);
         }
     }
 
@@ -741,7 +586,6 @@ Thank you for using our bot! 😊
 \`;
 
 return sendMessage(welcomeMessage);`,
-
             echo: `// Echo command - repeats user's message
 const message = getMessage();
 const text = message.text;
@@ -750,38 +594,10 @@ const text = message.text;
 const echoText = text.replace('/echo', '').trim();
 
 if (!echoText) {
-    return sendMessage('Please provide some text after /echo command.\\\\nExample: /echo Hello World!');
+    return sendMessage('Please provide some text after /echo command.\\nExample: /echo Hello World!');
 }
 
-return sendMessage(\`🔊 Echo: \${echoText}\`);`,
-
-            buttons: `// Message with inline buttons
-const keyboard = {
-    inline_keyboard: [
-        [
-            { text: '✅ Option 1', callback_data: 'option_1' },
-            { text: '🔘 Option 2', callback_data: 'option_2' }
-        ],
-        [
-            { text: '🌐 Visit Website', url: 'https://example.com' }
-        ]
-    ]
-};
-
-return sendMessage('Please choose an option:', {
-    reply_markup: keyboard
-});`,
-
-            wait: `// Command that waits for user answer
-const user = getUser();
-
-// Send initial message
-await sendMessage(\`Hello \${user.first_name}! Please tell me your favorite color:\`);
-
-// The bot will now wait for user's response
-// Make sure "Wait for Answer" is enabled and answer handler is set
-
-// Note: User's response will be processed by the answer handler code`
+return sendMessage(\`🔊 Echo: \${echoText}\`);`
         };
 
         return templates[templateName] || templates.welcome;
@@ -790,79 +606,34 @@ await sendMessage(\`Hello \${user.first_name}! Please tell me your favorite colo
     formatCode() {
         const codeTextarea = document.getElementById('commandCode');
         if (!codeTextarea) return;
-
-        let code = codeTextarea.value;
         
         try {
-            // Improved code formatting
-            const lines = code.split('\n');
-            let indentLevel = 0;
-            const formattedLines = [];
-            const indentSize = 4;
-            
-            for (let line of lines) {
-                let trimmed = line.trim();
-                if (!trimmed) {
-                    formattedLines.push('');
-                    continue;
-                }
-                
-                // Decrease indent for closing braces
-                if (trimmed.startsWith('}') || trimmed.startsWith(']') || trimmed.startsWith(')')) {
-                    indentLevel = Math.max(0, indentLevel - 1);
-                }
-                
-                // Add current line with proper indentation
-                formattedLines.push(' '.repeat(indentLevel * indentSize) + trimmed);
-                
-                // Increase indent for opening braces
-                if (trimmed.endsWith('{') || trimmed.endsWith('[') || trimmed.endsWith('(') || 
-                    trimmed.endsWith('=>') || trimmed.includes(' function')) {
-                    indentLevel++;
-                }
-            }
-            
-            codeTextarea.value = formattedLines.join('\n');
+            const code = codeTextarea.value;
+            // Simple formatting logic
+            const formatted = code.split('\n').map(line => line.trim()).join('\n');
+            codeTextarea.value = formatted;
             this.showSuccess('Code formatted successfully!');
         } catch (error) {
-            this.showError('Formatting failed: ' + error.message);
+            this.showError('Formatting failed');
         }
     }
 
     showTemplateSelector() {
-        const templates = ['welcome', 'echo', 'buttons', 'wait'];
-        const templateHTML = templates.map(tpl => 
-            `<button type="button" onclick="commandEditor.insertTemplate('${tpl}')" 
-                    class="btn btn-secondary btn-small" style="margin: 2px;">
-                ${tpl}
-            </button>`
-        ).join('');
-        
-        this.showNotification(
-            `<div style="text-align: center;">
-                <p style="margin-bottom: 8px; font-weight: bold;">Select Template:</p>
-                <div style="display: flex; gap: 4px; flex-wrap: wrap; justify-content: center;">
-                    ${templateHTML}
-                </div>
-            </div>`, 
-            'info',
-            8000
-        );
+        this.showNotification('Select a template from the templates section below', 'info');
     }
 
     logout() {
         const sessionId = localStorage.getItem('sessionId');
-        const token = localStorage.getItem('token');
         
-        if (sessionId && token) {
+        if (sessionId) {
             fetch('/api/auth/logout', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
                 },
                 body: JSON.stringify({ sessionId })
-            }).catch(() => {}); // Ignore errors during logout
+            }).catch(() => {});
         }
 
         localStorage.clear();
@@ -884,28 +655,21 @@ await sendMessage(\`Hello \${user.first_name}! Please tell me your favorite colo
         this.showNotification(message, 'success');
     }
 
-    showNotification(message, type = 'info', duration = 5000) {
+    showNotification(message, type = 'info') {
         // Remove existing notifications
-        const existing = document.querySelectorAll('.notification');
-        existing.forEach(notif => notif.remove());
+        const existing = document.querySelector('.notification');
+        if (existing) existing.remove();
 
         const notification = document.createElement('div');
         notification.className = `notification notification-${type}`;
-        
-        // Check if message contains HTML
-        if (message.includes('<')) {
-            notification.innerHTML = message;
-        } else {
-            notification.innerHTML = `
-                <div class="notification-content">
-                    <i class="fas fa-${type === 'error' ? 'exclamation-triangle' : type === 'success' ? 'check-circle' : 'info-circle'}"></i>
-                    <span class="notification-message">${message}</span>
-                    <button class="notification-close">&times;</button>
-                </div>
-            `;
-        }
+        notification.innerHTML = `
+            <div class="notification-content">
+                <i class="fas fa-${type === 'error' ? 'exclamation-triangle' : type === 'success' ? 'check-circle' : 'info-circle'}"></i>
+                <span class="notification-message">${message}</span>
+                <button class="notification-close">&times;</button>
+            </div>
+        `;
 
-        // Apply styles
         Object.assign(notification.style, {
             position: 'fixed',
             top: '20px',
@@ -922,26 +686,18 @@ await sendMessage(\`Hello \${user.first_name}! Please tell me your favorite colo
             gap: '0.75rem'
         });
 
-        // Add close button functionality
-        const closeBtn = notification.querySelector('.notification-close');
-        if (closeBtn) {
-            closeBtn.addEventListener('click', () => {
-                notification.remove();
-            });
-        }
+        notification.querySelector('.notification-close').addEventListener('click', () => {
+            notification.remove();
+        });
 
         document.body.appendChild(notification);
 
-        // Auto remove after duration
         setTimeout(() => {
-            if (notification.parentNode) {
-                notification.remove();
-            }
-        }, duration);
+            notification.remove();
+        }, 5000);
     }
 
     escapeHtml(unsafe) {
-        if (!unsafe) return '';
         return unsafe
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
@@ -951,8 +707,23 @@ await sendMessage(\`Hello \${user.first_name}! Please tell me your favorite colo
     }
 }
 
-// Initialize command editor
+// FIXED: Initialize command editor with error handling
 let commandEditor;
-document.addEventListener('DOMContentLoaded', () => {
-    commandEditor = new CommandEditor();
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Initializing Command Editor...');
+    try {
+        commandEditor = new CommandEditor();
+        
+        // Attach click events after a short delay to ensure DOM is ready
+        setTimeout(() => {
+            if (commandEditor.attachCommandClickEvents) {
+                commandEditor.attachCommandClickEvents();
+            }
+        }, 1000);
+        
+    } catch (error) {
+        console.error('❌ Failed to initialize Command Editor:', error);
+        alert('Failed to load command editor. Please refresh the page.');
+    }
 });
