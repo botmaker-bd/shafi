@@ -5,7 +5,6 @@ const botManager = require('../core/bot-manager');
 
 const router = express.Router();
 
-// Add new bot
 router.post('/add', async (req, res) => {
     try {
         const { token, name, userId } = req.body;
@@ -14,7 +13,6 @@ router.post('/add', async (req, res) => {
             return res.status(400).json({ error: 'Bot token and user ID are required' });
         }
 
-        // Validate bot token
         const testBot = new TelegramBot(token, { polling: false });
         let botInfo;
         try {
@@ -23,7 +21,6 @@ router.post('/add', async (req, res) => {
             return res.status(400).json({ error: 'Invalid bot token' });
         }
 
-        // Check if bot already exists for this user
         const { data: existingBot } = await supabase
             .from('bots')
             .select('id')
@@ -35,8 +32,7 @@ router.post('/add', async (req, res) => {
             return res.status(400).json({ error: 'This bot is already added to your account' });
         }
 
-        // Set webhook
-        const webhookUrl = `https://bot-maker-bd.onrender.com/webhook/${token}`;
+        const webhookUrl = `${process.env.BASE_URL || 'https://your-app.onrender.com'}/api/webhook/${token}`;
         try {
             await testBot.setWebHook(webhookUrl);
             console.log(`✅ Webhook set: ${webhookUrl}`);
@@ -45,7 +41,6 @@ router.post('/add', async (req, res) => {
             return res.status(400).json({ error: 'Failed to set webhook. Please check your bot token.' });
         }
 
-        // Save to database
         const { data: botData, error } = await supabase
             .from('bots')
             .insert([{
@@ -61,7 +56,6 @@ router.post('/add', async (req, res) => {
 
         if (error) throw error;
 
-        // Initialize bot
         await botManager.initializeBot(token);
 
         res.json({
@@ -76,7 +70,6 @@ router.post('/add', async (req, res) => {
     }
 });
 
-// Get user's bots
 router.get('/user/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
@@ -100,7 +93,6 @@ router.get('/user/:userId', async (req, res) => {
     }
 });
 
-// Get bot details
 router.get('/:botId', async (req, res) => {
     try {
         const { botId } = req.params;
@@ -126,12 +118,10 @@ router.get('/:botId', async (req, res) => {
     }
 });
 
-// Remove bot
 router.delete('/:botId', async (req, res) => {
     try {
         const { botId } = req.params;
 
-        // Get bot token first
         const { data: bot } = await supabase
             .from('bots')
             .select('token')
@@ -139,7 +129,6 @@ router.delete('/:botId', async (req, res) => {
             .single();
 
         if (bot) {
-            // Delete webhook
             try {
                 const telegramBot = new TelegramBot(bot.token, { polling: false });
                 await telegramBot.deleteWebHook();
@@ -147,11 +136,9 @@ router.delete('/:botId', async (req, res) => {
                 console.error('Webhook delete error:', webhookError);
             }
 
-            // Remove from active bots
             botManager.removeBot(bot.token);
         }
 
-        // Remove from database
         await supabase
             .from('bots')
             .delete()
@@ -168,12 +155,37 @@ router.delete('/:botId', async (req, res) => {
     }
 });
 
-// Test bot connection
+router.post('/test', async (req, res) => {
+    try {
+        const { token } = req.body;
+
+        if (!token) {
+            return res.status(400).json({ error: 'Bot token is required' });
+        }
+
+        const testBot = new TelegramBot(token, { polling: false });
+        const botInfo = await testBot.getMe();
+
+        res.json({
+            success: true,
+            message: 'Bot connection successful!',
+            botInfo: {
+                id: botInfo.id,
+                name: botInfo.first_name,
+                username: botInfo.username
+            }
+        });
+
+    } catch (error) {
+        console.error('Test bot error:', error);
+        res.status(500).json({ error: 'Failed to connect to bot. Please check your bot token.' });
+    }
+});
+
 router.post('/:botId/test', async (req, res) => {
     try {
         const { botId } = req.params;
 
-        // Get bot token
         const { data: bot } = await supabase
             .from('bots')
             .select('token, name')
@@ -184,7 +196,6 @@ router.post('/:botId/test', async (req, res) => {
             return res.status(404).json({ error: 'Bot not found' });
         }
 
-        // Test bot connection
         const testBot = new TelegramBot(bot.token, { polling: false });
         const botInfo = await testBot.getMe();
 
