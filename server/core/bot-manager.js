@@ -380,7 +380,7 @@ async function getBotData(botToken, key) {
     }
 }
 
-// Enhanced command code execution with async/await support
+// Enhanced command code execution
 async function executeCommandCode(bot, code, context) {
     const { msg, chatId, userId, username, first_name, isTest, botToken, waitForAnswer, userAnswer, originalMessage } = context;
     
@@ -595,57 +595,22 @@ async function executeCommandCode(bot, code, context) {
     };
 
     try {
-        // Check if code contains async operations and wrap accordingly
-        const hasAsyncOperations = code.includes('await ') || code.includes('.then(') || code.includes('async ');
-        
-        if (hasAsyncOperations) {
-            // Wrap in async function for await support
-            const asyncWrappedCode = `
-                return (async function() {
-                    const { 
-                        message, u, chat, KEY, User, Bot, getUser, getChat, waitForAnswer, 
-                        bot, HTTP, parseInt, parseFloat, JSON, wait, ReturnCommand,
-                        userAnswer, originalMessage
-                    } = this;
-                    
-                    try {
-                        ${code}
-                    } catch (error) {
-                        if (error.name === "ReturnCommand") {
-                            return null;
-                        }
-                        throw error;
-                    }
-                }).call(this);
-            `;
-            
-            const func = new Function(asyncWrappedCode);
-            const result = await func.call(safeFunctions);
-            return result;
-        } else {
-            // Sync code execution
-            const syncWrappedCode = `
-                const { 
-                    message, u, chat, KEY, User, Bot, getUser, getChat, waitForAnswer, 
-                    bot, HTTP, parseInt, parseFloat, JSON, wait, ReturnCommand,
-                    userAnswer, originalMessage
-                } = this;
-                
-                try {
-                    ${code}
-                } catch (error) {
-                    if (error.name === "ReturnCommand") {
-                        return null;
-                    }
-                    throw error;
+        // Safe code execution with proper error handling
+        const wrappedCode = `
+            try {
+                ${code}
+            } catch (error) {
+                if (error.name === "ReturnCommand") {
+                    return null;
                 }
-            `;
-            
-            const func = new Function(syncWrappedCode);
-            const result = func.call(safeFunctions);
-            return result;
-        }
+                throw error;
+            }
+        `;
+
+        const func = new Function(...Object.keys(safeFunctions), wrappedCode);
+        const result = await func(...Object.values(safeFunctions));
         
+        return result;
     } catch (error) {
         if (error.name === "ReturnCommand") {
             return null;
@@ -654,23 +619,19 @@ async function executeCommandCode(bot, code, context) {
     }
 }
 
-// Format command code - remove problematic characters and fix syntax
+// Format command code
 function formatCommandCode(code) {
     if (!code) return '';
     
-    // Remove any problematic Unicode characters and normalize
+    // Remove any problematic characters and format
     let formatted = code
         .replace(/[^\x20-\x7E\n\r\t]/g, '') // Remove non-printable characters
-        .replace(/[\u2018\u2019]/g, "'")     // Replace smart quotes
-        .replace(/[\u201C\u201D]/g, '"')     // Replace smart double quotes
         .replace(/\$\s*{\s*([^}]+)\s*}/g, '${$1}')
         .replace(/(\w+)\s*\(\s*/g, '$1(')
         .replace(/\s*\)/g, ')')
-        .replace(/\s*{/g, '{')
-        .replace(/}\s*/g, '}')
         .replace(/\s*;/g, ';')
         .replace(/\r\n/g, '\n')
-        .replace(/\n\s*\n/g, '\n\n')
+        .replace(/\n+/g, '\n')
         .trim();
     
     return formatted;
