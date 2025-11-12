@@ -168,6 +168,7 @@ router.put('/:commandId', async (req, res) => {
                 .eq('bot_token', botToken)
                 .eq('pattern', singlePattern)
                 .neq('id', commandId)
+                .neq('name', name.trim()) // Allow same pattern for same command name
                 .single();
 
             if (existingCommand) {
