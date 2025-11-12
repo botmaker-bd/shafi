@@ -5,66 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bot Maker Pro - Create Telegram Bots Easily</title>
     <link rel="stylesheet" href="css/style.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
-    <!-- Navigation -->
     <nav class="navbar">
         <div class="container">
             <a href="index.html" class="nav-brand">
                 <span class="brand-icon">🤖</span>
                 <span class="brand-text">Bot Maker Pro</span>
             </a>
-            
-            <button class="mobile-menu-btn" id="mobileMenuBtn">
-                <i class="fas fa-bars"></i>
-            </button>
-            
-            <div class="nav-links" id="navLinks">
-                <a href="dashboard.html" class="nav-link">
-                    <i class="fas fa-home"></i>
-                    <span>Dashboard</span>
-                </a>
-                <a href="bot-management.html" class="nav-link">
-                    <i class="fas fa-robot"></i>
-                    <span>My Bots</span>
-                </a>
-                <a href="command-editor.html" class="nav-link">
-                    <i class="fas fa-code"></i>
-                    <span>Commands</span>
-                </a>
-                <a href="admin-settings.html" class="nav-link">
-                    <i class="fas fa-cog"></i>
-                    <span>Settings</span>
-                </a>
-                
-                <div class="user-menu">
-                    <button class="user-btn" id="userMenuBtn">
-                        <div class="user-avatar" id="userAvatar">U</div>
-                        <span id="userEmail">user@example.com</span>
-                        <i class="fas fa-chevron-down"></i>
-                    </button>
-                    <div class="user-dropdown" id="userDropdown">
-                        <a href="profile.html" class="dropdown-item">
-                            <i class="fas fa-user-edit"></i> Edit Profile
-                        </a>
-                        <a href="change-password.html" class="dropdown-item">
-                            <i class="fas fa-key"></i> Change Password
-                        </a>
-                        <div class="dropdown-divider"></div>
-                        <a href="#" id="logoutBtn" class="dropdown-item">
-                            <i class="fas fa-sign-out-alt"></i> Logout
-                        </a>
-                    </div>
-                </div>
+            <div class="nav-links">
+                <a href="login.html" class="btn btn-primary">Get Started</a>
             </div>
         </div>
     </nav>
 
-    <!-- Hero Section -->
     <section class="hero-section">
         <div class="container">
             <div class="hero-content">
@@ -74,62 +30,19 @@
                     No programming experience required.
                 </p>
                 <div class="hero-actions">
-                    <a href="dashboard.html" class="btn btn-primary btn-large">
+                    <a href="login.html" class="btn btn-primary btn-large">
                         <i class="fas fa-rocket"></i>
                         Get Started Free
                     </a>
-                    <a href="#features" class="btn btn-secondary btn-large">
-                        <i class="fas fa-play-circle"></i>
-                        Watch Demo
-                    </a>
-                </div>
-                <div class="hero-stats">
-                    <div class="stat">
-                        <div class="stat-number">10K+</div>
-                        <div class="stat-label">Bots Created</div>
-                    </div>
-                    <div class="stat">
-                        <div class="stat-number">50K+</div>
-                        <div class="stat-label">Messages/Day</div>
-                    </div>
-                    <div class="stat">
-                        <div class="stat-number">99.9%</div>
-                        <div class="stat-label">Uptime</div>
-                    </div>
-                </div>
-            </div>
-            <div class="bot-illustration">
-                <div class="bot-message incoming">
-                    <div class="message-avatar">B</div>
-                    <div class="message-content">
-                        <div class="message-text">Hello! I'm your new bot. What can I help you with today?</div>
-                        <div class="message-time">12:00 PM</div>
-                    </div>
-                </div>
-                <div class="bot-message outgoing">
-                    <div class="message-content">
-                        <div class="message-text">Show me the latest news</div>
-                        <div class="message-time">12:01 PM</div>
-                    </div>
-                    <div class="message-avatar">U</div>
-                </div>
-                <div class="bot-message incoming">
-                    <div class="message-avatar">B</div>
-                    <div class="message-content">
-                        <div class="message-text">Here are the top news headlines...</div>
-                        <div class="message-time">12:01 PM</div>
-                    </div>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Features Section -->
-    <section id="features" class="features-section">
+    <section class="features-section">
         <div class="container">
             <div class="section-header">
                 <h2>Powerful Features for Bot Creation</h2>
-                <p>Everything you need to build and manage your Telegram bots</p>
             </div>
             <div class="features-grid">
                 <div class="feature-card">
@@ -137,61 +50,26 @@
                         <i class="fas fa-code"></i>
                     </div>
                     <h3>Visual Command Editor</h3>
-                    <p>Create bot commands with our intuitive visual editor. No coding required.</p>
+                    <p>Create bot commands with our intuitive visual editor.</p>
                 </div>
                 <div class="feature-card">
                     <div class="feature-icon">
                         <i class="fas fa-bolt"></i>
                     </div>
                     <h3>Real-time Testing</h3>
-                    <p>Test your bot commands instantly and see results in real-time.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <i class="fas fa-shield-alt"></i>
-                    </div>
-                    <h3>Secure & Reliable</h3>
-                    <p>Enterprise-grade security with 99.9% uptime guarantee.</p>
+                    <p>Test your bot commands instantly and see results.</p>
                 </div>
                 <div class="feature-card">
                     <div class="feature-icon">
                         <i class="fas fa-cloud"></i>
                     </div>
                     <h3>Cloud Hosting</h3>
-                    <p>No server setup required. We handle all the infrastructure.</p>
+                    <p>No server setup required. We handle all infrastructure.</p>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- How It Works Section -->
-    <section class="how-it-works">
-        <div class="container">
-            <div class="section-header">
-                <h2>How It Works</h2>
-                <p>Get your bot up and running in just 3 simple steps</p>
-            </div>
-            <div class="steps">
-                <div class="step">
-                    <div class="step-number">1</div>
-                    <h3>Create Your Bot</h3>
-                    <p>Use BotFather on Telegram to create a new bot and get your API token.</p>
-                </div>
-                <div class="step">
-                    <div class="step-number">2</div>
-                    <h3>Design Commands</h3>
-                    <p>Use our visual editor to create custom commands and responses.</p>
-                </div>
-                <div class="step">
-                    <div class="step-number">3</div>
-                    <h3>Deploy & Share</h3>
-                    <p>Deploy your bot and share it with your audience on Telegram.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Footer -->
     <footer class="footer">
         <div class="container">
             <div class="footer-content">
@@ -200,14 +78,9 @@
                     <span>Bot Maker Pro</span>
                 </div>
                 <div class="footer-links">
-                    <a href="#">Privacy Policy</a>
-                    <a href="#">Terms of Service</a>
-                    <a href="#">Documentation</a>
-                    <a href="#">Support</a>
+                    <a href="login.html">Login</a>
+                    <a href="signup.html">Sign Up</a>
                 </div>
-            </div>
-            <div class="footer-bottom">
-                <p>&copy; 2024 Bot Maker Pro. All rights reserved.</p>
             </div>
         </div>
     </footer>
