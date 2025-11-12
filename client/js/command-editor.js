@@ -655,10 +655,14 @@ class CommandEditor {
         const isActive = firstCommand.is_active;
         const isSelected = this.currentCommand?.name === commandName;
         const patterns = commands.map(cmd => cmd.pattern);
-        const mainPattern = patterns[0];
-        const additionalCount = patterns.length - 1;
+        <!-- const mainPattern = patterns[0]; -->
+        <!-- const additionalCount = patterns.length - 1; -->
+        <!--  -->
+        <!-- const patternsText = patterns.join(', '); -->
         
-        const patternsText = patterns.join(', ');
+        const patternsHTML = patterns.map(pattern => 
+             `<span>${this.escapeHtml(pattern)}</span>`
+        ).join('');
         
         return `
             <div class="command-group ${isSelected ? 'active' : ''}" 
@@ -668,12 +672,12 @@ class CommandEditor {
                 </div>
                 <div class="command-content">
                     <div class="command-header">
-                        // <span class="command-name">${this.escapeHtml(patternsText)}</span>
-                        <span class="command-pattern">${this.escapeHtml(patternsText)}</span>
+                        <!-- <span class="command-name">${this.escapeHtml(patternsText)}</span> -->
+                        <span class="command-pattern">${patternsHTML}</span>
                     </div>
-                    // <div class="command-description">
-                        // ${firstCommand.description || 'No description'}
-                    // </div>
+                    <!-- <div class="command-description"> -->
+                        <!-- ${firstCommand.description || 'No description'} -->
+                    <!-- </div> -->
                     <div class="command-meta">
                         <span class="command-status ${isActive ? 'active' : 'inactive'}">
                             <i class="fas fa-circle"></i>
@@ -682,7 +686,7 @@ class CommandEditor {
                         ${additionalCount > 0 ? 
                             `<span class="command-feature">+${additionalCount} patterns</span>` : ''}
                         ${firstCommand.wait_for_answer ? '<span class="command-feature">⏳ Waits</span>' : ''}
-                        // <span class="command-id">ID: ${firstCommand.id.substring(0, 8)}...</span>
+                        <!-- <span class="command-id">ID: ${firstCommand.id.substring(0, 8)}...</span> -->
                     </div>
                 </div>
             </div>
