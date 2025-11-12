@@ -669,11 +669,8 @@ class CommandEditor {
                     <div class="command-header">
                         <span class="command-name">${this.escapeHtml(commandName)}</span>
                     </div>
-                    <div class="command-patterns">
+                    <div class="command-pattern">
                         ${this.escapeHtml(patternsText)}
-                    </div>
-                    <div class="command-description">
-                        ${firstCommand.description || 'No description'}
                     </div>
                     <div class="command-meta">
                         <span class="command-status ${isActive ? 'active' : 'inactive'}">
