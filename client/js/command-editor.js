@@ -651,42 +651,41 @@ class CommandEditor {
     }
 
     getCommandGroupHTML(commandName, commands) {
-    const firstCommand = commands[0];
-    const isActive = firstCommand.is_active;
-    const isSelected = this.currentCommand?.name === commandName;
-    const patterns = commands.map(cmd => cmd.pattern);
-    
-    // Show all patterns separated by commas
-    const patternsText = patterns.join(', ');
-    
-    return `
-        <div class="command-group ${isSelected ? 'active' : ''}" 
-             data-command-name="${this.escapeHtml(commandName)}">
-            <div class="command-icon">
-                <i class="fas fa-code"></i>
+        const firstCommand = commands[0];
+        const isActive = firstCommand.is_active;
+        const isSelected = this.currentCommand?.name === commandName;
+        const patterns = commands.map(cmd => cmd.pattern);
+        const mainPattern = patterns[0];
+        const additionalCount = patterns.length - 1;
+        
+        return `
+            <div class="command-group ${isSelected ? 'active' : ''}" 
+                 data-command-name="${this.escapeHtml(commandName)}">
+                <div class="command-icon">
+                    <i class="fas fa-code"></i>
+                </div>
+                <div class="command-content">
+                    <div class="command-header">
+                        <span class="command-name">${this.escapeHtml(commandName)}</span>
+                        <span class="command-pattern">${this.escapeHtml(mainPattern)}</span>
+                    </div>
+                    <div class="command-description">
+                        ${firstCommand.description || 'No description'}
+                    </div>
+                    <div class="command-meta">
+                        <span class="command-status ${isActive ? 'active' : 'inactive'}">
+                            <i class="fas fa-circle"></i>
+                            ${isActive ? 'Active' : 'Inactive'}
+                        </span>
+                        ${additionalCount > 0 ? 
+                            `<span class="command-feature">+${additionalCount} patterns</span>` : ''}
+                        ${firstCommand.wait_for_answer ? '<span class="command-feature">⏳ Waits</span>' : ''}
+                        <span class="command-id">ID: ${firstCommand.id.substring(0, 8)}...</span>
+                    </div>
+                </div>
             </div>
-            <div class="command-content">
-                <div class="command-header">
-                    <span class="command-name">${this.escapeHtml(commandName)}</span>
-                </div>
-                <div class="command-patterns">
-                    ${this.escapeHtml(patternsText)}
-                </div>
-                <div class="command-description">
-                    ${firstCommand.description || 'No description'}
-                </div>
-                <div class="command-meta">
-                    <span class="command-status ${isActive ? 'active' : 'inactive'}">
-                        <i class="fas fa-circle"></i>
-                        ${isActive ? 'Active' : 'Inactive'}
-                    </span>
-                    ${firstCommand.wait_for_answer ? '<span class="command-feature">⏳ Waits</span>' : ''}
-                    <span class="command-id">ID: ${firstCommand.id.substring(0, 10)}</span>
-                </div>
-            </div>
-        </div>
-    `;
-}
+        `;
+    }
 
     filterCommands(searchTerm) {
         const commandGroups = document.querySelectorAll('.command-group');
@@ -835,123 +834,101 @@ class CommandEditor {
     }
 
     async saveCommand() {
-    if (!this.currentCommand || !this.currentBot) {
-        this.showError('No command selected or bot not loaded');
-        return false;
-    }
+        if (!this.currentCommand || !this.currentBot) {
+            this.showError('No command selected or bot not loaded');
+            return false;
+        }
 
-    const commands = this.getCommandsFromTags();
-    
-    if (commands.length === 0) {
-        this.showError('Please add at least one command pattern');
-        document.getElementById('moreCommands').focus();
-        return false;
-    }
+        const commands = this.getCommandsFromTags();
+        
+        if (commands.length === 0) {
+            this.showError('Please add at least one command pattern');
+            document.getElementById('moreCommands').focus();
+            return false;
+        }
 
-    // Check for duplicate patterns in the same command
-    const uniqueCommands = [...new Set(commands)];
-    if (uniqueCommands.length !== commands.length) {
-        this.showError('Duplicate command patterns are not allowed');
-        return false;
-    }
-
-    const commandName = document.getElementById('commandName').value.trim();
-    
-    if (!commandName) {
-        this.showError('Command name is required');
-        document.getElementById('commandName').focus();
-        return false;
-    }
-
-    const commandPattern = commands.join(', ');
-    const commandDescription = document.getElementById('commandDescription').value.trim();
-    const commandCode = document.getElementById('commandCode').value.trim();
-    
-    if (!commandCode) {
-        this.showError('Command code is required');
-        document.getElementById('commandCode').focus();
-        return false;
-    }
-
-    const waitForAnswer = document.getElementById('waitForAnswer').checked;
-    const answerHandler = waitForAnswer ? document.getElementById('answerHandler').value.trim() : '';
-
-    if (waitForAnswer && !answerHandler) {
-        this.showError('Answer handler code is required when "Wait for Answer" is enabled');
-        document.getElementById('answerHandler').focus();
-        return false;
-    }
-
-    this.showLoading(true);
-
-    try {
-        const token = localStorage.getItem('token');
-        let response;
-        let url;
-        let method;
+        const commandPattern = commands.join(', ');
+        const commandName = document.getElementById('commandName').value.trim();
+        
+        if (!commandName) {
+            this.showError('Command name is required');
+            document.getElementById('commandName').focus();
+            return false;
+        }
 
         const formData = {
             name: commandName,
             pattern: commandPattern,
-            description: commandDescription,
-            code: commandCode,
-            waitForAnswer: waitForAnswer,
-            answerHandler: answerHandler,
+            description: document.getElementById('commandDescription').value.trim(),
+            code: document.getElementById('commandCode').value.trim(),
+            waitForAnswer: document.getElementById('waitForAnswer').checked,
+            answerHandler: document.getElementById('waitForAnswer').checked ? 
+                          document.getElementById('answerHandler').value.trim() : '',
             botToken: this.currentBot.token
         };
 
-        if (this.currentCommand.id === 'new') {
-            url = '/api/commands';
-            method = 'POST';
-        } else {
-            url = `/api/commands/${this.currentCommand.id}`;
-            method = 'PUT';
-            formData.commandId = this.currentCommand.id;
+        if (!formData.code) {
+            this.showError('Command code is required');
+            document.getElementById('commandCode').focus();
+            return false;
         }
 
-        console.log('🔄 Saving command:', { 
-            method, 
-            url, 
-            name: commandName,
-            patterns: commandPattern 
-        });
-
-        response = await fetch(url, {
-            method: method,
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(formData)
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.error || 'Failed to save command');
+        if (formData.waitForAnswer && !formData.answerHandler) {
+            this.showError('Answer handler code is required when "Wait for Answer" is enabled');
+            document.getElementById('answerHandler').focus();
+            return false;
         }
 
-        this.showSuccess('Command saved successfully!');
-        
-        // Reload commands to update the list
-        await this.loadCommands();
-        
-        // Update current command if it's a new one
-        if (this.currentCommand.id === 'new' && data.commands && data.commands.length > 0) {
-            this.currentCommand = data.commands[0];
-            this.populateCommandForm();
-        }
-        
-        return true;
+        this.showLoading(true);
 
-    } catch (error) {
-        console.error('❌ Save command error:', error);
-        this.showError(error.message || 'Failed to save command');
-        return false;
-    } finally {
-        this.showLoading(false);
+        try {
+            const token = localStorage.getItem('token');
+            let response;
+            let url;
+            let method;
+
+            if (this.currentCommand.id === 'new') {
+                url = '/api/commands';
+                method = 'POST';
+            } else {
+                url = `/api/commands/${this.currentCommand.id}`;
+                method = 'PUT';
+                formData.commandId = this.currentCommand.id;
+            }
+
+            response = await fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.showSuccess('Command saved successfully!');
+                
+                await this.loadCommands();
+                
+                if (data.command) {
+                    this.currentCommand = Array.isArray(data.command) ? data.command[0] : data.command;
+                    this.populateCommandForm();
+                }
+                
+                return true;
+            } else {
+                this.showError(data.error || 'Failed to save command');
+                return false;
+            }
+        } catch (error) {
+            this.showError('Network error while saving command');
+            return false;
+        } finally {
+            this.showLoading(false);
+        }
     }
-}
 
     async deleteCommand() {
         if (!this.currentCommand || this.currentCommand.id === 'new') {
