@@ -158,6 +158,10 @@
                                     <label for="commandName">Command Name *</label>
                                     <input type="text" id="commandName" required placeholder="Enter command name">
                                 </div>
+                                <div class="form-group">
+                                    <label for="commandDescription">Description</label>
+                                    <input type="text" id="commandDescription" placeholder="Brief description">
+                                </div>
                             </div>
                         </div>
 
@@ -165,6 +169,7 @@
                         <div class="form-section">
                             <h4>Command Patterns</h4>
                             <div class="form-group">
+                                <label for="moreCommands">Command Patterns *</label>
                                 <div class="commands-input-container">
                                     <div id="commandsTags" class="commands-tags">
                                         <!-- Command tags will be added here -->
@@ -173,7 +178,7 @@
                                            placeholder="Type command pattern and press Enter or comma...">
                                 </div>
                                 <div class="form-help">
-                                    Add multiple command patterns separated by commas.
+                                    Add multiple command patterns separated by commas. All patterns will execute the same code.
                                     Example: /start, start, hello
                                 </div>
                             </div>
@@ -183,6 +188,7 @@
                         <div class="form-section">
                             <h4>Test Command</h4>
                             <div class="form-group">
+                                <label for="testInput">Test Input *</label>
                                 <div class="test-input-container">
                                     <input type="text" id="testInput" 
                                            placeholder="Enter test input to simulate user message..." required>
@@ -248,23 +254,6 @@
                                           placeholder="Code to handle user's answer..."></textarea>
                                 <div class="form-help">
                                     This code will execute when user responds. Use waitForAnswer() to get user's response.
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Test Section -->
-                        <div class="form-section">
-                            <h4>Test Command</h4>
-                            <div class="form-group">
-                                <div class="test-input-container">
-                                    <input type="text" id="testInput" 
-                                           placeholder="Enter test input to simulate user message..." required>
-                                    <button type="button" id="runTestBtn" class="btn btn-warning">
-                                        <i class="fas fa-play"></i> Run Test
-                                    </button>
-                                </div>
-                                <div class="form-help">
-                                    Enter test input to simulate how users will trigger this command.
                                 </div>
                             </div>
                         </div>
