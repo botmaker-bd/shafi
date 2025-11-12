@@ -1154,15 +1154,15 @@ class CommandEditor {
         document.getElementById('templatesModal').style.display = 'flex';
     }
 
-    applyTemplate(templateName) {
-        let code = '';
-        let patterns = '';
-        
-        // This is a simplified version - you would expand this with all your templates
-        switch(templateName) {
-            case 'welcome':
-                patterns = '/start, start, hello';
-                code = `// Welcome message template
+    // Enhanced templates with correct function usage
+applyTemplate(templateName) {
+    let code = '';
+    let patterns = '';
+    
+    switch(templateName) {
+        case 'welcome':
+            patterns = '/start, start, hello';
+            code = `// Welcome message template
 const user = getUser();
 const welcomeMessage = \`Hello \${user.first_name}! 👋
 
@@ -1176,11 +1176,11 @@ Username: @\${user.username || 'Not set'}\`;
 bot.sendMessage(welcomeMessage, {
     parse_mode: 'Markdown'
 });`;
-                break;
-                
-            case 'help':
-                patterns = '/help, help, commands';
-                code = `// Help command template
+            break;
+            
+        case 'help':
+            patterns = '/help, help, commands';
+            code = `// Help command template
 const helpText = \`🤖 *Bot Help Menu*
 
 *Available Commands:*
@@ -1200,11 +1200,11 @@ Contact support if you need assistance.\`;
 bot.sendMessage(helpText, {
     parse_mode: 'Markdown'
 });`;
-                break;
-                
-            case 'echo':
-                patterns = '/echo, echo, repeat';
-                code = `// Echo command with wait for answer
+            break;
+            
+        case 'echo':
+            patterns = '/echo, echo, repeat';
+            code = `// Echo command with wait for answer
 bot.sendMessage('Please send me a message to echo:');
 
 try {
@@ -1218,19 +1218,159 @@ try {
 } catch (error) {
     bot.sendMessage('Timeout! Please try again.');
 }`;
-                break;
-                
-            // Add more templates here...
-            default:
-                code = `// Template: ${templateName}\n// This template is not yet implemented.`;
-                patterns = '/template';
-        }
+            break;
+            
+        case 'user_data':
+            patterns = '/data, /save, /get';
+            code = `// User data management example
+
+// Save user data
+User.saveData('name', 'John Doe');
+User.saveData('age', '25');
+
+// Get user data
+const userName = User.getData('name');
+const userAge = User.getData('age');
+
+// Use in message
+if (userName) {
+    bot.sendMessage(\`Welcome back, \${userName}!\`);
+} else {
+    bot.sendMessage("What's your name?");
+    const name = await waitForAnswer();
+    User.saveData('name', name);
+    bot.sendMessage(\`Nice to meet you, \${name}!\`);
+}`;
+            break;
+            
+        case 'inline_buttons':
+            patterns = '/menu, /buttons';
+            code = `// Inline keyboard example
+const inlineKeyboard = {
+    inline_keyboard: [
+        [
+            {
+                text: "Button 1",
+                callback_data: "button_1"
+            },
+            {
+                text: "Button 2", 
+                callback_data: "button_2"
+            }
+        ],
+        [
+            {
+                text: "Visit Website",
+                url: "https://example.com"
+            }
+        ]
+    ]
+};
+
+bot.sendMessage("Choose an option:", {
+    reply_markup: inlineKeyboard
+});`;
+            break;
+            
+        case 'http_get':
+            patterns = '/fetch, /api';
+            code = `// HTTP GET request example
+try {
+    const data = await HTTP.get("https://api.example.com/data");
+    const result = bunchify(data);
+    
+    bot.sendMessage(\`Data received: \${JSON.stringify(result)}\`);
+} catch (error) {
+    bot.sendMessage(\`Error: \${error.message}\`);
+}`;
+            break;
+            
+        case 'conversation':
+            patterns = '/conversation, chat';
+            code = `// Interactive conversation
+bot.sendMessage("Hello! What's your name?");
+
+try {
+    const userName = await waitForAnswer(60000);
+    
+    if (userName && userName.trim()) {
+        bot.sendMessage(\`Nice to meet you, \${userName}!\`);
         
-        this.setCommandsToTags(patterns);
-        document.getElementById('commandCode').value = code;
-        document.getElementById('templatesModal').style.display = 'none';
-        this.showSuccess('Template applied successfully!');
+        bot.sendMessage("How old are you?");
+        const ageText = await waitForAnswer(60000);
+        const age = parseInt(ageText);
+        
+        if (!isNaN(age)) {
+            if (age >= 18) {
+                bot.sendMessage(\`Great \${userName}! You're an adult.\`);
+            } else {
+                bot.sendMessage(\`Hello young friend \${userName}!\`);
+            }
+        } else {
+            bot.sendMessage("Please enter a valid age!");
+        }
+    } else {
+        bot.sendMessage("You didn't provide a name!");
     }
+} catch (error) {
+    bot.sendMessage("Conversation timeout!");
+}`;
+            break;
+            
+        case 'media_photo':
+            patterns = '/photo, picture';
+            code = `// Send photo example
+bot.sendPhoto("https://example.com/photo.jpg", {
+    caption: "Here's a beautiful photo for you!",
+    parse_mode: "Markdown"
+});`;
+            break;
+            
+        case 'conditional':
+            patterns = '/check, /if';
+            code = `// Conditional logic example
+const user = getUser();
+const messageText = message.text.toLowerCase();
+
+if (messageText.includes('hello') || messageText.includes('hi')) {
+    bot.sendMessage(\`Hello \${user.first_name}! How can I help you?\`);
+} else if (messageText.includes('thank')) {
+    bot.sendMessage('You\\'re welcome! 😊');
+} else if (messageText.includes('bye')) {
+    bot.sendMessage('Goodbye! Have a great day! 👋');
+} else {
+    bot.sendMessage('I\\'m not sure how to respond to that.');
+}`;
+            break;
+            
+        case 'chat_action':
+            patterns = '/typing, /action';
+            code = `// Chat actions example
+bot.sendChatAction('typing');
+await wait(2000); // Wait 2 seconds
+
+bot.sendMessage("I was typing...");
+
+bot.sendChatAction('upload_photo');
+await wait(3000);
+
+bot.sendPhoto("https://example.com/photo.jpg", {
+    caption: "Here's your photo!"
+});`;
+            break;
+            
+        default:
+            patterns = '/template';
+            code = `// Basic template
+const user = getUser();
+bot.sendMessage(\`Hello \${user.first_name}! This is a basic command.\`);`;
+    }
+    
+    this.setCommandsToTags(patterns);
+    document.getElementById('commandCode').value = code;
+    document.getElementById('templatesModal').style.display = 'none';
+    this.showSuccess('Template applied successfully!');
+}
 
     logout() {
         localStorage.clear();
