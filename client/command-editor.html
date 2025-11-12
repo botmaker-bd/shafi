@@ -150,7 +150,22 @@
                     </div>
 
                     <form id="commandForm" class="command-form">
-                        <!-- Command Patterns Section -->
+                        <!-- Command Basic Info -->
+                        <div class="form-section">
+                            <h4>Command Information</h4>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="commandName">Command Name *</label>
+                                    <input type="text" id="commandName" required placeholder="Enter command name">
+                                </div>
+                                <div class="form-group">
+                                    <label for="commandDescription">Description</label>
+                                    <input type="text" id="commandDescription" placeholder="Brief description">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Command Patterns -->
                         <div class="form-section">
                             <h4>Command Patterns</h4>
                             <div class="form-group">
@@ -169,62 +184,6 @@
                             </div>
                         </div>
 
-                        <!-- Code Editor Section -->
-                        <div class="form-section">
-                            <div class="code-editor-header">
-                                <h4>Command Code</h4>
-                                <div class="code-actions">
-                                    <button type="button" class="btn btn-secondary btn-small" id="openEditor">
-                                        <i class="fas fa-edit"></i> Open Editor
-                                    </button>
-                                    <button type="button" class="btn btn-secondary btn-small" id="showTemplates">
-                                        <i class="fas fa-layer-group"></i> Templates
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <textarea id="commandCode" 
-                                          placeholder="Write your command code here..."></textarea>
-                                <div class="code-help">
-                                    <strong>Available Functions:</strong> bot.sendMessage(), User.saveData(), waitForAnswer(), HTTP.get(), etc.
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Advanced Options -->
-                        <div class="form-section">
-                            <div class="advanced-header">
-                                <h4>Advanced Options</h4>
-                                <div class="wait-toggle-container">
-                                    <label class="toggle-label inline-toggle">
-                                        <span class="toggle-text">
-                                            <span class="toggle-title">Wait for Answer</span>
-                                        </span>
-                                        <div class="toggle-switch">
-                                            <input type="checkbox" id="waitForAnswer">
-                                            <span class="toggle-slider"></span>
-                                        </div>
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div id="answerHandlerSection" class="form-group" style="display: none;">
-                                <div class="code-editor-header">
-                                    <label for="answerHandler">Answer Handler Code</label>
-                                    <div class="code-actions">
-                                        <button type="button" class="btn btn-secondary btn-small" id="openAnswerEditor">
-                                            <i class="fas fa-edit"></i> Open Editor
-                                        </button>
-                                    </div>
-                                </div>
-                                <textarea id="answerHandler" 
-                                          placeholder="Code to handle user's answer..."></textarea>
-                                <div class="form-help">
-                                    This code will execute when user responds. Use waitForAnswer() to get user's response.
-                                </div>
-                            </div>
-                        </div>
-
                         <!-- Test Section -->
                         <div class="form-section">
                             <h4>Test Command</h4>
@@ -239,6 +198,62 @@
                                 </div>
                                 <div class="form-help">
                                     Enter test input to simulate how users will trigger this command.
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Code Editor Section -->
+                        <div class="form-section">
+                            <h4>Command Code</h4>
+                            <div class="form-group">
+                                <div class="code-editor-header">
+                                    <label for="commandCode">Command Code *</label>
+                                    <div class="code-actions">
+                                        <button type="button" class="btn-code" id="openEditor">
+                                            <i class="fas fa-edit"></i> Full Editor
+                                        </button>
+                                        <button type="button" class="btn-code" id="showTemplates">
+                                            <i class="fas fa-layer-group"></i> Templates
+                                        </button>
+                                    </div>
+                                </div>
+                                <textarea id="commandCode" 
+                                          placeholder="Write your command code here..."></textarea>
+                                <div class="code-help">
+                                    <strong>Available Functions:</strong> bot.sendMessage(), User.saveData(), waitForAnswer(), HTTP.get(), etc.
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Advanced Options -->
+                        <div class="form-section">
+                            <h4>Advanced Options</h4>
+                            <div class="toggle-group">
+                                <label class="toggle-label">
+                                    <div class="toggle-text">
+                                        <span class="toggle-title">Wait for Answer</span>
+                                        <span class="toggle-description">Enable to wait for user response after command execution</span>
+                                    </div>
+                                    <div class="toggle-switch">
+                                        <input type="checkbox" id="waitForAnswer">
+                                        <span class="toggle-slider"></span>
+                                    </div>
+                                </label>
+                            </div>
+
+                            <div id="answerHandlerSection" class="form-group" style="display: none;">
+                                <div class="code-editor-header">
+                                    <label for="answerHandler">Answer Handler Code</label>
+                                    <div class="code-actions">
+                                        <button type="button" class="btn-code" id="openAnswerEditor">
+                                            <i class="fas fa-edit"></i> Full Editor
+                                        </button>
+                                    </div>
+                                </div>
+                                <textarea id="answerHandler" 
+                                          placeholder="Code to handle user's answer..."></textarea>
+                                <div class="form-help">
+                                    This code will execute when user responds. Use waitForAnswer() to get user's response.
                                 </div>
                             </div>
                         </div>
@@ -281,19 +296,7 @@
     <!-- Full Screen Code Editor Modal -->
     <div id="codeEditorModal" class="modal fullscreen-modal">
         <div class="modal-content fullscreen-content">
-            <div class="modal-header">
-                <h3>Code Editor</h3>
-                <div class="modal-actions">
-                    <button class="btn btn-secondary btn-small" id="cancelEdit">
-                        <i class="fas fa-times"></i> Cancel
-                    </button>
-                    <button class="btn btn-primary btn-small" id="saveCode">
-                        <i class="fas fa-save"></i> Save Code
-                    </button>
-                    <button class="modal-close">&times;</button>
-                </div>
-            </div>
-            <div class="modal-body fullscreen-body">
+            <div class="modal-header compact-header">
                 <div class="editor-toolbar">
                     <div class="toolbar-group">
                         <button class="btn-icon" id="undoBtn" title="Undo">
@@ -334,6 +337,9 @@
                         </button>
                     </div>
                 </div>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body fullscreen-body">
                 <textarea id="advancedCodeEditor" class="fullscreen-editor" 
                          placeholder="Write your code here..."></textarea>
             </div>
@@ -341,6 +347,10 @@
                 <div class="editor-info">
                     <span id="lineCount">Line: 1</span>
                     <span id="charCount">Chars: 0</span>
+                </div>
+                <div class="editor-actions">
+                    <button class="btn btn-secondary" id="cancelEdit">Cancel</button>
+                    <button class="btn btn-primary" id="saveCode">Save Code</button>
                 </div>
             </div>
         </div>
