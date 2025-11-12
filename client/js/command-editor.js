@@ -1227,13 +1227,19 @@ bot.sendMessage(botInfo, {
                 
             case 'echo':
                 patterns = '/echo, echo, repeat';
-                code = `// Simple echo command
-const userMessage = message.text;
-if (userMessage && userMessage.trim()) {
-    bot.sendMessage("You said: " + userMessage);
-} else {
-    bot.sendMessage('Please send a message to echo!');
-}`;
+                code = `// Echo command with wait for answer
+bot.sendMessage('Please send me a message to echo:');
+
+// Using then/catch instead of await for compatibility
+waitForAnswer(60000).then(function(userMessage) {
+    if (userMessage && userMessage.trim()) {
+        bot.sendMessage("You said: " + userMessage);
+    } else {
+        bot.sendMessage('You did not send any message!');
+    }
+}).catch(function(error) {
+    bot.sendMessage('Timeout! Please try again.');
+});`;
                 break;
                 
             case 'user_data':
@@ -1252,9 +1258,11 @@ const userAge = User.getData('age');
 if (userName) {
     bot.sendMessage("Welcome back, " + userName + "!");
 } else {
-    bot.sendMessage("Hello new user! I'll save your data.");
-    User.saveData('name', 'New User');
-    User.saveData('joined_at', new Date().toISOString());
+    bot.sendMessage("What's your name?");
+    waitForAnswer().then(function(name) {
+        User.saveData('name', name);
+        bot.sendMessage("Nice to meet you, " + name + "!");
+    });
 }`;
                 break;
                 
@@ -1301,6 +1309,40 @@ HTTP.get("https://jsonplaceholder.typicode.com/posts/1").then(function(data) {
 });`;
                 break;
                 
+            case 'conversation':
+                patterns = '/conversation, chat';
+                code = `// Interactive conversation without async/await
+bot.sendMessage("Hello! What's your name?");
+
+waitForAnswer(60000).then(function(userName) {
+    if (userName && userName.trim()) {
+        bot.sendMessage("Nice to meet you, " + userName + "!");
+        
+        bot.sendMessage("How old are you?");
+        return waitForAnswer(60000);
+    } else {
+        bot.sendMessage("You didn't provide a name!");
+        throw new Error('No name provided');
+    }
+}).then(function(ageText) {
+    var age = parseInt(ageText);
+    
+    if (!isNaN(age)) {
+        if (age >= 18) {
+            bot.sendMessage("Great! You're an adult.");
+        } else {
+            bot.sendMessage("Hello young friend!");
+        }
+    } else {
+        bot.sendMessage("Please enter a valid age!");
+    }
+}).catch(function(error) {
+    if (error.message !== 'No name provided') {
+        bot.sendMessage("Conversation timeout!");
+    }
+});`;
+                break;
+                
             case 'send_photo':
                 patterns = '/photo, picture, image';
                 code = `// Send photo example
@@ -1330,7 +1372,7 @@ bot.sendDocument("https://example.com/document.pdf", {
 
             case 'media_gallery':
                 patterns = '/gallery, media, photos';
-                code = `// Media gallery example - Fixed version
+                code = `// Media gallery example
 bot.sendMediaGroup([
     {
         type: "photo",
@@ -1390,7 +1432,16 @@ const user = getUser();
 
 // Check if user is admin
 if (user.id === 123456789) { // Replace with actual admin ID
-    bot.sendMessage("📢 Admin Broadcast Message:\\nThis is a broadcast to all users!");
+    bot.sendMessage("Please enter the broadcast message:");
+    
+    waitForAnswer(60000).then(function(broadcastMessage) {
+        if (broadcastMessage && broadcastMessage.trim()) {
+            // In a real implementation, you would send to all users
+            bot.sendMessage("📢 Broadcast Sent:\\n" + broadcastMessage);
+        }
+    }).catch(function(error) {
+        bot.sendMessage("Broadcast cancelled.");
+    });
 } else {
     bot.sendMessage("❌ Admin access required.");
 }`;
@@ -1405,26 +1456,6 @@ bot.sendMessage("Message will be sent after 5 seconds...");
 wait(5000).then(function() {
     bot.sendMessage("⏰ 5 seconds have passed! This is your scheduled message.");
 });`;
-                break;
-
-            case 'run_command':
-                patterns = '/run, execute';
-                code = `// Run another command example
-bot.sendMessage("Running another command...");
-
-// Run a specific command
-const result = Bot.runCommand("/help");
-bot.sendMessage("Command execution result: " + result);`;
-                break;
-
-            case 'next_command':
-                patterns = '/next, queue';
-                code = `// Queue next command example
-bot.sendMessage("This command will queue another command...");
-
-// Queue next command to run after user response
-const nextResult = Bot.nextCommand("/info");
-bot.sendMessage("Next command queued: " + nextResult);`;
                 break;
 
             default:
