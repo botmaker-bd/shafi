@@ -288,26 +288,59 @@ class EnhancedCommandEditor {
             }
         });
 
-        // Keep toolbar visible when scrolling
-        this.setupStickyToolbar();
+        // Make toolbar always visible and handle responsive behavior
+        this.setupResponsiveToolbar();
     }
 
-    setupStickyToolbar() {
-        const modalContent = document.querySelector('.fullscreen-content');
+    setupResponsiveToolbar() {
         const toolbar = document.querySelector('.compact-header');
+        const toolbarIcons = document.querySelector('.editor-toolbar-icons');
         
-        if (modalContent && toolbar) {
-            modalContent.addEventListener('scroll', () => {
-                const scrollTop = modalContent.scrollTop;
-                if (scrollTop > 10) {
-                    toolbar.style.position = 'sticky';
-                    toolbar.style.top = '0';
-                    toolbar.style.zIndex = '1000';
-                    toolbar.style.background = 'var(--bg-primary)';
-                    toolbar.style.borderBottom = '1px solid var(--border-color)';
-                } else {
-                    toolbar.style.position = 'relative';
-                    toolbar.style.background = 'var(--bg-tertiary)';
+        if (!toolbar || !toolbarIcons) return;
+
+        // Handle window resize for responsive behavior
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                this.adjustToolbarLayout();
+            }, 100);
+        });
+
+        // Initial adjustment
+        setTimeout(() => {
+            this.adjustToolbarLayout();
+        }, 100);
+    }
+
+    adjustToolbarLayout() {
+        const toolbarIcons = document.querySelector('.editor-toolbar-icons');
+        const buttons = toolbarIcons?.querySelectorAll('.btn-icon');
+        
+        if (!buttons) return;
+
+        const toolbarWidth = toolbarIcons.offsetWidth;
+        let totalWidth = 0;
+
+        buttons.forEach(btn => {
+            totalWidth += btn.offsetWidth + 8; // 8px for gap
+        });
+
+        // If buttons overflow, switch to compact mode
+        if (totalWidth > toolbarWidth * 0.9) {
+            toolbarIcons.classList.add('compact-mode');
+            buttons.forEach(btn => {
+                const textSpan = btn.querySelector('span');
+                if (textSpan) {
+                    textSpan.style.display = 'none';
+                }
+            });
+        } else {
+            toolbarIcons.classList.remove('compact-mode');
+            buttons.forEach(btn => {
+                const textSpan = btn.querySelector('span');
+                if (textSpan) {
+                    textSpan.style.display = 'inline';
                 }
             });
         }
@@ -336,6 +369,9 @@ class EnhancedCommandEditor {
         if (this.historyIndex > 0) {
             this.historyIndex--;
             document.getElementById('advancedCodeEditor').value = this.codeHistory[this.historyIndex];
+            this.showInfo('Undo performed');
+        } else {
+            this.showInfo('Nothing to undo');
         }
     }
 
@@ -343,6 +379,9 @@ class EnhancedCommandEditor {
         if (this.historyIndex < this.codeHistory.length - 1) {
             this.historyIndex++;
             document.getElementById('advancedCodeEditor').value = this.codeHistory[this.historyIndex];
+            this.showInfo('Redo performed');
+        } else {
+            this.showInfo('Nothing to redo');
         }
     }
 
@@ -365,7 +404,9 @@ class EnhancedCommandEditor {
                 editor.focus();
                 
                 this.saveToHistory(editor.value);
-                this.showSuccess('Selected code cut to clipboard!');
+                this.showSuccess(`Cut ${selectedText.length} characters to clipboard!`);
+            }).catch(err => {
+                this.showError('Failed to cut text: ' + err.message);
             });
         } else {
             this.showInfo('No text selected to cut');
@@ -378,7 +419,9 @@ class EnhancedCommandEditor {
         
         if (selectedText) {
             navigator.clipboard.writeText(selectedText).then(() => {
-                this.showSuccess('Selected code copied to clipboard!');
+                this.showSuccess(`Copied ${selectedText.length} characters to clipboard!`);
+            }).catch(err => {
+                this.showError('Failed to copy text: ' + err.message);
             });
         } else {
             this.showInfo('No text selected to copy');
@@ -397,20 +440,21 @@ class EnhancedCommandEditor {
             editor.focus();
             
             this.saveToHistory(editor.value);
-            this.showSuccess('Text pasted from clipboard!');
+            this.showSuccess(`Pasted ${text.length} characters from clipboard!`);
         } catch (err) {
-            this.showError('Failed to paste from clipboard');
+            this.showError('Failed to paste from clipboard: ' + err.message);
         }
     }
 
     clearAllCode() {
         if (confirm('Are you sure you want to clear all code? This action cannot be undone.')) {
             const editor = document.getElementById('advancedCodeEditor');
+            const previousLength = editor.value.length;
             editor.value = '';
             editor.focus();
             
             this.saveToHistory('');
-            this.showSuccess('All code cleared!');
+            this.showSuccess(`Cleared ${previousLength} characters!`);
         }
     }
 
@@ -549,6 +593,16 @@ class EnhancedCommandEditor {
                 text: 'Hello! Welcome to our bot! 👋', 
                 desc: 'Welcome message',
                 code: 'sendMessage("Hello! Welcome to our bot! 👋");'
+            },
+            { 
+                text: 'How can I help you today?', 
+                desc: 'Help message',
+                code: 'sendMessage("How can I help you today?");'
+            },
+            { 
+                text: 'Thank you for using our bot!', 
+                desc: 'Thank you message',
+                code: 'sendMessage("Thank you for using our bot!");'
             }
         ];
 
@@ -625,6 +679,7 @@ class EnhancedCommandEditor {
         
         this.saveToHistory(newCode);
         this.hideSuggestionList();
+        this.showSuccess('Suggestion applied!');
     }
 
     openCodeEditor(editorType) {
@@ -650,10 +705,13 @@ class EnhancedCommandEditor {
             suggestBtn.classList.remove('active');
         }
         
-        // Focus and ensure toolbar is visible
+        // Focus and ensure responsive layout
         setTimeout(() => {
             const editor = document.getElementById('advancedCodeEditor');
             editor.focus();
+            
+            // Adjust toolbar for current screen size
+            this.adjustToolbarLayout();
             
             // Ensure modal content is scrolled to top
             const modalContent = document.querySelector('.fullscreen-content');
