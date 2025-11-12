@@ -669,11 +669,11 @@ class CommandEditor {
                 <div class="command-content">
                     <div class="command-header">
                         <span class="command-name">${this.escapeHtml(patternsText)}</span>
-                        <span class="command-pattern">${this.escapeHtml(mainPattern)}</span>
+                        <span class="command-pattern">${this.escapeHtml(patterns)}</span>
                     </div>
-                    <div class="command-description">
-                        ${firstCommand.description || 'No description'}
-                    </div>
+                    // <div class="command-description">
+                        // ${firstCommand.description || 'No description'}
+                    // </div>
                     <div class="command-meta">
                         <span class="command-status ${isActive ? 'active' : 'inactive'}">
                             <i class="fas fa-circle"></i>
@@ -682,7 +682,7 @@ class CommandEditor {
                         ${additionalCount > 0 ? 
                             `<span class="command-feature">+${additionalCount} patterns</span>` : ''}
                         ${firstCommand.wait_for_answer ? '<span class="command-feature">⏳ Waits</span>' : ''}
-                        <span class="command-id">ID: ${firstCommand.id.substring(0, 8)}...</span>
+                        // <span class="command-id">ID: ${firstCommand.id.substring(0, 8)}...</span>
                     </div>
                 </div>
             </div>
