@@ -108,9 +108,13 @@ class EnhancedCommandEditor {
             this.openCodeEditor('answer');
         });
 
-        // Templates
+        // Templates buttons
         document.getElementById('showTemplates').addEventListener('click', () => {
-            this.showTemplates();
+            this.showTemplates('main');
+        });
+
+        document.getElementById('showAnswerTemplates').addEventListener('click', () => {
+            this.showTemplates('answer');
         });
 
         // Modal events
@@ -260,12 +264,10 @@ class EnhancedCommandEditor {
                 }
             }
             
-            // Escape key to close suggestions
             if (e.key === 'Escape') {
                 this.hideSuggestionList();
             }
 
-            // Tab key for indentation
             if (e.key === 'Tab') {
                 e.preventDefault();
                 this.insertTab();
@@ -276,7 +278,11 @@ class EnhancedCommandEditor {
     }
 
     setupResponsiveToolbar() {
-        // Handle window resize for responsive behavior
+        const toolbar = document.querySelector('.compact-header');
+        const toolbarIcons = document.querySelector('.editor-toolbar-icons');
+        
+        if (!toolbar || !toolbarIcons) return;
+
         let resizeTimeout;
         window.addEventListener('resize', () => {
             clearTimeout(resizeTimeout);
@@ -285,7 +291,6 @@ class EnhancedCommandEditor {
             }, 100);
         });
 
-        // Initial adjustment
         setTimeout(() => {
             this.adjustToolbarLayout();
         }, 100);
@@ -301,10 +306,9 @@ class EnhancedCommandEditor {
         let totalWidth = 0;
 
         buttons.forEach(btn => {
-            totalWidth += btn.offsetWidth + 8; // 8px for gap
+            totalWidth += btn.offsetWidth + 8;
         });
 
-        // If buttons overflow, switch to compact mode
         if (totalWidth > toolbarWidth * 0.9) {
             toolbarIcons.classList.add('compact-mode');
             buttons.forEach(btn => {
@@ -324,372 +328,57 @@ class EnhancedCommandEditor {
         }
     }
 
-    insertTab() {
-        const editor = document.getElementById('advancedCodeEditor');
-        const start = editor.selectionStart;
-        const end = editor.selectionEnd;
-        
-        // Insert tab character
-        editor.value = editor.value.substring(0, start) + '  ' + editor.value.substring(end);
-        editor.selectionStart = editor.selectionEnd = start + 2;
-        editor.focus();
-        
-        this.saveToHistory(editor.value);
-    }
-
-    saveToHistory(code) {
-        this.codeHistory = this.codeHistory.slice(0, this.historyIndex + 1);
-        this.codeHistory.push(code);
-        this.historyIndex = this.codeHistory.length - 1;
-    }
-
-    undoCode() {
-        if (this.historyIndex > 0) {
-            this.historyIndex--;
-            document.getElementById('advancedCodeEditor').value = this.codeHistory[this.historyIndex];
-            this.showInfo('Undo performed');
-        } else {
-            this.showInfo('Nothing to undo');
+    // Template functionality
+    showTemplates(type) {
+        if (type === 'main') {
+            document.getElementById('templatesModal').style.display = 'flex';
+        } else if (type === 'answer') {
+            document.getElementById('answerTemplatesModal').style.display = 'flex';
         }
     }
 
-    redoCode() {
-        if (this.historyIndex < this.codeHistory.length - 1) {
-            this.historyIndex++;
-            document.getElementById('advancedCodeEditor').value = this.codeHistory[this.historyIndex];
-            this.showInfo('Redo performed');
-        } else {
-            this.showInfo('Nothing to redo');
-        }
-    }
-
-    selectAllCode() {
-        const editor = document.getElementById('advancedCodeEditor');
-        editor.select();
-        this.showInfo('All code selected');
-    }
-
-    cutSelectedCode() {
-        const editor = document.getElementById('advancedCodeEditor');
-        const selectedText = editor.value.substring(editor.selectionStart, editor.selectionEnd);
-        
-        if (selectedText) {
-            navigator.clipboard.writeText(selectedText).then(() => {
-                const start = editor.selectionStart;
-                const end = editor.selectionEnd;
-                editor.value = editor.value.substring(0, start) + editor.value.substring(end);
-                editor.selectionStart = editor.selectionEnd = start;
-                editor.focus();
-                
-                this.saveToHistory(editor.value);
-                this.showSuccess(`Cut ${selectedText.length} characters to clipboard!`);
-            }).catch(err => {
-                this.showError('Failed to cut text: ' + err.message);
-            });
-        } else {
-            this.showInfo('No text selected to cut');
-        }
-    }
-
-    copySelectedCode() {
-        const editor = document.getElementById('advancedCodeEditor');
-        const selectedText = editor.value.substring(editor.selectionStart, editor.selectionEnd);
-        
-        if (selectedText) {
-            navigator.clipboard.writeText(selectedText).then(() => {
-                this.showSuccess(`Copied ${selectedText.length} characters to clipboard!`);
-            }).catch(err => {
-                this.showError('Failed to copy text: ' + err.message);
-            });
-        } else {
-            this.showInfo('No text selected to copy');
-        }
-    }
-
-    async pasteCode() {
-        try {
-            const text = await navigator.clipboard.readText();
-            const editor = document.getElementById('advancedCodeEditor');
-            const start = editor.selectionStart;
-            const end = editor.selectionEnd;
-            
-            editor.value = editor.value.substring(0, start) + text + editor.value.substring(end);
-            editor.selectionStart = editor.selectionEnd = start + text.length;
-            editor.focus();
-            
-            this.saveToHistory(editor.value);
-            this.showSuccess(`Pasted ${text.length} characters from clipboard!`);
-        } catch (err) {
-            this.showError('Failed to paste from clipboard: ' + err.message);
-        }
-    }
-
-    clearAllCode() {
-        if (confirm('Are you sure you want to clear all code? This action cannot be undone.')) {
-            const editor = document.getElementById('advancedCodeEditor');
-            const previousLength = editor.value.length;
-            editor.value = '';
-            editor.focus();
-            
-            this.saveToHistory('');
-            this.showSuccess(`Cleared ${previousLength} characters!`);
-        }
-    }
-
-    toggleSuggestions() {
-        this.suggestionsEnabled = !this.suggestionsEnabled;
-        const suggestBtn = document.getElementById('suggestBtn');
-        
-        if (this.suggestionsEnabled) {
-            suggestBtn.classList.add('active');
-            suggestBtn.title = 'Disable Suggestions';
-            this.showInfo('Suggestions enabled');
-        } else {
-            suggestBtn.classList.remove('active');
-            suggestBtn.title = 'Enable Suggestions';
-            this.hideSuggestionList();
-            this.showInfo('Suggestions disabled');
-        }
-    }
-
-    formatAdvancedCode() {
-        const editor = document.getElementById('advancedCodeEditor');
-        const code = editor.value;
-        
-        try {
-            const formatted = this.formatJavaScript(code);
-            editor.value = formatted;
-            this.saveToHistory(formatted);
-            this.showSuccess('Code formatted successfully!');
-        } catch (error) {
-            this.showError('Formatting failed: ' + error.message);
-        }
-    }
-
-    formatJavaScript(code) {
-        // Basic code formatting without breaking structure
-        return code
-            // Fix template literals
-            .replace(/\$\s*{\s*/g, '${')
-            .replace(/\s*}\s*/g, '}')
-            // Fix function calls
-            .replace(/(\w+)\s*\(\s*/g, '$1(')
-            .replace(/\s*\)/g, ')')
-            // Fix operators
-            .replace(/([<>!=]=?)\s*/g, '$1 ')
-            .replace(/\s*([<>!=]=?)/g, ' $1')
-            // Fix assignments
-            .replace(/(\w+)\s*=/g, '$1 =')
-            // Add spaces after commas
-            .replace(/,(\S)/g, ', $1')
-            // Clean up multiple spaces
-            .replace(/\s+/g, ' ')
-            .trim();
-    }
-
-    showRealTimeSuggestions(code, cursorPos) {
-        clearTimeout(this.suggestionTimeout);
-        
-        this.suggestionTimeout = setTimeout(() => {
-            const currentLine = this.getCurrentLine(code, cursorPos);
-            const suggestions = this.generateRealTimeSuggestions(currentLine);
-            
-            if (suggestions.length > 0 && this.suggestionsEnabled) {
-                this.showSuggestionList(suggestions);
-            } else {
-                this.hideSuggestionList();
-            }
-        }, 300);
-    }
-
-    getCurrentLine(code, cursorPos) {
-        const textUpToCursor = code.substring(0, cursorPos);
-        const lines = textUpToCursor.split('\n');
-        return lines[lines.length - 1];
-    }
-
-    generateRealTimeSuggestions(currentLine) {
-        const suggestions = [];
-        const words = currentLine.trim().split(/\s+/);
-        const lastWord = words[words.length - 1].toLowerCase();
-
-        // Complete function suggestions with ready-to-use code
-        const functions = [
-            { 
-                name: 'sendMessage', 
-                desc: 'Send a text message to user', 
-                code: 'sendMessage("Hello!");' 
-            },
-            { 
-                name: 'sendPhoto', 
-                desc: 'Send a photo to user', 
-                code: 'sendPhoto("https://example.com/photo.jpg");' 
-            },
-            { 
-                name: 'getUser', 
-                desc: 'Get current user information', 
-                code: 'const user = getUser();\n// user.id, user.first_name, user.username' 
-            },
-            { 
-                name: 'getChatId', 
-                desc: 'Get current chat ID', 
-                code: 'const chatId = getChatId();' 
-            },
-            { 
-                name: 'isTest', 
-                desc: 'Check if running in test mode', 
-                code: 'if (isTest()) {\n  // Test mode code\n}' 
-            },
-            { 
-                name: 'wait', 
-                desc: 'Wait for specified milliseconds', 
-                code: 'await wait(1000); // Wait 1 second' 
-            }
-        ];
-
-        // Match functions
-        functions.forEach(func => {
-            if (func.name.toLowerCase().includes(lastWord) || lastWord.length < 2) {
-                suggestions.push({
-                    type: 'function',
-                    content: func.name,
-                    description: func.desc,
-                    code: func.code
-                });
-            }
-        });
-
-        return suggestions.slice(0, 6); // Limit to 6 suggestions
-    }
-
-    showSuggestionList(suggestions) {
-        const suggestionsPanel = document.getElementById('suggestionsPanel');
-        const suggestionsList = document.getElementById('suggestionsList');
-        
-        suggestionsList.innerHTML = suggestions.map(suggestion => `
-            <div class="suggestion-item" onclick="commandEditor.applySuggestion('${suggestion.content}')">
-                <div class="suggestion-content">
-                    <div class="suggestion-header">
-                        <strong>${suggestion.content}</strong>
-                        <span class="suggestion-type">${suggestion.type}</span>
-                    </div>
-                    <div class="suggestion-desc">${suggestion.description}</div>
-                </div>
-            </div>
-        `).join('');
-        
-        suggestionsPanel.style.display = 'block';
-    }
-
-    hideSuggestionList() {
-        const suggestionsPanel = document.getElementById('suggestionsPanel');
-        suggestionsPanel.style.display = 'none';
-    }
-
-    applySuggestion(content) {
-        const editor = document.getElementById('advancedCodeEditor');
-        const currentCode = editor.value;
-        const cursorPos = editor.selectionStart;
-        
-        // Insert the suggestion at cursor position
-        const textBeforeCursor = currentCode.substring(0, cursorPos);
-        const textAfterCursor = currentCode.substring(cursorPos);
-        
-        const newCode = textBeforeCursor + content + textAfterCursor;
-        const newCursorPos = cursorPos + content.length;
-        
-        editor.value = newCode;
-        editor.setSelectionRange(newCursorPos, newCursorPos);
-        editor.focus();
-        
-        this.saveToHistory(newCode);
-        this.hideSuggestionList();
-        this.showSuccess('Suggestion applied!');
-    }
-
-    openCodeEditor(editorType) {
-        this.currentEditorType = editorType;
+    applyTemplate(templateType, target) {
         let code = '';
         
-        if (editorType === 'main') {
-            code = document.getElementById('commandCode').value;
-        } else if (editorType === 'answer') {
-            code = document.getElementById('answerHandler').value;
+        switch(templateType) {
+            case 'welcome':
+                code = `const user = getUser();\nsendMessage(\`Hello \${user.first_name}! Welcome to our bot.\`);`;
+                break;
+            case 'help':
+                code = `sendMessage(\`Available commands:\n/start - Start the bot\n/help - Show this help\n/info - Bot information\`);`;
+                break;
+            case 'echo':
+                code = `// Use with wait_for_answer\nconst answer = getAnswer();\nsendMessage(\`You said: \${answer}\`);`;
+                break;
+            case 'photo':
+                code = `sendPhoto("https://example.com/image.jpg", {\n    caption: "Here's your image!"\n});`;
+                break;
+            case 'conditional':
+                code = `const user = getUser();\nif (user.language_code === 'bn') {\n    sendMessage("স্বাগতম!");\n} else {\n    sendMessage("Welcome!");\n}`;
+                break;
+            case 'delay':
+                code = `sendMessage("Processing your request...");\nawait wait(2000);\nsendMessage("Request completed!");`;
+                break;
+            case 'echo_answer':
+                code = `const answer = getAnswer();\nsendMessage(\`You answered: \${answer}\`);`;
+                break;
+            case 'validate_answer':
+                code = `const answer = getAnswer();\nif (answer.length < 3) {\n    sendMessage("Answer too short. Please try again.");\n} else {\n    sendMessage("Thank you for your answer!");\n}`;
+                break;
+            case 'process_data':
+                code = `const answer = getAnswer();\n// Process the answer here\nsendMessage(\`Data received: \${answer}\`);\n// Store or process the data as needed`;
+                break;
         }
         
-        document.getElementById('advancedCodeEditor').value = code;
-        this.codeHistory = [code];
-        this.historyIndex = 0;
-        document.getElementById('codeEditorModal').style.display = 'flex';
-        
-        // Update suggestions button state
-        const suggestBtn = document.getElementById('suggestBtn');
-        if (this.suggestionsEnabled) {
-            suggestBtn.classList.add('active');
-        } else {
-            suggestBtn.classList.remove('active');
-        }
-        
-        // Focus and ensure responsive layout
-        setTimeout(() => {
-            const editor = document.getElementById('advancedCodeEditor');
-            editor.focus();
-            this.adjustToolbarLayout();
-        }, 100);
-    }
-
-    closeCodeEditor() {
-        document.getElementById('codeEditorModal').style.display = 'none';
-        this.hideSuggestionList();
-    }
-
-    saveCodeFromEditor() {
-        const code = document.getElementById('advancedCodeEditor').value;
-        
-        if (this.currentEditorType === 'main') {
+        if (target === 'main') {
             document.getElementById('commandCode').value = code;
-        } else if (this.currentEditorType === 'answer') {
+            document.getElementById('templatesModal').style.display = 'none';
+        } else if (target === 'answer') {
             document.getElementById('answerHandler').value = code;
+            document.getElementById('answerTemplatesModal').style.display = 'none';
         }
         
-        this.closeCodeEditor();
-        this.showSuccess('Code saved from editor!');
-    }
-
-    setupModalEvents() {
-        const modals = ['testCommandModal', 'codeEditorModal', 'templatesModal'];
-        
-        modals.forEach(modalId => {
-            const modal = document.getElementById(modalId);
-            const closeBtn = modal?.querySelector('.modal-close');
-            
-            if (closeBtn) {
-                closeBtn.addEventListener('click', () => {
-                    modal.style.display = 'none';
-                });
-            }
-        });
-
-        // Close test command modal
-        document.getElementById('closeTestCommand')?.addEventListener('click', () => {
-            document.getElementById('testCommandModal').style.display = 'none';
-        });
-
-        // Close templates modal
-        document.getElementById('closeTemplates')?.addEventListener('click', () => {
-            document.getElementById('templatesModal').style.display = 'none';
-        });
-
-        window.addEventListener('click', (e) => {
-            if (e.target.classList.contains('modal')) {
-                e.target.style.display = 'none';
-            }
-        });
-    }
-
-    toggleAnswerHandler(show) {
-        const section = document.getElementById('answerHandlerSection');
-        section.style.display = show ? 'block' : 'none';
+        this.showSuccess('Template applied successfully!');
     }
 
     async loadBotInfo() {
@@ -783,6 +472,8 @@ class EnhancedCommandEditor {
         const isActive = command.is_active;
         const hasAnswerHandler = command.wait_for_answer && command.answer_handler;
         const isSelected = this.currentCommand?.id === command.id;
+        const patterns = command.pattern.split(',').map(p => p.trim());
+        const displayPattern = patterns.length > 1 ? `${patterns[0]} +${patterns.length - 1} more` : patterns[0];
         
         return `
             <div class="command-item ${isSelected ? 'active' : ''}" 
@@ -793,7 +484,7 @@ class EnhancedCommandEditor {
                 <div class="command-content">
                     <div class="command-header">
                         <span class="command-name">${this.escapeHtml(command.name)}</span>
-                        <span class="command-pattern">${this.escapeHtml(command.pattern)}</span>
+                        <span class="command-pattern">${this.escapeHtml(displayPattern)}</span>
                     </div>
                     <div class="command-meta">
                         <span class="command-status ${isActive ? 'active' : 'inactive'}">
@@ -801,6 +492,7 @@ class EnhancedCommandEditor {
                             ${isActive ? 'Active' : 'Inactive'}
                         </span>
                         ${hasAnswerHandler ? '<span class="command-feature">⏳ Waits</span>' : ''}
+                        ${patterns.length > 1 ? `<span class="command-feature">${patterns.length} patterns</span>` : ''}
                     </div>
                 </div>
             </div>
@@ -832,7 +524,7 @@ class EnhancedCommandEditor {
             id: 'new',
             name: 'New Command',
             pattern: '/start',
-            code: '// Write your command code here\nconst user = getUser();\nreturn sendMessage(`Hello ${user.first_name}!`);',
+            code: '// Write your command code here\nconst user = getUser();\nsendMessage(`Hello ${user.first_name}!`);',
             is_active: true,
             wait_for_answer: false,
             answer_handler: ''
@@ -913,12 +605,15 @@ class EnhancedCommandEditor {
         document.getElementById('answerHandler').value = this.currentCommand.answer_handler || '';
         
         document.getElementById('currentCommandName').textContent = this.currentCommand.name;
-        
-        const statusBadge = document.getElementById('commandStatus');
-        statusBadge.textContent = this.currentCommand.is_active ? 'Active' : 'Inactive';
-        statusBadge.className = `status-badge ${this.currentCommand.is_active ? 'active' : 'inactive'}`;
+        document.getElementById('commandStatus').textContent = this.currentCommand.is_active ? 'Active' : 'Inactive';
+        document.getElementById('commandStatus').className = `status-badge ${this.currentCommand.is_active ? 'active' : 'inactive'}`;
         
         this.updateButtonStates();
+    }
+
+    toggleAnswerHandler(show) {
+        const section = document.getElementById('answerHandlerSection');
+        section.style.display = show ? 'block' : 'none';
     }
 
     updateButtonStates() {
@@ -928,6 +623,13 @@ class EnhancedCommandEditor {
         if (deleteBtn) {
             deleteBtn.disabled = isNew;
             deleteBtn.title = isNew ? 'Save command first to enable delete' : 'Delete command';
+        }
+        
+        // Test button is always enabled
+        const testBtn = document.getElementById('testCommandBtn');
+        if (testBtn) {
+            testBtn.disabled = false;
+            testBtn.title = 'Test current command code';
         }
     }
 
@@ -940,21 +642,23 @@ class EnhancedCommandEditor {
         const commands = this.getCommandsFromTags();
         
         if (commands.length === 0) {
-            this.showError('Please add at least one command');
+            this.showError('Please add at least one command pattern');
             document.getElementById('moreCommands').focus();
             return false;
         }
 
         const commandPattern = commands.join(', ');
+        const commandName = commands[0]; // Use first pattern as command name
         
         const formData = {
-            name: commands[0],
+            name: commandName,
             pattern: commandPattern,
             code: document.getElementById('commandCode').value.trim(),
             waitForAnswer: document.getElementById('waitForAnswer').checked,
             answerHandler: document.getElementById('waitForAnswer').checked ? 
                           document.getElementById('answerHandler').value.trim() : '',
-            botToken: this.currentBot.token
+            botToken: this.currentBot.token,
+            isActive: true
         };
 
         if (!formData.code) {
@@ -1132,7 +836,6 @@ class EnhancedCommandEditor {
         }
     }
 
-    // Enhanced test with custom input
     async runCustomTest() {
         if (!this.currentBot) {
             this.showError('Bot information not loaded');
@@ -1140,10 +843,10 @@ class EnhancedCommandEditor {
         }
 
         const testInput = document.getElementById('testInput').value.trim();
-        const commands = this.getCommandsFromTags();
         
-        if (!testInput && commands.length === 0) {
-            this.showError('Please add commands or enter test input');
+        if (!testInput) {
+            this.showError('Please enter test input');
+            document.getElementById('testInput').focus();
             return;
         }
 
@@ -1158,10 +861,9 @@ class EnhancedCommandEditor {
         try {
             const token = localStorage.getItem('token');
             
-            // Create a temporary command object for testing
             const tempCommand = {
-                name: commands[0] || 'Test Command',
-                pattern: testInput || commands.join(', '),
+                name: 'Test Command',
+                pattern: testInput,
                 code: commandCode,
                 wait_for_answer: document.getElementById('waitForAnswer').checked,
                 answer_handler: document.getElementById('answerHandler').value || ''
@@ -1187,7 +889,7 @@ class EnhancedCommandEditor {
                     <div class="test-success">
                         <h4>✅ Test Command Executed Successfully!</h4>
                         <div class="test-details">
-                            <p><strong>Test Input:</strong> ${testInput || commands.join(', ')}</p>
+                            <p><strong>Test Input:</strong> ${testInput}</p>
                             <p><strong>Bot:</strong> ${this.currentBot.name}</p>
                             <p><strong>Result:</strong> ${data.result || 'Command executed successfully'}</p>
                         </div>
@@ -1217,39 +919,6 @@ class EnhancedCommandEditor {
         }
     }
 
-    showTemplates() {
-        document.getElementById('templatesModal').style.display = 'flex';
-    }
-
-    applyTemplate(templateName) {
-        let code = '';
-        
-        switch(templateName) {
-            case 'welcome':
-                code = `const user = getUser();\nsendMessage(\`Hello \${user.first_name}! Welcome to our bot.\`);`;
-                break;
-            case 'help':
-                code = `sendMessage(\`Available commands:\n/start - Start the bot\n/help - Show this help\n/info - Bot information\`);`;
-                break;
-            case 'echo':
-                code = `// Use with wait_for_answer\nconst answer = getAnswer();\nsendMessage(\`You said: \${answer}\`);`;
-                break;
-            case 'photo':
-                code = `sendPhoto("https://example.com/image.jpg", {\n    caption: "Here's your image!"\n});`;
-                break;
-            case 'conditional':
-                code = `const user = getUser();\nif (user.language_code === 'bn') {\n    sendMessage("স্বাগতম!");\n} else {\n    sendMessage("Welcome!");\n}`;
-                break;
-            case 'delay':
-                code = `sendMessage("Processing your request...");\nawait wait(2000);\nsendMessage("Request completed!");`;
-                break;
-        }
-        
-        document.getElementById('commandCode').value = code;
-        document.getElementById('templatesModal').style.display = 'none';
-        this.showSuccess('Template applied successfully!');
-    }
-
     showTestResult(html) {
         const modal = document.getElementById('testCommandModal');
         const resultDiv = document.getElementById('testCommandResult');
@@ -1258,6 +927,388 @@ class EnhancedCommandEditor {
             resultDiv.innerHTML = html;
             modal.style.display = 'flex';
         }
+    }
+
+    // Code Editor Methods
+    insertTab() {
+        const editor = document.getElementById('advancedCodeEditor');
+        const start = editor.selectionStart;
+        const end = editor.selectionEnd;
+        
+        editor.value = editor.value.substring(0, start) + '  ' + editor.value.substring(end);
+        editor.selectionStart = editor.selectionEnd = start + 2;
+        editor.focus();
+        
+        this.saveToHistory(editor.value);
+    }
+
+    saveToHistory(code) {
+        this.codeHistory = this.codeHistory.slice(0, this.historyIndex + 1);
+        this.codeHistory.push(code);
+        this.historyIndex = this.codeHistory.length - 1;
+    }
+
+    undoCode() {
+        if (this.historyIndex > 0) {
+            this.historyIndex--;
+            document.getElementById('advancedCodeEditor').value = this.codeHistory[this.historyIndex];
+            this.showInfo('Undo performed');
+        } else {
+            this.showInfo('Nothing to undo');
+        }
+    }
+
+    redoCode() {
+        if (this.historyIndex < this.codeHistory.length - 1) {
+            this.historyIndex++;
+            document.getElementById('advancedCodeEditor').value = this.codeHistory[this.historyIndex];
+            this.showInfo('Redo performed');
+        } else {
+            this.showInfo('Nothing to redo');
+        }
+    }
+
+    selectAllCode() {
+        const editor = document.getElementById('advancedCodeEditor');
+        editor.select();
+        this.showInfo('All code selected');
+    }
+
+    cutSelectedCode() {
+        const editor = document.getElementById('advancedCodeEditor');
+        const selectedText = editor.value.substring(editor.selectionStart, editor.selectionEnd);
+        
+        if (selectedText) {
+            navigator.clipboard.writeText(selectedText).then(() => {
+                const start = editor.selectionStart;
+                const end = editor.selectionEnd;
+                editor.value = editor.value.substring(0, start) + editor.value.substring(end);
+                editor.selectionStart = editor.selectionEnd = start;
+                editor.focus();
+                
+                this.saveToHistory(editor.value);
+                this.showSuccess(`Cut ${selectedText.length} characters to clipboard!`);
+            }).catch(err => {
+                this.showError('Failed to cut text: ' + err.message);
+            });
+        } else {
+            this.showInfo('No text selected to cut');
+        }
+    }
+
+    copySelectedCode() {
+        const editor = document.getElementById('advancedCodeEditor');
+        const selectedText = editor.value.substring(editor.selectionStart, editor.selectionEnd);
+        
+        if (selectedText) {
+            navigator.clipboard.writeText(selectedText).then(() => {
+                this.showSuccess(`Copied ${selectedText.length} characters to clipboard!`);
+            }).catch(err => {
+                this.showError('Failed to copy text: ' + err.message);
+            });
+        } else {
+            this.showInfo('No text selected to copy');
+        }
+    }
+
+    async pasteCode() {
+        try {
+            const text = await navigator.clipboard.readText();
+            const editor = document.getElementById('advancedCodeEditor');
+            const start = editor.selectionStart;
+            const end = editor.selectionEnd;
+            
+            editor.value = editor.value.substring(0, start) + text + editor.value.substring(end);
+            editor.selectionStart = editor.selectionEnd = start + text.length;
+            editor.focus();
+            
+            this.saveToHistory(editor.value);
+            this.showSuccess(`Pasted ${text.length} characters from clipboard!`);
+        } catch (err) {
+            this.showError('Failed to paste from clipboard: ' + err.message);
+        }
+    }
+
+    clearAllCode() {
+        if (confirm('Are you sure you want to clear all code? This action cannot be undone.')) {
+            const editor = document.getElementById('advancedCodeEditor');
+            const previousLength = editor.value.length;
+            editor.value = '';
+            editor.focus();
+            
+            this.saveToHistory('');
+            this.showSuccess(`Cleared ${previousLength} characters!`);
+        }
+    }
+
+    toggleSuggestions() {
+        this.suggestionsEnabled = !this.suggestionsEnabled;
+        const suggestBtn = document.getElementById('suggestBtn');
+        
+        if (this.suggestionsEnabled) {
+            suggestBtn.classList.add('active');
+            suggestBtn.title = 'Disable Suggestions';
+            this.showInfo('Suggestions enabled');
+        } else {
+            suggestBtn.classList.remove('active');
+            suggestBtn.title = 'Enable Suggestions';
+            this.hideSuggestionList();
+            this.showInfo('Suggestions disabled');
+        }
+    }
+
+    formatAdvancedCode() {
+        const editor = document.getElementById('advancedCodeEditor');
+        const code = editor.value;
+        
+        try {
+            const formatted = this.formatJavaScript(code);
+            editor.value = formatted;
+            this.saveToHistory(formatted);
+            this.showSuccess('Code formatted successfully!');
+        } catch (error) {
+            this.showError('Formatting failed: ' + error.message);
+        }
+    }
+
+    formatJavaScript(code) {
+        let formatted = code;
+
+        formatted = formatted
+            .replace(/\$\s*{\s*/g, '${')
+            .replace(/\s*}\s*/g, '}')
+            .replace(/(\w+)\s*\(\s*/g, '$1(')
+            .replace(/\s*\)/g, ')')
+            .replace(/\s+/g, ' ')
+            .replace(/,(\S)/g, ', $1')
+            .replace(/;(\S)/g, '; $1')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        const lines = formatted.split('\n');
+        const processedLines = lines.map(line => {
+            if (line.includes(';') && !line.trim().startsWith('//')) {
+                const statements = line.split(';');
+                return statements.map(statement => statement.trim()).join(';\n');
+            }
+            return line;
+        });
+        
+        return processedLines.join('\n');
+    }
+
+    showRealTimeSuggestions(code, cursorPos) {
+        clearTimeout(this.suggestionTimeout);
+        
+        this.suggestionTimeout = setTimeout(() => {
+            const currentLine = this.getCurrentLine(code, cursorPos);
+            const suggestions = this.generateRealTimeSuggestions(currentLine);
+            
+            if (suggestions.length > 0 && this.suggestionsEnabled) {
+                this.showSuggestionList(suggestions);
+            } else {
+                this.hideSuggestionList();
+            }
+        }, 300);
+    }
+
+    getCurrentLine(code, cursorPos) {
+        const textUpToCursor = code.substring(0, cursorPos);
+        const lines = textUpToCursor.split('\n');
+        return lines[lines.length - 1];
+    }
+
+    generateRealTimeSuggestions(currentLine) {
+        const suggestions = [];
+        const words = currentLine.trim().split(/\s+/);
+        const lastWord = words[words.length - 1].toLowerCase();
+
+        const functions = [
+            { 
+                name: 'sendMessage', 
+                desc: 'Send a text message to user', 
+                code: 'sendMessage("Hello!");' 
+            },
+            { 
+                name: 'sendPhoto', 
+                desc: 'Send a photo to user', 
+                code: 'sendPhoto("https://example.com/photo.jpg");' 
+            },
+            { 
+                name: 'sendDocument', 
+                desc: 'Send a document to user', 
+                code: 'sendDocument("https://example.com/file.pdf");' 
+            },
+            { 
+                name: 'getUser', 
+                desc: 'Get current user information', 
+                code: 'const user = getUser();\n// user.id, user.first_name, user.username' 
+            },
+            { 
+                name: 'getChatId', 
+                desc: 'Get current chat ID', 
+                code: 'const chatId = getChatId();' 
+            },
+            { 
+                name: 'isTest', 
+                desc: 'Check if running in test mode', 
+                code: 'if (isTest()) {\n  // Test mode code\n}' 
+            },
+            { 
+                name: 'wait', 
+                desc: 'Wait for specified milliseconds', 
+                code: 'await wait(1000); // Wait 1 second' 
+            },
+            { 
+                name: 'getAnswer', 
+                desc: 'Get user answer in wait_for_answer mode', 
+                code: 'const answer = getAnswer();' 
+            }
+        ];
+
+        functions.forEach(func => {
+            if (func.name.toLowerCase().includes(lastWord) || lastWord.length < 2) {
+                suggestions.push({
+                    type: 'function',
+                    content: func.name,
+                    description: func.desc,
+                    code: func.code
+                });
+            }
+        });
+
+        return suggestions.slice(0, 6);
+    }
+
+    showSuggestionList(suggestions) {
+        const suggestionsPanel = document.getElementById('suggestionsPanel');
+        const suggestionsList = document.getElementById('suggestionsList');
+        
+        suggestionsList.innerHTML = suggestions.map(suggestion => `
+            <div class="suggestion-item" onclick="commandEditor.applySuggestionCode('${this.escapeHtml(suggestion.code).replace(/'/g, "\\'")}')">
+                <div class="suggestion-content">
+                    <div class="suggestion-header">
+                        <strong>${suggestion.content}</strong>
+                        <span class="suggestion-type">${suggestion.type}</span>
+                    </div>
+                    <div class="suggestion-desc">${suggestion.description}</div>
+                    <div class="suggestion-code">${this.escapeHtml(suggestion.code)}</div>
+                </div>
+            </div>
+        `).join('');
+        
+        suggestionsPanel.style.display = 'block';
+    }
+
+    hideSuggestionList() {
+        const suggestionsPanel = document.getElementById('suggestionsPanel');
+        suggestionsPanel.style.display = 'none';
+    }
+
+    applySuggestionCode(fullCode) {
+        const editor = document.getElementById('advancedCodeEditor');
+        const currentCode = editor.value;
+        const cursorPos = editor.selectionStart;
+        
+        const textBeforeCursor = currentCode.substring(0, cursorPos);
+        const textAfterCursor = currentCode.substring(cursorPos);
+        
+        const newCode = textBeforeCursor + '\n' + fullCode + '\n' + textAfterCursor;
+        const newCursorPos = textBeforeCursor.length + fullCode.length + 2;
+        
+        editor.value = newCode;
+        editor.setSelectionRange(newCursorPos, newCursorPos);
+        editor.focus();
+        
+        this.saveToHistory(newCode);
+        this.hideSuggestionList();
+        this.showSuccess('Suggestion applied!');
+    }
+
+    openCodeEditor(editorType) {
+        this.currentEditorType = editorType;
+        let code = '';
+        
+        if (editorType === 'main') {
+            code = document.getElementById('commandCode').value;
+        } else if (editorType === 'answer') {
+            code = document.getElementById('answerHandler').value;
+        }
+        
+        document.getElementById('advancedCodeEditor').value = code;
+        this.codeHistory = [code];
+        this.historyIndex = 0;
+        document.getElementById('codeEditorModal').style.display = 'flex';
+        
+        const suggestBtn = document.getElementById('suggestBtn');
+        if (this.suggestionsEnabled) {
+            suggestBtn.classList.add('active');
+        } else {
+            suggestBtn.classList.remove('active');
+        }
+        
+        setTimeout(() => {
+            const editor = document.getElementById('advancedCodeEditor');
+            editor.focus();
+            
+            this.adjustToolbarLayout();
+            
+            const modalContent = document.querySelector('.fullscreen-content');
+            if (modalContent) {
+                modalContent.scrollTop = 0;
+            }
+        }, 100);
+    }
+
+    closeCodeEditor() {
+        document.getElementById('codeEditorModal').style.display = 'none';
+        this.hideSuggestionList();
+    }
+
+    saveCodeFromEditor() {
+        const code = document.getElementById('advancedCodeEditor').value;
+        
+        if (this.currentEditorType === 'main') {
+            document.getElementById('commandCode').value = code;
+        } else if (this.currentEditorType === 'answer') {
+            document.getElementById('answerHandler').value = code;
+        }
+        
+        this.closeCodeEditor();
+        this.showSuccess('Code saved from editor!');
+    }
+
+    setupModalEvents() {
+        const modals = ['testCommandModal', 'codeEditorModal', 'templatesModal', 'answerTemplatesModal'];
+        
+        modals.forEach(modalId => {
+            const modal = document.getElementById(modalId);
+            const closeBtn = modal?.querySelector('.modal-close');
+            
+            if (closeBtn) {
+                closeBtn.addEventListener('click', () => {
+                    modal.style.display = 'none';
+                });
+            }
+        });
+
+        document.getElementById('closeTestCommand')?.addEventListener('click', () => {
+            document.getElementById('testCommandModal').style.display = 'none';
+        });
+
+        document.getElementById('closeTemplates')?.addEventListener('click', () => {
+            document.getElementById('templatesModal').style.display = 'none';
+        });
+
+        document.getElementById('closeAnswerTemplates')?.addEventListener('click', () => {
+            document.getElementById('answerTemplatesModal').style.display = 'none';
+        });
+
+        window.addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal')) {
+                e.target.style.display = 'none';
+            }
+        });
     }
 
     logout() {
@@ -1336,7 +1387,7 @@ class EnhancedCommandEditor {
 
         setTimeout(() => {
             notification.remove();
-        }, 2000);
+        }, 5000);
     }
 
     escapeHtml(unsafe) {
