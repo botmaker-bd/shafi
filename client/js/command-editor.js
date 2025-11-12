@@ -658,6 +658,8 @@ class CommandEditor {
         const mainPattern = patterns[0];
         const additionalCount = patterns.length - 1;
         
+        const patternsText = patterns.join(', ');
+        
         return `
             <div class="command-group ${isSelected ? 'active' : ''}" 
                  data-command-name="${this.escapeHtml(commandName)}">
@@ -666,7 +668,7 @@ class CommandEditor {
                 </div>
                 <div class="command-content">
                     <div class="command-header">
-                        <span class="command-name">${this.escapeHtml(commandName)}</span>
+                        <span class="command-name">${this.escapeHtml(patternsText)}</span>
                         <span class="command-pattern">${this.escapeHtml(mainPattern)}</span>
                     </div>
                     <div class="command-description">
