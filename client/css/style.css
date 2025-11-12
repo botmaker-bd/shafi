@@ -966,7 +966,7 @@ body {
 }
 
 .command-pattern {
-    font-family: 'Courier New', monospace;
+    font-family: 'sans-serif', bold;
     font-size: 0.875rem;
     background: var(--bg-secondary);
     padding: 0.25rem 0.5rem;
