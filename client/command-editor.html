@@ -73,15 +73,19 @@
                 <button class="btn btn-secondary" id="backToBots">
                     <i class="fas fa-arrow-left"></i> Back to Bots
                 </button>
+                <button class="btn btn-primary" id="quickTest">
+                    <i class="fas fa-bolt"></i> Quick Test
+                </button>
             </div>
         </div>
 
         <div class="editor-layout">
+            <!-- Sidebar -->
             <div class="commands-sidebar">
                 <div class="sidebar-header">
                     <h3>Commands</h3>
                     <button id="addCommandBtn" class="btn btn-primary btn-small">
-                        <i class="fas fa-plus"></i> New Command
+                        <i class="fas fa-plus"></i> New
                     </button>
                 </div>
                 
@@ -105,8 +109,9 @@
                 </div>
             </div>
 
+            <!-- Main Editor -->
             <div class="editor-main">
-                <!-- No Command Selected State -->
+                <!-- No Command Selected -->
                 <div id="noCommandSelected" class="empty-state">
                     <div class="empty-icon">
                         <i class="fas fa-code"></i>
@@ -118,15 +123,20 @@
                     </button>
                 </div>
 
+                <!-- Command Editor -->
                 <div id="commandEditor" class="command-editor" style="display: none;">
                     <div class="editor-header">
                         <div class="command-title">
                             <h3 id="currentCommandName">Command Name</h3>
                             <div class="command-status">
                                 <span class="status-badge active" id="commandStatus">Active</span>
+                                <span class="command-id" id="commandId">ID: loading...</span>
                             </div>
                         </div>
                         <div class="editor-actions">
+                            <button id="toggleCommandBtn" class="btn btn-warning btn-small">
+                                <i class="fas fa-power-off"></i> Toggle
+                            </button>
                             <button id="testCommandBtn" class="btn btn-success btn-small">
                                 <i class="fas fa-bolt"></i> Test
                             </button>
@@ -140,87 +150,114 @@
                     </div>
 
                     <form id="commandForm" class="command-form">
-                        <!-- Command Patterns Section -->
-                        <div class="form-group">
-                            <label for="moreCommands">Command Patterns *</label>
-                            <div class="commands-input-container">
-                                <div id="commandsTags" class="commands-tags">
-                                    <!-- Command tags will be added here -->
+                        <!-- Command Basic Info -->
+                        <div class="form-section">
+                            <h4>Basic Information</h4>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="commandName">Command Name *</label>
+                                    <input type="text" id="commandName" required placeholder="Enter command name">
                                 </div>
-                                <input type="text" id="moreCommands" 
-                                       placeholder="Type command pattern and press Enter...">
-                            </div>
-                            <div class="form-help">
-                                Add multiple command patterns. All patterns will execute the same code.
+                                <div class="form-group">
+                                    <label for="commandDescription">Description</label>
+                                    <input type="text" id="commandDescription" placeholder="Brief description">
+                                </div>
                             </div>
                         </div>
 
-                        <!-- Enhanced Test Section -->
-                        <div class="form-group">
-                            <label for="testInput">Test Command Input *</label>
-                            <div class="test-input-container">
-                                <input type="text" id="testInput" 
-                                       placeholder="Enter test input to simulate user message..." required>
-                                <button type="button" id="runTestBtn" class="btn btn-warning btn-small">
-                                    <i class="fas fa-play"></i> Run Test
-                                </button>
-                            </div>
-                            <div class="form-help">
-                                Enter test input to simulate how users will trigger this command.
+                        <!-- Command Patterns -->
+                        <div class="form-section">
+                            <h4>Command Patterns</h4>
+                            <div class="form-group">
+                                <label for="moreCommands">Command Patterns *</label>
+                                <div class="commands-input-container">
+                                    <div id="commandsTags" class="commands-tags">
+                                        <!-- Command tags will be added here -->
+                                    </div>
+                                    <input type="text" id="moreCommands" 
+                                           placeholder="Type command pattern and press Enter or comma...">
+                                </div>
+                                <div class="form-help">
+                                    Add multiple command patterns separated by commas. All patterns will execute the same code.
+                                    Example: /start, start, hello
+                                </div>
                             </div>
                         </div>
 
-                        <!-- Wait for Answer Toggle -->
-                        <div class="toggle-group">
-                            <label class="toggle-label">
-                                <div class="toggle-text">
-                                    <span class="toggle-title">Wait for Answer</span>
-                                    <span class="toggle-description">Enable this to wait for user response after command execution</span>
-                                </div>
-                                <div class="toggle-switch">
-                                    <input type="checkbox" id="waitForAnswer">
-                                    <span class="toggle-slider"></span>
-                                </div>
-                            </label>
-                        </div>
-
-                        <!-- Answer Handler Section -->
-                        <div id="answerHandlerSection" class="form-group" style="display: none;">
-                            <div class="code-editor-header">
-                                <label for="answerHandler">Answer Handler Code</label>
-                                <div class="code-actions">
-                                    <button type="button" class="btn-code" id="openAnswerEditor">
-                                        <i class="fas fa-edit"></i> Open Editor
-                                    </button>
-                                    <button type="button" class="btn-code" id="showAnswerTemplates">
-                                        <i class="fas fa-layer-group"></i> Templates
+                        <!-- Test Section -->
+                        <div class="form-section">
+                            <h4>Test Command</h4>
+                            <div class="form-group">
+                                <label for="testInput">Test Input *</label>
+                                <div class="test-input-container">
+                                    <input type="text" id="testInput" 
+                                           placeholder="Enter test input to simulate user message..." required>
+                                    <button type="button" id="runTestBtn" class="btn btn-warning">
+                                        <i class="fas fa-play"></i> Run Test
                                     </button>
                                 </div>
-                            </div>
-                            <textarea id="answerHandler" 
-                                      placeholder="Code to handle user's answer..."></textarea>
-                            <div class="form-help">
-                                This code will execute when user responds. Use `getAnswer()` to get user's response.
+                                <div class="form-help">
+                                    Enter test input to simulate how users will trigger this command.
+                                </div>
                             </div>
                         </div>
 
-                        <!-- Main Command Code Section -->
-                        <div class="form-group">
-                            <div class="code-editor-header">
-                                <label for="commandCode">Command Code *</label>
-                                <div class="code-actions">
-                                    <button type="button" class="btn-code" id="openEditor">
-                                        <i class="fas fa-edit"></i> Open Editor
-                                    </button>
-                                    <button type="button" class="btn-code" id="showTemplates">
-                                        <i class="fas fa-layer-group"></i> Templates
-                                    </button>
+                        <!-- Code Editor Section -->
+                        <div class="form-section">
+                            <h4>Command Code</h4>
+                            <div class="form-group">
+                                <div class="code-editor-header">
+                                    <label for="commandCode">Command Code *</label>
+                                    <div class="code-actions">
+                                        <button type="button" class="btn-code" id="openEditor">
+                                            <i class="fas fa-edit"></i> Full Editor
+                                        </button>
+                                        <button type="button" class="btn-code" id="showTemplates">
+                                            <i class="fas fa-layer-group"></i> Templates
+                                        </button>
+                                        <button type="button" class="btn-code" id="formatCode">
+                                            <i class="fas fa-indent"></i> Format
+                                        </button>
+                                    </div>
+                                </div>
+                                <textarea id="commandCode" 
+                                          placeholder="Write your command code here..."></textarea>
+                                <div class="code-help">
+                                    <strong>Available Functions:</strong> bot.sendMessage(), User.saveData(), waitForAnswer(), HTTP.get(), etc.
                                 </div>
                             </div>
-                            <textarea id="commandCode" 
-                                      placeholder="Write your command code here..."></textarea>
-                            <div class="code-help">
-                                <strong>Available functions:</strong> sendMessage(), sendPhoto(), getUser(), getChatId(), isTest(), wait() etc.
+                        </div>
+
+                        <!-- Advanced Options -->
+                        <div class="form-section">
+                            <h4>Advanced Options</h4>
+                            <div class="toggle-group">
+                                <label class="toggle-label">
+                                    <div class="toggle-text">
+                                        <span class="toggle-title">Wait for Answer</span>
+                                        <span class="toggle-description">Enable to wait for user response after command execution</span>
+                                    </div>
+                                    <div class="toggle-switch">
+                                        <input type="checkbox" id="waitForAnswer">
+                                        <span class="toggle-slider"></span>
+                                    </div>
+                                </label>
+                            </div>
+
+                            <div id="answerHandlerSection" class="form-group" style="display: none;">
+                                <div class="code-editor-header">
+                                    <label for="answerHandler">Answer Handler Code</label>
+                                    <div class="code-actions">
+                                        <button type="button" class="btn-code" id="openAnswerEditor">
+                                            <i class="fas fa-edit"></i> Full Editor
+                                        </button>
+                                    </div>
+                                </div>
+                                <textarea id="answerHandler" 
+                                          placeholder="Code to handle user's answer..."></textarea>
+                                <div class="form-help">
+                                    This code will execute when user responds. Use waitForAnswer() to get user's response.
+                                </div>
                             </div>
                         </div>
                     </form>
@@ -237,7 +274,7 @@
         </div>
     </div>
 
-    <!-- Enhanced Test Command Modal -->
+    <!-- Test Command Modal -->
     <div id="testCommandModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -246,11 +283,15 @@
             </div>
             <div class="modal-body">
                 <div id="testCommandResult">
-                    <p>Testing command execution...</p>
+                    <div class="test-loading">
+                        <div class="spinner"></div>
+                        <p>Testing command execution...</p>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" id="closeTestCommand">Close</button>
+                <button class="btn btn-primary" id="viewLogs">View Logs</button>
             </div>
         </div>
     </div>
@@ -259,62 +300,65 @@
     <div id="codeEditorModal" class="modal fullscreen-modal">
         <div class="modal-content fullscreen-content">
             <div class="modal-header compact-header">
-                <div class="editor-toolbar-icons">
-                    <button class="btn-icon" id="undoBtn" title="Undo">
-                        <i class="fas fa-undo"></i>
-                        <span>Undo</span>
-                    </button>
-                    <button class="btn-icon" id="redoBtn" title="Redo">
-                        <i class="fas fa-redo"></i>
-                        <span>Redo</span>
-                    </button>
-                    <button class="btn-icon" id="selectAllBtn" title="Select All">
-                        <i class="fas fa-expand-arrows-alt"></i>
-                        <span>Select All</span>
-                    </button>
-                    <button class="btn-icon" id="cutBtn" title="Cut Selected">
-                        <i class="fas fa-cut"></i>
-                        <span>Cut</span>
-                    </button>
-                    <button class="btn-icon" id="copyBtn" title="Copy Selected">
-                        <i class="fas fa-copy"></i>
-                        <span>Copy</span>
-                    </button>
-                    <button class="btn-icon" id="pasteBtn" title="Paste">
-                        <i class="fas fa-paste"></i>
-                        <span>Paste</span>
-                    </button>
-                    <button class="btn-icon" id="clearBtn" title="Clear All">
-                        <i class="fas fa-eraser"></i>
-                        <span>Clear</span>
-                    </button>
-                    <button class="btn-icon" id="formatBtn" title="Format Code">
-                        <i class="fas fa-indent"></i>
-                        <span>Format</span>
-                    </button>
-                    <button class="btn-icon" id="suggestBtn" title="Toggle Suggestions">
-                        <i class="fas fa-lightbulb"></i>
-                        <span>Suggest</span>
-                    </button>
+                <div class="editor-toolbar">
+                    <div class="toolbar-group">
+                        <button class="btn-icon" id="undoBtn" title="Undo">
+                            <i class="fas fa-undo"></i>
+                            <span>Undo</span>
+                        </button>
+                        <button class="btn-icon" id="redoBtn" title="Redo">
+                            <i class="fas fa-redo"></i>
+                            <span>Redo</span>
+                        </button>
+                    </div>
+                    <div class="toolbar-group">
+                        <button class="btn-icon" id="selectAllBtn" title="Select All">
+                            <i class="fas fa-expand-arrows-alt"></i>
+                            <span>Select All</span>
+                        </button>
+                        <button class="btn-icon" id="cutBtn" title="Cut">
+                            <i class="fas fa-cut"></i>
+                            <span>Cut</span>
+                        </button>
+                        <button class="btn-icon" id="copyBtn" title="Copy">
+                            <i class="fas fa-copy"></i>
+                            <span>Copy</span>
+                        </button>
+                        <button class="btn-icon" id="pasteBtn" title="Paste">
+                            <i class="fas fa-paste"></i>
+                            <span>Paste</span>
+                        </button>
+                    </div>
+                    <div class="toolbar-group">
+                        <button class="btn-icon" id="clearBtn" title="Clear All">
+                            <i class="fas fa-eraser"></i>
+                            <span>Clear</span>
+                        </button>
+                        <button class="btn-icon" id="formatBtn" title="Format Code">
+                            <i class="fas fa-indent"></i>
+                            <span>Format</span>
+                        </button>
+                        <button class="btn-icon" id="suggestBtn" title="Toggle Suggestions">
+                            <i class="fas fa-lightbulb"></i>
+                            <span>Suggest</span>
+                        </button>
+                    </div>
                 </div>
                 <button class="modal-close">&times;</button>
             </div>
             <div class="modal-body fullscreen-body">
                 <textarea id="advancedCodeEditor" class="fullscreen-editor" 
                          placeholder="Write your code here..."></textarea>
-                <div class="suggestions-panel" id="suggestionsPanel" style="display: none;">
-                    <div class="suggestions-header">
-                        <h4>Suggestions</h4>
-                        <button class="btn-icon" id="closeSuggestions" title="Close Suggestions">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    <div id="suggestionsList"></div>
-                </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" id="cancelEdit">Cancel</button>
-                <button class="btn btn-primary" id="saveCode">Save Code</button>
+                <div class="editor-info">
+                    <span id="lineCount">Line: 1</span>
+                    <span id="charCount">Chars: 0</span>
+                </div>
+                <div class="editor-actions">
+                    <button class="btn btn-secondary" id="cancelEdit">Cancel</button>
+                    <button class="btn btn-primary" id="saveCode">Save Code</button>
+                </div>
             </div>
         </div>
     </div>
@@ -327,149 +371,309 @@
                 <button class="modal-close">&times;</button>
             </div>
             <div class="modal-body">
-                <div class="templates-grid">
-                    <div class="template-card" onclick="commandEditor.applyTemplate('welcome', 'main')">
-                        <div class="template-icon">
-                            <i class="fas fa-hand-wave"></i>
-                        </div>
-                        <h4>Welcome Message</h4>
-                        <p>Simple welcome message with user info</p>
-                        <div class="template-code">
-const user = getUser();
-sendMessage(`Hello ${user.first_name}! Welcome to our bot.`);
-                        </div>
+                <div class="templates-categories">
+                    <div class="category-tabs">
+                        <button class="category-tab active" data-category="basic">Basic</button>
+                        <button class="category-tab" data-category="interactive">Interactive</button>
+                        <button class="category-tab" data-category="media">Media</button>
+                        <button class="category-tab" data-category="buttons">Buttons</button>
+                        <button class="category-tab" data-category="data">Data</button>
+                        <button class="category-tab" data-category="http">HTTP</button>
+                        <button class="category-tab" data-category="advanced">Advanced</button>
                     </div>
                     
-                    <div class="template-card" onclick="commandEditor.applyTemplate('help', 'main')">
-                        <div class="template-icon">
-                            <i class="fas fa-question-circle"></i>
+                    <div class="templates-content">
+                        <!-- Basic Templates -->
+                        <div id="basic-templates" class="template-category active">
+                            <div class="templates-grid">
+                                <div class="template-card" onclick="commandEditor.applyTemplate('welcome')">
+                                    <div class="template-icon">
+                                        <i class="fas fa-hand-wave"></i>
+                                    </div>
+                                    <h4>Welcome Message</h4>
+                                    <p>Simple welcome message with user info</p>
+                                    <div class="template-patterns">/start, start, hello</div>
+                                </div>
+                                
+                                <div class="template-card" onclick="commandEditor.applyTemplate('help')">
+                                    <div class="template-icon">
+                                        <i class="fas fa-question-circle"></i>
+                                    </div>
+                                    <h4>Help Command</h4>
+                                    <p>Display available commands</p>
+                                    <div class="template-patterns">/help, help, commands</div>
+                                </div>
+                                
+                                <div class="template-card" onclick="commandEditor.applyTemplate('info')">
+                                    <div class="template-icon">
+                                        <i class="fas fa-info-circle"></i>
+                                    </div>
+                                    <h4>Bot Information</h4>
+                                    <p>Show bot info and statistics</p>
+                                    <div class="template-patterns">/info, about, bot</div>
+                                </div>
+                                
+                                <div class="template-card" onclick="commandEditor.applyTemplate('echo')">
+                                    <div class="template-icon">
+                                        <i class="fas fa-comment-alt"></i>
+                                    </div>
+                                    <h4>Echo Command</h4>
+                                    <p>Repeat user's message back</p>
+                                    <div class="template-patterns">/echo, repeat, say</div>
+                                </div>
+                            </div>
                         </div>
-                        <h4>Help Command</h4>
-                        <p>Display available commands</p>
-                        <div class="template-code">
-sendMessage(`Available commands:
-/start - Start the bot
-/help - Show this help
-/info - Bot information`);
+
+                        <!-- Interactive Templates -->
+                        <div id="interactive-templates" class="template-category">
+                            <div class="templates-grid">
+                                <div class="template-card" onclick="commandEditor.applyTemplate('conversation')">
+                                    <div class="template-icon">
+                                        <i class="fas fa-comments"></i>
+                                    </div>
+                                    <h4>Interactive Conversation</h4>
+                                    <p>Multiple questions with wait for answer</p>
+                                    <div class="template-patterns">/conversation, chat, talk</div>
+                                </div>
+                                
+                                <div class="template-card" onclick="commandEditor.applyTemplate('registration')">
+                                    <div class="template-icon">
+                                        <i class="fas fa-user-plus"></i>
+                                    </div>
+                                    <h4>User Registration</h4>
+                                    <p>Collect user information step by step</p>
+                                    <div class="template-patterns">/register, signup, join</div>
+                                </div>
+                                
+                                <div class="template-card" onclick="commandEditor.applyTemplate('quiz')">
+                                    <div class="template-icon">
+                                        <i class="fas fa-brain"></i>
+                                    </div>
+                                    <h4>Simple Quiz</h4>
+                                    <p>Interactive quiz with scoring</p>
+                                    <div class="template-patterns">/quiz, test, exam</div>
+                                </div>
+                                
+                                <div class="template-card" onclick="commandEditor.applyTemplate('feedback')">
+                                    <div class="template-icon">
+                                        <i class="fas fa-star"></i>
+                                    </div>
+                                    <h4>Feedback System</h4>
+                                    <p>Collect user feedback and ratings</p>
+                                    <div class="template-patterns">/feedback, rate, review</div>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    
-                    <div class="template-card" onclick="commandEditor.applyTemplate('echo', 'main')">
-                        <div class="template-icon">
-                            <i class="fas fa-comment-alt"></i>
+
+                        <!-- Media Templates -->
+                        <div id="media-templates" class="template-category">
+                            <div class="templates-grid">
+                                <div class="template-card" onclick="commandEditor.applyTemplate('send_photo')">
+                                    <div class="template-icon">
+                                        <i class="fas fa-image"></i>
+                                    </div>
+                                    <h4>Send Photo</h4>
+                                    <p>Send image with caption</p>
+                                    <div class="template-patterns">/photo, picture, image</div>
+                                </div>
+                                
+                                <div class="template-card" onclick="commandEditor.applyTemplate('send_video')">
+                                    <div class="template-icon">
+                                        <i class="fas fa-video"></i>
+                                    </div>
+                                    <h4>Send Video</h4>
+                                    <p>Send video file with caption</p>
+                                    <div class="template-patterns">/video, clip, movie</div>
+                                </div>
+                                
+                                <div class="template-card" onclick="commandEditor.applyTemplate('send_document')">
+                                    <div class="template-icon">
+                                        <i class="fas fa-file"></i>
+                                    </div>
+                                    <h4>Send Document</h4>
+                                    <p>Send file/document to user</p>
+                                    <div class="template-patterns">/document, file, doc</div>
+                                </div>
+                                
+                                <div class="template-card" onclick="commandEditor.applyTemplate('media_gallery')">
+                                    <div class="template-icon">
+                                        <i class="fas fa-images"></i>
+                                    </div>
+                                    <h4>Media Gallery</h4>
+                                    <p>Send multiple media files</p>
+                                    <div class="template-patterns">/gallery, media, photos</div>
+                                </div>
+                            </div>
                         </div>
-                        <h4>Echo Command</h4>
-                        <p>Repeat user's message</p>
-                        <div class="template-code">
-// Use with wait_for_answer
-const answer = getAnswer();
-sendMessage(`You said: ${answer}`);
+
+                        <!-- Buttons Templates -->
+                        <div id="buttons-templates" class="template-category">
+                            <div class="templates-grid">
+                                <div class="template-card" onclick="commandEditor.applyTemplate('inline_buttons')">
+                                    <div class="template-icon">
+                                        <i class="fas fa-th"></i>
+                                    </div>
+                                    <h4>Inline Buttons</h4>
+                                    <p>Message with inline keyboard</p>
+                                    <div class="template-patterns">/buttons, menu, options</div>
+                                </div>
+                                
+                                <div class="template-card" onclick="commandEditor.applyTemplate('reply_keyboard')">
+                                    <div class="template-icon">
+                                        <i class="fas fa-keyboard"></i>
+                                    </div>
+                                    <h4>Reply Keyboard</h4>
+                                    <p>Custom reply keyboard</p>
+                                    <div class="template-patterns">/keyboard, keys, reply</div>
+                                </div>
+                                
+                                <div class="template-card" onclick="commandEditor.applyTemplate('url_buttons')">
+                                    <div class="template-icon">
+                                        <i class="fas fa-link"></i>
+                                    </div>
+                                    <h4>URL Buttons</h4>
+                                    <p>Buttons that open URLs</p>
+                                    <div class="template-patterns">/links, urls, web</div>
+                                </div>
+                                
+                                <div class="template-card" onclick="commandEditor.applyTemplate('web_app_buttons')">
+                                    <div class="template-icon">
+                                        <i class="fas fa-window-restore"></i>
+                                    </div>
+                                    <h4>Web App Buttons</h4>
+                                    <p>Buttons that open web apps</p>
+                                    <div class="template-patterns">/webapp, app, web</div>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    
-                    <div class="template-card" onclick="commandEditor.applyTemplate('photo', 'main')">
-                        <div class="template-icon">
-                            <i class="fas fa-image"></i>
+
+                        <!-- Data Templates -->
+                        <div id="data-templates" class="template-category">
+                            <div class="templates-grid">
+                                <div class="template-card" onclick="commandEditor.applyTemplate('user_data')">
+                                    <div class="template-icon">
+                                        <i class="fas fa-database"></i>
+                                    </div>
+                                    <h4>User Data Management</h4>
+                                    <p>Save and retrieve user data</p>
+                                    <div class="template-patterns">/data, profile, save</div>
+                                </div>
+                                
+                                <div class="template-card" onclick="commandEditor.applyTemplate('bot_data')">
+                                    <div class="template-icon">
+                                        <i class="fas fa-robot"></i>
+                                    </div>
+                                    <h4>Bot Data Management</h4>
+                                    <p>Global bot data storage</p>
+                                    <div class="template-patterns">/botdata, global, stats</div>
+                                </div>
+                                
+                                <div class="template-card" onclick="commandEditor.applyTemplate('data_cleanup')">
+                                    <div class="template-icon">
+                                        <i class="fas fa-broom"></i>
+                                    </div>
+                                    <h4>Data Cleanup</h4>
+                                    <p>Clear user or bot data</p>
+                                    <div class="template-patterns">/clear, cleanup, reset</div>
+                                </div>
+                                
+                                <div class="template-card" onclick="commandEditor.applyTemplate('data_export')">
+                                    <div class="template-icon">
+                                        <i class="fas fa-file-export"></i>
+                                    </div>
+                                    <h4>Data Export</h4>
+                                    <p>Export user data as text</p>
+                                    <div class="template-patterns">/export, backup, download</div>
+                                </div>
+                            </div>
                         </div>
-                        <h4>Send Photo</h4>
-                        <p>Send image with caption</p>
-                        <div class="template-code">
-sendPhoto("https://example.com/image.jpg", {
-    caption: "Here's your image!"
-});
+
+                        <!-- HTTP Templates -->
+                        <div id="http-templates" class="template-category">
+                            <div class="templates-grid">
+                                <div class="template-card" onclick="commandEditor.applyTemplate('http_get')">
+                                    <div class="template-icon">
+                                        <i class="fas fa-cloud-download-alt"></i>
+                                    </div>
+                                    <h4>HTTP GET Request</h4>
+                                    <p>Fetch data from API</p>
+                                    <div class="template-patterns">/fetch, get, api</div>
+                                </div>
+                                
+                                <div class="template-card" onclick="commandEditor.applyTemplate('http_post')">
+                                    <div class="template-icon">
+                                        <i class="fas fa-cloud-upload-alt"></i>
+                                    </div>
+                                    <h4>HTTP POST Request</h4>
+                                    <p>Send data to API</p>
+                                    <div class="template-patterns">/post, send, submit</div>
+                                </div>
+                                
+                                <div class="template-card" onclick="commandEditor.applyTemplate('weather')">
+                                    <div class="template-icon">
+                                        <i class="fas fa-cloud-sun"></i>
+                                    </div>
+                                    <h4>Weather API</h4>
+                                    <p>Get weather information</p>
+                                    <div class="template-patterns">/weather, climate, temp</div>
+                                </div>
+                                
+                                <div class="template-card" onclick="commandEditor.applyTemplate('news')">
+                                    <div class="template-icon">
+                                        <i class="fas fa-newspaper"></i>
+                                    </div>
+                                    <h4>News API</h4>
+                                    <p>Fetch latest news</p>
+                                    <div class="template-patterns">/news, headlines, articles</div>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    
-                    <div class="template-card" onclick="commandEditor.applyTemplate('conditional', 'main')">
-                        <div class="template-icon">
-                            <i class="fas fa-code-branch"></i>
-                        </div>
-                        <h4>Conditional Response</h4>
-                        <p>Different responses based on input</p>
-                        <div class="template-code">
-const user = getUser();
-if (user.language_code === 'bn') {
-    sendMessage("স্বাগতম!");
-} else {
-    sendMessage("Welcome!");
-}
-                        </div>
-                    </div>
-                    
-                    <div class="template-card" onclick="commandEditor.applyTemplate('delay', 'main')">
-                        <div class="template-icon">
-                            <i class="fas fa-clock"></i>
-                        </div>
-                        <h4>Delayed Response</h4>
-                        <p>Send messages with delay</p>
-                        <div class="template-code">
-sendMessage("Processing your request...");
-await wait(2000);
-sendMessage("Request completed!");
+
+                        <!-- Advanced Templates -->
+                        <div id="advanced-templates" class="template-category">
+                            <div class="templates-grid">
+                                <div class="template-card" onclick="commandEditor.applyTemplate('admin_panel')">
+                                    <div class="template-icon">
+                                        <i class="fas fa-shield-alt"></i>
+                                    </div>
+                                    <h4>Admin Panel</h4>
+                                    <p>Admin-only commands and controls</p>
+                                    <div class="template-patterns">/admin, panel, control</div>
+                                </div>
+                                
+                                <div class="template-card" onclick="commandEditor.applyTemplate('broadcast')">
+                                    <div class="template-icon">
+                                        <i class="fas fa-bullhorn"></i>
+                                    </div>
+                                    <h4>Broadcast Message</h4>
+                                    <p>Send message to all users</p>
+                                    <div class="template-patterns">/broadcast, announce, notify</div>
+                                </div>
+                                
+                                <div class="template-card" onclick="commandEditor.applyTemplate('scheduler')">
+                                    <div class="template-icon">
+                                        <i class="fas fa-clock"></i>
+                                    </div>
+                                    <h4>Message Scheduler</h4>
+                                    <p>Schedule messages with delays</p>
+                                    <div class="template-patterns">/schedule, timer, delay</div>
+                                </div>
+                                
+                                <div class="template-card" onclick="commandEditor.applyTemplate('error_handler')">
+                                    <div class="template-icon">
+                                        <i class="fas fa-bug"></i>
+                                    </div>
+                                    <h4>Error Handling</h4>
+                                    <p>Comprehensive error handling</p>
+                                    <div class="template-patterns">/error, debug, test</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" id="closeTemplates">Close</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Answer Templates Modal -->
-    <div id="answerTemplatesModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Answer Handler Templates</h3>
-                <button class="modal-close">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="templates-grid">
-                    <div class="template-card" onclick="commandEditor.applyTemplate('echo_answer', 'answer')">
-                        <div class="template-icon">
-                            <i class="fas fa-comment-alt"></i>
-                        </div>
-                        <h4>Echo Answer</h4>
-                        <p>Simply repeat user's answer</p>
-                        <div class="template-code">
-const answer = getAnswer();
-sendMessage(`You answered: ${answer}`);
-                        </div>
-                    </div>
-                    
-                    <div class="template-card" onclick="commandEditor.applyTemplate('validate_answer', 'answer')">
-                        <div class="template-icon">
-                            <i class="fas fa-check-circle"></i>
-                        </div>
-                        <h4>Validate Answer</h4>
-                        <p>Check if answer meets criteria</p>
-                        <div class="template-code">
-const answer = getAnswer();
-if (answer.length < 3) {
-    sendMessage("Answer too short. Please try again.");
-} else {
-    sendMessage("Thank you for your answer!");
-}
-                        </div>
-                    </div>
-                    
-                    <div class="template-card" onclick="commandEditor.applyTemplate('process_data', 'answer')">
-                        <div class="template-icon">
-                            <i class="fas fa-cogs"></i>
-                        </div>
-                        <h4>Process Data</h4>
-                        <p>Process and store user input</p>
-                        <div class="template-code">
-const answer = getAnswer();
-// Process the answer here
-sendMessage(`Data received: ${answer}`);
-// Store or process the data as needed
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" id="closeAnswerTemplates">Close</button>
             </div>
         </div>
     </div>
