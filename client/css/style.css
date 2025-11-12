@@ -2579,71 +2579,61 @@ a:focus-visible {
     background: rgba(255, 255, 255, 0.2);
 }
 
-/* Form Section Improvements */
-.form-section {
-    margin-bottom: 2rem;
-    padding: 1.5rem;
+/* Template Styles */
+.template-card {
     background: var(--bg-tertiary);
     border-radius: var(--radius-lg);
-    border: 1px solid var(--border-color);
+    padding: 1.5rem;
+    cursor: pointer;
+    transition: var(--transition);
+    border: 1px solid transparent;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
 }
 
-.form-section h4 {
+.template-card:hover {
+    background: white;
+    border-color: var(--primary-color);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.template-icon {
+    width: 3rem;
+    height: 3rem;
+    border-radius: var(--radius-lg);
+    background: var(--primary-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.25rem;
     margin-bottom: 1rem;
+}
+
+.template-card h4 {
+    margin-bottom: 0.5rem;
     font-size: 1.125rem;
     color: var(--text-primary);
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
 }
 
-.form-section h4::before {
-    content: '';
-    width: 4px;
-    height: 16px;
-    background: var(--primary-color);
-    border-radius: 2px;
-}
-
-/* Test Results Improvements */
-.test-success, .test-error {
-    padding: 1.5rem;
-    border-radius: var(--radius-lg);
-    margin-bottom: 1rem;
-}
-
-.test-success {
-    background: rgba(16, 185, 129, 0.1);
-    border: 1px solid rgba(16, 185, 129, 0.2);
-}
-
-.test-error {
-    background: rgba(239, 68, 68, 0.1);
-    border: 1px solid rgba(239, 68, 68, 0.2);
-}
-
-.test-success h4, .test-error h4 {
-    margin-bottom: 1rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.test-details, .error-details {
-    margin-bottom: 1rem;
-}
-
-.test-details p, .error-details p {
-    margin-bottom: 0.5rem;
-    font-size: 0.875rem;
-    line-height: 1.5;
-}
-
-.test-message {
-    font-style: italic;
+.template-card p {
     color: var(--text-secondary);
-    margin-bottom: 0;
     font-size: 0.875rem;
+    margin-bottom: 1rem;
+    flex: 1;
+}
+
+.template-patterns {
+    font-family: 'Courier New', monospace;
+    font-size: 0.75rem;
+    background: var(--bg-primary);
+    padding: 0.5rem;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    word-break: break-all;
 }
 
 /* Animation for new elements */
@@ -2675,7 +2665,7 @@ a:focus-visible {
         gap: 0.5rem;
     }
     
-    .form-section {
-        padding: 1rem;
+    .templates-grid {
+        grid-template-columns: 1fr;
     }
 }
