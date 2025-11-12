@@ -71,16 +71,6 @@ class EnhancedCommandEditor {
             this.toggleAnswerHandler(e.target.checked);
         });
 
-        document.getElementById('commandActive').addEventListener('change', (e) => {
-            if (this.currentCommand) {
-                this.currentCommand.is_active = e.target.checked;
-                const statusBadge = document.getElementById('commandStatus');
-                statusBadge.textContent = e.target.checked ? 'Active' : 'Inactive';
-                statusBadge.className = `status-badge ${e.target.checked ? 'active' : 'inactive'}`;
-                this.showSuccess(`Command ${e.target.checked ? 'activated' : 'deactivated'}`);
-            }
-        });
-
         // Save button
         document.getElementById('saveCommandBtn').addEventListener('click', (e) => {
             e.preventDefault();
@@ -118,6 +108,11 @@ class EnhancedCommandEditor {
             this.openCodeEditor('answer');
         });
 
+        // Templates
+        document.getElementById('showTemplates').addEventListener('click', () => {
+            this.showTemplates();
+        });
+
         // Modal events
         this.setupModalEvents();
     }
@@ -143,11 +138,6 @@ class EnhancedCommandEditor {
                 this.addCommandTag(command);
                 moreCommandsInput.value = '';
             }
-        });
-
-        // Allow any character for commands (not just starting with /)
-        moreCommandsInput.addEventListener('input', (e) => {
-            // Remove any validation that requires starting with /
         });
     }
 
@@ -202,7 +192,7 @@ class EnhancedCommandEditor {
             this.selectAllCode();
         });
 
-        // New: Cut, Copy, Paste, Clear buttons
+        // Cut, Copy, Paste, Clear buttons
         document.getElementById('cutBtn').addEventListener('click', () => {
             this.cutSelectedCode();
         });
@@ -267,12 +257,6 @@ class EnhancedCommandEditor {
                         e.preventDefault();
                         this.cutSelectedCode();
                         break;
-                    case 'c':
-                        // Allow default copy behavior
-                        break;
-                    case 'v':
-                        // Allow default paste behavior
-                        break;
                 }
             }
             
@@ -288,16 +272,10 @@ class EnhancedCommandEditor {
             }
         });
 
-        // Make toolbar always visible and handle responsive behavior
         this.setupResponsiveToolbar();
     }
 
     setupResponsiveToolbar() {
-        const toolbar = document.querySelector('.compact-header');
-        const toolbarIcons = document.querySelector('.editor-toolbar-icons');
-        
-        if (!toolbar || !toolbarIcons) return;
-
         // Handle window resize for responsive behavior
         let resizeTimeout;
         window.addEventListener('resize', () => {
@@ -489,107 +467,25 @@ class EnhancedCommandEditor {
     }
 
     formatJavaScript(code) {
-    // Step 1: Preserve comments and basic structure
-    const lines = code.split('\n');
-    const processedLines = [];
-    
-    for (let i = 0; i < lines.length; i++) {
-        let line = lines[i].trim();
-        
-        // Skip completely empty lines
-        if (!line) {
-            processedLines.push('');
-            continue;
-        }
-        
-        // Handle full line comments
-        if (line.startsWith('//')) {
-            processedLines.push(line);
-            continue;
-        }
-        
-        // Handle inline comments - split them properly
-        const commentIndex = line.indexOf('//');
-        if (commentIndex > -1) {
-            const codePart = line.substring(0, commentIndex).trim();
-            const commentPart = line.substring(commentIndex).trim();
-            
-            if (codePart) {
-                // Process the code part for basic formatting
-                let formattedCode = this.formatCodeLine(codePart);
-                processedLines.push(formattedCode);
-            }
-            processedLines.push(commentPart);
-            continue;
-        }
-        
-        // Process regular code lines
-        let formattedLine = this.formatCodeLine(line);
-        processedLines.push(formattedLine);
+        // Basic code formatting without breaking structure
+        return code
+            // Fix template literals
+            .replace(/\$\s*{\s*/g, '${')
+            .replace(/\s*}\s*/g, '}')
+            // Fix function calls
+            .replace(/(\w+)\s*\(\s*/g, '$1(')
+            .replace(/\s*\)/g, ')')
+            // Fix operators
+            .replace(/([<>!=]=?)\s*/g, '$1 ')
+            .replace(/\s*([<>!=]=?)/g, ' $1')
+            // Fix assignments
+            .replace(/(\w+)\s*=/g, '$1 =')
+            // Add spaces after commas
+            .replace(/,(\S)/g, ', $1')
+            // Clean up multiple spaces
+            .replace(/\s+/g, ' ')
+            .trim();
     }
-    
-    // Step 2: Apply proper indentation
-    return this.applyIndentation(processedLines);
-}
-
-formatCodeLine(line) {
-    // Basic code formatting without breaking structure
-    return line
-        // Fix template literals
-        .replace(/\$\s*{\s*/g, '${')
-        .replace(/\s*}\s*/g, '}')
-        // Fix function calls
-        .replace(/(\w+)\s*\(\s*/g, '$1(')
-        .replace(/\s*\)/g, ')')
-        // Fix operators
-        .replace(/([<>!=]=?)\s*/g, '$1 ')
-        .replace(/\s*([<>!=]=?)/g, ' $1')
-        // Fix assignments
-        .replace(/(\w+)\s*=/g, '$1 =')
-        // Add spaces after commas
-        .replace(/,(\S)/g, ', $1')
-        // Clean up multiple spaces
-        .replace(/\s+/g, ' ')
-        .trim();
-}
-
-applyIndentation(lines) {
-    let result = [];
-    let indentLevel = 0;
-    const indentSize = 2;
-    
-    for (let i = 0; i < lines.length; i++) {
-        let line = lines[i];
-        
-        // Skip processing for empty lines and comments
-        if (!line.trim()) {
-            result.push('');
-            continue;
-        }
-        
-        // Handle closing braces - decrease indent before the line
-        if (line.trim().startsWith('}') || line.includes('} else')) {
-            indentLevel = Math.max(0, indentLevel - 1);
-        }
-        
-        // Add proper indentation (except for comments)
-        const indent = line.startsWith('//') ? '' : ' '.repeat(indentLevel * indentSize);
-        result.push(indent + line);
-        
-        // Handle opening braces - increase indent after the line
-        if ((line.includes('{') && !line.startsWith('//')) || 
-            line.trim().endsWith('{')) {
-            indentLevel++;
-        }
-        
-        // Handle else statements
-        if (line.trim().startsWith('} else')) {
-            indentLevel++; // The else block will increase indent
-        }
-    }
-    
-    return result.join('\n');
-}
 
     showRealTimeSuggestions(code, cursorPos) {
         clearTimeout(this.suggestionTimeout);
@@ -630,11 +526,6 @@ applyIndentation(lines) {
                 code: 'sendPhoto("https://example.com/photo.jpg");' 
             },
             { 
-                name: 'sendDocument', 
-                desc: 'Send a document to user', 
-                code: 'sendDocument("https://example.com/file.pdf");' 
-            },
-            { 
                 name: 'getUser', 
                 desc: 'Get current user information', 
                 code: 'const user = getUser();\n// user.id, user.first_name, user.username' 
@@ -653,30 +544,6 @@ applyIndentation(lines) {
                 name: 'wait', 
                 desc: 'Wait for specified milliseconds', 
                 code: 'await wait(1000); // Wait 1 second' 
-            },
-            { 
-                name: 'getAnswer', 
-                desc: 'Get user answer in wait_for_answer mode', 
-                code: 'const answer = getAnswer();' 
-            }
-        ];
-
-        // Text message suggestions
-        const textSuggestions = [
-            { 
-                text: 'Hello! Welcome to our bot! 👋', 
-                desc: 'Welcome message',
-                code: 'sendMessage("Hello! Welcome to our bot! 👋");'
-            },
-            { 
-                text: 'How can I help you today?', 
-                desc: 'Help message',
-                code: 'sendMessage("How can I help you today?");'
-            },
-            { 
-                text: 'Thank you for using our bot!', 
-                desc: 'Thank you message',
-                code: 'sendMessage("Thank you for using our bot!");'
             }
         ];
 
@@ -692,21 +559,6 @@ applyIndentation(lines) {
             }
         });
 
-        // Match text suggestions
-        if (lastWord.length > 0) {
-            textSuggestions.forEach(suggestion => {
-                if (suggestion.text.toLowerCase().includes(lastWord) || 
-                    suggestion.desc.toLowerCase().includes(lastWord)) {
-                    suggestions.push({
-                        type: 'text',
-                        content: suggestion.text,
-                        description: suggestion.desc,
-                        code: suggestion.code
-                    });
-                }
-            });
-        }
-
         return suggestions.slice(0, 6); // Limit to 6 suggestions
     }
 
@@ -715,14 +567,13 @@ applyIndentation(lines) {
         const suggestionsList = document.getElementById('suggestionsList');
         
         suggestionsList.innerHTML = suggestions.map(suggestion => `
-            <div class="suggestion-item" onclick="commandEditor.applySuggestionCode('${this.escapeHtml(suggestion.code).replace(/'/g, "\\'")}')">
+            <div class="suggestion-item" onclick="commandEditor.applySuggestion('${suggestion.content}')">
                 <div class="suggestion-content">
                     <div class="suggestion-header">
                         <strong>${suggestion.content}</strong>
                         <span class="suggestion-type">${suggestion.type}</span>
                     </div>
                     <div class="suggestion-desc">${suggestion.description}</div>
-                    <div class="suggestion-code">${this.escapeHtml(suggestion.code)}</div>
                 </div>
             </div>
         `).join('');
@@ -735,17 +586,17 @@ applyIndentation(lines) {
         suggestionsPanel.style.display = 'none';
     }
 
-    applySuggestionCode(fullCode) {
+    applySuggestion(content) {
         const editor = document.getElementById('advancedCodeEditor');
         const currentCode = editor.value;
         const cursorPos = editor.selectionStart;
         
-        // Insert the complete code at cursor position
+        // Insert the suggestion at cursor position
         const textBeforeCursor = currentCode.substring(0, cursorPos);
         const textAfterCursor = currentCode.substring(cursorPos);
         
-        const newCode = textBeforeCursor + '\n' + fullCode + '\n' + textAfterCursor;
-        const newCursorPos = textBeforeCursor.length + fullCode.length + 2;
+        const newCode = textBeforeCursor + content + textAfterCursor;
+        const newCursorPos = cursorPos + content.length;
         
         editor.value = newCode;
         editor.setSelectionRange(newCursorPos, newCursorPos);
@@ -783,15 +634,7 @@ applyIndentation(lines) {
         setTimeout(() => {
             const editor = document.getElementById('advancedCodeEditor');
             editor.focus();
-            
-            // Adjust toolbar for current screen size
             this.adjustToolbarLayout();
-            
-            // Ensure modal content is scrolled to top
-            const modalContent = document.querySelector('.fullscreen-content');
-            if (modalContent) {
-                modalContent.scrollTop = 0;
-            }
         }, 100);
     }
 
@@ -814,7 +657,7 @@ applyIndentation(lines) {
     }
 
     setupModalEvents() {
-        const modals = ['testCommandModal', 'codeEditorModal'];
+        const modals = ['testCommandModal', 'codeEditorModal', 'templatesModal'];
         
         modals.forEach(modalId => {
             const modal = document.getElementById(modalId);
@@ -830,6 +673,11 @@ applyIndentation(lines) {
         // Close test command modal
         document.getElementById('closeTestCommand')?.addEventListener('click', () => {
             document.getElementById('testCommandModal').style.display = 'none';
+        });
+
+        // Close templates modal
+        document.getElementById('closeTemplates')?.addEventListener('click', () => {
+            document.getElementById('templatesModal').style.display = 'none';
         });
 
         window.addEventListener('click', (e) => {
@@ -1064,14 +912,11 @@ applyIndentation(lines) {
         
         document.getElementById('answerHandler').value = this.currentCommand.answer_handler || '';
         
-        const activeToggle = document.getElementById('commandActive');
-        if (activeToggle) {
-            activeToggle.checked = this.currentCommand.is_active !== false;
-        }
-        
         document.getElementById('currentCommandName').textContent = this.currentCommand.name;
-        document.getElementById('commandStatus').textContent = this.currentCommand.is_active ? 'Active' : 'Inactive';
-        document.getElementById('commandStatus').className = `status-badge ${this.currentCommand.is_active ? 'active' : 'inactive'}`;
+        
+        const statusBadge = document.getElementById('commandStatus');
+        statusBadge.textContent = this.currentCommand.is_active ? 'Active' : 'Inactive';
+        statusBadge.className = `status-badge ${this.currentCommand.is_active ? 'active' : 'inactive'}`;
         
         this.updateButtonStates();
     }
@@ -1083,13 +928,6 @@ applyIndentation(lines) {
         if (deleteBtn) {
             deleteBtn.disabled = isNew;
             deleteBtn.title = isNew ? 'Save command first to enable delete' : 'Delete command';
-        }
-        
-        // Test button is always enabled
-        const testBtn = document.getElementById('testCommandBtn');
-        if (testBtn) {
-            testBtn.disabled = false;
-            testBtn.title = 'Test current command code';
         }
     }
 
@@ -1377,6 +1215,39 @@ applyIndentation(lines) {
         } finally {
             this.showLoading(false);
         }
+    }
+
+    showTemplates() {
+        document.getElementById('templatesModal').style.display = 'flex';
+    }
+
+    applyTemplate(templateName) {
+        let code = '';
+        
+        switch(templateName) {
+            case 'welcome':
+                code = `const user = getUser();\nsendMessage(\`Hello \${user.first_name}! Welcome to our bot.\`);`;
+                break;
+            case 'help':
+                code = `sendMessage(\`Available commands:\n/start - Start the bot\n/help - Show this help\n/info - Bot information\`);`;
+                break;
+            case 'echo':
+                code = `// Use with wait_for_answer\nconst answer = getAnswer();\nsendMessage(\`You said: \${answer}\`);`;
+                break;
+            case 'photo':
+                code = `sendPhoto("https://example.com/image.jpg", {\n    caption: "Here's your image!"\n});`;
+                break;
+            case 'conditional':
+                code = `const user = getUser();\nif (user.language_code === 'bn') {\n    sendMessage("স্বাগতম!");\n} else {\n    sendMessage("Welcome!");\n}`;
+                break;
+            case 'delay':
+                code = `sendMessage("Processing your request...");\nawait wait(2000);\nsendMessage("Request completed!");`;
+                break;
+        }
+        
+        document.getElementById('commandCode').value = code;
+        document.getElementById('templatesModal').style.display = 'none';
+        this.showSuccess('Template applied successfully!');
     }
 
     showTestResult(html) {
