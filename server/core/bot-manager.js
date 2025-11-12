@@ -287,30 +287,21 @@ function waitForUserAnswer(bot, token, userId, timeout = 60000) {
     });
 }
 
-// Enhanced database functions for user and bot data
+// Database functions for user and bot data
 async function saveUserData(botToken, userId, key, value) {
     try {
-        // Convert value to string if it's an object
-        const dataValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
-        
         const { data, error } = await supabase
             .from('user_data')
             .upsert({
                 bot_token: botToken,
                 user_id: userId,
                 data_key: key,
-                data_value: dataValue,
-                updated_at: new Date().toISOString()
+                data_value: typeof value === 'object' ? JSON.stringify(value) : value
             }, {
                 onConflict: 'bot_token,user_id,data_key'
             });
 
-        if (error) {
-            console.error('❌ Save user data error:', error);
-            throw error;
-        }
-        
-        console.log(`✅ User data saved: ${botToken.substring(0, 10)}.../${userId}/${key}`);
+        if (error) throw error;
         return value;
     } catch (error) {
         console.error('❌ Save user data error:', error);
@@ -328,17 +319,12 @@ async function getUserData(botToken, userId, key) {
             .eq('data_key', key)
             .single();
 
-        if (error && error.code !== 'PGRST116') {
-            console.error('❌ Get user data error:', error);
-            throw error;
-        }
+        if (error && error.code !== 'PGRST116') throw error;
         
         if (data && data.data_value) {
             try {
-                // Try to parse as JSON first
                 return JSON.parse(data.data_value);
             } catch {
-                // Return as string if not JSON
                 return data.data_value;
             }
         }
@@ -351,26 +337,17 @@ async function getUserData(botToken, userId, key) {
 
 async function saveBotData(botToken, key, value) {
     try {
-        // Convert value to string if it's an object
-        const dataValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
-        
         const { data, error } = await supabase
             .from('bot_data')
             .upsert({
                 bot_token: botToken,
                 data_key: key,
-                data_value: dataValue,
-                updated_at: new Date().toISOString()
+                data_value: typeof value === 'object' ? JSON.stringify(value) : value
             }, {
                 onConflict: 'bot_token,data_key'
             });
 
-        if (error) {
-            console.error('❌ Save bot data error:', error);
-            throw error;
-        }
-        
-        console.log(`✅ Bot data saved: ${botToken.substring(0, 10)}.../${key}`);
+        if (error) throw error;
         return value;
     } catch (error) {
         console.error('❌ Save bot data error:', error);
@@ -387,17 +364,12 @@ async function getBotData(botToken, key) {
             .eq('data_key', key)
             .single();
 
-        if (error && error.code !== 'PGRST116') {
-            console.error('❌ Get bot data error:', error);
-            throw error;
-        }
+        if (error && error.code !== 'PGRST116') throw error;
         
         if (data && data.data_value) {
             try {
-                // Try to parse as JSON first
                 return JSON.parse(data.data_value);
             } catch {
-                // Return as string if not JSON
                 return data.data_value;
             }
         }
@@ -408,7 +380,7 @@ async function getBotData(botToken, key) {
     }
 }
 
-// Enhanced command code execution with async wrapper
+// Enhanced command code execution
 async function executeCommandCode(bot, code, context) {
     const { msg, chatId, userId, username, first_name, isTest, botToken, waitForAnswer, userAnswer, originalMessage } = context;
     
@@ -474,18 +446,18 @@ async function executeCommandCode(bot, code, context) {
         }),
         
         // ===== WAIT FOR ANSWER =====
-        waitForAnswer: async (timeout = 60000) => {
+        waitForAnswer: (timeout = 60000) => {
             if (!waitForAnswer) {
                 throw new Error('waitForAnswer is not available in this context');
             }
-            return await waitForAnswer(timeout);
+            return waitForAnswer(timeout);
         },
         
         // ===== BOT ACTIONS =====
         bot: {
-            // Message sending with async support
-            sendMessage: async (text, params = {}) => {
-                return await bot.sendMessage(params.chat_id || chatId, text, {
+            // Message sending
+            sendMessage: (text, params = {}) => {
+                return bot.sendMessage(params.chat_id || chatId, text, {
                     parse_mode: params.parse_mode,
                     reply_markup: params.reply_markup,
                     reply_to_message_id: params.reply_to_message_id,
@@ -493,68 +465,68 @@ async function executeCommandCode(bot, code, context) {
                 });
             },
             
-            replyText: async (text, params = {}) => {
-                return await bot.sendMessage(params.chat_id || chatId, text, {
+            replyText: (text, params = {}) => {
+                return bot.sendMessage(params.chat_id || chatId, text, {
                     parse_mode: params.parse_mode,
                     reply_to_message_id: params.reply_to_message_id || msg.message_id,
                     reply_markup: params.reply_markup
                 });
             },
             
-            // Media messages with async support
-            sendPhoto: async (photo, params = {}) => {
-                return await bot.sendPhoto(params.chat_id || chatId, photo, {
+            // Media messages
+            sendPhoto: (photo, params = {}) => {
+                return bot.sendPhoto(params.chat_id || chatId, photo, {
                     caption: params.caption,
                     parse_mode: params.parse_mode,
                     reply_markup: params.reply_markup
                 });
             },
             
-            sendVideo: async (video, params = {}) => {
-                return await bot.sendVideo(params.chat_id || chatId, video, {
+            sendVideo: (video, params = {}) => {
+                return bot.sendVideo(params.chat_id || chatId, video, {
                     caption: params.caption,
                     parse_mode: params.parse_mode,
                     reply_markup: params.reply_markup
                 });
             },
             
-            sendAudio: async (audio, params = {}) => {
-                return await bot.sendAudio(params.chat_id || chatId, audio, {
+            sendAudio: (audio, params = {}) => {
+                return bot.sendAudio(params.chat_id || chatId, audio, {
                     caption: params.caption,
                     parse_mode: params.parse_mode,
                     reply_markup: params.reply_markup
                 });
             },
             
-            sendDocument: async (document, params = {}) => {
-                return await bot.sendDocument(params.chat_id || chatId, document, {
+            sendDocument: (document, params = {}) => {
+                return bot.sendDocument(params.chat_id || chatId, document, {
                     caption: params.caption,
                     parse_mode: params.parse_mode,
                     reply_markup: params.reply_markup
                 });
             },
             
-            sendAnimation: async (animation, params = {}) => {
-                return await bot.sendAnimation(params.chat_id || chatId, animation, {
+            sendAnimation: (animation, params = {}) => {
+                return bot.sendAnimation(params.chat_id || chatId, animation, {
                     caption: params.caption,
                     parse_mode: params.parse_mode,
                     reply_markup: params.reply_markup
                 });
             },
             
-            sendSticker: async (sticker, params = {}) => {
-                return await bot.sendSticker(params.chat_id || chatId, sticker, params);
+            sendSticker: (sticker, params = {}) => {
+                return bot.sendSticker(params.chat_id || chatId, sticker, params);
             },
             
-            sendDice: async (params = {}) => {
-                return await bot.sendDice(params.chat_id || chatId, {
+            sendDice: (params = {}) => {
+                return bot.sendDice(params.chat_id || chatId, {
                     emoji: params.emoji || '🎲'
                 });
             },
             
-            // Message management with async support
-            editMessageText: async (text, params = {}) => {
-                return await bot.editMessageText(text, {
+            // Message management
+            editMessageText: (text, params = {}) => {
+                return bot.editMessageText(text, {
                     chat_id: params.chat_id || chatId,
                     message_id: params.message_id || msg.message_id,
                     parse_mode: params.parse_mode,
@@ -562,16 +534,16 @@ async function executeCommandCode(bot, code, context) {
                 });
             },
             
-            deleteMessage: async (params = {}) => {
-                return await bot.deleteMessage(
+            deleteMessage: (params = {}) => {
+                return bot.deleteMessage(
                     params.chat_id || chatId,
                     params.message_id || msg.message_id
                 );
             },
             
-            // Chat actions with async support
-            sendChatAction: async (action, params = {}) => {
-                return await bot.sendChatAction(params.chat_id || chatId, action);
+            // Chat actions
+            sendChatAction: (action, params = {}) => {
+                return bot.sendChatAction(params.chat_id || chatId, action);
             }
         },
         
@@ -611,7 +583,7 @@ async function executeCommandCode(bot, code, context) {
         },
         
         // Utility function for waiting
-        wait: async (ms) => new Promise(resolve => setTimeout(resolve, ms)),
+        wait: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
         
         // ===== COMMAND CONTROL =====
         ReturnCommand: class ReturnCommand extends Error {
@@ -623,18 +595,16 @@ async function executeCommandCode(bot, code, context) {
     };
 
     try {
-        // Wrap user code in async function to support await
+        // Safe code execution with proper error handling
         const wrappedCode = `
-            return (async function() {
-                try {
-                    ${code}
-                } catch (error) {
-                    if (error.name === "ReturnCommand") {
-                        return null;
-                    }
-                    throw error;
+            try {
+                ${code}
+            } catch (error) {
+                if (error.name === "ReturnCommand") {
+                    return null;
                 }
-            })();
+                throw error;
+            }
         `;
 
         const func = new Function(...Object.keys(safeFunctions), wrappedCode);
@@ -645,12 +615,6 @@ async function executeCommandCode(bot, code, context) {
         if (error.name === "ReturnCommand") {
             return null;
         }
-        
-        // Enhanced error logging
-        console.error('❌ Command code execution error:', error);
-        console.error('❌ Error stack:', error.stack);
-        console.error('❌ Command code that failed:', code.substring(0, 200) + '...');
-        
         throw error;
     }
 }
