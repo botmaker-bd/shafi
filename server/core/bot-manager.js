@@ -381,8 +381,6 @@ async function getBotData(botToken, key) {
 }
 
 // Enhanced command code execution with async/await support
-// bot-manager.js এ এই ফাংশনগুলো যোগ করুন
-// Enhanced command code execution
 async function executeCommandCode(bot, code, context) {
     const { msg, chatId, userId, username, first_name, isTest, botToken, waitForAnswer, userAnswer, originalMessage } = context;
     
@@ -446,6 +444,14 @@ async function executeCommandCode(bot, code, context) {
             title: msg.chat.title,
             username: msg.chat.username
         }),
+        
+        // ===== WAIT FOR ANSWER =====
+        waitForAnswer: (timeout = 60000) => {
+            if (!waitForAnswer) {
+                throw new Error('waitForAnswer is not available in this context');
+            }
+            return waitForAnswer(timeout);
+        },
         
         // ===== BOT ACTIONS =====
         bot: {
@@ -517,11 +523,6 @@ async function executeCommandCode(bot, code, context) {
                     emoji: params.emoji || '🎲'
                 });
             },
-
-            // Media group function যোগ করুন
-            sendMediaGroup: (media, params = {}) => {
-                return bot.sendMediaGroup(params.chat_id || chatId, media, params);
-            },
             
             // Message management
             editMessageText: (text, params = {}) => {
@@ -584,45 +585,11 @@ async function executeCommandCode(bot, code, context) {
         // Utility function for waiting
         wait: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
         
-        // bunchify function যোগ করুন
-        bunchify: (obj) => {
-            if (obj && typeof obj === 'object') {
-                return new Proxy(obj, {
-                    get: (target, prop) => {
-                        if (prop in target) {
-                            const value = target[prop];
-                            if (typeof value === 'object' && value !== null) {
-                                return safeFunctions.bunchify(value);
-                            }
-                            return value;
-                        }
-                        return undefined;
-                    }
-                });
-            }
-            return obj;
-        },
-        
         // ===== COMMAND CONTROL =====
         ReturnCommand: class ReturnCommand extends Error {
             constructor(message = "Command returned") {
                 super(message);
                 this.name = "ReturnCommand";
-            }
-        },
-
-        // Bot.runCommand এবং Bot.nextCommand যোগ করুন
-        Bot: {
-            runCommand: (commandPattern) => {
-                console.log(`Would run command: ${commandPattern}`);
-                // এই ফাংশনটি অন্য কমান্ড রান করতে পারে
-                return `Command ${commandPattern} executed`;
-            },
-            
-            nextCommand: (commandPattern) => {
-                console.log(`Would run next command: ${commandPattern}`);
-                // এই ফাংশনটি পরবর্তী কমান্ড সেট করতে পারে
-                return `Next command ${commandPattern} queued`;
             }
         }
     };
@@ -636,8 +603,8 @@ async function executeCommandCode(bot, code, context) {
             const asyncWrappedCode = `
                 return (async function() {
                     const { 
-                        message, u, chat, KEY, User, Bot, getUser, getChat, 
-                        bot, HTTP, parseInt, parseFloat, JSON, wait, ReturnCommand, bunchify,
+                        message, u, chat, KEY, User, Bot, getUser, getChat, waitForAnswer, 
+                        bot, HTTP, parseInt, parseFloat, JSON, wait, ReturnCommand,
                         userAnswer, originalMessage
                     } = this;
                     
@@ -659,8 +626,8 @@ async function executeCommandCode(bot, code, context) {
             // Sync code execution
             const syncWrappedCode = `
                 const { 
-                    message, u, chat, KEY, User, Bot, getUser, getChat, 
-                    bot, HTTP, parseInt, parseFloat, JSON, wait, ReturnCommand, bunchify,
+                    message, u, chat, KEY, User, Bot, getUser, getChat, waitForAnswer, 
+                    bot, HTTP, parseInt, parseFloat, JSON, wait, ReturnCommand,
                     userAnswer, originalMessage
                 } = this;
                 
