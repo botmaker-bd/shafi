@@ -46,6 +46,15 @@ class BotManager {
     }
 
     setupEventListeners() {
+        // Add bot form
+        document.getElementById('addBotBtn').addEventListener('click', () => {
+            this.toggleAddBotSection();
+        });
+
+        document.getElementById('addFirstBot').addEventListener('click', () => {
+            this.toggleAddBotSection();
+        });
+
         document.getElementById('addBotForm').addEventListener('submit', (e) => {
             e.preventDefault();
             this.addNewBot();
@@ -55,13 +64,12 @@ class BotManager {
             this.testBotToken();
         });
 
-        document.getElementById('refreshBots').addEventListener('click', () => {
-            this.loadBots();
+        document.getElementById('cancelAddBot').addEventListener('click', () => {
+            this.toggleAddBotSection(false);
         });
 
-        document.getElementById('logoutBtn').addEventListener('click', (e) => {
-            e.preventDefault();
-            this.logout();
+        document.getElementById('refreshBots').addEventListener('click', () => {
+            this.loadBots();
         });
 
         this.setupModalEvents();
@@ -81,12 +89,18 @@ class BotManager {
                 userDropdown.classList.remove('show');
             });
         }
+
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.logout();
+        });
     }
 
     setupModalEvents() {
         const modal = document.getElementById('testTokenModal');
         const closeBtn = document.getElementById('closeTestModal');
-        const modalClose = document.querySelector('.modal-close');
+        const modalClose = document.querySelector('#testTokenModal .modal-close');
 
         if (closeBtn) {
             closeBtn.addEventListener('click', () => {
@@ -105,6 +119,15 @@ class BotManager {
                 modal.style.display = 'none';
             }
         });
+    }
+
+    toggleAddBotSection(show = true) {
+        const section = document.getElementById('addBotSection');
+        section.style.display = show ? 'block' : 'none';
+        
+        if (show) {
+            section.scrollIntoView({ behavior: 'smooth' });
+        }
     }
 
     async loadBots() {
@@ -144,7 +167,7 @@ class BotManager {
             return;
         }
 
-        container.style.display = 'block';
+        container.style.display = 'grid';
         emptyState.style.display = 'none';
 
         container.innerHTML = this.bots.map(bot => this.getBotHTML(bot)).join('');
@@ -239,6 +262,7 @@ class BotManager {
                 this.showSuccess('Bot added successfully!');
                 tokenInput.value = '';
                 nameInput.value = '';
+                this.toggleAddBotSection(false);
                 await this.loadBots();
             } else {
                 this.showError(data.error || 'Failed to add bot');
