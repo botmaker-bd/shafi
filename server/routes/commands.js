@@ -58,7 +58,6 @@ router.get('/:commandId', async (req, res) => {
 });
 
 // Add new command - FIXED MULTIPLE PATTERNS
-// Add new command - FIXED RESPONSE
 router.post('/', async (req, res) => {
     try {
         const { botToken, name, pattern, code, description, waitForAnswer, answerHandler } = req.body;
@@ -70,10 +69,7 @@ router.post('/', async (req, res) => {
         });
 
         if (!botToken || !name || !pattern || !code) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'Bot token, name, pattern and code are required' 
-            });
+            return res.status(400).json({ error: 'Bot token, name, pattern and code are required' });
         }
 
         // Parse multiple patterns
@@ -81,7 +77,6 @@ router.post('/', async (req, res) => {
         
         if (patterns.length === 0) {
             return res.status(400).json({ 
-                success: false,
                 error: 'At least one command pattern is required' 
             });
         }
@@ -97,7 +92,6 @@ router.post('/', async (req, res) => {
 
             if (existingCommand) {
                 return res.status(400).json({ 
-                    success: false,
                     error: `Command pattern "${singlePattern}" already exists in command "${existingCommand.name}"` 
                 });
             }
@@ -136,15 +130,12 @@ router.post('/', async (req, res) => {
         res.json({
             success: true,
             message: `Commands created successfully! (${commands.length} patterns)`,
-            commands: commands
+            commands
         });
 
     } catch (error) {
         console.error('Add command error:', error);
-        res.status(500).json({ 
-            success: false,
-            error: 'Failed to create command: ' + error.message 
-        });
+        res.status(500).json({ error: 'Failed to create command: ' + error.message });
     }
 });
 
@@ -170,23 +161,21 @@ router.put('/:commandId', async (req, res) => {
         }
 
         // Check for duplicate command patterns (excluding current command)
-        // Check for duplicate command patterns (excluding current command and other patterns with same name)
-for (const singlePattern of patterns) {
-    const { data: existingCommand } = await supabase
-        .from('commands')
-        .select('id, name')
-        .eq('bot_token', botToken)
-        .eq('pattern', singlePattern)
-        .neq('id', commandId)
-        .neq('name', name.trim()) // Allow same pattern for same command name
-        .single();
+        for (const singlePattern of patterns) {
+            const { data: existingCommand } = await supabase
+                .from('commands')
+                .select('id, name')
+                .eq('bot_token', botToken)
+                .eq('pattern', singlePattern)
+                .neq('id', commandId)
+                .single();
 
-    if (existingCommand) {
-        return res.status(400).json({ 
-            error: `Another command "${existingCommand.name}" already uses pattern "${singlePattern}"` 
-        });
-    }
-}
+            if (existingCommand) {
+                return res.status(400).json({ 
+                    error: `Another command "${existingCommand.name}" already uses pattern "${singlePattern}"` 
+                });
+            }
+        }
 
         // For simplicity, we'll update the first pattern and delete others
         // Then create new commands for additional patterns
