@@ -949,21 +949,21 @@ body {
     min-width: 0;
 }
 
-.command-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    margin-bottom: 0.5rem;
-    gap: 1rem;
-}
+/*.command-header {*/
+    /*display: flex;*/
+    /*align-items: flex-start;*/
+    /*justify-content: space-between;*/
+    /*margin-bottom: 0.5rem;*/
+    /*gap: 1rem;*/
+/*}*/
 
-.command-name {
-    font-weight: 600;
-    font-size: 1rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
+/*.command-name {*/
+    /*font-weight: 600;*/
+    /*font-size: 1rem;*/
+    /*overflow: hidden;*/
+    /*text-overflow: ellipsis;*/
+    /*white-space: nowrap;*/
+/*}*/
 
 .command-pattern {
     font-family: 'Courier New', monospace;
@@ -1035,6 +1035,37 @@ body {
 .command-item.active .command-feature {
     background: rgba(255, 255, 255, 0.2);
     color: white;
+}
+
+/* Command patterns display */
+.command-patterns {
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    background: var(--bg-secondary);
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    margin: 0.25rem 0;
+    word-break: break-all;
+}
+
+.command-group.active .command-patterns {
+    background: var(--primary-light);
+    color: var(--primary-dark);
+}
+
+/* Command header adjustment */
+.command-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.25rem;
+}
+
+.command-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    flex: 1;
 }
 
 /* ===== NOTIFICATION STYLES ===== */
@@ -1295,7 +1326,7 @@ body {
     border: none;
     border-radius: 0;
     padding: 1rem;
-    font-family: 'Courier New', monospace;
+    /*font-family: 'Courier New', monospace;*/
     font-size: 14px;
     line-height: 1.5;
     resize: none;
