@@ -161,21 +161,23 @@ router.put('/:commandId', async (req, res) => {
         }
 
         // Check for duplicate command patterns (excluding current command)
-        for (const singlePattern of patterns) {
-            const { data: existingCommand } = await supabase
-                .from('commands')
-                .select('id, name')
-                .eq('bot_token', botToken)
-                .eq('pattern', singlePattern)
-                .neq('id', commandId)
-                .single();
+        // Check for duplicate command patterns (excluding current command and other patterns with same name)
+for (const singlePattern of patterns) {
+    const { data: existingCommand } = await supabase
+        .from('commands')
+        .select('id, name')
+        .eq('bot_token', botToken)
+        .eq('pattern', singlePattern)
+        .neq('id', commandId)
+        .neq('name', name.trim()) // Allow same pattern for same command name
+        .single();
 
-            if (existingCommand) {
-                return res.status(400).json({ 
-                    error: `Another command "${existingCommand.name}" already uses pattern "${singlePattern}"` 
-                });
-            }
-        }
+    if (existingCommand) {
+        return res.status(400).json({ 
+            error: `Another command "${existingCommand.name}" already uses pattern "${singlePattern}"` 
+        });
+    }
+}
 
         // For simplicity, we'll update the first pattern and delete others
         // Then create new commands for additional patterns
