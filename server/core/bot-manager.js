@@ -446,18 +446,18 @@ async function executeCommandCode(bot, code, context) {
         }),
         
         // ===== WAIT FOR ANSWER =====
-        waitForAnswer: (timeout = 60000) => {
+        waitForAnswer: async (timeout = 60000) => {
             if (!waitForAnswer) {
                 throw new Error('waitForAnswer is not available in this context');
             }
-            return waitForAnswer(timeout);
+            return await waitForAnswer(timeout);
         },
         
         // ===== BOT ACTIONS =====
         bot: {
-            // Message sending
-            sendMessage: (text, params = {}) => {
-                return bot.sendMessage(params.chat_id || chatId, text, {
+            // Message sending with async support
+            sendMessage: async (text, params = {}) => {
+                return await bot.sendMessage(params.chat_id || chatId, text, {
                     parse_mode: params.parse_mode,
                     reply_markup: params.reply_markup,
                     reply_to_message_id: params.reply_to_message_id,
@@ -465,8 +465,8 @@ async function executeCommandCode(bot, code, context) {
                 });
             },
             
-            replyText: (text, params = {}) => {
-                return bot.sendMessage(params.chat_id || chatId, text, {
+            replyText: async (text, params = {}) => {
+                return await bot.sendMessage(params.chat_id || chatId, text, {
                     parse_mode: params.parse_mode,
                     reply_to_message_id: params.reply_to_message_id || msg.message_id,
                     reply_markup: params.reply_markup
@@ -575,36 +575,22 @@ async function executeCommandCode(bot, code, context) {
         },
         
         // ===== UTILITY FUNCTIONS =====
-        parseInt: (value) => parseInt(value),
-        parseFloat: (value) => parseFloat(value),
-        JSON: {
-            parse: (text) => JSON.parse(text),
-            stringify: (obj) => JSON.stringify(obj)
-        },
-        
-        // Utility function for waiting
-        wait: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
-        
-        // ===== COMMAND CONTROL =====
-        ReturnCommand: class ReturnCommand extends Error {
-            constructor(message = "Command returned") {
-                super(message);
-                this.name = "ReturnCommand";
-            }
-        }
+        wait: async (ms) => new Promise(resolve => setTimeout(resolve, ms)),
     };
 
     try {
-        // Safe code execution with proper error handling
+        // Wrap user code in async function to support await
         const wrappedCode = `
-            try {
-                ${code}
-            } catch (error) {
-                if (error.name === "ReturnCommand") {
-                    return null;
+            return (async function() {
+                try {
+                    ${code}
+                } catch (error) {
+                    if (error.name === "ReturnCommand") {
+                        return null;
+                    }
+                    throw error;
                 }
-                throw error;
-            }
+            })();
         `;
 
         const func = new Function(...Object.keys(safeFunctions), wrappedCode);
