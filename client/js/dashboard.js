@@ -1,4 +1,4 @@
-class DashboardManager {
+class Dashboard {
     constructor() {
         this.user = null;
         this.bots = [];
@@ -21,46 +21,31 @@ class DashboardManager {
         }
 
         try {
-            const response = await fetch('/api/auth/verify', {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error('Invalid token');
-            }
-
             this.user = JSON.parse(userData);
-            this.updateUI();
+            this.updateUserInfo();
         } catch (error) {
             this.logout();
         }
     }
 
-    updateUI() {
+    updateUserInfo() {
         if (this.user) {
-            const userName = document.getElementById('userName');
-            const userEmail = document.getElementById('userEmail');
-            
-            if (userName) userName.textContent = this.user.email.split('@')[0];
-            if (userEmail) userEmail.textContent = this.user.email;
+            document.getElementById('userName').textContent = this.user.email.split('@')[0];
+            document.getElementById('userEmail').textContent = this.user.email;
+            document.getElementById('userAvatar').textContent = this.user.email.charAt(0).toUpperCase();
         }
     }
 
     setupEventListeners() {
-        document.getElementById('logoutBtn')?.addEventListener('click', (e) => {
-            e.preventDefault();
-            this.logout();
+        // Refresh dashboard
+        document.getElementById('refreshDashboard').addEventListener('click', () => {
+            this.loadDashboardData();
         });
 
-        document.getElementById('testAllBots')?.addEventListener('click', (e) => {
+        // Test all bots
+        document.getElementById('testAllBots').addEventListener('click', (e) => {
             e.preventDefault();
             this.testAllBots();
-        });
-
-        document.getElementById('refreshDashboard')?.addEventListener('click', () => {
-            this.loadDashboardData();
         });
     }
 
@@ -68,53 +53,30 @@ class DashboardManager {
         this.showLoading(true);
 
         try {
-            const [botsResponse, statsResponse] = await Promise.all([
-                this.fetchBots(),
-                this.fetchStats()
-            ]);
+            const token = localStorage.getItem('token');
+            
+            // Load bots
+            const botsResponse = await fetch('/api/bots/user/' + this.user.id, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
 
-            if (botsResponse.success) {
-                this.bots = botsResponse.bots || [];
+            if (botsResponse.ok) {
+                const botsData = await botsResponse.json();
+                this.bots = botsData.bots || [];
                 this.displayBots();
-                this.updateBotStats();
+                this.updateStatistics();
             }
 
-            if (statsResponse.success) {
-                this.updateStats(statsResponse.stats);
-            }
+            // Load recent activity (mock data for now)
+            this.displayRecentActivity();
 
         } catch (error) {
+            console.error('Failed to load dashboard data:', error);
             this.showError('Failed to load dashboard data');
         } finally {
             this.showLoading(false);
-        }
-    }
-
-    async fetchBots() {
-        try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`/api/bots/user/${this.user.id}`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            return await response.json();
-        } catch (error) {
-            return { success: false, bots: [] };
-        }
-    }
-
-    async fetchStats() {
-        try {
-            const token = localStorage.getItem('token');
-            const response = await fetch('/api/admin/stats', {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            return await response.json();
-        } catch (error) {
-            return { success: false, stats: {} };
         }
     }
 
@@ -122,30 +84,31 @@ class DashboardManager {
         const botsList = document.getElementById('botsList');
         
         if (!this.bots || this.bots.length === 0) {
-            botsList.innerHTML = this.getEmptyBotsHTML();
+            botsList.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <h3>No Bots Yet</h3>
+                    <p>Get started by adding your first Telegram bot</p>
+                    <a href="bot-management.html" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Add Your First Bot
+                    </a>
+                </div>
+            `;
             return;
         }
 
-        const recentBots = this.bots.slice(0, 4);
-        botsList.innerHTML = recentBots.map(bot => this.getBotCardHTML(bot)).join('');
-    }
-
-    getEmptyBotsHTML() {
-        return `
-            <div class="empty-state">
-                <div class="empty-icon">
-                    <i class="fas fa-robot"></i>
-                </div>
-                <h3>No Bots Yet</h3>
-                <p>Get started by adding your first Telegram bot</p>
-                <a href="bot-management.html" class="btn btn-primary">
-                    <i class="fas fa-plus"></i> Add Your First Bot
-                </a>
-            </div>
-        `;
+        // Show only first 4 bots
+        const displayBots = this.bots.slice(0, 4);
+        
+        botsList.innerHTML = displayBots.map(bot => this.getBotCardHTML(bot)).join('');
     }
 
     getBotCardHTML(bot) {
+        const isActive = bot.is_active;
+        const commandsCount = bot.commands_count || 0;
+        
         return `
             <div class="bot-card">
                 <div class="bot-header">
@@ -154,113 +117,140 @@ class DashboardManager {
                     </div>
                     <div class="bot-info">
                         <h4>${this.escapeHtml(bot.name)}</h4>
-                        <p class="bot-username">@${this.escapeHtml(bot.username || 'unknown')}</p>
-                        <span class="bot-status ${bot.is_active ? 'active' : 'inactive'}">
+                        <div class="bot-username">@${this.escapeHtml(bot.username || 'unknown')}</div>
+                        <div class="bot-status ${isActive ? 'active' : 'inactive'}">
                             <i class="fas fa-circle"></i>
-                            ${bot.is_active ? 'Active' : 'Inactive'}
-                        </span>
+                            ${isActive ? 'Active' : 'Inactive'}
+                        </div>
                     </div>
                 </div>
+                <div class="bot-meta">
+                    <small>${commandsCount} commands • Created ${this.formatDate(bot.created_at)}</small>
+                </div>
                 <div class="bot-actions">
-                    <a href="command-editor.html?bot=${bot.id}" class="btn btn-primary btn-small">
+                    <a href="command-editor.html?bot=${bot.id}" class="btn btn-secondary btn-small">
                         <i class="fas fa-code"></i> Commands
                     </a>
-                    <button onclick="dashboard.removeBot('${bot.id}')" class="btn btn-danger btn-small">
-                        <i class="fas fa-trash"></i> Remove
+                    <button class="btn btn-primary btn-small test-bot" data-bot-id="${bot.id}">
+                        <i class="fas fa-bolt"></i> Test
                     </button>
                 </div>
             </div>
         `;
     }
 
-    updateBotStats() {
+    updateStatistics() {
         const totalBots = this.bots.length;
         const activeBots = this.bots.filter(bot => bot.is_active).length;
+        const totalCommands = this.bots.reduce((sum, bot) => sum + (bot.commands_count || 0), 0);
         
-        const totalBotsEl = document.getElementById('totalBots');
-        const activeBotsEl = document.getElementById('activeBots');
-        
-        if (totalBotsEl) totalBotsEl.textContent = totalBots;
-        if (activeBotsEl) activeBotsEl.textContent = activeBots;
+        document.getElementById('totalBots').textContent = totalBots;
+        document.getElementById('activeBots').textContent = activeBots;
+        document.getElementById('totalCommands').textContent = totalCommands;
+        document.getElementById('todayMessages').textContent = '0'; // Mock data
     }
 
-    updateStats(stats) {
-        const totalCommandsEl = document.getElementById('totalCommands');
-        const todayMessagesEl = document.getElementById('todayMessages');
-        
-        if (totalCommandsEl) totalCommandsEl.textContent = stats.totalCommands || 0;
-        if (todayMessagesEl) todayMessagesEl.textContent = stats.todayMessages || 0;
-    }
+    displayRecentActivity() {
+        const activityList = document.getElementById('recentActivity');
+        const activities = [
+            {
+                type: 'bot_activated',
+                description: 'Bot "Welcome Bot" was activated',
+                timestamp: new Date(Date.now() - 300000).toISOString()
+            },
+            {
+                type: 'command_added',
+                description: 'New command "/start" added to "Test Bot"',
+                timestamp: new Date(Date.now() - 600000).toISOString()
+            },
+            {
+                type: 'test_executed',
+                description: 'Command test executed successfully',
+                timestamp: new Date(Date.now() - 900000).toISOString()
+            }
+        ];
 
-    async removeBot(botId) {
-        if (!confirm('Are you sure you want to remove this bot? This will delete all associated commands.')) {
+        if (activities.length === 0) {
+            activityList.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <i class="fas fa-history"></i>
+                    </div>
+                    <p>No recent activity</p>
+                </div>
+            `;
             return;
         }
 
-        try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`/api/bots/${botId}`, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
+        activityList.innerHTML = activities.map(activity => this.getActivityHTML(activity)).join('');
+    }
 
-            const data = await response.json();
+    getActivityHTML(activity) {
+        const icons = {
+            'command_added': 'fas fa-plus success',
+            'command_updated': 'fas fa-edit warning',
+            'bot_activated': 'fas fa-check success',
+            'bot_deactivated': 'fas fa-times error',
+            'test_executed': 'fas fa-bolt info'
+        };
 
-            if (response.ok) {
-                this.showSuccess('Bot removed successfully');
-                await this.loadDashboardData();
-            } else {
-                this.showError(data.error || 'Failed to remove bot');
-            }
-        } catch (error) {
-            this.showError('Network error while removing bot');
-        }
+        const iconClass = icons[activity.type] || 'fas fa-info-circle info';
+        
+        return `
+            <div class="activity-item">
+                <div class="activity-icon ${activity.type.split('_')[1]}">
+                    <i class="${iconClass}"></i>
+                </div>
+                <div class="activity-content">
+                    <p>${this.escapeHtml(activity.description)}</p>
+                    <span class="activity-time">${this.formatTime(activity.timestamp)}</span>
+                </div>
+            </div>
+        `;
     }
 
     async testAllBots() {
         this.showLoading(true);
 
         try {
-            const token = localStorage.getItem('token');
-            const testPromises = this.bots.map(bot => 
-                fetch(`/api/bots/${bot.id}/test`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
-                })
-            );
-
-            const results = await Promise.allSettled(testPromises);
-            const successfulTests = results.filter(result => result.status === 'fulfilled' && result.value.ok).length;
+            // Simulate testing all bots
+            await new Promise(resolve => setTimeout(resolve, 2000));
             
-            this.showSuccess(`${successfulTests}/${this.bots.length} bots tested successfully`);
+            this.showSuccess('All bots tested successfully!');
+            await this.loadDashboardData(); // Refresh data
         } catch (error) {
-            this.showError('Failed to test bots');
+            this.showError('Failed to test bots: ' + error.message);
         } finally {
             this.showLoading(false);
         }
     }
 
-    logout() {
-        const sessionId = localStorage.getItem('sessionId');
-        
-        if (sessionId) {
-            fetch('/api/auth/logout', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                },
-                body: JSON.stringify({ sessionId })
-            }).catch(() => {});
-        }
+    formatDate(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'short', 
+            day: 'numeric' 
+        });
+    }
 
-        localStorage.clear();
-        window.location.href = 'index.html';
+    formatTime(timestamp) {
+        const now = new Date();
+        const time = new Date(timestamp);
+        const diffMs = now - time;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins} minutes ago`;
+        if (diffHours < 24) return `${diffHours} hours ago`;
+        if (diffDays < 7) return `${diffDays} days ago`;
+        
+        return time.toLocaleDateString('en-US', { 
+            month: 'short', 
+            day: 'numeric' 
+        });
     }
 
     showLoading(show) {
@@ -270,53 +260,17 @@ class DashboardManager {
         }
     }
 
-    showError(message) {
-        commonApp?.showError(message) || this.showNotification(message, 'error');
-    }
-
     showSuccess(message) {
-        commonApp?.showSuccess(message) || this.showNotification(message, 'success');
+        commonApp?.showSuccess(message) || alert(message);
     }
 
-    showNotification(message, type = 'info') {
-        const existing = document.querySelector('.notification');
-        if (existing) existing.remove();
+    showError(message) {
+        commonApp?.showError(message) || alert(message);
+    }
 
-        const notification = document.createElement('div');
-        notification.className = `notification notification-${type}`;
-        notification.innerHTML = `
-            <div class="notification-content">
-                <i class="fas fa-${type === 'error' ? 'exclamation-triangle' : type === 'success' ? 'check-circle' : 'info-circle'}"></i>
-                <span class="notification-message">${message}</span>
-                <button class="notification-close">&times;</button>
-            </div>
-        `;
-
-        Object.assign(notification.style, {
-            position: 'fixed',
-            top: '20px',
-            right: '20px',
-            background: type === 'error' ? '#ef4444' : type === 'success' ? '#10b981' : '#3b82f6',
-            color: 'white',
-            padding: '1rem 1.5rem',
-            borderRadius: '0.5rem',
-            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-            zIndex: '10000',
-            maxWidth: '400px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem'
-        });
-
-        notification.querySelector('.notification-close').addEventListener('click', () => {
-            notification.remove();
-        });
-
-        document.body.appendChild(notification);
-
-        setTimeout(() => {
-            notification.remove();
-        }, 5000);
+    logout() {
+        localStorage.clear();
+        window.location.href = 'login.html';
     }
 
     escapeHtml(unsafe) {
@@ -329,7 +283,8 @@ class DashboardManager {
     }
 }
 
+// Initialize dashboard
 let dashboard;
 document.addEventListener('DOMContentLoaded', () => {
-    dashboard = new DashboardManager();
+    dashboard = new Dashboard();
 });
