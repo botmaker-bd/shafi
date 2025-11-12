@@ -192,6 +192,9 @@
                                     <button type="button" class="btn-code" id="openAnswerEditor">
                                         <i class="fas fa-edit"></i> Open Editor
                                     </button>
+                                    <button type="button" class="btn-code" id="showAnswerTemplates">
+                                        <i class="fas fa-layer-group"></i> Templates
+                                    </button>
                                 </div>
                             </div>
                             <textarea id="answerHandler" 
@@ -325,90 +328,148 @@
             </div>
             <div class="modal-body">
                 <div class="templates-grid">
-                    <div class="template-card" onclick="commandEditor.applyTemplate('welcome')">
+                    <div class="template-card" onclick="commandEditor.applyTemplate('welcome', 'main')">
                         <div class="template-icon">
                             <i class="fas fa-hand-wave"></i>
                         </div>
                         <h4>Welcome Message</h4>
                         <p>Simple welcome message with user info</p>
                         <div class="template-code">
-                            const user = getUser();
-                            sendMessage(`Hello ${user.first_name}! Welcome to our bot.`);
+const user = getUser();
+sendMessage(`Hello ${user.first_name}! Welcome to our bot.`);
                         </div>
                     </div>
                     
-                    <div class="template-card" onclick="commandEditor.applyTemplate('help')">
+                    <div class="template-card" onclick="commandEditor.applyTemplate('help', 'main')">
                         <div class="template-icon">
                             <i class="fas fa-question-circle"></i>
                         </div>
                         <h4>Help Command</h4>
                         <p>Display available commands</p>
                         <div class="template-code">
-                            sendMessage(`Available commands:
-                            /start - Start the bot
-                            /help - Show this help
-                            /info - Bot information`);
+sendMessage(`Available commands:
+/start - Start the bot
+/help - Show this help
+/info - Bot information`);
                         </div>
                     </div>
                     
-                    <div class="template-card" onclick="commandEditor.applyTemplate('echo')">
+                    <div class="template-card" onclick="commandEditor.applyTemplate('echo', 'main')">
                         <div class="template-icon">
                             <i class="fas fa-comment-alt"></i>
                         </div>
                         <h4>Echo Command</h4>
                         <p>Repeat user's message</p>
                         <div class="template-code">
-                            // Use with wait_for_answer
-                            const answer = getAnswer();
-                            sendMessage(`You said: ${answer}`);
+// Use with wait_for_answer
+const answer = getAnswer();
+sendMessage(`You said: ${answer}`);
                         </div>
                     </div>
                     
-                    <div class="template-card" onclick="commandEditor.applyTemplate('photo')">
+                    <div class="template-card" onclick="commandEditor.applyTemplate('photo', 'main')">
                         <div class="template-icon">
                             <i class="fas fa-image"></i>
                         </div>
                         <h4>Send Photo</h4>
                         <p>Send image with caption</p>
                         <div class="template-code">
-                            sendPhoto("https://example.com/image.jpg", {
-                                caption: "Here's your image!"
-                            });
+sendPhoto("https://example.com/image.jpg", {
+    caption: "Here's your image!"
+});
                         </div>
                     </div>
                     
-                    <div class="template-card" onclick="commandEditor.applyTemplate('conditional')">
+                    <div class="template-card" onclick="commandEditor.applyTemplate('conditional', 'main')">
                         <div class="template-icon">
                             <i class="fas fa-code-branch"></i>
                         </div>
                         <h4>Conditional Response</h4>
                         <p>Different responses based on input</p>
                         <div class="template-code">
-                            const user = getUser();
-                            if (user.language_code === 'bn') {
-                                sendMessage("স্বাগতম!");
-                            } else {
-                                sendMessage("Welcome!");
-                            }
+const user = getUser();
+if (user.language_code === 'bn') {
+    sendMessage("স্বাগতম!");
+} else {
+    sendMessage("Welcome!");
+}
                         </div>
                     </div>
                     
-                    <div class="template-card" onclick="commandEditor.applyTemplate('delay')">
+                    <div class="template-card" onclick="commandEditor.applyTemplate('delay', 'main')">
                         <div class="template-icon">
                             <i class="fas fa-clock"></i>
                         </div>
                         <h4>Delayed Response</h4>
                         <p>Send messages with delay</p>
                         <div class="template-code">
-                            sendMessage("Processing your request...");
-                            await wait(2000);
-                            sendMessage("Request completed!");
+sendMessage("Processing your request...");
+await wait(2000);
+sendMessage("Request completed!");
                         </div>
                     </div>
                 </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" id="closeTemplates">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Answer Templates Modal -->
+    <div id="answerTemplatesModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Answer Handler Templates</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="templates-grid">
+                    <div class="template-card" onclick="commandEditor.applyTemplate('echo_answer', 'answer')">
+                        <div class="template-icon">
+                            <i class="fas fa-comment-alt"></i>
+                        </div>
+                        <h4>Echo Answer</h4>
+                        <p>Simply repeat user's answer</p>
+                        <div class="template-code">
+const answer = getAnswer();
+sendMessage(`You answered: ${answer}`);
+                        </div>
+                    </div>
+                    
+                    <div class="template-card" onclick="commandEditor.applyTemplate('validate_answer', 'answer')">
+                        <div class="template-icon">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <h4>Validate Answer</h4>
+                        <p>Check if answer meets criteria</p>
+                        <div class="template-code">
+const answer = getAnswer();
+if (answer.length < 3) {
+    sendMessage("Answer too short. Please try again.");
+} else {
+    sendMessage("Thank you for your answer!");
+}
+                        </div>
+                    </div>
+                    
+                    <div class="template-card" onclick="commandEditor.applyTemplate('process_data', 'answer')">
+                        <div class="template-icon">
+                            <i class="fas fa-cogs"></i>
+                        </div>
+                        <h4>Process Data</h4>
+                        <p>Process and store user input</p>
+                        <div class="template-code">
+const answer = getAnswer();
+// Process the answer here
+sendMessage(`Data received: ${answer}`);
+// Store or process the data as needed
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="closeAnswerTemplates">Close</button>
             </div>
         </div>
     </div>
