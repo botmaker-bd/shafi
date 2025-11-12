@@ -7,7 +7,7 @@ class CommandEditor {
         this.codeHistory = [];
         this.historyIndex = -1;
         this.currentEditorType = null;
-        this.commandGroups = new Map(); // Group commands by name
+        this.commandGroups = new Map();
         this.init();
     }
 
@@ -18,6 +18,7 @@ class CommandEditor {
         await this.loadCommands();
         this.setupCodeEditor();
         this.setupCommandsTags();
+        this.setupTemplateEvents();
     }
 
     async checkAuth() {
@@ -126,6 +127,17 @@ class CommandEditor {
         this.setupTemplateCategories();
     }
 
+    setupTemplateEvents() {
+        // Template card click events
+        document.addEventListener('click', (e) => {
+            const templateCard = e.target.closest('.template-card');
+            if (templateCard) {
+                const templateName = templateCard.dataset.template;
+                this.applyTemplate(templateName);
+            }
+        });
+    }
+
     setupCommandsTags() {
         const moreCommandsInput = document.getElementById('moreCommands');
         const commandsTags = document.getElementById('commandsTags');
@@ -172,10 +184,15 @@ class CommandEditor {
         tag.className = 'command-tag';
         tag.innerHTML = `
             <span class="tag-text">${this.escapeHtml(command)}</span>
-            <button type="button" class="remove-tag" onclick="this.parentElement.remove()">
+            <button type="button" class="remove-tag">
                 <i class="fas fa-times"></i>
             </button>
         `;
+        
+        tag.querySelector('.remove-tag').addEventListener('click', () => {
+            tag.remove();
+        });
+        
         commandsTags.appendChild(tag);
     }
 
@@ -643,7 +660,7 @@ class CommandEditor {
         
         return `
             <div class="command-group ${isSelected ? 'active' : ''}" 
-                 onclick="commandEditor.selectCommandGroup('${commandName}')">
+                 data-command-name="${this.escapeHtml(commandName)}">
                 <div class="command-icon">
                     <i class="fas fa-code"></i>
                 </div>
@@ -712,7 +729,7 @@ class CommandEditor {
         }, 100);
     }
 
-    async selectCommandGroup(commandName) {
+    async selectCommand(commandName) {
         if (this.currentCommand?.name === commandName) return;
 
         this.showLoading(true);
@@ -750,7 +767,7 @@ class CommandEditor {
                     group.classList.remove('active');
                 });
                 
-                const selectedGroup = document.querySelector(`[onclick*="${commandName}"]`);
+                const selectedGroup = document.querySelector(`[data-command-name="${commandName}"]`);
                 if (selectedGroup) {
                     selectedGroup.classList.add('active');
                     selectedGroup.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -1192,10 +1209,12 @@ class CommandEditor {
     applyTemplate(templateName) {
         let code = '';
         let patterns = '';
+        let description = '';
         
         switch(templateName) {
             case 'welcome':
                 patterns = '/start, start, hello';
+                description = 'Welcome message for new users';
                 code = `// Welcome message template
 const user = getUser();
 const welcomeMessage = \`Hello \${user.first_name}! 👋
@@ -1214,6 +1233,7 @@ bot.sendMessage(welcomeMessage, {
                 
             case 'help':
                 patterns = '/help, help, commands';
+                description = 'Show available commands';
                 code = `// Help command template
 const helpText = \`🤖 *Bot Help Menu*
 
@@ -1236,8 +1256,33 @@ bot.sendMessage(helpText, {
 });`;
                 break;
                 
+            case 'info':
+                patterns = '/info, about, bot';
+                description = 'Show bot information';
+                code = `// Bot information template
+const botInfo = \`🤖 *Bot Information*
+
+*Name:* ${this.currentBot?.name || 'My Bot'}
+*Username:* @${this.currentBot?.username || 'mybot'}
+*Status:* ✅ Active
+*Version:* 2.0.0
+
+*Features:*
+• Advanced command system
+• User data management
+• Media support
+• Interactive conversations
+
+*Created with:* Bot Maker Pro\`;
+
+bot.sendMessage(botInfo, {
+    parse_mode: 'Markdown'
+});`;
+                break;
+                
             case 'echo':
                 patterns = '/echo, echo, repeat';
+                description = 'Repeat user message';
                 code = `// Echo command with wait for answer
 bot.sendMessage('Please send me a message to echo:');
 
@@ -1256,6 +1301,7 @@ try {
                 
             case 'user_data':
                 patterns = '/data, /save, /get';
+                description = 'Manage user data';
                 code = `// User data management example
 
 // Save user data
@@ -1279,6 +1325,7 @@ if (userName) {
                 
             case 'inline_buttons':
                 patterns = '/menu, /buttons';
+                description = 'Show inline keyboard buttons';
                 code = `// Inline keyboard example
 const inlineKeyboard = {
     inline_keyboard: [
@@ -1308,19 +1355,25 @@ bot.sendMessage("Choose an option:", {
                 
             case 'http_get':
                 patterns = '/fetch, /api';
+                description = 'Fetch data from API';
                 code = `// HTTP GET request example
 try {
-    const data = await HTTP.get("https://api.example.com/data");
+    bot.sendMessage("Fetching data from API...");
+    
+    const data = await HTTP.get("https://jsonplaceholder.typicode.com/posts/1");
     const result = bunchify(data);
     
-    bot.sendMessage(\`Data received: \${JSON.stringify(result)}\`);
+    bot.sendMessage(\`📊 API Response:
+Title: \${result.title}
+Body: \${result.body}\`);
 } catch (error) {
-    bot.sendMessage(\`Error: \${error.message}\`);
+    bot.sendMessage(\`❌ Error: \${error.message}\`);
 }`;
                 break;
                 
             case 'conversation':
                 patterns = '/conversation, chat';
+                description = 'Interactive conversation';
                 code = `// Interactive conversation
 bot.sendMessage("Hello! What's your name?");
 
@@ -1351,55 +1404,85 @@ try {
 }`;
                 break;
                 
-            case 'media_photo':
+            case 'send_photo':
                 patterns = '/photo, picture';
+                description = 'Send photo with caption';
                 code = `// Send photo example
-bot.sendPhoto("https://example.com/photo.jpg", {
-    caption: "Here's a beautiful photo for you!",
+bot.sendPhoto("https://picsum.photos/400/300", {
+    caption: "Here's a beautiful photo for you! 🌅",
     parse_mode: "Markdown"
 });`;
                 break;
                 
-            case 'conditional':
-                patterns = '/check, /if';
-                code = `// Conditional logic example
-const user = getUser();
-const messageText = message.text.toLowerCase();
-
-if (messageText.includes('hello') || messageText.includes('hi')) {
-    bot.sendMessage(\`Hello \${user.first_name}! How can I help you?\`);
-} else if (messageText.includes('thank')) {
-    bot.sendMessage('You\\'re welcome! 😊');
-} else if (messageText.includes('bye')) {
-    bot.sendMessage('Goodbye! Have a great day! 👋');
-} else {
-    bot.sendMessage('I\\'m not sure how to respond to that.');
+            case 'send_video':
+                patterns = '/video, clip';
+                description = 'Send video file';
+                code = `// Send video example
+bot.sendVideo("https://example.com/video.mp4", {
+    caption: "Check out this video! 🎥",
+    parse_mode: "Markdown"
+});`;
+                break;
+                
+            case 'weather':
+                patterns = '/weather, climate';
+                description = 'Get weather information';
+                code = `// Weather API example
+try {
+    const weatherData = await HTTP.get("https://api.openweathermap.org/data/2.5/weather?q=London&appid=YOUR_API_KEY");
+    const weather = bunchify(weatherData);
+    
+    const tempCelsius = (weather.main.temp - 273.15).toFixed(1);
+    
+    bot.sendMessage(\`🌤️ Weather in \${weather.name}:
+Temperature: \${tempCelsius}°C
+Condition: \${weather.weather[0].description}
+Humidity: \${weather.main.humidity}%\`);
+} catch (error) {
+    bot.sendMessage(\`❌ Weather data unavailable: \${error.message}\`);
 }`;
                 break;
                 
-            case 'chat_action':
-                patterns = '/typing, /action';
-                code = `// Chat actions example
-bot.sendChatAction('typing');
-await wait(2000); // Wait 2 seconds
+            case 'broadcast':
+                patterns = '/broadcast, announce';
+                description = 'Admin broadcast message';
+                code = `// Broadcast message (admin only)
+const user = getUser();
 
-bot.sendMessage("I was typing...");
-
-bot.sendChatAction('upload_photo');
-await wait(3000);
-
-bot.sendPhoto("https://example.com/photo.jpg", {
-    caption: "Here's your photo!"
-});`;
+// Check if user is admin
+if (user.id === 123456789) { // Replace with actual admin ID
+    bot.sendMessage("Please enter the broadcast message:");
+    
+    try {
+        const broadcastMessage = await waitForAnswer(60000);
+        
+        if (broadcastMessage && broadcastMessage.trim()) {
+            // In a real implementation, you would send to all users
+            bot.sendMessage(\`📢 Broadcast Sent:
+\${broadcastMessage}\`);
+        }
+    } catch (error) {
+        bot.sendMessage("Broadcast cancelled.");
+    }
+} else {
+    bot.sendMessage("❌ Admin access required.");
+}`;
                 break;
                 
             default:
                 patterns = '/template';
+                description = 'Basic command template';
                 code = `// Basic template
 const user = getUser();
 bot.sendMessage(\`Hello \${user.first_name}! This is a basic command.\`);`;
         }
         
+        // Apply template to form
+        if (this.currentCommand?.id === 'new') {
+            document.getElementById('commandName').value = templateName.charAt(0).toUpperCase() + templateName.slice(1).replace('_', ' ');
+        }
+        
+        document.getElementById('commandDescription').value = description;
         this.setCommandsToTags(patterns);
         document.getElementById('commandCode').value = code;
         document.getElementById('templatesModal').style.display = 'none';
@@ -1485,4 +1568,13 @@ bot.sendMessage(\`Hello \${user.first_name}! This is a basic command.\`);`;
 let commandEditor;
 document.addEventListener('DOMContentLoaded', () => {
     commandEditor = new CommandEditor();
+    
+    // Add click event for command groups
+    document.addEventListener('click', (e) => {
+        const commandGroup = e.target.closest('.command-group');
+        if (commandGroup) {
+            const commandName = commandGroup.dataset.commandName;
+            commandEditor.selectCommand(commandName);
+        }
+    });
 });
