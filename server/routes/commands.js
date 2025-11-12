@@ -58,84 +58,66 @@ router.get('/:commandId', async (req, res) => {
 });
 
 // Add new command - FIXED MULTIPLE PATTERNS
-router.post('/', async (req, res) => {
+// Save command endpoint - add proper validation
+router.post('/', auth, async (req, res) => {
     try {
-        const { botToken, name, pattern, code, description, waitForAnswer, answerHandler } = req.body;
+        const { pattern, code, waitForAnswer, answerHandler, botToken } = req.body;
 
-        console.log('🔄 Adding new command:', { 
-            name, 
-            pattern: pattern?.substring(0, 50) + '...',
-            botToken: botToken?.substring(0, 10) + '...' 
-        });
-
-        if (!botToken || !name || !pattern || !code) {
-            return res.status(400).json({ error: 'Bot token, name, pattern and code are required' });
-        }
-
-        // Parse multiple patterns
-        const patterns = pattern.split(',').map(p => p.trim()).filter(p => p.length > 0);
-        
-        if (patterns.length === 0) {
-            return res.status(400).json({ 
-                error: 'At least one command pattern is required' 
+        // Validate required fields
+        if (!pattern || !code || !botToken) {
+            return res.status(400).json({
+                success: false,
+                error: 'Bot token, pattern and code are required'
             });
         }
 
-        // Check for duplicate command patterns
-        for (const singlePattern of patterns) {
-            const { data: existingCommand } = await supabase
-                .from('commands')
-                .select('id, name')
-                .eq('bot_token', botToken)
-                .eq('pattern', singlePattern)
-                .single();
+        // Check if bot belongs to user
+        const { data: bot, error: botError } = await supabase
+            .from('bots')
+            .select('*')
+            .eq('token', botToken)
+            .eq('user_id', req.user.id)
+            .single();
 
-            if (existingCommand) {
-                return res.status(400).json({ 
-                    error: `Command pattern "${singlePattern}" already exists in command "${existingCommand.name}"` 
-                });
-            }
+        if (botError || !bot) {
+            return res.status(404).json({
+                success: false,
+                error: 'Bot not found or access denied'
+            });
         }
 
-        // Insert command for each pattern
-        const commandPromises = patterns.map(singlePattern => 
-            supabase
-                .from('commands')
-                .insert([{
-                    bot_token: botToken,
-                    name: name.trim(),
-                    pattern: singlePattern,
-                    code: code.trim(),
-                    description: description?.trim() || '',
-                    wait_for_answer: waitForAnswer || false,
-                    answer_handler: answerHandler?.trim() || null,
-                    is_active: true
-                }])
-                .select('*')
-                .single()
-        );
+        // Create command
+        const { data: command, error } = await supabase
+            .from('commands')
+            .insert({
+                bot_token: botToken,
+                name: pattern.split(',')[0].trim(), // Use first pattern as name
+                pattern: pattern,
+                code: code,
+                wait_for_answer: waitForAnswer || false,
+                answer_handler: answerHandler || '',
+                is_active: true
+            })
+            .select()
+            .single();
 
-        const results = await Promise.all(commandPromises);
-        const commands = results.map(result => result.data).filter(cmd => cmd);
-
-        if (commands.length === 0) {
-            throw new Error('Failed to create any commands');
-        }
+        if (error) throw error;
 
         // Update command cache
-        await botManager.updateCommandCache(botToken);
-
-        console.log('✅ Commands created successfully:', commands.length);
+        await updateCommandCache(botToken);
 
         res.json({
             success: true,
-            message: `Commands created successfully! (${commands.length} patterns)`,
-            commands
+            command: command,
+            message: 'Command created successfully'
         });
 
     } catch (error) {
-        console.error('Add command error:', error);
-        res.status(500).json({ error: 'Failed to create command: ' + error.message });
+        console.error('❌ Create command error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to create command: ' + error.message
+        });
     }
 });
 
