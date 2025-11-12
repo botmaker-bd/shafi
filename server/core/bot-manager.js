@@ -7,8 +7,6 @@ const supabase = require('../config/supabase');
 const activeBots = new Map();
 const botCommands = new Map();
 const waitingForAnswer = new Map();
-const userDataStore = new Map();
-const botDataStore = new Map();
 
 // Initialize all bots on startup
 async function initializeAllBots() {
@@ -59,7 +57,7 @@ async function initializeBot(token) {
         if (error) throw error;
 
         const bot = new TelegramBot(token, { 
-            polling: false,
+            polling: true,
             request: {
                 timeout: 10000,
                 agentOptions: {
@@ -109,8 +107,9 @@ async function handleMessage(bot, token, msg) {
             const waitData = waitingForAnswer.get(waitKey);
             waitingForAnswer.delete(waitKey);
             
-            if (waitData.resolve) {
-                waitData.resolve(text);
+            if (waitData.answerHandler) {
+                console.log(`🔄 Processing answer for command: ${waitData.commandName}`);
+                await executeAnswerHandler(bot, waitData.answerHandler, msg, waitData.originalMessage);
             }
             return;
         }
@@ -199,6 +198,19 @@ async function executeCommand(bot, command, msg, isTest = false) {
     try {
         const formattedCode = formatCommandCode(command.code);
         
+        // If command requires waiting for answer, set up the wait
+        if (command.wait_for_answer && command.answer_handler) {
+            const waitKey = `${command.bot_token}_${msg.from.id}`;
+            waitingForAnswer.set(waitKey, {
+                commandName: command.name,
+                answerHandler: command.answer_handler,
+                originalMessage: msg,
+                timestamp: Date.now()
+            });
+            
+            console.log(`⏳ Waiting for answer for command: ${command.name}`);
+        }
+
         const result = await executeCommandCode(bot, formattedCode, {
             msg,
             chatId: msg.chat.id,
@@ -206,7 +218,8 @@ async function executeCommand(bot, command, msg, isTest = false) {
             username: msg.from.username,
             first_name: msg.from.first_name,
             isTest,
-            botToken: command.bot_token
+            botToken: command.bot_token,
+            waitForAnswer: (timeout = 60000) => waitForUserAnswer(bot, command.bot_token, msg.from.id, timeout)
         });
 
         return result;
@@ -228,22 +241,155 @@ async function executeCommand(bot, command, msg, isTest = false) {
     }
 }
 
-// Enhanced command code execution with official API
-// Enhanced command execution with complete TBC style functions
-async function executeCommandCode(bot, code, context) {
-    const { msg, chatId, userId, username, first_name, isTest, botToken, waitForAnswer } = context;
-    
-    // User data storage (simulated)
-    const userDataStore = new Map();
-    const botDataStore = new Map();
-    
-    const getUserDataKey = (key) => `${botToken}_${userId}_${key}`;
-    const getBotDataKey = (key) => `${botToken}_${key}`;
+// Execute answer handler code
+async function executeAnswerHandler(bot, answerHandlerCode, msg, originalMessage) {
+    try {
+        const formattedCode = formatCommandCode(answerHandlerCode);
+        
+        await executeCommandCode(bot, formattedCode, {
+            msg,
+            chatId: msg.chat.id,
+            userId: msg.from.id,
+            username: msg.from.username,
+            first_name: msg.from.first_name,
+            isTest: false,
+            botToken: originalMessage.botToken,
+            originalMessage: originalMessage,
+            userAnswer: msg.text
+        });
 
+    } catch (error) {
+        console.error('❌ Answer handler execution error:', error);
+        await bot.sendMessage(msg.chat.id, '❌ Error processing your answer.');
+    }
+}
+
+// Wait for user answer
+function waitForUserAnswer(bot, token, userId, timeout = 60000) {
+    return new Promise((resolve, reject) => {
+        const waitKey = `${token}_${userId}`;
+        
+        // Set timeout
+        const timeoutId = setTimeout(() => {
+            waitingForAnswer.delete(waitKey);
+            reject(new Error('Timeout waiting for answer'));
+        }, timeout);
+
+        // Store resolve function
+        waitingForAnswer.set(waitKey, {
+            resolve: (answer) => {
+                clearTimeout(timeoutId);
+                waitingForAnswer.delete(waitKey);
+                resolve(answer);
+            },
+            timestamp: Date.now()
+        });
+    });
+}
+
+// Database functions for user and bot data
+async function saveUserData(botToken, userId, key, value) {
+    try {
+        const { data, error } = await supabase
+            .from('user_data')
+            .upsert({
+                bot_token: botToken,
+                user_id: userId,
+                data_key: key,
+                data_value: typeof value === 'object' ? JSON.stringify(value) : value
+            }, {
+                onConflict: 'bot_token,user_id,data_key'
+            });
+
+        if (error) throw error;
+        return value;
+    } catch (error) {
+        console.error('❌ Save user data error:', error);
+        throw error;
+    }
+}
+
+async function getUserData(botToken, userId, key) {
+    try {
+        const { data, error } = await supabase
+            .from('user_data')
+            .select('data_value')
+            .eq('bot_token', botToken)
+            .eq('user_id', userId)
+            .eq('data_key', key)
+            .single();
+
+        if (error && error.code !== 'PGRST116') throw error;
+        
+        if (data && data.data_value) {
+            try {
+                return JSON.parse(data.data_value);
+            } catch {
+                return data.data_value;
+            }
+        }
+        return null;
+    } catch (error) {
+        console.error('❌ Get user data error:', error);
+        return null;
+    }
+}
+
+async function saveBotData(botToken, key, value) {
+    try {
+        const { data, error } = await supabase
+            .from('bot_data')
+            .upsert({
+                bot_token: botToken,
+                data_key: key,
+                data_value: typeof value === 'object' ? JSON.stringify(value) : value
+            }, {
+                onConflict: 'bot_token,data_key'
+            });
+
+        if (error) throw error;
+        return value;
+    } catch (error) {
+        console.error('❌ Save bot data error:', error);
+        throw error;
+    }
+}
+
+async function getBotData(botToken, key) {
+    try {
+        const { data, error } = await supabase
+            .from('bot_data')
+            .select('data_value')
+            .eq('bot_token', botToken)
+            .eq('data_key', key)
+            .single();
+
+        if (error && error.code !== 'PGRST116') throw error;
+        
+        if (data && data.data_value) {
+            try {
+                return JSON.parse(data.data_value);
+            } catch {
+                return data.data_value;
+            }
+        }
+        return null;
+    } catch (error) {
+        console.error('❌ Get bot data error:', error);
+        return null;
+    }
+}
+
+// Enhanced command code execution
+async function executeCommandCode(bot, code, context) {
+    const { msg, chatId, userId, username, first_name, isTest, botToken, waitForAnswer, userAnswer, originalMessage } = context;
+    
     // Enhanced available functions for command code
     const safeFunctions = {
         // ===== MESSAGE PROPERTIES =====
         message: msg,
+        userAnswer: userAnswer,
+        originalMessage: originalMessage,
         
         // ===== CHAT ID SHORTCUTS =====
         u: chatId,
@@ -257,38 +403,29 @@ async function executeCommandCode(bot, code, context) {
         
         // ===== USER DATA MANAGEMENT =====
         User: {
-            saveData: (key, value) => {
-                const dataKey = getUserDataKey(key);
-                userDataStore.set(dataKey, value);
-                return value;
-            },
-            
-            getData: (key) => {
-                const dataKey = getUserDataKey(key);
-                return userDataStore.get(dataKey) || null;
-            },
-            
-            deleteData: (key) => {
-                const dataKey = getUserDataKey(key);
-                return userDataStore.delete(dataKey);
+            saveData: (key, value) => saveUserData(botToken, userId, key, value),
+            getData: (key) => getUserData(botToken, userId, key),
+            deleteData: async (key) => {
+                const { error } = await supabase
+                    .from('user_data')
+                    .delete()
+                    .eq('bot_token', botToken)
+                    .eq('user_id', userId)
+                    .eq('data_key', key);
+                return !error;
             }
         },
         
         Bot: {
-            saveData: (key, value) => {
-                const dataKey = getBotDataKey(key);
-                botDataStore.set(dataKey, value);
-                return value;
-            },
-            
-            getData: (key) => {
-                const dataKey = getBotDataKey(key);
-                return botDataStore.get(dataKey) || null;
-            },
-            
-            deleteData: (key) => {
-                const dataKey = getBotDataKey(key);
-                return botDataStore.delete(dataKey);
+            saveData: (key, value) => saveBotData(botToken, key, value),
+            getData: (key) => getBotData(botToken, key),
+            deleteData: async (key) => {
+                const { error } = await supabase
+                    .from('bot_data')
+                    .delete()
+                    .eq('bot_token', botToken)
+                    .eq('data_key', key);
+                return !error;
             }
         },
         
@@ -310,10 +447,13 @@ async function executeCommandCode(bot, code, context) {
         
         // ===== WAIT FOR ANSWER =====
         waitForAnswer: (timeout = 60000) => {
+            if (!waitForAnswer) {
+                throw new Error('waitForAnswer is not available in this context');
+            }
             return waitForAnswer(timeout);
         },
         
-        // ===== BOT ACTIONS (Official API Style) =====
+        // ===== BOT ACTIONS =====
         bot: {
             // Message sending
             sendMessage: (text, params = {}) => {
@@ -442,110 +582,33 @@ async function executeCommandCode(bot, code, context) {
             stringify: (obj) => JSON.stringify(obj)
         },
         
+        // Utility function for waiting
+        wait: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
+        
         // ===== COMMAND CONTROL =====
         ReturnCommand: class ReturnCommand extends Error {
             constructor(message = "Command returned") {
                 super(message);
                 this.name = "ReturnCommand";
             }
-        },
-        
-        runCommand: (commandPattern, params = {}) => {
-            console.log(`Would run command: ${commandPattern}`, params);
-            throw new Error('runCommand not implemented in this version');
-        },
-        
-        // ===== BUNCHIFY UTILITY =====
-        bunchify: (obj) => {
-            if (obj && typeof obj === 'object') {
-                return new Proxy(obj, {
-                    get: (target, prop) => {
-                        if (prop in target) {
-                            const value = target[prop];
-                            if (typeof value === 'object' && value !== null) {
-                                return safeFunctions.bunchify(value);
-                            }
-                            return value;
-                        }
-                        return undefined;
-                    }
-                });
-            }
-            return obj;
-        },
-        
-        // ===== ALIAS FUNCTIONS FOR COMPATIBILITY =====
-        // TBC Style compatibility
-        sendMessage: (text, params = {}) => {
-            return bot.sendMessage(params.chat_id || chatId, text, {
-                parse_mode: params.parse_mode,
-                reply_markup: params.reply_markup
-            });
-        },
-        
-        sendPhoto: (photo, params = {}) => {
-            return bot.sendPhoto(params.chat_id || chatId, photo, {
-                caption: params.caption,
-                parse_mode: params.parse_mode
-            });
-        },
-        
-        deleteMessage: (params = {}) => {
-            return bot.deleteMessage(
-                params.chat_id || chatId,
-                params.message_id || msg.message_id
-            );
         }
     };
 
     try {
-        // Enhanced wrapped code with all functions
+        // Safe code execution with proper error handling
         const wrappedCode = `
-            return (async function() {
-                const { 
-                    // Message properties
-                    message,
-                    u,
-                    chat,
-                    KEY,
-                    
-                    // User data
-                    User,
-                    Bot,
-                    
-                    // User information
-                    getUser,
-                    getChat,
-                    
-                    // Wait for answer
-                    waitForAnswer,
-                    
-                    // Bot actions
-                    bot,
-                    
-                    // HTTP requests
-                    HTTP,
-                    
-                    // Utility functions
-                    parseInt,
-                    parseFloat,
-                    JSON,
-                    ReturnCommand,
-                    runCommand,
-                    bunchify,
-                    
-                    // Alias functions
-                    sendMessage,
-                    sendPhoto,
-                    deleteMessage
-                } = this;
-                
+            try {
                 ${code}
-            }).call(this);
+            } catch (error) {
+                if (error.name === "ReturnCommand") {
+                    return null;
+                }
+                throw error;
+            }
         `;
 
-        const func = new Function(wrappedCode);
-        const result = await func.call(safeFunctions);
+        const func = new Function(...Object.keys(safeFunctions), wrappedCode);
+        const result = await func(...Object.values(safeFunctions));
         
         return result;
     } catch (error) {
@@ -560,17 +623,18 @@ async function executeCommandCode(bot, code, context) {
 function formatCommandCode(code) {
     if (!code) return '';
     
+    // Remove any problematic characters and format
     let formatted = code
+        .replace(/[^\x20-\x7E\n\r\t]/g, '') // Remove non-printable characters
         .replace(/\$\s*{\s*([^}]+)\s*}/g, '${$1}')
         .replace(/(\w+)\s*\(\s*/g, '$1(')
         .replace(/\s*\)/g, ')')
         .replace(/\s*;/g, ';')
         .replace(/\r\n/g, '\n')
         .replace(/\n+/g, '\n')
-        .replace(/\/\/.*$/gm, '')
-        .replace(/return\s+\(/g, 'return (');
+        .trim();
     
-    return formatted.trim();
+    return formatted;
 }
 
 // Handle bot updates from webhook
@@ -621,10 +685,27 @@ function getBotInstance(token) {
 
 // Remove bot from active bots
 function removeBot(token) {
+    const bot = activeBots.get(token);
+    if (bot) {
+        bot.stopPolling();
+    }
     activeBots.delete(token);
     botCommands.delete(token);
     console.log(`🗑️ Removed bot from active: ${token.substring(0, 15)}...`);
 }
+
+// Clean up waiting answers periodically
+setInterval(() => {
+    const now = Date.now();
+    const timeout = 5 * 60 * 1000; // 5 minutes
+    
+    for (const [key, data] of waitingForAnswer.entries()) {
+        if (now - data.timestamp > timeout) {
+            waitingForAnswer.delete(key);
+            console.log(`🧹 Cleaned up expired wait for answer: ${key}`);
+        }
+    }
+}, 60000); // Run every minute
 
 // Initialize on startup
 setTimeout(() => {
@@ -639,6 +720,10 @@ module.exports = {
     getBotInstance,
     removeBot,
     executeCommand,
+    saveUserData,
+    getUserData,
+    saveBotData,
+    getBotData,
     activeBots,
     botCommands
 };
