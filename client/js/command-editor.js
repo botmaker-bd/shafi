@@ -489,33 +489,107 @@ class EnhancedCommandEditor {
     }
 
     formatJavaScript(code) {
-        let formatted = code;
-
-        // Fix common formatting issues
-        formatted = formatted
-            .replace(/\$\s*{\s*/g, '${')
-            .replace(/\s*}\s*/g, '}')
-            .replace(/(\w+)\s*\(\s*/g, '$1(')
-            .replace(/\s*\)/g, ')')
-            .replace(/\s+/g, ' ')
-            .replace(/,(\S)/g, ', $1')
-            .replace(/;(\S)/g, '; $1')
-            .replace(/\s+/g, ' ')
-            .trim();
-
-        // Handle line breaks while preserving comments
-        const lines = formatted.split('\n');
-        const processedLines = lines.map(line => {
-            // Process each line separately for semicolons
-            if (line.includes(';') && !line.trim().startsWith('//')) {
-                const statements = line.split(';');
-                return statements.map(statement => statement.trim()).join(';\n');
-            }
-            return line;
-        });
+    // Step 1: Preserve comments and basic structure
+    const lines = code.split('\n');
+    const processedLines = [];
+    
+    for (let i = 0; i < lines.length; i++) {
+        let line = lines[i].trim();
         
-        return processedLines.join('\n');
+        // Skip completely empty lines
+        if (!line) {
+            processedLines.push('');
+            continue;
+        }
+        
+        // Handle full line comments
+        if (line.startsWith('//')) {
+            processedLines.push(line);
+            continue;
+        }
+        
+        // Handle inline comments - split them properly
+        const commentIndex = line.indexOf('//');
+        if (commentIndex > -1) {
+            const codePart = line.substring(0, commentIndex).trim();
+            const commentPart = line.substring(commentIndex).trim();
+            
+            if (codePart) {
+                // Process the code part for basic formatting
+                let formattedCode = this.formatCodeLine(codePart);
+                processedLines.push(formattedCode);
+            }
+            processedLines.push(commentPart);
+            continue;
+        }
+        
+        // Process regular code lines
+        let formattedLine = this.formatCodeLine(line);
+        processedLines.push(formattedLine);
     }
+    
+    // Step 2: Apply proper indentation
+    return this.applyIndentation(processedLines);
+}
+
+formatCodeLine(line) {
+    // Basic code formatting without breaking structure
+    return line
+        // Fix template literals
+        .replace(/\$\s*{\s*/g, '${')
+        .replace(/\s*}\s*/g, '}')
+        // Fix function calls
+        .replace(/(\w+)\s*\(\s*/g, '$1(')
+        .replace(/\s*\)/g, ')')
+        // Fix operators
+        .replace(/([<>!=]=?)\s*/g, '$1 ')
+        .replace(/\s*([<>!=]=?)/g, ' $1')
+        // Fix assignments
+        .replace(/(\w+)\s*=/g, '$1 =')
+        // Add spaces after commas
+        .replace(/,(\S)/g, ', $1')
+        // Clean up multiple spaces
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+applyIndentation(lines) {
+    let result = [];
+    let indentLevel = 0;
+    const indentSize = 2;
+    
+    for (let i = 0; i < lines.length; i++) {
+        let line = lines[i];
+        
+        // Skip processing for empty lines and comments
+        if (!line.trim()) {
+            result.push('');
+            continue;
+        }
+        
+        // Handle closing braces - decrease indent before the line
+        if (line.trim().startsWith('}') || line.includes('} else')) {
+            indentLevel = Math.max(0, indentLevel - 1);
+        }
+        
+        // Add proper indentation (except for comments)
+        const indent = line.startsWith('//') ? '' : ' '.repeat(indentLevel * indentSize);
+        result.push(indent + line);
+        
+        // Handle opening braces - increase indent after the line
+        if ((line.includes('{') && !line.startsWith('//')) || 
+            line.trim().endsWith('{')) {
+            indentLevel++;
+        }
+        
+        // Handle else statements
+        if (line.trim().startsWith('} else')) {
+            indentLevel++; // The else block will increase indent
+        }
+    }
+    
+    return result.join('\n');
+}
 
     showRealTimeSuggestions(code, cursorPos) {
         clearTimeout(this.suggestionTimeout);
