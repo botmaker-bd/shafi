@@ -651,42 +651,41 @@ class CommandEditor {
     }
 
     getCommandGroupHTML(commandName, commands) {
-    const firstCommand = commands[0];
-    const isActive = firstCommand.is_active;
-    const isSelected = this.currentCommand?.name === commandName;
-    const patterns = commands.map(cmd => cmd.pattern);
-    
-    // Show all patterns separated by commas
-    const patternsText = patterns.join(', ');
-    
-    return `
-        <div class="command-group ${isSelected ? 'active' : ''}" 
-             data-command-name="${this.escapeHtml(commandName)}">
-            <div class="command-icon">
-                <i class="fas fa-code"></i>
+        const firstCommand = commands[0];
+        const isActive = firstCommand.is_active;
+        const isSelected = this.currentCommand?.name === commandName;
+        const patterns = commands.map(cmd => cmd.pattern);
+        const mainPattern = patterns[0];
+        const additionalCount = patterns.length - 1;
+        
+        return `
+            <div class="command-group ${isSelected ? 'active' : ''}" 
+                 data-command-name="${this.escapeHtml(commandName)}">
+                <div class="command-icon">
+                    <i class="fas fa-code"></i>
+                </div>
+                <div class="command-content">
+                    <div class="command-header">
+                        <span class="command-name">${this.escapeHtml(commandName)}</span>
+                        <span class="command-pattern">${this.escapeHtml(mainPattern)}</span>
+                    </div>
+                    <div class="command-description">
+                        ${firstCommand.description || 'No description'}
+                    </div>
+                    <div class="command-meta">
+                        <span class="command-status ${isActive ? 'active' : 'inactive'}">
+                            <i class="fas fa-circle"></i>
+                            ${isActive ? 'Active' : 'Inactive'}
+                        </span>
+                        ${additionalCount > 0 ? 
+                            `<span class="command-feature">+${additionalCount} patterns</span>` : ''}
+                        ${firstCommand.wait_for_answer ? '<span class="command-feature">⏳ Waits</span>' : ''}
+                        <span class="command-id">ID: ${firstCommand.id.substring(0, 8)}...</span>
+                    </div>
+                </div>
             </div>
-            <div class="command-content">
-                <div class="command-header">
-                    <span class="command-name">${this.escapeHtml(commandName)}</span>
-                </div>
-                <div class="command-patterns">
-                    ${this.escapeHtml(patternsText)}
-                </div>
-                <div class="command-description">
-                    ${firstCommand.description || 'No description'}
-                </div>
-                <div class="command-meta">
-                    <span class="command-status ${isActive ? 'active' : 'inactive'}">
-                        <i class="fas fa-circle"></i>
-                        ${isActive ? 'Active' : 'Inactive'}
-                    </span>
-                    ${firstCommand.wait_for_answer ? '<span class="command-feature">⏳ Waits</span>' : ''}
-                    <span class="command-id">ID: ${firstCommand.id.substring(0, 10)}</span>
-                </div>
-            </div>
-        </div>
-    `;
-}
+        `;
+    }
 
     filterCommands(searchTerm) {
         const commandGroups = document.querySelectorAll('.command-group');
@@ -835,35 +834,27 @@ class CommandEditor {
     }
 
     async saveCommand() {
-    if (!this.currentCommand || !this.currentBot) {
-        this.showError('No command selected or bot not loaded');
-        return false;
-    }
+        if (!this.currentCommand || !this.currentBot) {
+            this.showError('No command selected or bot not loaded');
+            return false;
+        }
 
-    const commands = this.getCommandsFromTags();
-    
-    if (commands.length === 0) {
-        this.showError('Please add at least one command pattern');
-        document.getElementById('moreCommands').focus();
-        return false;
-    }
+        const commands = this.getCommandsFromTags();
+        
+        if (commands.length === 0) {
+            this.showError('Please add at least one command pattern');
+            document.getElementById('moreCommands').focus();
+            return false;
+        }
 
-    // Check for duplicate patterns in the same command
-    const uniqueCommands = [...new Set(commands)];
-    if (uniqueCommands.length !== commands.length) {
-        this.showError('Duplicate command patterns are not allowed');
-        return false;
-    }
-
-    const commandName = document.getElementById('commandName').value.trim();
-    
-    if (!commandName) {
-        this.showError('Command name is required');
-        document.getElementById('commandName').focus();
-        return false;
-    }
-
-    // Rest of the method remains same...
+        const commandPattern = commands.join(', ');
+        const commandName = document.getElementById('commandName').value.trim();
+        
+        if (!commandName) {
+            this.showError('Command name is required');
+            document.getElementById('commandName').focus();
+            return false;
+        }
 
         const formData = {
             name: commandName,
