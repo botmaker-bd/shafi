@@ -229,15 +229,20 @@ async function executeCommand(bot, command, msg, isTest = false) {
 }
 
 // Enhanced command code execution with official API
+// Enhanced command execution with complete TBC style functions
 async function executeCommandCode(bot, code, context) {
-    const { msg, chatId, userId, username, first_name, isTest, botToken } = context;
+    const { msg, chatId, userId, username, first_name, isTest, botToken, waitForAnswer } = context;
     
-    // User data management
+    // User data storage (simulated)
+    const userDataStore = new Map();
+    const botDataStore = new Map();
+    
     const getUserDataKey = (key) => `${botToken}_${userId}_${key}`;
     const getBotDataKey = (key) => `${botToken}_${key}`;
 
+    // Enhanced available functions for command code
     const safeFunctions = {
-        // ===== OFFICIAL TELEGRAM BOT PROPERTIES =====
+        // ===== MESSAGE PROPERTIES =====
         message: msg,
         
         // ===== CHAT ID SHORTCUTS =====
@@ -287,23 +292,25 @@ async function executeCommandCode(bot, code, context) {
             }
         },
         
+        // ===== USER INFORMATION =====
+        getUser: () => ({ 
+            id: userId, 
+            username: username || 'No username', 
+            first_name: first_name || 'User',
+            telegramid: userId,
+            language_code: msg.from.language_code
+        }),
+        
+        getChat: () => ({
+            id: chatId,
+            type: msg.chat.type,
+            title: msg.chat.title,
+            username: msg.chat.username
+        }),
+        
         // ===== WAIT FOR ANSWER =====
         waitForAnswer: (timeout = 60000) => {
-            return new Promise((resolve, reject) => {
-                const waitKey = `${botToken}_${userId}`;
-                
-                const timeoutId = setTimeout(() => {
-                    waitingForAnswer.delete(waitKey);
-                    reject(new Error('Wait for answer timeout'));
-                }, timeout);
-                
-                waitingForAnswer.set(waitKey, {
-                    resolve: (answer) => {
-                        clearTimeout(timeoutId);
-                        resolve(answer);
-                    }
-                });
-            });
+            return waitForAnswer(timeout);
         },
         
         // ===== BOT ACTIONS (Official API Style) =====
@@ -444,7 +451,6 @@ async function executeCommandCode(bot, code, context) {
         },
         
         runCommand: (commandPattern, params = {}) => {
-            // This would need to be implemented based on your command system
             console.log(`Would run command: ${commandPattern}`, params);
             throw new Error('runCommand not implemented in this version');
         },
@@ -466,28 +472,72 @@ async function executeCommandCode(bot, code, context) {
                 });
             }
             return obj;
+        },
+        
+        // ===== ALIAS FUNCTIONS FOR COMPATIBILITY =====
+        // TBC Style compatibility
+        sendMessage: (text, params = {}) => {
+            return bot.sendMessage(params.chat_id || chatId, text, {
+                parse_mode: params.parse_mode,
+                reply_markup: params.reply_markup
+            });
+        },
+        
+        sendPhoto: (photo, params = {}) => {
+            return bot.sendPhoto(params.chat_id || chatId, photo, {
+                caption: params.caption,
+                parse_mode: params.parse_mode
+            });
+        },
+        
+        deleteMessage: (params = {}) => {
+            return bot.deleteMessage(
+                params.chat_id || chatId,
+                params.message_id || msg.message_id
+            );
         }
     };
 
     try {
+        // Enhanced wrapped code with all functions
         const wrappedCode = `
             return (async function() {
                 const { 
+                    // Message properties
                     message,
                     u,
                     chat,
                     KEY,
+                    
+                    // User data
                     User,
                     Bot,
+                    
+                    // User information
+                    getUser,
+                    getChat,
+                    
+                    // Wait for answer
                     waitForAnswer,
+                    
+                    // Bot actions
                     bot,
+                    
+                    // HTTP requests
                     HTTP,
+                    
+                    // Utility functions
                     parseInt,
                     parseFloat,
                     JSON,
                     ReturnCommand,
                     runCommand,
-                    bunchify
+                    bunchify,
+                    
+                    // Alias functions
+                    sendMessage,
+                    sendPhoto,
+                    deleteMessage
                 } = this;
                 
                 ${code}
