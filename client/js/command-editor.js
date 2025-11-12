@@ -833,102 +833,102 @@ class CommandEditor {
         }
     }
 
-    async saveCommand() {
-        if (!this.currentCommand || !this.currentBot) {
-            this.showError('No command selected or bot not loaded');
-            return false;
-        }
-
-        const commands = this.getCommandsFromTags();
-        
-        if (commands.length === 0) {
-            this.showError('Please add at least one command pattern');
-            document.getElementById('moreCommands').focus();
-            return false;
-        }
-
-        const commandPattern = commands.join(', ');
-        const commandName = document.getElementById('commandName').value.trim();
-        
-        if (!commandName) {
-            this.showError('Command name is required');
-            document.getElementById('commandName').focus();
-            return false;
-        }
-
-        const formData = {
-            name: commandName,
-            pattern: commandPattern,
-            description: document.getElementById('commandDescription').value.trim(),
-            code: document.getElementById('commandCode').value.trim(),
-            waitForAnswer: document.getElementById('waitForAnswer').checked,
-            answerHandler: document.getElementById('waitForAnswer').checked ? 
-                          document.getElementById('answerHandler').value.trim() : '',
-            botToken: this.currentBot.token
-        };
-
-        if (!formData.code) {
-            this.showError('Command code is required');
-            document.getElementById('commandCode').focus();
-            return false;
-        }
-
-        if (formData.waitForAnswer && !formData.answerHandler) {
-            this.showError('Answer handler code is required when "Wait for Answer" is enabled');
-            document.getElementById('answerHandler').focus();
-            return false;
-        }
-
-        this.showLoading(true);
-
-        try {
-            const token = localStorage.getItem('token');
-            let response;
-            let url;
-            let method;
-
-            if (this.currentCommand.id === 'new') {
-                url = '/api/commands';
-                method = 'POST';
-            } else {
-                url = `/api/commands/${this.currentCommand.id}`;
-                method = 'PUT';
-                formData.commandId = this.currentCommand.id;
-            }
-
-            response = await fetch(url, {
-                method: method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(formData)
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                this.showSuccess('Command saved successfully!');
-                
-                await this.loadCommands();
-                
-                if (data.command) {
-                    this.currentCommand = Array.isArray(data.command) ? data.command[0] : data.command;
-                    this.populateCommandForm();
-                }
-                
-                return true;
-            } else {
-                this.showError(data.error || 'Failed to save command');
-                return false;
-            }
-        } catch (error) {
-            this.showError('Network error while saving command');
-            return false;
-        } finally {
-            this.showLoading(false);
-        }
+    // Save command function - auto select after save
+async saveCommand() {
+    if (!this.currentCommand || !this.currentBot) {
+        this.showError('No command selected or bot not loaded');
+        return false;
     }
+
+    const commands = this.getCommandsFromTags();
+    
+    if (commands.length === 0) {
+        this.showError('Please add at least one command pattern');
+        document.getElementById('moreCommands').focus();
+        return false;
+    }
+
+    const commandName = commands[0]; // Use first pattern as command name
+    
+    if (!commandName) {
+        this.showError('Command name is required');
+        document.getElementById('moreCommands').focus();
+        return false;
+    }
+
+    const formData = {
+        name: commandName,
+        pattern: commands.join(', '),
+        code: document.getElementById('commandCode').value.trim(),
+        waitForAnswer: document.getElementById('waitForAnswer').checked,
+        answerHandler: document.getElementById('waitForAnswer').checked ? 
+                      document.getElementById('answerHandler').value.trim() : '',
+        botToken: this.currentBot.token
+    };
+
+    if (!formData.code) {
+        this.showError('Command code is required');
+        document.getElementById('commandCode').focus();
+        return false;
+    }
+
+    if (formData.waitForAnswer && !formData.answerHandler) {
+        this.showError('Answer handler code is required when "Wait for Answer" is enabled');
+        document.getElementById('answerHandler').focus();
+        return false;
+    }
+
+    this.showLoading(true);
+
+    try {
+        const token = localStorage.getItem('token');
+        let response;
+        let url;
+        let method;
+
+        if (this.currentCommand.id === 'new') {
+            url = '/api/commands';
+            method = 'POST';
+        } else {
+            url = `/api/commands/${this.currentCommand.id}`;
+            method = 'PUT';
+            formData.commandId = this.currentCommand.id;
+        }
+
+        response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(formData)
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            this.showSuccess('Command saved successfully!');
+            
+            // Auto-select the saved command
+            await this.loadCommands();
+            
+            if (data.commands && data.commands.length > 0) {
+                const savedCommand = data.commands[0];
+                await this.selectCommand(savedCommand.name);
+            }
+            
+            return true;
+        } else {
+            this.showError(data.error || 'Failed to save command');
+            return false;
+        }
+    } catch (error) {
+        this.showError('Network error while saving command');
+        return false;
+    } finally {
+        this.showLoading(false);
+    }
+}
 
     async deleteCommand() {
         if (!this.currentCommand || this.currentCommand.id === 'new') {
