@@ -1,55 +1,135 @@
+// Global error handlers
+process.on('uncaughtException', (error) => {
+    console.error('🚨 UNCAUGHT EXCEPTION:', error.message);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('🚨 UNHANDLED REJECTION:', reason);
+});
+
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const bodyParser = require('body-parser');
 const path = require('path');
-require('dotenv').config();
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(cors());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+// Get base URL for webhooks
+const BASE_URL = process.env.BASE_URL || `https://${process.env.RENDER_EXTERNAL_HOSTNAME || `localhost:${PORT}`}`;
+console.log('🌐 Base URL:', BASE_URL);
 
-// Serve static files
-app.use(express.static(path.join(__dirname, '../')));
+// Enhanced CORS configuration for production
+app.use(cors({
+    origin: function (origin, callback) {
+        const allowedOrigins = [
+            'https://bot-maker-bd.onrender.com',
+            'http://localhost:3000',
+            'http://localhost:8080'
+        ];
+        
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            console.log('🚫 CORS blocked origin:', origin);
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true
+}));
 
-// API Routes
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/bots', require('./routes/bots'));
-app.use('/api/commands', require('./routes/commands'));
+app.use(bodyParser.json({ limit: '10mb' }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
+
+// Static files - Render compatible path
+app.use(express.static(path.join(__dirname, '../client')));
+
+// Rate limiting
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // limit each IP to 100 requests per windowMs
+    message: 'Too many requests from this IP, please try again later.',
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+app.use(limiter);
+
+// Import routes with better error handling
+const loadRoutes = () => {
+    try {
+        const authRoutes = require('./routes/auth');
+        const botRoutes = require('./routes/bots');
+        const commandRoutes = require('./routes/commands');
+        const adminRoutes = require('./routes/admin');
+        const passwordRoutes = require('./routes/password');
+
+        app.use('/api/auth', authRoutes);
+        app.use('/api/bots', botRoutes);
+        app.use('/api/commands', commandRoutes);
+        app.use('/api/admin', adminRoutes);
+        app.use('/api/password', passwordRoutes);
+        
+        console.log('✅ All routes loaded successfully');
+        return true;
+    } catch (error) {
+        console.error('❌ Route loading failed:', error);
+        return false;
+    }
+};
+
+// Load routes
+loadRoutes();
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-    res.json({ 
-        success: true, 
-        message: 'Server is running',
-        timestamp: new Date().toISOString()
+    res.json({
+        status: 'OK',
+        message: 'Bot Maker Pro API is running',
+        timestamp: new Date().toISOString(),
+        version: '2.0.0',
+        environment: process.env.NODE_ENV || 'development',
+        baseUrl: BASE_URL
     });
 });
 
-// Serve HTML files for SPA
-app.get('*', (req, res) => {
-    const filePath = path.join(__dirname, '../', req.path);
-    
-    // If the request is for a specific file and it exists, serve it
-    if (req.path.includes('.') && require('fs').existsSync(filePath)) {
-        return res.sendFile(filePath);
+// 🔥 IMPORTANT: Webhook endpoint for Telegram
+app.post('/api/webhook/:token', async (req, res) => {
+    try {
+        const { token } = req.params;
+        const update = req.body;
+        
+        console.log('🔄 Webhook received for bot:', token.substring(0, 10) + '...');
+        console.log('📦 Update type:', update.message ? 'message' : update.callback_query ? 'callback' : 'other');
+        
+        // Import bot manager
+        const botManager = require('./core/bot-manager');
+        
+        // Process the update
+        await botManager.handleBotUpdate(token, update);
+        
+        // Always respond with 200 OK to Telegram
+        res.status(200).send('OK');
+        
+    } catch (error) {
+        console.error('❌ Webhook error:', error);
+        // Still respond with 200 to prevent Telegram from retrying
+        res.status(200).send('OK');
     }
-    
-    // Otherwise serve the main HTML file based on the path
-    let htmlFile = 'index.html';
-    if (req.path.startsWith('/dashboard')) htmlFile = 'dashboard.html';
-    if (req.path.startsWith('/bot-management')) htmlFile = 'bot-management.html';
-    if (req.path.startsWith('/command-editor')) htmlFile = 'command-editor.html';
-    if (req.path.startsWith('/admin-settings')) htmlFile = 'admin-settings.html';
-    
-    res.sendFile(path.join(__dirname, '../', htmlFile));
+});
+
+// Serve SPA - All other routes go to client
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/index.html'));
 });
 
 // Error handling middleware
 app.use((error, req, res, next) => {
-    console.error('❌ Server error:', error);
+    console.error('🚨 Error:', error);
     res.status(500).json({
         success: false,
         error: 'Internal server error'
@@ -57,10 +137,31 @@ app.use((error, req, res, next) => {
 });
 
 // Start server
-app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`📧 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`🔗 Health check: http://localhost:${PORT}/api/health`);
+const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log('🚀 Server started successfully!');
+    console.log(`📍 Port: ${PORT}`);
+    console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🌐 Base URL: ${BASE_URL}`);
+    console.log(`🕒 Started at: ${new Date().toISOString()}`);
+    console.log(`🔗 Health check: ${BASE_URL}/api/health`);
+    console.log(`🤖 Webhook URL: ${BASE_URL}/api/webhook/{BOT_TOKEN}`);
+    
+    // Initialize bots after server starts with delay
+    setTimeout(() => {
+        const botManager = require('./core/bot-manager');
+        botManager.initializeAllBots().catch(error => {
+            console.error('❌ Bot initialization failed:', error);
+        });
+    }, 5000); // Increased delay to ensure server is fully ready
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+    console.log('🛑 SIGTERM received, shutting down gracefully');
+    server.close(() => {
+        console.log('✅ Server closed');
+        process.exit(0);
+    });
 });
 
 module.exports = app;
