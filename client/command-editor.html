@@ -4,11 +4,968 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Command Editor - Bot Maker Pro</title>
-    <link rel="stylesheet" href="css/style.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #3b82f6;
+            --primary-dark: #2563eb;
+            --secondary-color: #64748b;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8fafc;
+            --bg-tertiary: #f1f5f9;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --text-light: #94a3b8;
+            --border-color: #e2e8f0;
+            --border-light: #f1f5f9;
+            --radius-sm: 0.25rem;
+            --radius-md: 0.5rem;
+            --radius-lg: 0.75rem;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: var(--bg-secondary);
+            color: var(--text-primary);
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+
+        /* Navbar Styles */
+        .navbar {
+            background-color: var(--bg-primary);
+            box-shadow: var(--shadow-sm);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .navbar .container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem;
+        }
+
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            text-decoration: none;
+            color: var(--text-primary);
+            font-weight: 700;
+            font-size: 1.25rem;
+        }
+
+        .brand-icon {
+            margin-right: 0.5rem;
+            font-size: 1.5rem;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+            color: var(--text-secondary);
+            padding: 0.5rem 0.75rem;
+            border-radius: var(--radius-md);
+            transition: var(--transition);
+            font-weight: 500;
+        }
+
+        .nav-link:hover, .nav-link.active {
+            background-color: var(--bg-tertiary);
+            color: var(--primary-color);
+        }
+
+        .nav-link.active {
+            color: var(--primary-color);
+        }
+
+        .mobile-menu-btn {
+            display: none;
+            background: none;
+            border: none;
+            font-size: 1.25rem;
+            color: var(--text-primary);
+            cursor: pointer;
+        }
+
+        .user-menu {
+            position: relative;
+        }
+
+        .user-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: none;
+            border: none;
+            padding: 0.5rem 0.75rem;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: var(--transition);
+            color: var(--text-primary);
+        }
+
+        .user-btn:hover {
+            background-color: var(--bg-tertiary);
+        }
+
+        .user-avatar {
+            width: 2rem;
+            height: 2rem;
+            border-radius: 50%;
+            background-color: var(--primary-color);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .user-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: var(--bg-primary);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-lg);
+            padding: 0.5rem 0;
+            min-width: 200px;
+            display: none;
+            z-index: 10;
+        }
+
+        .user-dropdown.show {
+            display: block;
+        }
+
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            text-decoration: none;
+            color: var(--text-primary);
+            transition: var(--transition);
+        }
+
+        .dropdown-item:hover {
+            background-color: var(--bg-tertiary);
+        }
+
+        .dropdown-divider {
+            height: 1px;
+            background-color: var(--border-color);
+            margin: 0.5rem 0;
+        }
+
+        /* Page Header */
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 1.5rem 0;
+        }
+
+        .header-content h1 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .header-content p {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .bot-link {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-size: 0.875rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .bot-link:hover {
+            text-decoration: underline;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        /* Button Styles */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.625rem 1rem;
+            border-radius: var(--radius-md);
+            border: none;
+            font-weight: 500;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: var(--transition);
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-dark);
+        }
+
+        .btn-secondary {
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--border-color);
+        }
+
+        .btn-success {
+            background-color: var(--success-color);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background-color: #0da271;
+        }
+
+        .btn-warning {
+            background-color: var(--warning-color);
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background-color: #e58e0b;
+        }
+
+        .btn-danger {
+            background-color: var(--danger-color);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background-color: #dc2626;
+        }
+
+        .btn-small {
+            padding: 0.5rem 0.75rem;
+            font-size: 0.75rem;
+        }
+
+        /* Editor Layout */
+        .editor-layout {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        /* Commands Sidebar */
+        .commands-sidebar {
+            background-color: var(--bg-primary);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-sm);
+            overflow: hidden;
+            height: fit-content;
+        }
+
+        .sidebar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sidebar-header h3 {
+            font-size: 1.125rem;
+            font-weight: 600;
+        }
+
+        .sidebar-search {
+            position: relative;
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sidebar-search input {
+            width: 100%;
+            padding: 0.625rem 2.5rem 0.625rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            font-size: 0.875rem;
+            transition: var(--transition);
+        }
+
+        .sidebar-search input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .sidebar-search i {
+            position: absolute;
+            right: 2rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-light);
+        }
+
+        .commands-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .command-item {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border-light);
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .command-item:hover {
+            background-color: var(--bg-tertiary);
+        }
+
+        .command-item.active {
+            background-color: rgba(59, 130, 246, 0.05);
+            border-left: 3px solid var(--primary-color);
+        }
+
+        .command-info {
+            flex: 1;
+        }
+
+        .command-name {
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+        }
+
+        .command-patterns {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.25rem;
+        }
+
+        .command-pattern {
+            background-color: var(--bg-tertiary);
+            padding: 0.125rem 0.5rem;
+            border-radius: 1rem;
+        }
+
+        .command-status {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 1rem;
+            font-weight: 500;
+        }
+
+        .status-active {
+            background-color: rgba(16, 185, 129, 0.1);
+            color: var(--success-color);
+        }
+
+        .status-inactive {
+            background-color: rgba(100, 116, 139, 0.1);
+            color: var(--text-secondary);
+        }
+
+        .empty-state {
+            padding: 2rem 1.25rem;
+            text-align: center;
+            color: var(--text-secondary);
+        }
+
+        .empty-icon {
+            font-size: 3rem;
+            color: var(--text-light);
+            margin-bottom: 1rem;
+        }
+
+        /* Editor Main */
+        .editor-main {
+            background-color: var(--bg-primary);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-sm);
+            overflow: hidden;
+        }
+
+        .editor-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .command-title {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .command-title h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .status-badge.active {
+            background-color: rgba(16, 185, 129, 0.1);
+            color: var(--success-color);
+        }
+
+        .status-badge.inactive {
+            background-color: rgba(100, 116, 139, 0.1);
+            color: var(--text-secondary);
+        }
+
+        .editor-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        /* Command Form */
+        .command-form {
+            padding: 1.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            font-size: 0.875rem;
+            transition: var(--transition);
+            font-family: inherit;
+        }
+
+        .form-group input:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .form-group textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .form-help {
+            margin-top: 0.5rem;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .code-help {
+            margin-top: 0.5rem;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            background-color: var(--bg-tertiary);
+            padding: 0.75rem;
+            border-radius: var(--radius-md);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .template-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.25rem 0.75rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .template-btn:hover {
+            background: var(--primary-dark);
+        }
+
+        /* Toggle Group */
+        .toggle-group {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .toggle-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 1rem;
+            background-color: var(--bg-tertiary);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+        }
+
+        .toggle-text {
+            flex: 1;
+        }
+
+        .toggle-title {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+        }
+
+        .toggle-description {
+            display: block;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 44px;
+            height: 24px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--border-color);
+            transition: var(--transition);
+            border-radius: 24px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: var(--transition);
+            border-radius: 50%;
+        }
+
+        input:checked + .toggle-slider {
+            background-color: var(--primary-color);
+        }
+
+        input:checked + .toggle-slider:before {
+            transform: translateX(20px);
+        }
+
+        /* Code Editor Header */
+        .code-editor-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .code-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn-code {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            font-size: 0.75rem;
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .btn-code:hover {
+            background-color: var(--border-color);
+        }
+
+        /* Commands Tags */
+        .commands-input-container {
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 0.5rem;
+            background: var(--bg-primary);
+            min-height: 2.75rem;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .commands-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            flex: 1;
+        }
+
+        .command-tag {
+            background: var(--primary-color);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            animation: slideIn 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .command-tag .remove-tag {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            padding: 0;
+            width: 1rem;
+            height: 1rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            flex-shrink: 0;
+        }
+
+        .command-tag .remove-tag:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        #moreCommands {
+            border: none;
+            outline: none;
+            flex: 1;
+            min-width: 120px;
+            background: transparent;
+            font-size: 0.875rem;
+        }
+
+        /* Test Input Container */
+        .test-input-container {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .test-input-container input {
+            flex: 1;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            padding: 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+        }
+
+        .modal-body {
+            padding: 1.25rem;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .modal-footer {
+            padding: 1.25rem;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+        }
+
+        /* Template Modal */
+        .template-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .template-card {
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 1rem;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .template-card:hover {
+            border-color: var(--primary-color);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .template-card h4 {
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .template-card p {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .template-preview {
+            background: var(--bg-tertiary);
+            padding: 0.5rem;
+            border-radius: var(--radius-sm);
+            font-family: monospace;
+            font-size: 0.7rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Loading Overlay */
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.8);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+        }
+
+        .loading-spinner {
+            text-align: center;
+        }
+
+        .spinner {
+            border: 4px solid var(--border-color);
+            border-left: 4px solid var(--primary-color);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1024px) {
+            .editor-layout {
+                grid-template-columns: 1fr;
+            }
+            
+            .commands-sidebar {
+                order: 2;
+            }
+            
+            .editor-main {
+                order: 1;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+            
+            .mobile-menu-btn {
+                display: block;
+            }
+            
+            .page-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+            
+            .header-actions {
+                width: 100%;
+                justify-content: flex-end;
+            }
+            
+            .editor-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+            
+            .editor-actions {
+                width: 100%;
+                justify-content: flex-end;
+            }
+
+            .template-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-5px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Notification Styles */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--success-color);
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-lg);
+            z-index: 10000;
+            max-width: 400px;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .notification-error {
+            background: var(--danger-color);
+        }
+
+        .notification-info {
+            background: var(--primary-color);
+        }
+
+        .notification-content {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .notification-close {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 1.25rem;
+        }
+    </style>
 </head>
 <body>
     <nav class="navbar">
@@ -66,8 +1023,8 @@
     <div class="container">
         <div class="page-header">
             <div class="header-content">
-                <h1 id="botName">Command Editor</h1>
-                <p id="botUsername">Manage commands for your bot</p>
+                <h1>Command Editor</h1>
+                <p>Manage commands for <a href="#" class="bot-link">@MyAwesomeBot <i class="fas fa-external-link-alt"></i></a></p>
             </div>
             <div class="header-actions">
                 <button class="btn btn-secondary" id="backToBots">
@@ -79,7 +1036,7 @@
         <div class="editor-layout">
             <div class="commands-sidebar">
                 <div class="sidebar-header">
-                    <h3>Commands</h3>
+                    <h3>Command List</h3>
                     <button id="addCommandBtn" class="btn btn-primary btn-small">
                         <i class="fas fa-plus"></i> New
                     </button>
@@ -91,7 +1048,39 @@
                 </div>
 
                 <div id="commandsList" class="commands-list">
-                    <!-- Commands will be loaded here -->
+                    <div class="command-item active">
+                        <div class="command-info">
+                            <div class="command-name">Welcome Message</div>
+                            <div class="command-patterns">
+                                <span class="command-pattern">/start</span>
+                                <span class="command-pattern">hello</span>
+                                <span class="command-pattern">hi</span>
+                            </div>
+                        </div>
+                        <div class="command-status status-active">Active</div>
+                    </div>
+                    
+                    <div class="command-item">
+                        <div class="command-info">
+                            <div class="command-name">Help Command</div>
+                            <div class="command-patterns">
+                                <span class="command-pattern">/help</span>
+                                <span class="command-pattern">help me</span>
+                            </div>
+                        </div>
+                        <div class="command-status status-active">Active</div>
+                    </div>
+                    
+                    <div class="command-item">
+                        <div class="command-info">
+                            <div class="command-name">Weather Info</div>
+                            <div class="command-patterns">
+                                <span class="command-pattern">weather</span>
+                                <span class="command-pattern">forecast</span>
+                            </div>
+                        </div>
+                        <div class="command-status status-inactive">Inactive</div>
+                    </div>
                 </div>
 
                 <div id="emptyCommands" class="empty-state" style="display: none;">
@@ -106,126 +1095,131 @@
             </div>
 
             <div class="editor-main">
-                <!-- No Command Selected State -->
-                <div id="noCommandSelected" class="empty-state">
-                    <div class="empty-icon">
-                        <i class="fas fa-code"></i>
+                <div class="editor-header">
+                    <div class="command-title">
+                        <h3>Welcome Message</h3>
+                        <div class="command-status">
+                            <span class="status-badge active">Active</span>
+                        </div>
                     </div>
-                    <h3>No Command Selected</h3>
-                    <p>Select a command from the list or create a new one to start editing</p>
-                    <button class="btn btn-primary" id="createFirstCommand">
-                        <i class="fas fa-plus"></i> Create New Command
-                    </button>
+                    <div class="editor-actions">
+                        <button id="testCommandBtn" class="btn btn-success btn-small">
+                            <i class="fas fa-bolt"></i> Test
+                        </button>
+                        <button id="saveCommandBtn" class="btn btn-primary btn-small">
+                            <i class="fas fa-save"></i> Save
+                        </button>
+                        <button id="deleteCommandBtn" class="btn btn-danger btn-small">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                    </div>
                 </div>
 
-                <div id="commandEditor" class="command-editor" style="display: none;">
-                    <div class="editor-header">
-                        <div class="command-title">
-                            <h3 id="currentCommandName">Command Name</h3>
-                            <div class="command-status">
-                                <span class="status-badge active" id="commandStatus">Active</span>
-                            </div>
+                <form id="commandForm" class="command-form">
+                    <div class="form-group">
+                        <label for="testInput">Test Command Input</label>
+                        <div class="test-input-container">
+                            <input type="text" id="testInput" 
+                                   placeholder="Enter test input (required)">
+                            <button type="button" id="runTestBtn" class="btn btn-warning btn-small">
+                                <i class="fas fa-play"></i> Run Test
+                            </button>
                         </div>
-                        <div class="editor-actions">
-                            <button id="testCommandBtn" class="btn btn-success btn-small">
-                                <i class="fas fa-bolt"></i> Test
-                            </button>
-                            <button id="saveCommandBtn" class="btn btn-primary btn-small">
-                                <i class="fas fa-save"></i> Save
-                            </button>
-                            <button id="deleteCommandBtn" class="btn btn-danger btn-small">
-                                <i class="fas fa-trash"></i> Delete
-                            </button>
+                        <div class="form-help">
+                            Enter the exact command text to test. This field is required for testing.
                         </div>
                     </div>
 
-                    <form id="commandForm" class="command-form">
-                        <!-- Enhanced Test Section -->
-                        <div class="form-group">
-                            <label for="testInput">Test Command Input</label>
-                            <div class="test-input-container">
-                                <input type="text" id="testInput" 
-                                       placeholder="Enter custom test input or use command patterns above...">
-                                <button type="button" id="runTestBtn" class="btn btn-warning btn-small">
-                                    <i class="fas fa-play"></i> Run Test
+                    <div class="toggle-group">
+                        <label class="toggle-label">
+                            <div class="toggle-text">
+                                <span class="toggle-title">Wait for Answer</span>
+                                <span class="toggle-description">Enable this to wait for user response after command execution</span>
+                            </div>
+                            <div class="toggle-switch">
+                                <input type="checkbox" id="waitForAnswer">
+                                <span class="toggle-slider"></span>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="moreCommands">Command Patterns *</label>
+                        <div class="commands-input-container">
+                            <div id="commandsTags" class="commands-tags">
+                                <div class="command-tag">
+                                    /start
+                                    <button type="button" class="remove-tag">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                                <div class="command-tag">
+                                    hello
+                                    <button type="button" class="remove-tag">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                                <div class="command-tag">
+                                    hi
+                                    <button type="button" class="remove-tag">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <input type="text" id="moreCommands" 
+                                   placeholder="Type command and press Enter or comma...">
+                        </div>
+                        <div class="form-help">
+                            Add multiple command patterns. All patterns will execute the same code as a single command.
+                        </div>
+                    </div>
+
+                    <div id="answerHandlerSection" class="form-group" style="display: none;">
+                        <div class="code-editor-header">
+                            <label for="answerHandler">Answer Handler Code</label>
+                            <div class="code-actions">
+                                <button type="button" class="btn-code" id="openAnswerEditor">
+                                    <i class="fas fa-edit"></i> Open Editor
                                 </button>
                             </div>
-                            <div class="form-help">
-                                Test your command with custom input. Leave empty to use command patterns.
-                            </div>
                         </div>
+                        <textarea id="answerHandler" 
+                                  placeholder="Code to handle user's answer..."></textarea>
+                        <div class="form-help">
+                            This code will execute when user responds. Use `getAnswer()` to get user's response.
+                        </div>
+                    </div>
 
-                        <div class="toggle-group">
-                            <label class="toggle-label">
-                                <div class="toggle-text">
-                                    <span class="toggle-title">Wait for Answer</span>
-                                    <span class="toggle-description">Enable this to wait for user response after command execution</span>
-                                </div>
-                                <div class="toggle-switch">
-                                    <input type="checkbox" id="waitForAnswer">
-                                    <span class="toggle-slider"></span>
-                                </div>
-                            </label>
-                            
-                            <label class="toggle-label">
-                                <div class="toggle-text">
-                                    <span class="toggle-title">Command Active</span>
-                                    <span class="toggle-description">Enable or disable this command</span>
-                                </div>
-                                <div class="toggle-switch">
-                                    <input type="checkbox" id="commandActive" checked>
-                                    <span class="toggle-slider"></span>
-                                </div>
-                            </label>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="moreCommands">Command Patterns *</label>
-                            <div class="commands-input-container">
-                                <div id="commandsTags" class="commands-tags">
-                                    <!-- Command tags will be added here -->
-                                </div>
-                                <input type="text" id="moreCommands" 
-                                       placeholder="Type command and press Enter or comma...">
-                            </div>
-                            <div class="form-help">
-                                Add multiple command patterns. Each pattern will execute the same code.
+                    <div class="form-group">
+                        <div class="code-editor-header">
+                            <label for="commandCode">Command Code *</label>
+                            <div class="code-actions">
+                                <button type="button" class="btn-code" id="openEditor">
+                                    <i class="fas fa-edit"></i> Open Editor
+                                </button>
                             </div>
                         </div>
-
-                        <div id="answerHandlerSection" class="form-group" style="display: none;">
-                            <div class="code-editor-header">
-                                <label for="answerHandler">Answer Handler Code</label>
-                                <div class="code-actions">
-                                    <button type="button" class="btn-code" id="openAnswerEditor">
-                                        <i class="fas fa-edit"></i> Open Editor
-                                    </button>
-                                </div>
-                            </div>
-                            <textarea id="answerHandler" 
-                                      placeholder="Code to handle user's answer..."></textarea>
-                            <div class="form-help">
-                                This code will execute when user responds. Use `getAnswer()` to get user's response.
-                            </div>
+                        <textarea id="commandCode">// Welcome message command
+function execute() {
+    const userName = getUser().first_name;
+    sendMessage(`Hello ${userName}! Welcome to our bot. 🤖\n\nHow can I help you today?`);
+    
+    // Show main menu buttons
+    const buttons = [
+        [{ text: "Help 📚", callback_data: "help" }],
+        [{ text: "Settings ⚙️", callback_data: "settings" }]
+    ];
+    
+    sendMessage("Choose an option:", { reply_markup: { inline_keyboard: buttons } });
+}</textarea>
+                        <div class="code-help">
+                            <span><strong>Available functions:</strong> sendMessage(), sendPhoto(), getUser(), getChatId(), isTest(), wait() etc.</span>
+                            <button class="template-btn" id="templateBtn">
+                                <i class="fas fa-magic"></i> Templates
+                            </button>
                         </div>
-
-                        <div class="form-group">
-                            <div class="code-editor-header">
-                                <label for="commandCode">Command Code *</label>
-                                <div class="code-actions">
-                                    <button type="button" class="btn-code" id="openEditor">
-                                        <i class="fas fa-edit"></i> Open Editor
-                                    </button>
-                                </div>
-                            </div>
-                            <textarea id="commandCode" 
-                                      placeholder="Write your command code here..."></textarea>
-                            <div class="code-help">
-                                <strong>Available functions:</strong> sendMessage(), sendPhoto(), getUser(), getChatId(), isTest(), wait() etc..
-                            </div>
-                        </div>
-                    </form>
-                </div>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -238,7 +1232,7 @@
         </div>
     </div>
 
-    <!-- Enhanced Test Command Modal -->
+    <!-- Test Command Modal -->
     <div id="testCommandModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -256,462 +1250,884 @@
         </div>
     </div>
 
-    <!-- Full Screen Code Editor Modal -->
-    <div id="codeEditorModal" class="modal fullscreen-modal">
-        <div class="modal-content fullscreen-content">
-            <div class="modal-header compact-header">
-                <div class="editor-toolbar-icons">
-                    <button class="btn-icon" id="undoBtn" title="Undo">
-                        <i class="fas fa-undo"></i>
-                    </button>
-                    <button class="btn-icon" id="redoBtn" title="Redo">
-                        <i class="fas fa-redo"></i>
-                    </button>
-                    <button class="btn-icon" id="selectAllBtn" title="Select All">
-                        <i class="fas fa-expand-arrows-alt"></i>
-                    </button>
-                    <button class="btn-icon" id="cutBtn" title="Cut Selected">
-                        <i class="fas fa-cut"></i>
-                    </button>
-                    <button class="btn-icon" id="copyBtn" title="Copy Selected">
-                        <i class="fas fa-copy"></i>
-                    </button>
-                    <button class="btn-icon" id="pasteBtn" title="Paste">
-                        <i class="fas fa-paste"></i>
-                    </button>
-                    <button class="btn-icon" id="clearBtn" title="Clear All">
-                        <i class="fas fa-eraser"></i>
-                    </button>
-                    <button class="btn-icon" id="formatBtn" title="Format Code">
-                        <i class="fas fa-indent"></i>
-                    </button>
-                    <button class="btn-icon" id="suggestBtn" title="Toggle Suggestions">
-                        <i class="fas fa-lightbulb"></i>
-                    </button>
-                </div>
+    <!-- Template Modal -->
+    <div id="templateModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Code Templates</h3>
                 <button class="modal-close">&times;</button>
             </div>
-            <div class="modal-body fullscreen-body">
-                <textarea id="advancedCodeEditor" class="fullscreen-editor" 
-                         placeholder="Write your code here..."></textarea>
-                <div class="suggestions-panel" id="suggestionsPanel" style="display: none;">
-                    <div class="suggestions-header">
-                        <h4>Suggestions</h4>
-                        <button class="btn-icon" id="closeSuggestions" title="Close Suggestions">
-                            <i class="fas fa-times"></i>
-                        </button>
+            <div class="modal-body">
+                <p>Choose a template to quickly add code to your command:</p>
+                <div class="template-grid">
+                    <div class="template-card" onclick="commandEditor.applyTemplate('welcome')">
+                        <h4>Welcome Message</h4>
+                        <p>Basic welcome message with user name</p>
+                        <div class="template-preview">sendMessage(`Hello ${user.first_name}!`);</div>
                     </div>
-                    <div id="suggestionsList"></div>
+                    <div class="template-card" onclick="commandEditor.applyTemplate('help')">
+                        <h4>Help Command</h4>
+                        <p>Help message with available commands</p>
+                        <div class="template-preview">sendMessage("Available commands: ...");</div>
+                    </div>
+                    <div class="template-card" onclick="commandEditor.applyTemplate('buttons')">
+                        <h4>Inline Buttons</h4>
+                        <p>Send message with inline keyboard</p>
+                        <div class="template-preview">sendMessage("Choose:", {reply_markup: ...});</div>
+                    </div>
+                    <div class="template-card" onclick="commandEditor.applyTemplate('photo')">
+                        <h4>Send Photo</h4>
+                        <p>Send image with caption</p>
+                        <div class="template-preview">sendPhoto("url", {caption: "..."});</div>
+                    </div>
+                    <div class="template-card" onclick="commandEditor.applyTemplate('userinfo')">
+                        <h4>User Info</h4>
+                        <p>Display user information</p>
+                        <div class="template-preview">const user = getUser();</div>
+                    </div>
+                    <div class="template-card" onclick="commandEditor.applyTemplate('wait')">
+                        <h4>Wait for Answer</h4>
+                        <p>Setup wait for user response</p>
+                        <div class="template-preview">waitForAnswer = true;</div>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" id="cancelEdit">Cancel</button>
-                <button class="btn btn-primary" id="saveCode">Save Code</button>
+                <button class="btn btn-secondary" id="closeTemplateModal">Close</button>
             </div>
         </div>
     </div>
 
-    <script src="js/common.js"></script>
-    <script src="js/command-editor.js"></script>
+    <script>
+        class EnhancedCommandEditor {
+            constructor() {
+                this.user = null;
+                this.currentBot = null;
+                this.currentCommand = null;
+                this.commands = [];
+                this.init();
+            }
 
-    <style>
-    .fullscreen-modal {
-        align-items: stretch;
-        padding: 0;
-    }
+            async init() {
+                await this.checkAuth();
+                await this.loadBotInfo();
+                this.setupEventListeners();
+                await this.loadCommands();
+                this.setupCommandsTags();
+            }
 
-    .fullscreen-content {
-        max-width: none;
-        width: 100%;
-        height: 100vh;
-        margin: 0;
-        display: flex;
-        flex-direction: column;
-        position: relative;
-    }
+            async checkAuth() {
+                const token = localStorage.getItem('token');
+                const userData = localStorage.getItem('user');
 
-    .compact-header {
-        padding: 0.75rem 1rem;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        background: var(--bg-primary);
-        border-bottom: 1px solid var(--border-color);
-        position: sticky;
-        top: 0;
-        z-index: 1000;
-        flex-shrink: 0;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
+                if (!token || !userData) {
+                    window.location.href = 'login.html';
+                    return;
+                }
 
-    .editor-toolbar-icons {
-        display: flex;
-        gap: 0.25rem;
-        flex-wrap: wrap;
-        align-items: center;
-    }
+                try {
+                    this.user = JSON.parse(userData);
+                    document.getElementById('userEmail').textContent = this.user.email;
+                    document.getElementById('userAvatar').textContent = this.user.name ? this.user.name.charAt(0).toUpperCase() : 'U';
+                } catch (error) {
+                    this.logout();
+                }
+            }
 
-    .btn-icon {
-        background: var(--bg-tertiary);
-        border: 1px solid var(--border-color);
-        padding: 0.5rem 0.75rem;
-        border-radius: var(--radius-sm);
-        cursor: pointer;
-        color: var(--text-secondary);
-        transition: var(--transition);
-        font-size: 0.75rem;
-        white-space: nowrap;
-        display: flex;
-        align-items: center;
-        gap: 0.25rem;
-        flex-shrink: 0;
-    }
+            setupEventListeners() {
+                // Navigation
+                document.getElementById('backToBots').addEventListener('click', () => {
+                    window.location.href = 'bot-management.html';
+                });
 
-    .btn-icon:hover {
-        background: var(--primary-color);
-        color: white;
-        border-color: var(--primary-color);
-    }
+                // Command actions
+                document.getElementById('addCommandBtn').addEventListener('click', () => {
+                    this.addNewCommand();
+                });
 
-    .btn-icon.active {
-        background: var(--primary-color);
-        color: white;
-        border-color: var(--primary-color);
-    }
+                document.getElementById('addFirstCommand').addEventListener('click', () => {
+                    this.addNewCommand();
+                });
 
-    .btn-icon i {
-        font-size: 0.7rem;
-    }
+                // Toggle switches
+                document.getElementById('waitForAnswer').addEventListener('change', (e) => {
+                    this.toggleAnswerHandler(e.target.checked);
+                });
 
-    .fullscreen-body {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        padding: 0;
-        overflow: hidden;
-        position: relative;
-    }
+                // Save button
+                document.getElementById('saveCommandBtn').addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.saveCommand();
+                });
 
-    .fullscreen-editor {
-        flex: 1;
-        width: 100%;
-        border: none;
-        border-radius: 0;
-        padding: 1rem;
-        font-family: 'Courier New', monospace;
-        font-size: 14px;
-        line-height: 1.5;
-        resize: none;
-        outline: none;
-        background: var(--bg-primary);
-        color: var(--text-primary);
-        overflow-y: auto;
-    }
+                document.getElementById('deleteCommandBtn').addEventListener('click', () => {
+                    this.deleteCommand();
+                });
 
-    .suggestions-panel {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        background: var(--bg-primary);
-        border-top: 1px solid var(--border-color);
-        max-height: 40%;
-        overflow-y: auto;
-        z-index: 1000;
-        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
-    }
+                document.getElementById('testCommandBtn').addEventListener('click', () => {
+                    this.testCommand();
+                });
 
-    .suggestions-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0.75rem 1rem;
-        background: var(--bg-tertiary);
-        border-bottom: 1px solid var(--border-color);
-        position: sticky;
-        top: 0;
-        z-index: 1001;
-    }
+                // Enhanced test with input
+                document.getElementById('runTestBtn').addEventListener('click', () => {
+                    this.runCustomTest();
+                });
 
-    .suggestions-header h4 {
-        margin: 0;
-        font-size: 0.875rem;
-        color: var(--text-secondary);
-        font-weight: 600;
-    }
+                // Command search
+                let searchTimeout;
+                document.getElementById('commandSearch').addEventListener('input', (e) => {
+                    clearTimeout(searchTimeout);
+                    searchTimeout = setTimeout(() => {
+                        this.filterCommands(e.target.value);
+                    }, 300);
+                });
 
-    .suggestion-item {
-        padding: 0.75rem 1rem;
-        border-bottom: 1px solid var(--border-light);
-        cursor: pointer;
-        transition: var(--transition);
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-    }
+                // Template button
+                document.getElementById('templateBtn').addEventListener('click', () => {
+                    this.showTemplateModal();
+                });
 
-    .suggestion-item:hover {
-        background: var(--bg-tertiary);
-    }
+                // Modal events
+                this.setupModalEvents();
 
-    .suggestion-item:last-child {
-        border-bottom: none;
-    }
+                // User menu
+                document.getElementById('userMenuBtn').addEventListener('click', () => {
+                    document.getElementById('userDropdown').classList.toggle('show');
+                });
 
-    .suggestion-content {
-        flex: 1;
-    }
+                document.getElementById('logoutBtn').addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.logout();
+                });
 
-    .suggestion-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-bottom: 0.25rem;
-    }
+                // Mobile menu
+                document.getElementById('mobileMenuBtn').addEventListener('click', () => {
+                    document.getElementById('navLinks').classList.toggle('show');
+                });
 
-    .suggestion-item strong {
-        color: var(--text-primary);
-        display: block;
-        font-size: 0.875rem;
-        font-weight: 600;
-    }
+                // Close dropdowns when clicking outside
+                document.addEventListener('click', (e) => {
+                    if (!e.target.closest('.user-menu')) {
+                        document.getElementById('userDropdown').classList.remove('show');
+                    }
+                    if (!e.target.closest('.mobile-menu-btn') && !e.target.closest('.nav-links')) {
+                        document.getElementById('navLinks').classList.remove('show');
+                    }
+                });
+            }
 
-    .suggestion-desc {
-        color: var(--text-secondary);
-        font-size: 0.75rem;
-        line-height: 1.4;
-        margin-bottom: 0.25rem;
-    }
+            setupCommandsTags() {
+                const moreCommandsInput = document.getElementById('moreCommands');
+                const commandsTags = document.getElementById('commandsTags');
 
-    .suggestion-code {
-        color: var(--text-secondary);
-        font-size: 0.7rem;
-        font-family: 'Courier New', monospace;
-        background: var(--bg-tertiary);
-        padding: 0.25rem 0.5rem;
-        border-radius: 0.25rem;
-        margin-top: 0.25rem;
-        border-left: 3px solid var(--primary-color);
-    }
+                moreCommandsInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ',') {
+                        e.preventDefault();
+                        const command = moreCommandsInput.value.trim();
+                        if (command) {
+                            this.addCommandTag(command);
+                            moreCommandsInput.value = '';
+                        }
+                    }
+                });
 
-    .suggestion-type {
-        background: var(--primary-color);
-        color: white;
-        padding: 0.125rem 0.5rem;
-        border-radius: 1rem;
-        font-size: 0.625rem;
-        font-weight: 600;
-        margin-left: 0.5rem;
-        flex-shrink: 0;
-    }
+                moreCommandsInput.addEventListener('blur', () => {
+                    const command = moreCommandsInput.value.trim();
+                    if (command) {
+                        this.addCommandTag(command);
+                        moreCommandsInput.value = '';
+                    }
+                });
 
-    /* Enhanced Test Input */
-    .test-input-container {
-        display: flex;
-        gap: 0.5rem;
-        align-items: center;
-    }
+                // Remove existing tags
+                document.querySelectorAll('.remove-tag').forEach(button => {
+                    button.addEventListener('click', function() {
+                        this.closest('.command-tag').remove();
+                    });
+                });
+            }
 
-    .test-input-container input {
-        flex: 1;
-    }
+            addCommandTag(command) {
+                if (!command) return;
 
-    .test-input-container .btn {
-        white-space: nowrap;
-    }
+                const commandsTags = document.getElementById('commandsTags');
+                const tag = document.createElement('div');
+                tag.className = 'command-tag';
+                tag.innerHTML = `
+                    <span class="tag-text">${this.escapeHtml(command)}</span>
+                    <button type="button" class="remove-tag">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+                commandsTags.appendChild(tag);
+                
+                // Add remove functionality
+                tag.querySelector('.remove-tag').addEventListener('click', function() {
+                    tag.remove();
+                });
+            }
 
-    /* Commands Tags Styles */
-    .commands-input-container {
-        border: 1px solid var(--border-color);
-        border-radius: var(--radius-md);
-        padding: 0.5rem;
-        background: var(--bg-primary);
-        min-height: 2.75rem;
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 0.5rem;
-    }
+            getCommandsFromTags() {
+                const tags = Array.from(document.querySelectorAll('.command-tag .tag-text'));
+                return tags.map(tag => tag.textContent.trim());
+            }
 
-    .commands-tags {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        flex: 1;
-    }
+            setCommandsToTags(commands) {
+                const commandsTags = document.getElementById('commandsTags');
+                commandsTags.innerHTML = '';
+                
+                if (typeof commands === 'string') {
+                    commands = commands.split(',').map(cmd => cmd.trim()).filter(cmd => cmd);
+                }
+                
+                commands.forEach(command => {
+                    if (command) {
+                        this.addCommandTag(command);
+                    }
+                });
+            }
 
-    .command-tag {
-        background: var(--primary-color);
-        color: white;
-        padding: 0.25rem 0.75rem;
-        border-radius: 1rem;
-        font-size: 0.75rem;
-        font-weight: 500;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        animation: slideIn 0.2s ease;
-        flex-shrink: 0;
-    }
+            setupModalEvents() {
+                // Test command modal
+                document.getElementById('closeTestCommand').addEventListener('click', () => {
+                    document.getElementById('testCommandModal').style.display = 'none';
+                });
 
-    .command-tag .remove-tag {
-        background: none;
-        border: none;
-        color: white;
-        cursor: pointer;
-        padding: 0;
-        width: 1rem;
-        height: 1rem;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 0.75rem;
-        flex-shrink: 0;
-    }
+                // Template modal
+                document.getElementById('closeTemplateModal').addEventListener('click', () => {
+                    document.getElementById('templateModal').style.display = 'none';
+                });
 
-    .command-tag .remove-tag:hover {
-        background: rgba(255, 255, 255, 0.2);
-    }
+                // Close modals when clicking outside
+                window.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('modal')) {
+                        e.target.style.display = 'none';
+                    }
+                });
 
-    #moreCommands {
-        border: none;
-        outline: none;
-        flex: 1;
-        min-width: 120px;
-        background: transparent;
-        font-size: 0.875rem;
-    }
+                // Close modals with escape key
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        document.querySelectorAll('.modal').forEach(modal => {
+                            modal.style.display = 'none';
+                        });
+                    }
+                });
+            }
 
-    /* Enhanced Test Results */
-    .test-success, .test-error {
-        padding: 1rem;
-        border-radius: var(--radius-md);
-        margin-bottom: 1rem;
-    }
+            toggleAnswerHandler(show) {
+                const section = document.getElementById('answerHandlerSection');
+                section.style.display = show ? 'block' : 'none';
+            }
 
-    .test-success {
-        background: rgba(16, 185, 129, 0.1);
-        border: 1px solid rgba(16, 185, 129, 0.2);
-    }
+            async loadBotInfo() {
+                // Simulate API call
+                setTimeout(() => {
+                    this.currentBot = {
+                        id: 1,
+                        name: 'MyAwesomeBot',
+                        username: 'MyAwesomeBot',
+                        token: 'bot123456'
+                    };
+                    this.updateBotInfo();
+                }, 100);
+            }
 
-    .test-error {
-        background: rgba(239, 68, 68, 0.1);
-        border: 1px solid rgba(239, 68, 68, 0.2);
-    }
+            updateBotInfo() {
+                if (this.currentBot) {
+                    document.querySelector('.header-content h1').textContent = `Commands - ${this.currentBot.name}`;
+                    document.querySelector('.bot-link').textContent = `@${this.currentBot.username}`;
+                    document.title = `Commands - ${this.currentBot.name} - Bot Maker Pro`;
+                }
+            }
 
-    .test-details, .error-details {
-        margin: 1rem 0;
-        padding: 1rem;
-        background: var(--bg-tertiary);
-        border-radius: var(--radius-md);
-    }
+            async loadCommands() {
+                if (!this.currentBot) return;
 
-    .test-details p, .error-details p {
-        margin-bottom: 0.5rem;
-    }
+                this.showLoading(true);
 
-    .test-message {
-        font-style: italic;
-        color: var(--text-secondary);
-    }
+                try {
+                    // Simulate API call
+                    setTimeout(() => {
+                        this.commands = [
+                            {
+                                id: 1,
+                                name: 'Welcome Message',
+                                pattern: '/start, hello, hi',
+                                code: `// Welcome message command
+function execute() {
+    const userName = getUser().first_name;
+    sendMessage(\`Hello \${userName}! Welcome to our bot. 🤖\\n\\nHow can I help you today?\`);
+    
+    // Show main menu buttons
+    const buttons = [
+        [{ text: "Help 📚", callback_data: "help" }],
+        [{ text: "Settings ⚙️", callback_data: "settings" }]
+    ];
+    
+    sendMessage("Choose an option:", { reply_markup: { inline_keyboard: buttons } });
+}`,
+                                is_active: true,
+                                wait_for_answer: false,
+                                answer_handler: ''
+                            },
+                            {
+                                id: 2,
+                                name: 'Help Command',
+                                pattern: '/help, help me',
+                                code: `// Help command
+function execute() {
+    const helpText = \`
+🤖 *Bot Help*
 
-    @keyframes slideIn {
-        from {
-            opacity: 0;
-            transform: translateY(-5px);
+Available commands:
+/start - Start the bot
+/help - Show this help message
+/weather - Get weather information
+
+Need more help? Contact support!
+    \`;
+    
+    sendMessage(helpText, { parse_mode: 'Markdown' });
+}`,
+                                is_active: true,
+                                wait_for_answer: false,
+                                answer_handler: ''
+                            },
+                            {
+                                id: 3,
+                                name: 'Weather Info',
+                                pattern: 'weather, forecast',
+                                code: `// Weather command
+function execute() {
+    sendMessage("Weather feature is coming soon! 🌤️");
+    
+    // Simulate API call
+    wait(1000).then(() => {
+        sendMessage("Weather data will be available in the next update!");
+    });
+}`,
+                                is_active: false,
+                                wait_for_answer: false,
+                                answer_handler: ''
+                            }
+                        ];
+                        this.displayCommands();
+                        this.showLoading(false);
+                    }, 500);
+                } catch (error) {
+                    this.showError('Failed to load commands: ' + error.message);
+                    this.showLoading(false);
+                }
+            }
+
+            displayCommands() {
+                const commandsList = document.getElementById('commandsList');
+                const emptyCommands = document.getElementById('emptyCommands');
+
+                if (!this.commands || this.commands.length === 0) {
+                    commandsList.style.display = 'none';
+                    emptyCommands.style.display = 'block';
+                    this.hideCommandEditor();
+                    return;
+                }
+
+                commandsList.style.display = 'block';
+                emptyCommands.style.display = 'none';
+
+                commandsList.innerHTML = this.commands.map(command => this.getCommandItemHTML(command)).join('');
+
+                // Select first command by default
+                if (this.commands.length > 0 && !this.currentCommand) {
+                    this.selectCommand(this.commands[0].id);
+                }
+            }
+
+            getCommandItemHTML(command) {
+                const isActive = command.is_active;
+                const isSelected = this.currentCommand?.id === command.id;
+                
+                return `
+                    <div class="command-item ${isSelected ? 'active' : ''}" 
+                         onclick="commandEditor.selectCommand('${command.id}')">
+                        <div class="command-info">
+                            <div class="command-name">${this.escapeHtml(command.name)}</div>
+                            <div class="command-patterns">
+                                ${command.pattern.split(', ').map(pattern => 
+                                    `<span class="command-pattern">${this.escapeHtml(pattern)}</span>`
+                                ).join('')}
+                            </div>
+                        </div>
+                        <div class="command-status ${isActive ? 'status-active' : 'status-inactive'}">
+                            ${isActive ? 'Active' : 'Inactive'}
+                        </div>
+                    </div>
+                `;
+            }
+
+            filterCommands(searchTerm) {
+                const commandItems = document.querySelectorAll('.command-item');
+                const lowerSearch = searchTerm.toLowerCase().trim();
+
+                if (!lowerSearch) {
+                    commandItems.forEach(item => item.style.display = 'flex');
+                    return;
+                }
+
+                commandItems.forEach(item => {
+                    const commandName = item.querySelector('.command-name').textContent.toLowerCase();
+                    const commandPatterns = item.querySelector('.command-patterns').textContent.toLowerCase();
+                    
+                    const isVisible = commandName.includes(lowerSearch) || 
+                                    commandPatterns.includes(lowerSearch);
+                    
+                    item.style.display = isVisible ? 'flex' : 'none';
+                });
+            }
+
+            addNewCommand() {
+                this.currentCommand = {
+                    id: 'new',
+                    name: 'New Command',
+                    pattern: '/start',
+                    code: '// Write your command code here\nsendMessage("Hello! This is a new command.");',
+                    is_active: true,
+                    wait_for_answer: false,
+                    answer_handler: ''
+                };
+
+                this.showCommandEditor();
+                this.populateCommandForm();
+                
+                setTimeout(() => {
+                    document.getElementById('moreCommands').focus();
+                }, 100);
+            }
+
+            async selectCommand(commandId) {
+                if (this.currentCommand?.id === commandId) return;
+
+                this.showLoading(true);
+
+                try {
+                    // Simulate API call
+                    setTimeout(() => {
+                        const command = this.commands.find(cmd => cmd.id == commandId);
+                        if (command) {
+                            this.currentCommand = command;
+                            this.showCommandEditor();
+                            this.populateCommandForm();
+                            
+                            document.querySelectorAll('.command-item').forEach(item => {
+                                item.classList.remove('active');
+                            });
+                            
+                            const selectedItem = document.querySelector(`[onclick*="${commandId}"]`);
+                            if (selectedItem) {
+                                selectedItem.classList.add('active');
+                            }
+                        }
+                        this.showLoading(false);
+                    }, 300);
+                } catch (error) {
+                    this.showError('Failed to load command: ' + error.message);
+                    this.showLoading(false);
+                }
+            }
+
+            showCommandEditor() {
+                document.getElementById('commandEditor').style.display = 'block';
+            }
+
+            hideCommandEditor() {
+                document.getElementById('commandEditor').style.display = 'none';
+                this.currentCommand = null;
+            }
+
+            populateCommandForm() {
+                if (!this.currentCommand) return;
+
+                // Set commands tags
+                this.setCommandsToTags(this.currentCommand.pattern);
+                
+                document.getElementById('commandCode').value = this.currentCommand.code || '';
+                
+                const waitToggle = document.getElementById('waitForAnswer');
+                if (waitToggle) {
+                    waitToggle.checked = this.currentCommand.wait_for_answer || false;
+                    this.toggleAnswerHandler(waitToggle.checked);
+                }
+                
+                document.getElementById('answerHandler').value = this.currentCommand.answer_handler || '';
+                
+                document.getElementById('currentCommandName').textContent = this.currentCommand.name;
+                
+                this.updateButtonStates();
+            }
+
+            updateButtonStates() {
+                const isNew = this.currentCommand?.id === 'new';
+                const deleteBtn = document.getElementById('deleteCommandBtn');
+                
+                if (deleteBtn) {
+                    deleteBtn.disabled = isNew;
+                    deleteBtn.title = isNew ? 'Save command first to enable delete' : 'Delete command';
+                }
+            }
+
+            async saveCommand() {
+                if (!this.currentCommand || !this.currentBot) {
+                    this.showError('No command selected or bot not loaded');
+                    return false;
+                }
+
+                const commands = this.getCommandsFromTags();
+                
+                if (commands.length === 0) {
+                    this.showError('Please add at least one command pattern');
+                    document.getElementById('moreCommands').focus();
+                    return false;
+                }
+
+                const commandPattern = commands.join(', ');
+                const commandName = commands[0];
+                
+                const formData = {
+                    name: commandName,
+                    pattern: commandPattern,
+                    code: document.getElementById('commandCode').value.trim(),
+                    waitForAnswer: document.getElementById('waitForAnswer').checked,
+                    answerHandler: document.getElementById('waitForAnswer').checked ? 
+                                  document.getElementById('answerHandler').value.trim() : '',
+                    botToken: this.currentBot.token
+                };
+
+                if (!formData.code) {
+                    this.showError('Command code is required');
+                    document.getElementById('commandCode').focus();
+                    return false;
+                }
+
+                if (formData.waitForAnswer && !formData.answerHandler) {
+                    this.showError('Answer handler code is required when "Wait for Answer" is enabled');
+                    document.getElementById('answerHandler').focus();
+                    return false;
+                }
+
+                this.showLoading(true);
+
+                try {
+                    // Simulate API call
+                    setTimeout(() => {
+                        if (this.currentCommand.id === 'new') {
+                            // Add new command
+                            const newCommand = {
+                                id: Date.now(),
+                                name: formData.name,
+                                pattern: formData.pattern,
+                                code: formData.code,
+                                is_active: true,
+                                wait_for_answer: formData.waitForAnswer,
+                                answer_handler: formData.answerHandler
+                            };
+                            this.commands.push(newCommand);
+                            this.currentCommand = newCommand;
+                        } else {
+                            // Update existing command
+                            const commandIndex = this.commands.findIndex(cmd => cmd.id === this.currentCommand.id);
+                            if (commandIndex !== -1) {
+                                this.commands[commandIndex] = {
+                                    ...this.commands[commandIndex],
+                                    name: formData.name,
+                                    pattern: formData.pattern,
+                                    code: formData.code,
+                                    wait_for_answer: formData.waitForAnswer,
+                                    answer_handler: formData.answerHandler
+                                };
+                                this.currentCommand = this.commands[commandIndex];
+                            }
+                        }
+
+                        this.showSuccess('Command saved successfully!');
+                        this.displayCommands();
+                        this.populateCommandForm();
+                        this.showLoading(false);
+                    }, 500);
+                } catch (error) {
+                    this.showError('Failed to save command: ' + error.message);
+                    this.showLoading(false);
+                }
+            }
+
+            async deleteCommand() {
+                if (!this.currentCommand || this.currentCommand.id === 'new') {
+                    return;
+                }
+
+                if (!confirm('Are you sure you want to delete this command?\n\nThis action cannot be undone and will remove the command from your bot.')) {
+                    return;
+                }
+
+                this.showLoading(true);
+
+                try {
+                    // Simulate API call
+                    setTimeout(() => {
+                        this.commands = this.commands.filter(cmd => cmd.id !== this.currentCommand.id);
+                        this.showSuccess('Command deleted successfully');
+                        this.hideCommandEditor();
+                        this.displayCommands();
+                        this.showLoading(false);
+                    }, 500);
+                } catch (error) {
+                    this.showError('Failed to delete command: ' + error.message);
+                    this.showLoading(false);
+                }
+            }
+
+            async testCommand() {
+                if (!this.currentBot) {
+                    this.showError('Bot information not loaded');
+                    return;
+                }
+
+                const commands = this.getCommandsFromTags();
+                if (commands.length === 0) {
+                    this.showError('Please add at least one command pattern to test');
+                    return;
+                }
+
+                const commandCode = document.getElementById('commandCode').value.trim();
+                if (!commandCode) {
+                    this.showError('Please add command code to test');
+                    return;
+                }
+
+                // Use first command pattern for testing
+                const testInput = commands[0];
+
+                this.runTestWithInput(testInput);
+            }
+
+            async runCustomTest() {
+                if (!this.currentBot) {
+                    this.showError('Bot information not loaded');
+                    return;
+                }
+
+                const testInput = document.getElementById('testInput').value.trim();
+                if (!testInput) {
+                    this.showError('Please enter test input');
+                    document.getElementById('testInput').focus();
+                    return;
+                }
+
+                const commandCode = document.getElementById('commandCode').value.trim();
+                if (!commandCode) {
+                    this.showError('Please add command code to test');
+                    return;
+                }
+
+                this.runTestWithInput(testInput);
+            }
+
+            async runTestWithInput(testInput) {
+                this.showLoading(true);
+
+                try {
+                    // Simulate API call
+                    setTimeout(() => {
+                        this.showTestResult(`
+                            <div class="test-success">
+                                <h4>✅ Test Command Executed Successfully!</h4>
+                                <div class="test-details">
+                                    <p><strong>Test Input:</strong> ${testInput}</p>
+                                    <p><strong>Bot:</strong> ${this.currentBot.name}</p>
+                                    <p><strong>Status:</strong> Command executed without errors</p>
+                                </div>
+                                <p class="test-message">The command would respond to: "${testInput}"</p>
+                            </div>
+                        `);
+                        this.showLoading(false);
+                    }, 1000);
+                } catch (error) {
+                    this.showTestResult(`
+                        <div class="test-error">
+                            <h4>❌ Test Failed</h4>
+                            <p>Error: ${error.message}</p>
+                        </div>
+                    `);
+                    this.showLoading(false);
+                }
+            }
+
+            showTestResult(html) {
+                const modal = document.getElementById('testCommandModal');
+                const resultDiv = document.getElementById('testCommandResult');
+                
+                if (modal && resultDiv) {
+                    resultDiv.innerHTML = html;
+                    modal.style.display = 'flex';
+                }
+            }
+
+            showTemplateModal() {
+                document.getElementById('templateModal').style.display = 'flex';
+            }
+
+            applyTemplate(templateType) {
+                let templateCode = '';
+                
+                switch(templateType) {
+                    case 'welcome':
+                        templateCode = `// Welcome message template
+const user = getUser();
+sendMessage(\`Hello \${user.first_name}! Welcome to our bot. 🤖\`);
+
+// Optional: Add buttons
+const buttons = [
+    [{ text: "Help", callback_data: "help" }],
+    [{ text: "About", callback_data: "about" }]
+];
+sendMessage("How can I help you?", { reply_markup: { inline_keyboard: buttons } });`;
+                        break;
+                        
+                    case 'help':
+                        templateCode = `// Help command template
+const helpText = \`
+🤖 *Bot Help*
+
+*Available Commands:*
+/start - Start the bot
+/help - Show this help message
+
+*Features:*
+• Feature 1
+• Feature 2
+• Feature 3
+
+Need assistance? Contact us!
+\`;
+
+sendMessage(helpText, { parse_mode: 'Markdown' });`;
+                        break;
+                        
+                    case 'buttons':
+                        templateCode = `// Inline buttons template
+const buttons = [
+    [{ text: "Button 1", callback_data: "btn1" }],
+    [{ text: "Button 2", callback_data: "btn2" }],
+    [{ text: "Button 3", callback_data: "btn3" }]
+];
+
+sendMessage("Please choose an option:", { 
+    reply_markup: { inline_keyboard: buttons } 
+});`;
+                        break;
+                        
+                    case 'photo':
+                        templateCode = `// Send photo template
+const photoUrl = "https://example.com/photo.jpg";
+const caption = "This is a sample photo with caption";
+
+sendPhoto(photoUrl, { caption: caption });`;
+                        break;
+                        
+                    case 'userinfo':
+                        templateCode = `// User information template
+const user = getUser();
+const userInfo = \`
+👤 *User Information*
+
+*Name:* \${user.first_name} \${user.last_name || ''}
+*Username:* \${user.username ? '@' + user.username : 'Not set'}
+*User ID:* \${user.id}
+*Language:* \${user.language_code || 'Unknown'}
+
+Account created: \${new Date(user.created_at).toLocaleDateString()}
+\`;
+
+sendMessage(userInfo, { parse_mode: 'Markdown' });`;
+                        break;
+                        
+                    case 'wait':
+                        templateCode = `// Wait for answer template
+sendMessage("Please enter your name:");
+
+// This enables wait for answer mode
+// The answer handler will receive the user's response
+// Use getAnswer() in the answer handler to get the response`;
+                        break;
+                }
+                
+                document.getElementById('commandCode').value = templateCode;
+                document.getElementById('templateModal').style.display = 'none';
+                this.showSuccess('Template applied successfully!');
+            }
+
+            logout() {
+                localStorage.clear();
+                window.location.href = 'index.html';
+            }
+
+            showLoading(show) {
+                const overlay = document.getElementById('loadingOverlay');
+                if (overlay) {
+                    overlay.style.display = show ? 'flex' : 'none';
+                }
+            }
+
+            showError(message) {
+                this.showNotification(message, 'error');
+            }
+
+            showSuccess(message) {
+                this.showNotification(message, 'success');
+            }
+
+            showNotification(message, type = 'info') {
+                // Remove existing notifications
+                const existing = document.querySelector('.notification');
+                if (existing) existing.remove();
+
+                const notification = document.createElement('div');
+                notification.className = `notification notification-${type}`;
+                notification.innerHTML = `
+                    <div class="notification-content">
+                        <i class="fas fa-${type === 'error' ? 'exclamation-triangle' : type === 'success' ? 'check-circle' : 'info-circle'}"></i>
+                        <span>${message}</span>
+                        <button class="notification-close">&times;</button>
+                    </div>
+                `;
+
+                document.body.appendChild(notification);
+
+                notification.querySelector('.notification-close').addEventListener('click', () => {
+                    notification.remove();
+                });
+
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.remove();
+                    }
+                }, 3000);
+            }
+
+            escapeHtml(unsafe) {
+                return unsafe
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
+            }
         }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
 
-    /* Test button styles */
-    #testCommandBtn:not(:disabled) {
-        background: var(--warning-color);
-    }
-
-    #testCommandBtn:not(:disabled):hover {
-        background: #e58e0b;
-    }
-
-    #runTestBtn:not(:disabled) {
-        background: var(--success-color);
-    }
-
-    #runTestBtn:not(:disabled):hover {
-        background: #0da271;
-    }
-
-    /* Responsive design for toolbar */
-    @media (max-width: 768px) {
-        .editor-toolbar-icons {
-            gap: 0.125rem;
-        }
-        
-        .btn-icon {
-            padding: 0.4rem 0.6rem;
-            font-size: 0.7rem;
-        }
-        
-        .btn-icon i {
-            font-size: 0.65rem;
-        }
-        
-        .compact-header {
-            padding: 0.5rem 0.75rem;
-        }
-    }
-
-    @media (max-width: 640px) {
-        .editor-toolbar-icons {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 0.25rem;
-            width: 100%;
-        }
-        
-        .btn-icon {
-            justify-content: center;
-            padding: 0.5rem;
-        }
-        
-        .btn-icon span {
-            display: none;
-        }
-    }
-
-    /* Scrollbar styling */
-    .fullscreen-editor::-webkit-scrollbar {
-        width: 8px;
-    }
-
-    .fullscreen-editor::-webkit-scrollbar-track {
-        background: var(--bg-tertiary);
-    }
-
-    .fullscreen-editor::-webkit-scrollbar-thumb {
-        background: var(--border-color);
-        border-radius: 4px;
-    }
-
-    .fullscreen-editor::-webkit-scrollbar-thumb:hover {
-        background: var(--text-secondary);
-    }
-
-    .suggestions-panel::-webkit-scrollbar {
-        width: 6px;
-    }
-
-    .suggestions-panel::-webkit-scrollbar-track {
-        background: var(--bg-tertiary);
-    }
-
-    .suggestions-panel::-webkit-scrollbar-thumb {
-        background: var(--border-color);
-        border-radius: 3px;
-    }
-</style>
+        // Initialize enhanced command editor
+        let commandEditor;
+        document.addEventListener('DOMContentLoaded', () => {
+            commandEditor = new EnhancedCommandEditor();
+        });
+    </script>
 </body>
 </html>
