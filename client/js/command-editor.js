@@ -655,14 +655,9 @@ class CommandEditor {
         const isActive = firstCommand.is_active;
         const isSelected = this.currentCommand?.name === commandName;
         const patterns = commands.map(cmd => cmd.pattern);
-        <!-- const mainPattern = patterns[0]; -->
-        <!-- const additionalCount = patterns.length - 1; -->
-        <!--  -->
-        <!-- const patternsText = patterns.join(', '); -->
         
-        const patternsHTML = patterns.map(pattern => 
-             `<span>${this.escapeHtml(pattern)}</span>`
-        ).join('');
+        // Show all patterns separated by commas
+        const patternsText = patterns.join(', ');
         
         return `
             <div class="command-group ${isSelected ? 'active' : ''}" 
@@ -672,21 +667,20 @@ class CommandEditor {
                 </div>
                 <div class="command-content">
                     <div class="command-header">
-                        <!-- <span class="command-name">${this.escapeHtml(patternsText)}</span> -->
-                        <span class="command-pattern">${patternsHTML}</span>
+                        <span class="command-name">${this.escapeHtml(commandName)}</span>
                     </div>
-                    <!-- <div class="command-description"> -->
-                        <!-- ${firstCommand.description || 'No description'} -->
-                    <!-- </div> -->
+                    <div class="command-patterns">
+                        ${this.escapeHtml(patternsText)}
+                    </div>
+                    <div class="command-description">
+                        ${firstCommand.description || 'No description'}
+                    </div>
                     <div class="command-meta">
                         <span class="command-status ${isActive ? 'active' : 'inactive'}">
                             <i class="fas fa-circle"></i>
                             ${isActive ? 'Active' : 'Inactive'}
                         </span>
-                        ${additionalCount > 0 ? 
-                            `<span class="command-feature">+${additionalCount} patterns</span>` : ''}
                         ${firstCommand.wait_for_answer ? '<span class="command-feature">⏳ Waits</span>' : ''}
-                        <!-- <span class="command-id">ID: ${firstCommand.id.substring(0, 8)}...</span> -->
                     </div>
                 </div>
             </div>
@@ -704,7 +698,7 @@ class CommandEditor {
 
         commandGroups.forEach(group => {
             const commandName = group.querySelector('.command-name').textContent.toLowerCase();
-            const commandPattern = group.querySelector('.command-pattern').textContent.toLowerCase();
+            const commandPattern = group.querySelector('.command-patterns').textContent.toLowerCase();
             const commandDesc = group.querySelector('.command-description').textContent.toLowerCase();
             
             const isVisible = commandName.includes(lowerSearch) || 
@@ -1214,8 +1208,10 @@ class CommandEditor {
 
     applyTemplate(templateName) {
         let code = '';
+        let answerHandlerCode = '';
         let patterns = '';
         let description = '';
+        let waitForAnswer = false;
         
         switch(templateName) {
             case 'welcome':
@@ -1250,9 +1246,8 @@ const helpText = \`🤖 *Bot Help Menu*
 
 *Features:*
 • Multiple command patterns
-• Wait for answer functionality
+• Interactive conversations
 • Media support
-• Interactive buttons
 
 *Need Help?*
 Contact support if you need assistance.\`;
@@ -1277,7 +1272,6 @@ const botInfo = \`🤖 *Bot Information*
 • Advanced command system
 • User data management
 • Media support
-• Interactive conversations
 
 *Created with:* Bot Maker Pro\`;
 
@@ -1289,19 +1283,12 @@ bot.sendMessage(botInfo, {
             case 'echo':
                 patterns = '/echo, echo, repeat';
                 description = 'Repeat user message';
-                code = `// Echo command with wait for answer
-bot.sendMessage('Please send me a message to echo:');
-
-try {
-    const userMessage = await waitForAnswer(60000);
-    
-    if (userMessage && userMessage.trim()) {
-        bot.sendMessage(\`You said: "\${userMessage}"\`);
-    } else {
-        bot.sendMessage('You didn\\'t send any message!');
-    }
-} catch (error) {
-    bot.sendMessage('Timeout! Please try again.');
+                code = `// Echo command
+const userMessage = msg.text.replace('/echo', '').replace('/repeat', '').trim();
+if (userMessage) {
+    bot.sendMessage(\`You said: "\${userMessage}"\`);
+} else {
+    bot.sendMessage('Please send a message after the command. Example: /echo Hello World');
 }`;
                 break;
                 
@@ -1318,15 +1305,7 @@ User.saveData('age', '25');
 const userName = User.getData('name');
 const userAge = User.getData('age');
 
-// Use in message
-if (userName) {
-    bot.sendMessage(\`Welcome back, \${userName}!\`);
-} else {
-    bot.sendMessage("What's your name?");
-    const name = await waitForAnswer();
-    User.saveData('name', name);
-    bot.sendMessage(\`Nice to meet you, \${name}!\`);
-}`;
+bot.sendMessage(\`User Data Saved!\\\\nName: \${userName}\\\\nAge: \${userAge}\`);`;
                 break;
                 
             case 'inline_buttons':
@@ -1366,12 +1345,9 @@ bot.sendMessage("Choose an option:", {
 try {
     bot.sendMessage("Fetching data from API...");
     
-    const data = await HTTP.get("https://jsonplaceholder.typicode.com/posts/1");
-    const result = bunchify(data);
+    const response = await HTTP.get("https://jsonplaceholder.typicode.com/posts/1");
     
-    bot.sendMessage(\`📊 API Response:
-Title: \${result.title}
-Body: \${result.body}\`);
+    bot.sendMessage(\`📊 API Response:\\\\nTitle: \${response.title}\\\\nBody: \${response.body}\`);
 } catch (error) {
     bot.sendMessage(\`❌ Error: \${error.message}\`);
 }`;
@@ -1380,78 +1356,86 @@ Body: \${result.body}\`);
             case 'conversation':
                 patterns = '/conversation, chat';
                 description = 'Interactive conversation';
-                code = `// Interactive conversation
+                waitForAnswer = true;
+                code = `// Interactive conversation - Part 1
 bot.sendMessage("Hello! What's your name?");
 
-try {
-    const userName = await waitForAnswer(60000);
+// This will wait for user's answer automatically
+// The answer handler will process the response`;
+                
+                answerHandlerCode = `// Answer handler for conversation - Part 2
+const userName = userAnswer;
+if (userName && userName.trim()) {
+    bot.sendMessage(\`Nice to meet you, \${userName}!\`);
     
-    if (userName && userName.trim()) {
-        bot.sendMessage(\`Nice to meet you, \${userName}!\`);
-        
-        bot.sendMessage("How old are you?");
-        const ageText = await waitForAnswer(60000);
-        const age = parseInt(ageText);
-        
-        if (!isNaN(age)) {
-            if (age >= 18) {
-                bot.sendMessage(\`Great \${userName}! You're an adult.\`);
-            } else {
-                bot.sendMessage(\`Hello young friend \${userName}!\`);
-            }
+    // Ask next question
+    bot.sendMessage("How old are you?");
+    
+    // Continue waiting for next answer
+    const ageText = await waitForAnswer(60000);
+    const age = parseInt(ageText);
+    
+    if (!isNaN(age)) {
+        if (age >= 18) {
+            bot.sendMessage(\`Great \${userName}! You're an adult.\`);
         } else {
-            bot.sendMessage("Please enter a valid age!");
+            bot.sendMessage(\`Hello young friend \${userName}!\`);
         }
+        
+        // Save user data
+        User.saveData('name', userName);
+        User.saveData('age', age.toString());
+        
+        bot.sendMessage("Your information has been saved! Use /data to view it.");
     } else {
-        bot.sendMessage("You didn't provide a name!");
+        bot.sendMessage("Please enter a valid age!");
     }
-} catch (error) {
-    bot.sendMessage("Conversation timeout!");
+} else {
+    bot.sendMessage("You didn't provide a name!");
 }`;
                 break;
-                
-            // টেমপ্লেট সেকশনে media টেমপ্লেট ঠিক করুন
-case 'send_photo':
-    patterns = '/photo, picture, image';
-    code = `// Send photo example
+
+            case 'send_photo':
+                patterns = '/photo, picture, image';
+                description = 'Send photo with caption';
+                code = `// Send photo example
 bot.sendPhoto("https://via.placeholder.com/400x300", {
     caption: "Here's a beautiful photo for you! 📸",
     parse_mode: "Markdown"
 });`;
-    break;
+                break;
 
-case 'send_video':
-    patterns = '/video, clip, movie';
-    code = `// Send video example  
+            case 'send_video':
+                patterns = '/video, clip, movie';
+                description = 'Send video with caption';
+                code = `// Send video example  
 bot.sendVideo("https://example.com/video.mp4", {
     caption: "Check out this video! 🎥",
     parse_mode: "Markdown"
 });`;
-    break;
+                break;
 
-case 'send_document':
-    patterns = '/document, file, doc';
-    code = `// Send document example
+            case 'send_document':
+                patterns = '/document, file, doc';
+                description = 'Send document file';
+                code = `// Send document example
 bot.sendDocument("https://example.com/document.pdf", {
     caption: "Here's your document! 📄",
     parse_mode: "Markdown"
 });`;
-    break;
+                break;
                 
             case 'weather':
                 patterns = '/weather, climate';
                 description = 'Get weather information';
                 code = `// Weather API example
 try {
+    // Note: Replace YOUR_API_KEY with actual OpenWeatherMap API key
     const weatherData = await HTTP.get("https://api.openweathermap.org/data/2.5/weather?q=London&appid=YOUR_API_KEY");
-    const weather = bunchify(weatherData);
     
-    const tempCelsius = (weather.main.temp - 273.15).toFixed(1);
+    const tempCelsius = (weatherData.main.temp - 273.15).toFixed(1);
     
-    bot.sendMessage(\`🌤️ Weather in \${weather.name}:
-Temperature: \${tempCelsius}°C
-Condition: \${weather.weather[0].description}
-Humidity: \${weather.main.humidity}%\`);
+    bot.sendMessage(\`🌤️ Weather in \${weatherData.name}:\\\\nTemperature: \${tempCelsius}°C\\\\nCondition: \${weatherData.weather[0].description}\`);
 } catch (error) {
     bot.sendMessage(\`❌ Weather data unavailable: \${error.message}\`);
 }`;
@@ -1463,26 +1447,191 @@ Humidity: \${weather.main.humidity}%\`);
                 code = `// Broadcast message (admin only)
 const user = getUser();
 
-// Check if user is admin
-if (user.id === 123456789) { // Replace with actual admin ID
-    bot.sendMessage("Please enter the broadcast message:");
+// Check if user is admin (replace with actual admin check)
+if (user.id === 123456789) {
+    const message = "This is a broadcast message to all users!";
     
-    try {
-        const broadcastMessage = await waitForAnswer(60000);
-        
-        if (broadcastMessage && broadcastMessage.trim()) {
-            // In a real implementation, you would send to all users
-            bot.sendMessage(\`📢 Broadcast Sent:
-\${broadcastMessage}\`);
-        }
-    } catch (error) {
-        bot.sendMessage("Broadcast cancelled.");
-    }
+    // In real implementation, you would loop through all users
+    bot.sendMessage(\`📢 Broadcast Sent:\\\\n\${message}\`);
 } else {
     bot.sendMessage("❌ Admin access required.");
 }`;
                 break;
+
+            case 'quiz':
+                patterns = '/quiz, test';
+                description = 'Simple quiz game';
+                code = `// Simple quiz example
+const questions = [
+    {
+        question: "What is 2+2?",
+        options: ["3", "4", "5", "6"],
+        correct: 1
+    },
+    {
+        question: "What is the capital of France?",
+        options: ["London", "Berlin", "Paris", "Madrid"],
+        correct: 2
+    }
+];
+
+// Save quiz state
+Bot.saveData('current_quiz', JSON.stringify({
+    currentQuestion: 0,
+    score: 0,
+    questions: questions
+}));
+
+// Ask first question
+askQuestion(0);
+
+function askQuestion(index) {
+    const question = questions[index];
+    const keyboard = {
+        inline_keyboard: question.options.map((option, i) => [
+            {
+                text: option,
+                callback_data: \`answer_\${index}_\${i}\`
+            }
+        ])
+    };
+    
+    bot.sendMessage(\`Question \${index + 1}: \${question.question}\`, {
+        reply_markup: keyboard
+    });
+}`;
+                break;
+
+            case 'feedback':
+                patterns = '/feedback, rate, review';
+                description = 'Collect user feedback';
+                waitForAnswer = true;
+                code = `// Feedback collection - Part 1
+bot.sendMessage("Please share your feedback about our bot:");`;
                 
+                answerHandlerCode = `// Feedback answer handler - Part 2
+const feedback = userAnswer;
+if (feedback && feedback.trim()) {
+    // Save feedback
+    const timestamp = new Date().toISOString();
+    User.saveData('last_feedback', feedback);
+    User.saveData('feedback_time', timestamp);
+    
+    bot.sendMessage("Thank you for your feedback! 💖\\\\nWe appreciate your input.");
+    
+    // Ask for rating
+    bot.sendMessage("How would you rate us from 1-5 stars?");
+    
+    const rating = await waitForAnswer(30000);
+    const ratingNum = parseInt(rating);
+    
+    if (!isNaN(ratingNum) && ratingNum >= 1 && ratingNum <= 5) {
+        User.saveData('rating', ratingNum.toString());
+        bot.sendMessage(\`Thanks for the \${'⭐'.repeat(ratingNum)} rating!\`);
+    } else {
+        bot.sendMessage("Thank you for your feedback!");
+    }
+} else {
+    bot.sendMessage("Feedback cannot be empty. Please try again.");
+}`;
+                break;
+
+            case 'registration':
+                patterns = '/register, signup';
+                description = 'User registration form';
+                waitForAnswer = true;
+                code = `// User registration - Part 1
+bot.sendMessage("Welcome to registration!\\\\nPlease enter your full name:");`;
+                
+                answerHandlerCode = `// Registration answer handler - Part 2
+const fullName = userAnswer;
+if (fullName && fullName.trim()) {
+    User.saveData('full_name', fullName);
+    
+    bot.sendMessage("Great! Now please enter your email:");
+    
+    const email = await waitForAnswer(30000);
+    
+    if (email && email.includes('@')) {
+        User.saveData('email', email);
+        
+        bot.sendMessage("Registration completed! ✅\\\\n\\\\nYour details:\\\\nName: " + fullName + "\\\\nEmail: " + email);
+        
+        // Save registration date
+        User.saveData('registered_at', new Date().toISOString());
+    } else {
+        bot.sendMessage("Invalid email format. Please start over with /register");
+    }
+} else {
+    bot.sendMessage("Name cannot be empty. Please try again with /register");
+}`;
+                break;
+
+            case 'calculator':
+                patterns = '/calc, calculate';
+                description = 'Simple calculator';
+                code = `// Simple calculator
+const expression = msg.text.replace('/calc', '').replace('/calculate', '').trim();
+
+if (!expression) {
+    bot.sendMessage("Usage: /calc 2+2\\\\nSupported operations: +, -, *, /");
+    return;
+}
+
+try {
+    // Basic safety check - only allow numbers and basic operators
+    if (!/^[0-9+\\-*/().\\s]+$/.test(expression)) {
+        bot.sendMessage("❌ Invalid characters in expression. Only numbers and + - * / are allowed.");
+        return;
+    }
+    
+    const result = eval(expression);
+    bot.sendMessage(\`🧮 Calculation: \${expression} = \${result}\`);
+} catch (error) {
+    bot.sendMessage("❌ Invalid mathematical expression. Please check your input.");
+}`;
+                break;
+
+            case 'joke':
+                patterns = '/joke, fun';
+                description = 'Tell a random joke';
+                code = `// Random joke generator
+const jokes = [
+    "Why don't scientists trust atoms? Because they make up everything!",
+    "Why did the scarecrow win an award? He was outstanding in his field!",
+    "Why don't eggs tell jokes? They'd crack each other up!",
+    "What do you call a fake noodle? An impasta!",
+    "Why did the math book look so sad? Because it had too many problems!"
+];
+
+const randomJoke = jokes[Math.floor(Math.random() * jokes.length)];
+bot.sendMessage(\`😂 \${randomJoke}\`);`;
+                break;
+
+            case 'timer':
+                patterns = '/timer, alarm';
+                description = 'Set a timer';
+                waitForAnswer = true;
+                code = `// Timer setup - Part 1
+bot.sendMessage("⏰ Timer Setup\\\\nHow many minutes for the timer?");`;
+                
+                answerHandlerCode = `// Timer answer handler - Part 2
+const minutes = parseInt(userAnswer);
+
+if (!isNaN(minutes) && minutes > 0 && minutes <= 60) {
+    const milliseconds = minutes * 60 * 1000;
+    
+    bot.sendMessage(\`⏰ Timer set for \${minutes} minutes. I'll notify you when time's up!\`);
+    
+    // Wait for the specified time
+    await wait(milliseconds);
+    
+    bot.sendMessage(\`🔔 Time's up! \${minutes} minutes have passed.\`);
+} else {
+    bot.sendMessage("❌ Please enter a valid number between 1 and 60 minutes.");
+}`;
+                break;
+
             default:
                 patterns = '/template';
                 description = 'Basic command template';
@@ -1493,12 +1642,28 @@ bot.sendMessage(\`Hello \${user.first_name}! This is a basic command.\`);`;
         
         // Apply template to form
         if (this.currentCommand?.id === 'new') {
-            document.getElementById('commandName').value = templateName.charAt(0).toUpperCase() + templateName.slice(1).replace('_', ' ');
+            const templateDisplayName = templateName.split('_').map(word => 
+                word.charAt(0).toUpperCase() + word.slice(1)
+            ).join(' ');
+            document.getElementById('commandName').value = templateDisplayName;
         }
         
         document.getElementById('commandDescription').value = description;
         this.setCommandsToTags(patterns);
         document.getElementById('commandCode').value = code;
+        
+        // Handle wait for answer toggle
+        const waitToggle = document.getElementById('waitForAnswer');
+        if (waitToggle) {
+            waitToggle.checked = waitForAnswer;
+            this.toggleAnswerHandler(waitForAnswer);
+        }
+        
+        // Set answer handler code if provided
+        if (answerHandlerCode) {
+            document.getElementById('answerHandler').value = answerHandlerCode;
+        }
+        
         document.getElementById('templatesModal').style.display = 'none';
         this.showSuccess('Template applied successfully!');
     }
