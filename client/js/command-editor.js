@@ -1155,15 +1155,14 @@ class CommandEditor {
         document.getElementById('templatesModal').style.display = 'flex';
     }
 
-    // Template section - fix all issues
-applyTemplate(templateName) {
-    let code = '';
-    let patterns = '';
-    
-    switch(templateName) {
-        case 'welcome':
-            patterns = '/start, start, hello';
-            code = `// Welcome message template
+    applyTemplate(templateName) {
+        let code = '';
+        let patterns = '';
+        
+        switch(templateName) {
+            case 'welcome':
+                patterns = '/start, start, hello';
+                code = `// Welcome message template
 const user = getUser();
 const welcomeMessage = \`Hello \${user.first_name}! 👋
 
@@ -1177,11 +1176,11 @@ Username: @\${user.username || 'Not set'}\`;
 bot.sendMessage(welcomeMessage, {
     parse_mode: 'Markdown'
 });`;
-            break;
-            
-        case 'help':
-            patterns = '/help, help, commands';
-            code = `// Help command template
+                break;
+                
+            case 'help':
+                patterns = '/help, help, commands';
+                code = `// Help command template
 const helpText = \`🤖 *Bot Help Menu*
 
 *Available Commands:*
@@ -1201,11 +1200,11 @@ Contact support if you need assistance.\`;
 bot.sendMessage(helpText, {
     parse_mode: 'Markdown'
 });`;
-            break;
-            
-        case 'info':
-            patterns = '/info, about, bot';
-            code = `// Bot information template
+                break;
+                
+            case 'info':
+                patterns = '/info, about, bot';
+                code = `// Bot information template
 const botInfo = \`🤖 *Bot Information*
 
 *Name:* ${this.currentBot?.name || 'My Bot'}
@@ -1224,28 +1223,22 @@ const botInfo = \`🤖 *Bot Information*
 bot.sendMessage(botInfo, {
     parse_mode: 'Markdown'
 });`;
-            break;
-            
-        case 'echo':
-            patterns = '/echo, echo, repeat';
-            code = `// Echo command with wait for answer
-bot.sendMessage('Please send me a message to echo:');
-
-// Using then/catch instead of await for compatibility
-waitForAnswer(60000).then(function(userMessage) {
-    if (userMessage && userMessage.trim()) {
-        bot.sendMessage("You said: " + userMessage);
-    } else {
-        bot.sendMessage('You did not send any message!');
-    }
-}).catch(function(error) {
-    bot.sendMessage('Timeout! Please try again.');
-});`;
-            break;
-            
-        case 'user_data':
-            patterns = '/data, /save, /get';
-            code = `// User data management example
+                break;
+                
+            case 'echo':
+                patterns = '/echo, echo, repeat';
+                code = `// Simple echo command
+const userMessage = message.text;
+if (userMessage && userMessage.trim()) {
+    bot.sendMessage("You said: " + userMessage);
+} else {
+    bot.sendMessage('Please send a message to echo!');
+}`;
+                break;
+                
+            case 'user_data':
+                patterns = '/data, /save, /get';
+                code = `// User data management example
 
 // Save user data
 User.saveData('name', 'John Doe');
@@ -1259,17 +1252,15 @@ const userAge = User.getData('age');
 if (userName) {
     bot.sendMessage("Welcome back, " + userName + "!");
 } else {
-    bot.sendMessage("What's your name?");
-    waitForAnswer().then(function(name) {
-        User.saveData('name', name);
-        bot.sendMessage("Nice to meet you, " + name + "!");
-    });
+    bot.sendMessage("Hello new user! I'll save your data.");
+    User.saveData('name', 'New User');
+    User.saveData('joined_at', new Date().toISOString());
 }`;
-            break;
-            
-        case 'inline_buttons':
-            patterns = '/menu, /buttons';
-            code = `// Inline keyboard example
+                break;
+                
+            case 'inline_buttons':
+                patterns = '/menu, /buttons';
+                code = `// Inline keyboard example
 const inlineKeyboard = {
     inline_keyboard: [
         [
@@ -1294,11 +1285,11 @@ const inlineKeyboard = {
 bot.sendMessage("Choose an option:", {
     reply_markup: inlineKeyboard
 });`;
-            break;
-            
-        case 'http_get':
-            patterns = '/fetch, /api';
-            code = `// HTTP GET request example
+                break;
+                
+            case 'http_get':
+                patterns = '/fetch, /api';
+                code = `// HTTP GET request example
 bot.sendMessage("Fetching data from API...");
 
 // Using then/catch instead of await
@@ -1308,72 +1299,55 @@ HTTP.get("https://jsonplaceholder.typicode.com/posts/1").then(function(data) {
 }).catch(function(error) {
     bot.sendMessage("❌ Error: " + error.message);
 });`;
-            break;
-            
-        case 'conversation':
-            patterns = '/conversation, chat';
-            code = `// Interactive conversation - SIMPLIFIED VERSION
-bot.sendMessage("Hello! What's your name?");
-
-// Simple wait for answer - this will work correctly
-waitForAnswer(60000).then(function(userName) {
-    if (userName && userName.trim()) {
-        bot.sendMessage("Nice to meet you, " + userName + "!");
-        // You can add more questions here if needed
-    } else {
-        bot.sendMessage("You didn't provide a name!");
-    }
-}).catch(function(error) {
-    bot.sendMessage("Conversation timeout!");
-});`;
-            break;
-            
-        case 'send_photo':
-            patterns = '/photo, picture, image';
-            code = `// Send photo example
+                break;
+                
+            case 'send_photo':
+                patterns = '/photo, picture, image';
+                code = `// Send photo example
 bot.sendPhoto("https://via.placeholder.com/400x300", {
     caption: "Here's a beautiful photo for you! 📸",
     parse_mode: "Markdown"
 });`;
-            break;
+                break;
 
-        case 'send_video':
-            patterns = '/video, clip, movie';
-            code = `// Send video example  
+            case 'send_video':
+                patterns = '/video, clip, movie';
+                code = `// Send video example  
 bot.sendVideo("https://example.com/video.mp4", {
     caption: "Check out this video! 🎥",
     parse_mode: "Markdown"
 });`;
-            break;
+                break;
 
-        case 'send_document':
-            patterns = '/document, file, doc';
-            code = `// Send document example
+            case 'send_document':
+                patterns = '/document, file, doc';
+                code = `// Send document example
 bot.sendDocument("https://example.com/document.pdf", {
     caption: "Here's your document! 📄",
     parse_mode: "Markdown"
 });`;
-            break;
+                break;
 
-        case 'media_gallery':
-            patterns = '/gallery, media, photos';
-            code = `// Media gallery example - SEND SEPARATE PHOTOS INSTEAD
-bot.sendPhoto("https://via.placeholder.com/400x300/FF0000", {
-    caption: "Photo 1 - Red"
-});
+            case 'media_gallery':
+                patterns = '/gallery, media, photos';
+                code = `// Media gallery example - Fixed version
+bot.sendMediaGroup([
+    {
+        type: "photo",
+        media: "https://via.placeholder.com/400x300",
+        caption: "Photo 1"
+    },
+    {
+        type: "photo", 
+        media: "https://via.placeholder.com/400x300",
+        caption: "Photo 2"
+    }
+]);`;
+                break;
 
-bot.sendPhoto("https://via.placeholder.com/400x300/00FF00", {
-    caption: "Photo 2 - Green"
-});
-
-bot.sendPhoto("https://via.placeholder.com/400x300/0000FF", {
-    caption: "Photo 3 - Blue"
-});`;
-            break;
-
-        case 'reply_keyboard':
-            patterns = '/keyboard, keys, reply';
-            code = `// Reply keyboard example
+            case 'reply_keyboard':
+                patterns = '/keyboard, keys, reply';
+                code = `// Reply keyboard example
 const replyKeyboard = {
     keyboard: [
         [
@@ -1392,11 +1366,11 @@ const replyKeyboard = {
 bot.sendMessage("Choose an option:", {
     reply_markup: replyKeyboard
 });`;
-            break;
+                break;
 
-        case 'weather':
-            patterns = '/weather, climate';
-            code = `// Weather API example
+            case 'weather':
+                patterns = '/weather, climate';
+                code = `// Weather API example
 bot.sendMessage("Fetching weather data...");
 
 HTTP.get("https://api.openweathermap.org/data/2.5/weather?q=London&appid=YOUR_API_KEY").then(function(weatherData) {
@@ -1407,91 +1381,64 @@ HTTP.get("https://api.openweathermap.org/data/2.5/weather?q=London&appid=YOUR_AP
 }).catch(function(error) {
     bot.sendMessage("❌ Weather data unavailable: " + error.message);
 });`;
-            break;
+                break;
 
-        case 'broadcast':
-            patterns = '/broadcast, announce';
-            code = `// Broadcast message (admin only)
+            case 'broadcast':
+                patterns = '/broadcast, announce';
+                code = `// Broadcast message (admin only)
 const user = getUser();
 
 // Check if user is admin
 if (user.id === 123456789) { // Replace with actual admin ID
-    bot.sendMessage("Please enter the broadcast message:");
-    
-    waitForAnswer(60000).then(function(broadcastMessage) {
-        if (broadcastMessage && broadcastMessage.trim()) {
-            // In a real implementation, you would send to all users
-            bot.sendMessage("📢 Broadcast Sent:\\n" + broadcastMessage);
-        }
-    }).catch(function(error) {
-        bot.sendMessage("Broadcast cancelled.");
-    });
+    bot.sendMessage("📢 Admin Broadcast Message:\\nThis is a broadcast to all users!");
 } else {
     bot.sendMessage("❌ Admin access required.");
 }`;
-            break;
+                break;
 
-        case 'scheduler':
-            patterns = '/schedule, timer, delay';
-            code = `// Message scheduler example
+            case 'scheduler':
+                patterns = '/schedule, timer, delay';
+                code = `// Message scheduler example
 bot.sendMessage("Message will be sent after 5 seconds...");
 
 // Wait function for delays
 wait(5000).then(function() {
     bot.sendMessage("⏰ 5 seconds have passed! This is your scheduled message.");
 });`;
-            break;
+                break;
 
-        case 'quiz':
-            patterns = '/quiz, test, exam';
-            code = `// Simple quiz example
-const questions = [
-    { question: "What is 2+2?", answer: "4" },
-    { question: "What is the capital of France?", answer: "Paris" }
-];
+            case 'run_command':
+                patterns = '/run, execute';
+                code = `// Run another command example
+bot.sendMessage("Running another command...");
 
-let currentQuestion = 0;
-let score = 0;
+// Run a specific command
+const result = Bot.runCommand("/help");
+bot.sendMessage("Command execution result: " + result);`;
+                break;
 
-function askQuestion() {
-    if (currentQuestion < questions.length) {
-        bot.sendMessage("Question " + (currentQuestion + 1) + ": " + questions[currentQuestion].question);
-        
-        waitForAnswer(30000).then(function(userAnswer) {
-            if (userAnswer && userAnswer.toLowerCase() === questions[currentQuestion].answer.toLowerCase()) {
-                score++;
-                bot.sendMessage("✅ Correct!");
-            } else {
-                bot.sendMessage("❌ Wrong! The answer was: " + questions[currentQuestion].answer);
-            }
-            currentQuestion++;
-            askQuestion();
-        }).catch(function(error) {
-            bot.sendMessage("Time's up! Moving to next question.");
-            currentQuestion++;
-            askQuestion();
-        });
-    } else {
-        bot.sendMessage("🎯 Quiz completed! Your score: " + score + "/" + questions.length);
-    }
-}
+            case 'next_command':
+                patterns = '/next, queue';
+                code = `// Queue next command example
+bot.sendMessage("This command will queue another command...");
 
-// Start the quiz
-askQuestion();`;
-            break;
+// Queue next command to run after user response
+const nextResult = Bot.nextCommand("/info");
+bot.sendMessage("Next command queued: " + nextResult);`;
+                break;
 
-        default:
-            patterns = '/template';
-            code = `// Basic template
+            default:
+                patterns = '/template';
+                code = `// Basic template
 const user = getUser();
 bot.sendMessage("Hello " + user.first_name + "! This is a basic command.");`;
+        }
+        
+        this.setCommandsToTags(patterns);
+        document.getElementById('commandCode').value = code;
+        document.getElementById('templatesModal').style.display = 'none';
+        this.showSuccess('Template applied successfully!');
     }
-    
-    this.setCommandsToTags(patterns);
-    document.getElementById('commandCode').value = code;
-    document.getElementById('templatesModal').style.display = 'none';
-    this.showSuccess('Template applied successfully!');
-}
 
     logout() {
         localStorage.clear();
