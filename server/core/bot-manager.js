@@ -107,6 +107,11 @@ async function handleMessage(bot, token, msg) {
             const waitData = waitingForAnswer.get(waitKey);
             waitingForAnswer.delete(waitKey);
             
+            if (waitData.resolve) {
+                waitData.resolve(text);
+                return;
+            }
+            
             if (waitData.answerHandler) {
                 console.log(`🔄 Processing answer for command: ${waitData.commandName}`);
                 await executeAnswerHandler(bot, waitData.answerHandler, msg, waitData.originalMessage);
@@ -380,7 +385,7 @@ async function getBotData(botToken, key) {
     }
 }
 
-// Enhanced command code execution with async/await support
+// Enhanced command code execution with all required functions
 async function executeCommandCode(bot, code, context) {
     const { msg, chatId, userId, username, first_name, isTest, botToken, waitForAnswer, userAnswer, originalMessage } = context;
     
@@ -524,6 +529,11 @@ async function executeCommandCode(bot, code, context) {
                 });
             },
             
+            // Media group (NEW FUNCTION)
+            sendMediaGroup: (media, params = {}) => {
+                return bot.sendMediaGroup(params.chat_id || chatId, media, params);
+            },
+            
             // Message management
             editMessageText: (text, params = {}) => {
                 return bot.editMessageText(text, {
@@ -585,6 +595,25 @@ async function executeCommandCode(bot, code, context) {
         // Utility function for waiting
         wait: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
         
+        // Bunchify function (FIXED)
+        bunchify: (obj) => {
+            if (obj && typeof obj === 'object') {
+                return new Proxy(obj, {
+                    get: (target, prop) => {
+                        if (prop in target) {
+                            const value = target[prop];
+                            if (typeof value === 'object' && value !== null) {
+                                return safeFunctions.bunchify(value);
+                            }
+                            return value;
+                        }
+                        return undefined;
+                    }
+                });
+            }
+            return obj;
+        },
+        
         // ===== COMMAND CONTROL =====
         ReturnCommand: class ReturnCommand extends Error {
             constructor(message = "Command returned") {
@@ -604,7 +633,7 @@ async function executeCommandCode(bot, code, context) {
                 return (async function() {
                     const { 
                         message, u, chat, KEY, User, Bot, getUser, getChat, waitForAnswer, 
-                        bot, HTTP, parseInt, parseFloat, JSON, wait, ReturnCommand,
+                        bot, HTTP, parseInt, parseFloat, JSON, wait, ReturnCommand, bunchify,
                         userAnswer, originalMessage
                     } = this;
                     
@@ -619,15 +648,15 @@ async function executeCommandCode(bot, code, context) {
                 }).call(this);
             `;
             
-            const func = new Function(asyncWrappedCode);
-            const result = await func.call(safeFunctions);
+            const func = new Function(...Object.keys(safeFunctions), asyncWrappedCode);
+            const result = await func(...Object.values(safeFunctions));
             return result;
         } else {
             // Sync code execution
             const syncWrappedCode = `
                 const { 
                     message, u, chat, KEY, User, Bot, getUser, getChat, waitForAnswer, 
-                    bot, HTTP, parseInt, parseFloat, JSON, wait, ReturnCommand,
+                    bot, HTTP, parseInt, parseFloat, JSON, wait, ReturnCommand, bunchify,
                     userAnswer, originalMessage
                 } = this;
                 
@@ -641,8 +670,8 @@ async function executeCommandCode(bot, code, context) {
                 }
             `;
             
-            const func = new Function(syncWrappedCode);
-            const result = func.call(safeFunctions);
+            const func = new Function(...Object.keys(safeFunctions), syncWrappedCode);
+            const result = func(...Object.values(safeFunctions));
             return result;
         }
         
