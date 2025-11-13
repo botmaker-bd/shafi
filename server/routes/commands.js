@@ -76,39 +76,49 @@ router.get('/:commandId', async (req, res) => {
 // Add new command
 router.post('/', async (req, res) => {
     try {
-        const { botToken, name, mainCommand, multipleCommand, code, description, waitForAnswer, answerHandler } = req.body;
+        const { botToken, commandPatterns, code, waitForAnswer, answerHandler } = req.body;
 
         console.log('🔄 Adding new command:', { 
-            name, 
-            mainCommand,
-            multipleCommand: multipleCommand?.substring(0, 50) + '...',
+            commandPatterns: commandPatterns?.substring(0, 50) + '...',
             botToken: botToken?.substring(0, 10) + '...' 
         });
 
-        if (!botToken || !name || !mainCommand || !code) {
+        if (!botToken || !commandPatterns || !code) {
             return res.status(400).json({ 
                 success: false,
-                error: 'Bot token, name, mainCommand and code are required' 
+                error: 'Bot token, command patterns and code are required' 
             });
         }
 
-        // Check for duplicate mainCommand
-        const { data: existingCommand, error: checkError } = await supabase
-            .from('commands')
-            .select('id, name')
-            .eq('bot_token', botToken)
-            .eq('mainCommand', mainCommand.trim())
-            .single();
-
-        if (checkError && checkError.code !== 'PGRST116') {
-            throw checkError;
-        }
-
-        if (existingCommand) {
+        // Parse and validate command patterns
+        const patterns = commandPatterns.split(',').map(p => p.trim()).filter(p => p.length > 0);
+        
+        if (patterns.length === 0) {
             return res.status(400).json({ 
                 success: false,
-                error: `Command "${mainCommand}" already exists in command "${existingCommand.name}"` 
+                error: 'At least one command pattern is required' 
             });
+        }
+
+        // Check for duplicate command patterns
+        for (const pattern of patterns) {
+            const { data: existingCommand, error: checkError } = await supabase
+                .from('commands')
+                .select('id, command_patterns')
+                .eq('bot_token', botToken)
+                .eq('command_patterns', pattern)
+                .single();
+
+            if (checkError && checkError.code !== 'PGRST116') {
+                throw checkError;
+            }
+
+            if (existingCommand) {
+                return res.status(400).json({ 
+                    success: false,
+                    error: `Command pattern "${pattern}" already exists` 
+                });
+            }
         }
 
         // Create command
@@ -116,11 +126,8 @@ router.post('/', async (req, res) => {
             .from('commands')
             .insert([{
                 bot_token: botToken,
-                name: name.trim(),
-                mainCommand: mainCommand.trim(),
-                multipleCommand: multipleCommand?.trim() || null,
+                command_patterns: commandPatterns.trim(),
                 code: code.trim(),
-                description: description?.trim() || '',
                 wait_for_answer: waitForAnswer || false,
                 answer_handler: answerHandler?.trim() || null,
                 is_active: true
@@ -157,46 +164,55 @@ router.post('/', async (req, res) => {
 router.put('/:commandId', async (req, res) => {
     try {
         const { commandId } = req.params;
-        const { name, mainCommand, multipleCommand, code, description, waitForAnswer, answerHandler, botToken } = req.body;
+        const { commandPatterns, code, waitForAnswer, answerHandler, botToken } = req.body;
 
-        console.log('🔄 Updating command:', { commandId, name, mainCommand });
+        console.log('🔄 Updating command:', { commandId, commandPatterns: commandPatterns?.substring(0, 50) + '...' });
 
-        if (!name || !mainCommand || !code) {
+        if (!commandPatterns || !code) {
             return res.status(400).json({ 
                 success: false,
-                error: 'Name, mainCommand and code are required' 
+                error: 'Command patterns and code are required' 
             });
         }
 
-        // Check for duplicate mainCommand (excluding current command)
-        const { data: existingCommand, error: checkError } = await supabase
-            .from('commands')
-            .select('id, name')
-            .eq('bot_token', botToken)
-            .eq('mainCommand', mainCommand.trim())
-            .neq('id', commandId)
-            .single();
-
-        if (checkError && checkError.code !== 'PGRST116') {
-            throw checkError;
-        }
-
-        if (existingCommand) {
+        // Parse and validate command patterns
+        const patterns = commandPatterns.split(',').map(p => p.trim()).filter(p => p.length > 0);
+        
+        if (patterns.length === 0) {
             return res.status(400).json({ 
                 success: false,
-                error: `Another command "${existingCommand.name}" already uses mainCommand "${mainCommand}"` 
+                error: 'At least one command pattern is required' 
             });
+        }
+
+        // Check for duplicate command patterns (excluding current command)
+        for (const pattern of patterns) {
+            const { data: existingCommand, error: checkError } = await supabase
+                .from('commands')
+                .select('id, command_patterns')
+                .eq('bot_token', botToken)
+                .eq('command_patterns', pattern)
+                .neq('id', commandId)
+                .single();
+
+            if (checkError && checkError.code !== 'PGRST116') {
+                throw checkError;
+            }
+
+            if (existingCommand) {
+                return res.status(400).json({ 
+                    success: false,
+                    error: `Command pattern "${pattern}" already exists in another command` 
+                });
+            }
         }
 
         // Update command
         const { data: command, error: updateError } = await supabase
             .from('commands')
             .update({
-                name: name.trim(),
-                mainCommand: mainCommand.trim(),
-                multipleCommand: multipleCommand?.trim() || null,
+                command_patterns: commandPatterns.trim(),
                 code: code.trim(),
-                description: description?.trim() || '',
                 wait_for_answer: waitForAnswer || false,
                 answer_handler: answerHandler?.trim() || null,
                 updated_at: new Date().toISOString()
@@ -242,7 +258,7 @@ router.delete('/:commandId', async (req, res) => {
         // Get command details for cache update
         const { data: command, error: fetchError } = await supabase
             .from('commands')
-            .select('bot_token, name')
+            .select('bot_token')
             .eq('id', commandId)
             .single();
 
@@ -336,8 +352,9 @@ router.post('/:commandId/test', async (req, res) => {
             });
         }
 
-        // Use provided test input or mainCommand
-        const testText = testInput || command.mainCommand;
+        // Use provided test input or first command pattern
+        const patterns = command.command_patterns.split(',').map(p => p.trim());
+        const testText = testInput || patterns[0];
 
         // Create test message
         const testMessage = {
@@ -407,8 +424,9 @@ router.post('/test-temp', async (req, res) => {
             });
         }
 
-        // Use provided test input or mainCommand
-        const testText = testInput || command.mainCommand;
+        // Use provided test input or first command pattern
+        const patterns = command.command_patterns.split(',').map(p => p.trim());
+        const testText = testInput || patterns[0];
 
         // Create test message
         const testMessage = {
@@ -483,35 +501,96 @@ router.patch('/:commandId/toggle', async (req, res) => {
     }
 });
 
-// Get command statistics
-router.get('/stats/:botToken', async (req, res) => {
+// Get command templates
+router.get('/templates/categories', async (req, res) => {
     try {
-        const { botToken } = req.params;
+        const templates = {
+            basic: [
+                {
+                    id: 'welcome',
+                    name: 'Welcome Message',
+                    patterns: '/start, start, hello',
+                    code: `// Welcome message template
+const user = getUser();
+const welcomeMessage = \`Hello \${user.first_name}! 👋
 
-        const { data: commands, error } = await supabase
-            .from('commands')
-            .select('id, is_active')
-            .eq('bot_token', botToken);
+Welcome to our bot! Here's what you can do:
+• Use /help to see all commands
+• Use /info to get bot information
 
-        if (error) throw error;
+Your User ID: \${user.id}
+Username: @\${user.username || 'Not set'}\`;
 
-        const totalCommands = commands.length;
-        const activeCommands = commands.filter(cmd => cmd.is_active).length;
+bot.sendMessage(welcomeMessage, {
+    parse_mode: 'Markdown'
+});`
+                },
+                {
+                    id: 'help',
+                    name: 'Help Command',
+                    patterns: '/help, help, commands',
+                    code: `// Help command template
+const helpText = \`🤖 *Bot Help Menu*
+
+*Available Commands:*
+• /start - Start the bot
+• /help - Show this help message
+• /info - Bot information
+
+*Features:*
+• Multiple command patterns
+• Interactive conversations
+• Media support
+
+*Need Help?*
+Contact support if you need assistance.\`;
+
+bot.sendMessage(helpText, {
+    parse_mode: 'Markdown'
+});`
+                }
+            ],
+            interactive: [
+                {
+                    id: 'conversation',
+                    name: 'Interactive Conversation',
+                    patterns: '/conversation, chat, talk',
+                    code: `// Interactive conversation - Part 1
+bot.sendMessage("Hello! What's your name?");`,
+                    waitForAnswer: true,
+                    answerHandler: `// Answer handler for conversation - Part 2
+const userName = userAnswer;
+if (userName && userName.trim()) {
+    bot.sendMessage(\`Nice to meet you, \${userName}!\`);
+} else {
+    bot.sendMessage("You didn't provide a name!");
+}`
+                }
+            ],
+            media: [
+                {
+                    id: 'send_photo',
+                    name: 'Send Photo',
+                    patterns: '/photo, picture, image',
+                    code: `// Send photo example
+bot.sendPhoto("https://via.placeholder.com/400x300", {
+    caption: "Here's a beautiful photo for you! 📸",
+    parse_mode: "Markdown"
+});`
+                }
+            ]
+        };
 
         res.json({
             success: true,
-            stats: {
-                total: totalCommands,
-                active: activeCommands,
-                inactive: totalCommands - activeCommands
-            }
+            templates: templates
         });
 
     } catch (error) {
-        console.error('❌ Get command stats error:', error);
+        console.error('❌ Get templates error:', error);
         res.status(500).json({ 
             success: false,
-            error: 'Failed to fetch command statistics' 
+            error: 'Failed to fetch templates' 
         });
     }
 });
