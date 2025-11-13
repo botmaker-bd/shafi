@@ -113,17 +113,6 @@ class CommandEditor {
         // Modal events
         this.setupModalEvents();
         this.setupTemplateCategories();
-
-        // Command group click events
-        document.addEventListener('click', (e) => {
-            const commandGroup = e.target.closest('.command-group');
-            if (commandGroup) {
-                const commandId = commandGroup.dataset.commandId;
-                if (commandId) {
-                    this.selectCommand(commandId);
-                }
-            }
-        });
     }
 
     setupModalEvents() {
@@ -702,6 +691,7 @@ class CommandEditor {
                 this.showError('Failed to load commands');
             }
         } catch (error) {
+            console.error('Error loading commands:', error);
             this.showError('Network error while loading commands');
         } finally {
             this.showLoading(false);
@@ -764,6 +754,25 @@ class CommandEditor {
         });
         
         commandsList.innerHTML = html;
+        
+        // Add click event listeners to command groups
+        this.setupCommandClickEvents();
+    }
+
+    setupCommandClickEvents() {
+        const commandGroups = document.querySelectorAll('.command-group');
+        
+        commandGroups.forEach(group => {
+            group.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const commandId = group.dataset.commandId;
+                if (commandId) {
+                    this.selectCommand(commandId);
+                }
+            });
+        });
     }
 
     filterCommands(searchTerm) {
@@ -910,12 +919,12 @@ class CommandEditor {
         }
 
         const formData = {
+            botToken: this.currentBot.token,
             commandPatterns: commandPatterns,
             code: commandCode,
             waitForAnswer: document.getElementById('waitForAnswer').checked,
             answerHandler: document.getElementById('waitForAnswer').checked ? 
-                          document.getElementById('answerHandler').value.trim() : '',
-            botToken: this.currentBot.token
+                          document.getElementById('answerHandler').value.trim() : ''
         };
 
         if (formData.waitForAnswer && !formData.answerHandler) {
