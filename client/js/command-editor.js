@@ -1070,16 +1070,31 @@ class CommandEditor {
 }
 
 // Initialize command editor
+// client/js/command-editor.js - ঠিক করা ভার্সন
+// Initialize command editor - এই অংশটি ঠিক করুন
 let commandEditor;
+
 document.addEventListener('DOMContentLoaded', () => {
     commandEditor = new CommandEditor();
     
-    // Add click event for command groups
+    // Add click event for command groups - এই অংশ যোগ করুন
     document.addEventListener('click', (e) => {
         const commandGroup = e.target.closest('.command-group');
         if (commandGroup) {
             const commandId = commandGroup.dataset.commandId;
-            commandEditor.selectCommand(commandId);
+            if (commandId && commandEditor.selectCommand) {
+                commandEditor.selectCommand(commandId);
+            }
         }
     });
+    
+    // Add event listener for waitForAnswer toggle
+    const waitForAnswerToggle = document.getElementById('waitForAnswer');
+    if (waitForAnswerToggle) {
+        waitForAnswerToggle.addEventListener('change', (e) => {
+            if (commandEditor && commandEditor.toggleAnswerHandler) {
+                commandEditor.toggleAnswerHandler(e.target.checked);
+            }
+        });
+    }
 });
