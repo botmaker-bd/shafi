@@ -1,7 +1,6 @@
 const TelegramBot = require('node-telegram-bot-api');
 const supabase = require('../config/supabase');
 const pythonRunner = require('./python-runner');
-const templateLoader = require('./template-loader');
 const ApiWrapper = require('./api-wrapper');
 
 class BotManager {
@@ -11,8 +10,60 @@ class BotManager {
         this.nextCommandHandlers = new Map();
         this.userStates = new Map();
         this.USE_WEBHOOK = process.env.USE_WEBHOOK === 'true';
+        this.initialized = false;
         
         console.log(`🤖 Bot Manager initialized in ${this.USE_WEBHOOK ? 'WEBHOOK' : 'POLLING'} mode`);
+    }
+
+    // ✅ ADD THIS MISSING METHOD
+    async initializeAllBots() {
+        if (this.initialized) {
+            console.log('🔄 Bots already initialized, skipping...');
+            return;
+        }
+        
+        try {
+            console.log('🔄 Initializing all bots from database...');
+            const { data: bots, error } = await supabase
+                .from('bots')
+                .select('token, name, is_active')
+                .eq('is_active', true);
+
+            if (error) {
+                console.error('❌ Database error fetching bots:', error);
+                throw error;
+            }
+
+            console.log(`📊 Found ${bots?.length || 0} active bots`);
+
+            if (!bots || bots.length === 0) {
+                console.log('ℹ️ No active bots found in database');
+                this.initialized = true;
+                return;
+            }
+
+            let successCount = 0;
+            
+            for (let i = 0; i < bots.length; i++) {
+                const bot = bots[i];
+                try {
+                    await this.initializeBot(bot.token);
+                    successCount++;
+                    
+                    if (i < bots.length - 1) {
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                    }
+                } catch (botError) {
+                    console.error(`❌ Failed to initialize bot ${bot.name}:`, botError.message);
+                }
+            }
+
+            this.initialized = true;
+            console.log(`✅ ${successCount}/${bots.length} bots initialized successfully`);
+        } catch (error) {
+            console.error('❌ Initialize all bots error:', error);
+            throw error;
+        }
     }
 
     async initializeBot(token) {
@@ -78,8 +129,12 @@ class BotManager {
             this.setupEventHandlers(bot, token);
 
             // Test connection
-            const botInfo = await bot.getMe();
-            console.log(`✅ Bot connected: @${botInfo.username}`);
+            try {
+                const botInfo = await bot.getMe();
+                console.log(`✅ Bot connected: @${botInfo.username}`);
+            } catch (botError) {
+                console.error(`❌ Bot connection failed:`, botError.message);
+            }
 
             // Store bot and commands
             this.activeBots.set(token, bot);
@@ -104,7 +159,6 @@ class BotManager {
         bot.on('audio', (msg) => this.handleMedia(bot, token, msg, 'audio'));
         bot.on('voice', (msg) => this.handleMedia(bot, token, msg, 'voice'));
         bot.on('sticker', (msg) => this.handleMedia(bot, token, msg, 'sticker'));
-        bot.on('animation', (msg) => this.handleMedia(bot, token, msg, 'animation'));
         
         // Location & Contact
         bot.on('location', (msg) => this.handleLocation(bot, token, msg));
@@ -119,29 +173,10 @@ class BotManager {
         
         // Inline queries
         bot.on('inline_query', (inlineQuery) => this.handleInlineQuery(bot, token, inlineQuery));
-        bot.on('chosen_inline_result', (result) => this.handleChosenInlineResult(bot, token, result));
         
         // Chat events
         bot.on('new_chat_members', (msg) => this.handleChatMember(bot, token, msg, 'new'));
         bot.on('left_chat_member', (msg) => this.handleChatMember(bot, token, msg, 'left'));
-        bot.on('new_chat_title', (msg) => this.handleChatTitle(bot, token, msg));
-        bot.on('new_chat_photo', (msg) => this.handleChatPhoto(bot, token, msg));
-        bot.on('delete_chat_photo', (msg) => this.handleDeleteChatPhoto(bot, token, msg));
-        bot.on('group_chat_created', (msg) => this.handleGroupCreated(bot, token, msg));
-        bot.on('supergroup_chat_created', (msg) => this.handleSupergroupCreated(bot, token, msg));
-        bot.on('channel_chat_created', (msg) => this.handleChannelCreated(bot, token, msg));
-        bot.on('migrate_to_chat_id', (msg) => this.handleMigrateTo(bot, token, msg));
-        bot.on('migrate_from_chat_id', (msg) => this.handleMigrateFrom(bot, token, msg));
-        bot.on('pinned_message', (msg) => this.handlePinnedMessage(bot, token, msg));
-        
-        // Chat member updates
-        bot.on('my_chat_member', (update) => this.handleMyChatMember(bot, token, update));
-        bot.on('chat_member', (update) => this.handleChatMemberUpdate(bot, token, update));
-        bot.on('chat_join_request', (request) => this.handleChatJoinRequest(bot, token, request));
-        
-        // Payment handlers
-        bot.on('shipping_query', (query) => this.handleShippingQuery(bot, token, query));
-        bot.on('pre_checkout_query', (query) => this.handlePreCheckoutQuery(bot, token, query));
         
         // Error handlers
         bot.on('polling_error', (error) => console.error(`❌ Polling error:`, error));
@@ -151,12 +186,14 @@ class BotManager {
 
     async handleMessage(bot, token, msg) {
         try {
+            // Skip non-text messages without caption
+            if (!msg.text && !msg.caption) return;
+
             const chatId = msg.chat.id;
             const userId = msg.from.id;
             const text = msg.text || msg.caption || '';
-            const messageType = this.getMessageType(msg);
 
-            console.log(`📨 ${messageType} from ${msg.from.first_name}: "${text}"`);
+            console.log(`📨 Message from ${msg.from.first_name}: "${text}"`);
 
             // Check for next command handler
             const nextCommandKey = `${token}_${userId}`;
@@ -191,11 +228,6 @@ class BotManager {
         }
     }
 
-    async handleEditedMessage(bot, token, msg) {
-        console.log(`✏️ Edited message from ${msg.from.first_name}`);
-        // Handle edited messages if needed
-    }
-
     async handleMedia(bot, token, msg, mediaType) {
         try {
             const caption = msg.caption || '';
@@ -205,36 +237,6 @@ class BotManager {
             }
         } catch (error) {
             console.error(`❌ Handle ${mediaType} error:`, error);
-        }
-    }
-
-    async handleLocation(bot, token, msg) {
-        try {
-            const location = msg.location;
-            console.log(`📍 Location from ${msg.from.first_name}: ${location.latitude}, ${location.longitude}`);
-            
-            // You can handle location-based commands here
-            const command = await this.findMatchingCommand(token, '/location', msg);
-            if (command) {
-                await this.executeCommand(bot, command, msg);
-            }
-        } catch (error) {
-            console.error('❌ Handle location error:', error);
-        }
-    }
-
-    async handleContact(bot, token, msg) {
-        try {
-            const contact = msg.contact;
-            console.log(`📞 Contact from ${msg.from.first_name}: ${contact.phone_number}`);
-            
-            // Handle contact sharing
-            const command = await this.findMatchingCommand(token, '/contact', msg);
-            if (command) {
-                await this.executeCommand(bot, command, msg);
-            }
-        } catch (error) {
-            console.error('❌ Handle contact error:', error);
         }
     }
 
@@ -277,82 +279,29 @@ class BotManager {
         }
     }
 
+    // Other event handlers with simple implementations
+    async handleEditedMessage(bot, token, msg) {
+        console.log(`✏️ Edited message from ${msg.from.first_name}`);
+    }
+
+    async handleLocation(bot, token, msg) {
+        console.log(`📍 Location from ${msg.from.first_name}`);
+    }
+
+    async handleContact(bot, token, msg) {
+        console.log(`📞 Contact from ${msg.from.first_name}`);
+    }
+
     async handlePoll(bot, token, poll) {
         console.log(`📊 Poll: ${poll.question}`);
     }
 
     async handlePollAnswer(bot, token, pollAnswer) {
-        console.log(`🗳️ Poll answer: ${pollAnswer.option_ids}`);
+        console.log(`🗳️ Poll answer received`);
     }
 
     async handleChatMember(bot, token, msg, type) {
         console.log(`👥 ${type === 'new' ? 'New' : 'Left'} chat member`);
-    }
-
-    async handleShippingQuery(bot, token, query) {
-        console.log(`🚚 Shipping query`);
-        await bot.answerShippingQuery(query.id, true);
-    }
-
-    async handlePreCheckoutQuery(bot, token, query) {
-        console.log(`💳 Pre-checkout query`);
-        await bot.answerPreCheckoutQuery(query.id, true);
-    }
-
-    // Other event handlers...
-    async handleChatTitle(bot, token, msg) {
-        console.log(`🏷️ New chat title: ${msg.new_chat_title}`);
-    }
-
-    async handleChatPhoto(bot, token, msg) {
-        console.log(`🖼️ New chat photo`);
-    }
-
-    async handleDeleteChatPhoto(bot, token, msg) {
-        console.log(`❌ Chat photo deleted`);
-    }
-
-    async handleGroupCreated(bot, token, msg) {
-        console.log(`👥 Group created`);
-    }
-
-    async handleSupergroupCreated(bot, token, msg) {
-        console.log(`👥 Supergroup created`);
-    }
-
-    async handleChannelCreated(bot, token, msg) {
-        console.log(`📢 Channel created`);
-    }
-
-    async handlePinnedMessage(bot, token, msg) {
-        console.log(`📌 Message pinned`);
-    }
-
-    async handleMyChatMember(bot, token, update) {
-        console.log(`👤 My chat member update`);
-    }
-
-    async handleChatMemberUpdate(bot, token, update) {
-        console.log(`👥 Chat member update`);
-    }
-
-    async handleChatJoinRequest(bot, token, request) {
-        console.log(`🤝 Chat join request`);
-        await bot.approveChatJoinRequest(request.chat.id, request.from.id);
-    }
-
-    getMessageType(msg) {
-        if (msg.text) return 'Text';
-        if (msg.photo) return 'Photo';
-        if (msg.video) return 'Video';
-        if (msg.document) return 'Document';
-        if (msg.audio) return 'Audio';
-        if (msg.voice) return 'Voice';
-        if (msg.sticker) return 'Sticker';
-        if (msg.location) return 'Location';
-        if (msg.contact) return 'Contact';
-        if (msg.poll) return 'Poll';
-        return 'Message';
     }
 
     async executePythonCode(bot, chatId, pythonCode) {
@@ -385,38 +334,11 @@ class BotManager {
     }
 
     generateCodeFromPrompt(prompt) {
-        const lowerPrompt = prompt.toLowerCase();
-        
-        if (lowerPrompt.includes('welcome')) {
-            return `// Welcome message - bot style
-bot.sendMessage(\`Hello \${user.first_name}! 👋 Welcome to our bot!\`);
+        return `// AI Generated code for: "${prompt}"
+const user = getUser();
+bot.sendMessage(\`Hello \${user.first_name}! You said: "${prompt}"\`);
 
-// Alternative: Api style  
-Api.sendMessage(\`Hello \${user.first_name}! 👋 Welcome to our bot!\`);`;
-        }
-        
-        if (lowerPrompt.includes('button')) {
-            return `// Inline keyboard - bot style
-bot.sendMessage("Choose option:", {
-    reply_markup: {
-        inline_keyboard: [
-            [{ text: "Option 1", callback_data: "opt1" }]
-        ]
-    }
-});
-
-// Alternative: Api style
-Api.sendKeyboard("Choose option:", [
-    [{ text: "Option 1", callback_data: "opt1" }]
-]);`;
-        }
-
-        return `// Generated code for: ${prompt}
-// bot style
-bot.sendMessage(\`Hello! You said: ${prompt}\`);
-
-// Api style
-Api.sendMessage(\`Hello! You said: ${prompt}\`);`;
+// Alternative: Api.sendMessage(\`Hello \${user.first_name}! You said: "${prompt}"\`);`;
     }
 
     async executeCommand(bot, command, msg, params = null) {
@@ -454,14 +376,14 @@ Api.sendMessage(\`Hello! You said: ${prompt}\`);`;
             }
         };
 
-        // Create API wrapper instances
+        // Create API wrapper instance
         const apiWrapper = new ApiWrapper(bot, baseContext);
         
         return {
             ...baseContext,
             bot: apiWrapper,      // bot.sendMessage() style
             Api: apiWrapper,      // Api.sendMessage() style
-            // Also expose direct methods for flexibility
+            // Direct methods
             sendMessage: (text, options) => apiWrapper.sendMessage(text, options),
             getUser: () => apiWrapper.getUser()
         };
@@ -484,15 +406,15 @@ Api.sendMessage(\`Hello! You said: ${prompt}\`);`;
                 );
 
                 const result = commandFunction(
-                    context.bot,           // bot.sendMessage() style
-                    context.Api,           // Api.sendMessage() style  
-                    context.sendMessage,   // Direct function
-                    context.getUser,       // User info
-                    context.User,          // User data storage
-                    context.Bot,           // Bot data storage
-                    context.pythonRunner.runPythonCode.bind(context.pythonRunner), // Python
-                    (ms) => new Promise(resolve => setTimeout(resolve, ms)), // wait
-                    context.bot.waitForAnswer.bind(context.bot) // waitForAnswer
+                    context.bot,
+                    context.Api,  
+                    context.sendMessage,
+                    context.getUser,
+                    context.User,
+                    context.Bot,
+                    context.pythonRunner.runPythonCode.bind(context.pythonRunner),
+                    (ms) => new Promise(resolve => setTimeout(resolve, ms)),
+                    context.bot.waitForAnswer.bind(context.bot)
                 );
                 
                 if (result && typeof result.then === 'function') {
