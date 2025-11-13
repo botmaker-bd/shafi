@@ -1284,7 +1284,7 @@ bot.sendMessage(botInfo, {
                 patterns = '/echo, echo, repeat';
                 description = 'Repeat user message';
                 code = `// Echo command
-const userMessage = msg.text.replace('/echo', '').replace('/repeat', '').trim();
+const userMessage = message.text.replace('/echo', '').replace('/repeat', '').trim();
 if (userMessage) {
     bot.sendMessage(\`You said: "\${userMessage}"\`);
 } else {
@@ -1367,29 +1367,6 @@ bot.sendMessage("Hello! What's your name?");
 const userName = userAnswer;
 if (userName && userName.trim()) {
     bot.sendMessage(\`Nice to meet you, \${userName}!\`);
-    
-    // Ask next question
-    bot.sendMessage("How old are you?");
-    
-    // Continue waiting for next answer
-    const ageText = await waitForAnswer(60000);
-    const age = parseInt(ageText);
-    
-    if (!isNaN(age)) {
-        if (age >= 18) {
-            bot.sendMessage(\`Great \${userName}! You're an adult.\`);
-        } else {
-            bot.sendMessage(\`Hello young friend \${userName}!\`);
-        }
-        
-        // Save user data
-        User.saveData('name', userName);
-        User.saveData('age', age.toString());
-        
-        bot.sendMessage("Your information has been saved! Use /data to view it.");
-    } else {
-        bot.sendMessage("Please enter a valid age!");
-    }
 } else {
     bot.sendMessage("You didn't provide a name!");
 }`;
