@@ -94,6 +94,11 @@ try {
     const adminRoutes = require('./routes/admin');
     const passwordRoutes = require('./routes/password');
     const webhookRoutes = require('./routes/webhook');
+    // অন্যান্য imports এর সাথে templates রাউট যোগ করুন
+    const templateRoutes = require('./routes/templates');
+
+    // অন্যান্য app.use() এর সাথে এটি যোগ করুন
+    app.use('/api/templates', templateRoutes);
 
     app.use('/api/auth', authRoutes);
     app.use('/api/bots', botRoutes);
