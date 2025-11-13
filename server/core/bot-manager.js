@@ -1,6 +1,5 @@
 const TelegramBot = require('node-telegram-bot-api');
 const supabase = require('../config/supabase');
-const { executeCommandCode } = require('./command-executor');
 
 class BotManager {
     constructor() {
@@ -122,69 +121,69 @@ class BotManager {
     }
 
     async handleMessage(bot, token, msg) {
-    try {
-        if (!msg.text && !msg.caption) return;
-
-        const chatId = msg.chat.id;
-        const text = msg.text || msg.caption || '';
-        const userId = msg.from.id;
-        const userName = msg.from.first_name || 'Unknown';
-
-        console.log(`📩 Message from ${userName} (${userId}): "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
-
-        // Check for next command handler
-        const nextCommandKey = `${token}_${userId}`;
-        if (this.nextCommandHandlers.has(nextCommandKey)) {
-            const handler = this.nextCommandHandlers.get(nextCommandKey);
-            this.nextCommandHandlers.delete(nextCommandKey);
-            
-            console.log(`🔄 Executing next command handler for user ${userId}`);
-            try {
-                await handler(text, msg);
-            } catch (handlerError) {
-                console.error('❌ Next command handler error:', handlerError);
-                await bot.sendMessage(chatId, '❌ Error processing your response. Please try again.');
-            }
-            return;
-        }
-
-        // Find matching command - command_patterns ব্যবহার করুন
-        const commands = this.botCommands.get(token) || [];
-        let matchedCommand = null;
-        let commandParams = null;
-
-        for (const command of commands) {
-            if (!command.command_patterns) continue;
-            
-            const patterns = command.command_patterns.split(',').map(p => p.trim());
-            
-            for (const pattern of patterns) {
-                if (text === pattern) {
-                    matchedCommand = command;
-                    commandParams = null;
-                    break;
-                } else if (text.startsWith(pattern + ' ')) {
-                    matchedCommand = command;
-                    commandParams = text.substring(pattern.length + 1).trim();
-                    break;
-                }
-            }
-            if (matchedCommand) break;
-        }
-
-        if (matchedCommand) {
-            console.log(`🎯 Executing command: ${matchedCommand.command_patterns} with params: ${commandParams || 'none'}`);
-            await this.executeCommand(bot, matchedCommand, msg, commandParams);
-        }
-    } catch (error) {
-        console.error('❌ Handle message error:', error);
         try {
-            await bot.sendMessage(msg.chat.id, '❌ An error occurred while processing your message.');
-        } catch (sendError) {
-            console.error('❌ Failed to send error message:', sendError);
+            if (!msg.text && !msg.caption) return;
+
+            const chatId = msg.chat.id;
+            const text = msg.text || msg.caption || '';
+            const userId = msg.from.id;
+            const userName = msg.from.first_name || 'Unknown';
+
+            console.log(`📩 Message from ${userName} (${userId}): "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
+
+            // Check for next command handler
+            const nextCommandKey = `${token}_${userId}`;
+            if (this.nextCommandHandlers.has(nextCommandKey)) {
+                const handler = this.nextCommandHandlers.get(nextCommandKey);
+                this.nextCommandHandlers.delete(nextCommandKey);
+                
+                console.log(`🔄 Executing next command handler for user ${userId}`);
+                try {
+                    await handler(text, msg);
+                } catch (handlerError) {
+                    console.error('❌ Next command handler error:', handlerError);
+                    await bot.sendMessage(chatId, '❌ Error processing your response. Please try again.');
+                }
+                return;
+            }
+
+            // Find matching command
+            const commands = this.botCommands.get(token) || [];
+            let matchedCommand = null;
+            let commandParams = null;
+
+            for (const command of commands) {
+                if (!command.command_patterns) continue;
+                
+                const patterns = command.command_patterns.split(',').map(p => p.trim());
+                
+                for (const pattern of patterns) {
+                    if (text === pattern) {
+                        matchedCommand = command;
+                        commandParams = null;
+                        break;
+                    } else if (text.startsWith(pattern + ' ')) {
+                        matchedCommand = command;
+                        commandParams = text.substring(pattern.length + 1).trim();
+                        break;
+                    }
+                }
+                if (matchedCommand) break;
+            }
+
+            if (matchedCommand) {
+                console.log(`🎯 Executing command: ${matchedCommand.command_patterns} with params: ${commandParams || 'none'}`);
+                await this.executeCommand(bot, matchedCommand, msg, commandParams);
+            }
+        } catch (error) {
+            console.error('❌ Handle message error:', error);
+            try {
+                await bot.sendMessage(msg.chat.id, '❌ An error occurred while processing your message.');
+            } catch (sendError) {
+                console.error('❌ Failed to send error message:', sendError);
+            }
         }
     }
-}
 
     async handleCallbackQuery(bot, token, callbackQuery) {
         try {
@@ -243,15 +242,130 @@ class BotManager {
                 }
             };
 
-            await executeCommandCode(bot, command.code, context);
+            await this.executeCommandCode(bot, command.code, context);
         } catch (error) {
-            console.error(`❌ Command execution error for "${command.mainCommand}":`, error);
+            console.error(`❌ Command execution error for command ID ${command.id}:`, error);
             try {
                 await bot.sendMessage(msg.chat.id, '❌ Command execution failed. Please try again.');
             } catch (sendError) {
                 console.error('❌ Failed to send error message:', sendError);
             }
         }
+    }
+
+    // Command execution function - directly defined here to avoid circular dependency
+    async executeCommandCode(bot, code, context) {
+        return new Promise(async (resolve, reject) => {
+            try {
+                const { msg, chatId, userId, username, first_name, botToken, userInput, User, Bot } = context;
+                
+                // Create safe execution environment
+                const botFunctions = {
+                    // Basic messaging
+                    sendMessage: (text, options = {}) => {
+                        return bot.sendMessage(chatId, text, {
+                            parse_mode: 'HTML',
+                            ...options
+                        });
+                    },
+                    
+                    send: (text, options = {}) => {
+                        return bot.sendMessage(chatId, text, {
+                            parse_mode: 'HTML',
+                            ...options
+                        });
+                    },
+                    
+                    reply: (text, options = {}) => {
+                        return bot.sendMessage(chatId, text, {
+                            reply_to_message_id: msg.message_id,
+                            parse_mode: 'HTML',
+                            ...options
+                        });
+                    },
+                    
+                    // Media messages
+                    sendPhoto: (photo, options = {}) => {
+                        return bot.sendPhoto(chatId, photo, {
+                            parse_mode: 'HTML',
+                            ...options
+                        });
+                    },
+                    
+                    sendDocument: (document, options = {}) => {
+                        return bot.sendDocument(chatId, document, {
+                            parse_mode: 'HTML',
+                            ...options
+                        });
+                    },
+                    
+                    // User information
+                    getUser: () => ({
+                        id: userId,
+                        username: username,
+                        first_name: first_name,
+                        chat_id: chatId
+                    }),
+                    
+                    // Command parameters
+                    params: userInput,
+                    userInput: userInput,
+                    
+                    // Message object
+                    message: msg,
+                    
+                    // Data storage
+                    User: User,
+                    Bot: Bot,
+                    
+                    // Utility functions
+                    wait: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
+                    
+                    // Wait for answer functionality
+                    waitForAnswer: (question, options = {}) => {
+                        return new Promise((resolve) => {
+                            const nextCommandKey = `${botToken}_${userId}`;
+                            
+                            // Send question first
+                            bot.sendMessage(chatId, question, options).then(() => {
+                                // Set up handler for next message
+                                this.nextCommandHandlers.set(nextCommandKey, (answer) => {
+                                    resolve(answer);
+                                });
+                            }).catch(reject);
+                        });
+                    }
+                };
+
+                // Execute the command code in a safe context
+                const commandFunction = new Function(
+                    ...Object.keys(botFunctions),
+                    `
+                    "use strict";
+                    try {
+                        ${code}
+                    } catch (error) {
+                        console.error('Command execution error:', error);
+                        throw error;
+                    }
+                    `
+                );
+
+                // Call the function with all the bot functions as parameters
+                const result = commandFunction(...Object.values(botFunctions));
+                
+                // Handle async commands
+                if (result && typeof result.then === 'function') {
+                    const finalResult = await result;
+                    resolve(finalResult);
+                } else {
+                    resolve(result);
+                }
+            } catch (error) {
+                console.error('❌ Command execution error:', error);
+                reject(error);
+            }
+        });
     }
 
     // Universal data storage methods
