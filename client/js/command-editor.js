@@ -1,4 +1,4 @@
-// Enhanced Command Editor JavaScript
+// Enhanced Command Editor JavaScript - Fixed Version
 class CommandEditor {
     constructor() {
         this.user = null;
@@ -35,12 +35,15 @@ class CommandEditor {
                     this.templates = data.templates;
                     this.populateTemplatesModal();
                     return true;
+                } else {
+                    throw new Error(data.error || 'Failed to load templates');
                 }
+            } else {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
-            throw new Error('Failed to load templates');
         } catch (error) {
             console.error('Load templates error:', error);
-            this.showTemplatesError('Failed to load templates from server');
+            this.showTemplatesError(`Failed to load templates: ${error.message}`);
             return false;
         } finally {
             this.showLoading(false);
@@ -56,6 +59,7 @@ class CommandEditor {
                 <div class="template-error">
                     <i class="fas fa-exclamation-triangle"></i>
                     <p>No templates available</p>
+                    <p class="template-help">Templates will be loaded from the server</p>
                 </div>
             `;
             return;
@@ -67,25 +71,37 @@ class CommandEditor {
             const categoryId = `${category}-templates`;
             const isActive = category === 'basic' ? 'active' : '';
             
-            html += `
-                <div id="${categoryId}" class="template-category ${isActive}">
-                    <div class="templates-grid">
-                        ${templates.map(template => `
-                            <div class="template-card" data-template='${JSON.stringify(template).replace(/'/g, "&#39;")}'>
-                                <div class="template-icon">
-                                    <i class="fas fa-${this.getTemplateIcon(category)}"></i>
-                                </div>
-                                <h4>${this.escapeHtml(template.name)}</h4>
-                                <p>${this.escapeHtml(template.description)}</p>
-                                <div class="template-preview">
-                                    <strong>Patterns:</strong> ${this.escapeHtml(template.patterns)}
-                                    <div class="template-code-preview">
-                                        ${this.escapeHtml(template.code.substring(0, 100))}...
+            if (templates && templates.length > 0) {
+                html += `
+                    <div id="${categoryId}" class="template-category ${isActive}">
+                        <div class="templates-grid">
+                            ${templates.map(template => `
+                                <div class="template-card" data-template='${JSON.stringify(template).replace(/'/g, "&#39;")}'>
+                                    <div class="template-icon">
+                                        <i class="fas fa-${this.getTemplateIcon(category)}"></i>
+                                    </div>
+                                    <h4>${this.escapeHtml(template.name)}</h4>
+                                    <p>${this.escapeHtml(template.description)}</p>
+                                    <div class="template-preview">
+                                        <strong>Patterns:</strong> ${this.escapeHtml(template.patterns)}
+                                        <div class="template-code-preview">
+                                            ${this.escapeHtml(template.code.substring(0, 100))}...
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        `).join('')}
+                            `).join('')}
+                        </div>
                     </div>
+                `;
+            }
+        }
+
+        // If no templates were added, show empty state
+        if (!html) {
+            html = `
+                <div class="template-error">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>No templates found in any category</p>
                 </div>
             `;
         }
@@ -101,7 +117,7 @@ class CommandEditor {
                     <i class="fas fa-exclamation-triangle"></i>
                     <p>${message}</p>
                     <button class="btn btn-primary btn-small" id="retryTemplates">
-                        <i class="fas fa-redo"></i> Retry
+                        <i class="fas fa-redo"></i> Retry Loading
                     </button>
                 </div>
             `;
@@ -244,12 +260,11 @@ class CommandEditor {
             `;
         }
 
-        // Load templates from server
-        const success = await this.loadTemplatesFromServer();
+        // Show modal first
+        document.getElementById('templatesModal').style.display = 'flex';
         
-        if (success) {
-            document.getElementById('templatesModal').style.display = 'flex';
-        }
+        // Then load templates
+        await this.loadTemplatesFromServer();
     }
 
     setupModalEvents() {
@@ -285,6 +300,7 @@ class CommandEditor {
                         this.applyTemplate(template);
                     } catch (error) {
                         console.error('Error parsing template:', error);
+                        this.showError('Failed to apply template');
                     }
                 }
             }
@@ -323,19 +339,115 @@ class CommandEditor {
     setupCodeEditor() {
         const advancedEditor = document.getElementById('advancedCodeEditor');
         
+        // Cancel button
         document.getElementById('cancelEdit').addEventListener('click', () => {
             this.closeCodeEditor();
         });
 
+        // Save button
         document.getElementById('saveCode').addEventListener('click', () => {
             this.saveCodeFromEditor();
         });
 
+        // Editor input events
         advancedEditor.addEventListener('input', (e) => {
             this.updateLineCount(e.target.value);
         });
 
+        // Editor toolbar buttons
+        this.setupEditorToolbar();
+
         this.updateLineCount(advancedEditor.value);
+    }
+
+    setupEditorToolbar() {
+        const editor = document.getElementById('advancedCodeEditor');
+        
+        // Undo/Redo functionality
+        document.getElementById('undoBtn').addEventListener('click', () => {
+            document.execCommand('undo');
+            editor.focus();
+        });
+
+        document.getElementById('redoBtn').addEventListener('click', () => {
+            document.execCommand('redo');
+            editor.focus();
+        });
+
+        // Select All
+        document.getElementById('selectAllBtn').addEventListener('click', () => {
+            editor.select();
+            editor.focus();
+        });
+
+        // Cut
+        document.getElementById('cutBtn').addEventListener('click', () => {
+            document.execCommand('cut');
+            editor.focus();
+        });
+
+        // Copy
+        document.getElementById('copyBtn').addEventListener('click', () => {
+            document.execCommand('copy');
+            editor.focus();
+        });
+
+        // Paste
+        document.getElementById('pasteBtn').addEventListener('click', async () => {
+            try {
+                const text = await navigator.clipboard.readText();
+                editor.focus();
+                document.execCommand('insertText', false, text);
+            } catch (err) {
+                // Fallback for browsers that don't support clipboard API
+                document.execCommand('paste');
+                editor.focus();
+            }
+        });
+
+        // Clear
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            editor.value = '';
+            this.updateLineCount('');
+            editor.focus();
+        });
+
+        // Format (basic indentation)
+        document.getElementById('formatBtn').addEventListener('click', () => {
+            this.formatCode();
+            editor.focus();
+        });
+    }
+
+    formatCode() {
+        const editor = document.getElementById('advancedCodeEditor');
+        let code = editor.value;
+        
+        // Basic formatting - add proper indentation
+        const lines = code.split('\n');
+        let formattedLines = [];
+        let indentLevel = 0;
+        
+        for (let line of lines) {
+            line = line.trim();
+            
+            // Decrease indent for closing braces
+            if (line.includes('}') || line.includes(')')) {
+                indentLevel = Math.max(0, indentLevel - 1);
+            }
+            
+            // Add current line with proper indentation
+            formattedLines.push('    '.repeat(indentLevel) + line);
+            
+            // Increase indent for opening braces
+            if (line.includes('{') || line.includes('(')) {
+                indentLevel++;
+            }
+        }
+        
+        editor.value = formattedLines.join('\n');
+        this.updateLineCount(editor.value);
+        this.showSuccess('Code formatted!');
     }
 
     setupCommandsTags() {
@@ -428,7 +540,7 @@ class CommandEditor {
             return;
         }
 
-        if (!this.currentCommand) {
+        if (!this.currentCommand || this.currentCommand.id === 'new') {
             this.showError('Please save the command first before testing');
             return;
         }
@@ -635,14 +747,17 @@ class CommandEditor {
             document.getElementById('editorType').textContent = 'Editor: Answer Handler';
         }
         
-        document.getElementById('advancedCodeEditor').value = code;
+        const advancedEditor = document.getElementById('advancedCodeEditor');
+        advancedEditor.value = code;
         this.updateLineCount(code);
+        
+        // Show modal
         document.getElementById('codeEditorModal').style.display = 'flex';
         
+        // Focus and set cursor position after a short delay
         setTimeout(() => {
-            const editor = document.getElementById('advancedCodeEditor');
-            editor.focus();
-            editor.setSelectionRange(0, 0);
+            advancedEditor.focus();
+            advancedEditor.setSelectionRange(0, 0);
         }, 100);
     }
 
