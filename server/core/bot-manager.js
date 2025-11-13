@@ -251,42 +251,54 @@ class BotManager {
     }
 
     async handleMessage(bot, token, msg) {
-        try {
-            if (!msg.text && !msg.caption) return;
+    try {
+        if (!msg.text && !msg.caption) return;
 
-            const chatId = msg.chat.id;
-            const text = msg.text || msg.caption || '';
-            const userId = msg.from.id;
-            const userName = msg.from.first_name || 'Unknown';
+        const chatId = msg.chat.id;
+        const text = msg.text || msg.caption || '';
+        const userId = msg.from.id;
+        const userName = msg.from.first_name || 'Unknown';
 
-            console.log(`📩 Message from ${userName} (${userId}): "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
+        console.log(`📩 Message from ${userName} (${userId}): "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
 
-            // Check for next command handler
-            const nextCommandKey = `${token}_${userId}`;
-            if (this.nextCommandHandlers.has(nextCommandKey)) {
-                const handler = this.nextCommandHandlers.get(nextCommandKey);
-                this.nextCommandHandlers.delete(nextCommandKey);
-                
-                console.log(`🔄 Executing next command handler for user ${userId}`);
-                try {
-                    await handler(text, msg);
-                } catch (handlerError) {
-                    console.error('❌ Next command handler error:', handlerError);
-                    await bot.sendMessage(chatId, '❌ Error processing your response. Please try again.');
-                }
-                return;
+        // Check for next command handler
+        const nextCommandKey = `${token}_${userId}`;
+        if (this.nextCommandHandlers.has(nextCommandKey)) {
+            const handler = this.nextCommandHandlers.get(nextCommandKey);
+            this.nextCommandHandlers.delete(nextCommandKey);
+            
+            console.log(`🔄 Executing next command handler for user ${userId}`);
+            try {
+                await handler(text, msg);
+            } catch (handlerError) {
+                console.error('❌ Next command handler error:', handlerError);
+                await bot.sendMessage(chatId, '❌ Error processing your response. Please try again.');
             }
+            return;
+        }
 
-            // Find matching command
-            const commands = this.botCommands.get(token) || [];
-            let matchedCommand = null;
-            let commandParams = null;
+        // Find matching command
+        const commands = this.botCommands.get(token) || [];
+        let matchedCommand = null;
+        let commandParams = null;
 
-            for (const command of commands) {
-                if (!command.pattern) continue;
-                
-                const patterns = command.pattern.split(',').map(p => p.trim());
-                
+        for (const command of commands) {
+            if (!command.mainCommand) continue;
+            
+            // Check mainCommand
+            if (text === command.mainCommand) {
+                matchedCommand = command;
+                commandParams = null;
+                break;
+            } else if (text.startsWith(command.mainCommand + ' ')) {
+                matchedCommand = command;
+                commandParams = text.substring(command.mainCommand.length + 1).trim();
+                break;
+            }
+            
+            // Check multipleCommand
+            if (command.multipleCommand) {
+                const patterns = command.multipleCommand.split(',').map(p => p.trim());
                 for (const pattern of patterns) {
                     if (text === pattern) {
                         matchedCommand = command;
@@ -300,20 +312,21 @@ class BotManager {
                 }
                 if (matchedCommand) break;
             }
+        }
 
-            if (matchedCommand) {
-                console.log(`🎯 Executing command: ${matchedCommand.pattern} with params: ${commandParams || 'none'}`);
-                await this.executeCommand(bot, matchedCommand, msg, commandParams);
-            }
-        } catch (error) {
-            console.error('❌ Handle message error:', error);
-            try {
-                await bot.sendMessage(msg.chat.id, '❌ An error occurred while processing your message.');
-            } catch (sendError) {
-                console.error('❌ Failed to send error message:', sendError);
-            }
+        if (matchedCommand) {
+            console.log(`🎯 Executing command: ${matchedCommand.mainCommand} with params: ${commandParams || 'none'}`);
+            await this.executeCommand(bot, matchedCommand, msg, commandParams);
+        }
+    } catch (error) {
+        console.error('❌ Handle message error:', error);
+        try {
+            await bot.sendMessage(msg.chat.id, '❌ An error occurred while processing your message.');
+        } catch (sendError) {
+            console.error('❌ Failed to send error message:', sendError);
         }
     }
+}
 
     async handleCallbackQuery(bot, token, callbackQuery) {
         try {
