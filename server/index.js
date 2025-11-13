@@ -17,6 +17,11 @@ console.log(`📍 Port: ${PORT}`);
 console.log(`🌐 Base URL: ${BASE_URL}`);
 console.log(`🔗 Mode: ${USE_WEBHOOK ? 'Webhook' : 'Polling'}`);
 
+// server/index.js - app configuration এর শুরুতে যোগ করুন
+
+// Trust proxy for rate limiting
+app.set('trust proxy', 1);
+
 // Enhanced CORS configuration
 app.use(cors({
     origin: function (origin, callback) {
