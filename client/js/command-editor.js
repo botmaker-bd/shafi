@@ -7,10 +7,6 @@ class CommandEditor {
         this.commands = [];
         this.templates = {};
         this.currentEditorType = 'main';
-        this.editorHistory = {
-            main: { past: [], future: [] },
-            answer: { past: [], future: [] }
-        };
         this.init();
     }
 
@@ -21,130 +17,6 @@ class CommandEditor {
         await this.loadCommands();
         this.setupCodeEditor();
         this.setupCommandsTags();
-    }
-
-    async loadTemplatesFromServer() {
-        try {
-            this.showLoading(true);
-            const token = localStorage.getItem('token');
-            const response = await fetch('/api/templates', {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                if (data.success) {
-                    this.templates = data.templates || {};
-                    this.populateTemplatesModal();
-                    return true;
-                } else {
-                    throw new Error(data.error || 'Failed to load templates');
-                }
-            } else {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-        } catch (error) {
-            console.error('Load templates error:', error);
-            this.showTemplatesError(`Failed to load templates: ${error.message}`);
-            return false;
-        } finally {
-            this.showLoading(false);
-        }
-    }
-
-    populateTemplatesModal() {
-        const templatesContent = document.querySelector('.templates-content');
-        if (!templatesContent) return;
-
-        if (!this.templates || Object.keys(this.templates).length === 0) {
-            this.showTemplatesError('No templates available from server');
-            return;
-        }
-
-        let html = '';
-        let hasTemplates = false;
-
-        for (const [category, templates] of Object.entries(this.templates)) {
-            const categoryId = `${category}-templates`;
-            const isActive = category === 'basic' ? 'active' : '';
-            
-            if (templates && Array.isArray(templates) && templates.length > 0) {
-                hasTemplates = true;
-                html += `
-                    <div id="${categoryId}" class="template-category ${isActive}">
-                        <div class="templates-grid">
-                            ${templates.map(template => `
-                                <div class="template-card" data-template='${JSON.stringify(template).replace(/'/g, "&apos;")}'>
-                                    <div class="template-icon">
-                                        <i class="fas fa-${this.getTemplateIcon(category)}"></i>
-                                    </div>
-                                    <h4>${this.escapeHtml(template.name || 'Unnamed Template')}</h4>
-                                    <p>${this.escapeHtml(template.description || 'No description available')}</p>
-                                    ${template.patterns ? `
-                                    <div class="template-preview">
-                                        <strong>Patterns:</strong> ${this.escapeHtml(template.patterns)}
-                                        ${template.code ? `
-                                        <div class="template-code-preview">
-                                            ${this.escapeHtml(template.code.substring(0, 100))}...
-                                        </div>
-                                        ` : ''}
-                                    </div>
-                                    ` : ''}
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                `;
-            }
-        }
-
-        if (!hasTemplates) {
-            html = `
-                <div class="template-error">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <p>No templates found in any category</p>
-                    <p class="template-help">Check if template files exist on the server</p>
-                </div>
-            `;
-        }
-
-        templatesContent.innerHTML = html;
-        this.setupTemplateCategories();
-    }
-
-    showTemplatesError(message) {
-        const templatesContent = document.querySelector('.templates-content');
-        if (templatesContent) {
-            templatesContent.innerHTML = `
-                <div class="template-error">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <p>${this.escapeHtml(message)}</p>
-                    <button class="btn btn-primary btn-small" id="retryTemplates">
-                        <i class="fas fa-redo"></i> Retry Loading
-                    </button>
-                </div>
-            `;
-
-            document.getElementById('retryTemplates')?.addEventListener('click', () => {
-                this.loadTemplatesFromServer();
-            });
-        }
-    }
-
-    getTemplateIcon(category) {
-        const icons = {
-            'basic': 'code',
-            'interactive': 'comments',
-            'media': 'image',
-            'buttons': 'th',
-            'data': 'database',
-            'http': 'cloud',
-            'advanced': 'cogs',
-            'python': 'python'
-        };
-        return icons[category] || 'code';
     }
 
     setupEventListeners() {
@@ -188,7 +60,7 @@ class CommandEditor {
             this.testCommand();
         });
 
-        // Quick test button
+        // Quick test button - REMOVED SAVE VALIDATION
         document.getElementById('runQuickTestBtn')?.addEventListener('click', () => {
             this.runQuickTest();
         });
@@ -206,7 +78,7 @@ class CommandEditor {
             this.toggleAnswerHandler(e.target.checked);
         });
 
-        // Code editor buttons
+        // Code editor buttons - UPDATED FOR NORMAL MODAL
         document.getElementById('openEditor')?.addEventListener('click', () => {
             this.openCodeEditor('main');
         });
@@ -215,7 +87,7 @@ class CommandEditor {
             this.openCodeEditor('answer');
         });
 
-        // Templates
+        // Templates - UPDATED FOR NORMAL MODAL
         document.getElementById('showTemplates')?.addEventListener('click', async () => {
             await this.showTemplates();
         });
@@ -252,94 +124,6 @@ class CommandEditor {
                 }
             }
         });
-
-        // Form validation
-        this.setupFormValidation();
-    }
-
-    setupFormValidation() {
-        const commandCode = document.getElementById('commandCode');
-        const moreCommands = document.getElementById('moreCommands');
-        
-        if (commandCode) {
-            commandCode.addEventListener('blur', () => {
-                this.validateCommandCode();
-            });
-        }
-        
-        if (moreCommands) {
-            moreCommands.addEventListener('blur', () => {
-                this.validateCommandPatterns();
-            });
-        }
-    }
-
-    validateCommandCode() {
-        const code = document.getElementById('commandCode').value.trim();
-        if (!code) {
-            this.showFieldError('commandCode', 'Command code is required');
-            return false;
-        }
-        this.clearFieldError('commandCode');
-        return true;
-    }
-
-    validateCommandPatterns() {
-        const commands = this.getCommandsFromTags();
-        if (commands.length === 0) {
-            this.showFieldError('moreCommands', 'At least one command pattern is required');
-            return false;
-        }
-        this.clearFieldError('moreCommands');
-        return true;
-    }
-
-    showFieldError(fieldId, message) {
-        this.clearFieldError(fieldId);
-        
-        const field = document.getElementById(fieldId);
-        if (!field) return;
-        
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'field-error';
-        errorDiv.style.cssText = `
-            color: #ef4444;
-            font-size: 0.75rem;
-            margin-top: 0.25rem;
-            display: flex;
-            align-items: center;
-            gap: 0.25rem;
-        `;
-        errorDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i> ${message}`;
-        
-        field.parentNode.appendChild(errorDiv);
-        field.style.borderColor = '#ef4444';
-    }
-
-    clearFieldError(fieldId) {
-        const field = document.getElementById(fieldId);
-        if (!field) return;
-        
-        const existingError = field.parentNode.querySelector('.field-error');
-        if (existingError) {
-            existingError.remove();
-        }
-        field.style.borderColor = '';
-    }
-
-    async showTemplates() {
-        const templatesContent = document.querySelector('.templates-content');
-        if (templatesContent) {
-            templatesContent.innerHTML = `
-                <div class="template-loading">
-                    <div class="spinner"></div>
-                    <p>Loading templates from server...</p>
-                </div>
-            `;
-        }
-
-        document.getElementById('templatesModal').style.display = 'flex';
-        await this.loadTemplatesFromServer();
     }
 
     setupModalEvents() {
@@ -427,164 +211,12 @@ class CommandEditor {
             this.saveCodeFromEditor();
         });
 
-        // Editor input events for undo/redo
+        // Editor input events
         advancedEditor.addEventListener('input', (e) => {
             this.updateLineCount(e.target.value);
-            this.saveToHistory(this.currentEditorType, e.target.value);
         });
-
-        // Editor toolbar buttons
-        this.setupEditorToolbar();
 
         this.updateLineCount(advancedEditor.value);
-    }
-
-    setupEditorToolbar() {
-        const editor = document.getElementById('advancedCodeEditor');
-        
-        if (!editor) return;
-
-        // Enhanced Undo/Redo functionality
-        document.getElementById('undoBtn')?.addEventListener('click', () => {
-            this.undo(this.currentEditorType);
-        });
-
-        document.getElementById('redoBtn')?.addEventListener('click', () => {
-            this.redo(this.currentEditorType);
-        });
-
-        // Select All
-        document.getElementById('selectAllBtn')?.addEventListener('click', () => {
-            editor.select();
-            editor.focus();
-        });
-
-        // Cut
-        document.getElementById('cutBtn')?.addEventListener('click', () => {
-            const selectedText = editor.value.substring(editor.selectionStart, editor.selectionEnd);
-            if (selectedText) {
-                navigator.clipboard.writeText(selectedText).then(() => {
-                    this.insertTextAtCursor(editor, '');
-                    this.saveToHistory(this.currentEditorType, editor.value);
-                });
-            }
-            editor.focus();
-        });
-
-        // Copy
-        document.getElementById('copyBtn')?.addEventListener('click', () => {
-            const selectedText = editor.value.substring(editor.selectionStart, editor.selectionEnd);
-            if (selectedText) {
-                navigator.clipboard.writeText(selectedText);
-            }
-            editor.focus();
-        });
-
-        // Paste
-        document.getElementById('pasteBtn')?.addEventListener('click', async () => {
-            try {
-                const text = await navigator.clipboard.readText();
-                this.insertTextAtCursor(editor, text);
-                this.saveToHistory(this.currentEditorType, editor.value);
-                editor.focus();
-            } catch (err) {
-                console.error('Paste failed:', err);
-            }
-        });
-
-        // Clear
-        document.getElementById('clearBtn')?.addEventListener('click', () => {
-            editor.value = '';
-            this.updateLineCount('');
-            this.saveToHistory(this.currentEditorType, '');
-            editor.focus();
-        });
-
-        // Format (basic indentation)
-        document.getElementById('formatBtn')?.addEventListener('click', () => {
-            this.formatCode();
-            editor.focus();
-        });
-    }
-
-    saveToHistory(editorType, content) {
-        if (!this.editorHistory[editorType]) return;
-        
-        this.editorHistory[editorType].past.push(content);
-        this.editorHistory[editorType].future = [];
-    }
-
-    undo(editorType) {
-        const history = this.editorHistory[editorType];
-        if (!history || history.past.length <= 1) return;
-        
-        const current = history.past.pop();
-        history.future.push(current);
-        
-        const previous = history.past[history.past.length - 1];
-        this.setEditorContent(previous);
-    }
-
-    redo(editorType) {
-        const history = this.editorHistory[editorType];
-        if (!history || history.future.length === 0) return;
-        
-        const next = history.future.pop();
-        history.past.push(next);
-        
-        this.setEditorContent(next);
-    }
-
-    setEditorContent(content) {
-        const editor = document.getElementById('advancedCodeEditor');
-        if (editor) {
-            editor.value = content;
-            this.updateLineCount(content);
-        }
-    }
-
-    insertTextAtCursor(textarea, text) {
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-        const before = textarea.value.substring(0, start);
-        const after = textarea.value.substring(end);
-        
-        textarea.value = before + text + after;
-        textarea.selectionStart = textarea.selectionEnd = start + text.length;
-    }
-
-    formatCode() {
-        const editor = document.getElementById('advancedCodeEditor');
-        if (!editor) return;
-        
-        let code = editor.value;
-        
-        const lines = code.split('\n');
-        let formattedLines = [];
-        let indentLevel = 0;
-        
-        for (let line of lines) {
-            line = line.trim();
-            if (!line) {
-                formattedLines.push('');
-                continue;
-            }
-            
-            if (line.includes('}') || line.includes(')')) {
-                indentLevel = Math.max(0, indentLevel - 1);
-            }
-            
-            formattedLines.push('    '.repeat(indentLevel) + line);
-            
-            if (line.includes('{') || line.includes('(')) {
-                indentLevel++;
-            }
-        }
-        
-        editor.value = formattedLines.join('\n');
-        this.updateLineCount(editor.value);
-        this.saveToHistory(this.currentEditorType, editor.value);
-        this.showSuccess('Code formatted!');
     }
 
     setupCommandsTags() {
@@ -646,11 +278,9 @@ class CommandEditor {
         
         tag.querySelector('.remove-tag').addEventListener('click', () => {
             tag.remove();
-            this.validateCommandPatterns();
         });
         
         commandsTags.appendChild(tag);
-        this.validateCommandPatterns();
     }
 
     removeLastCommandTag() {
@@ -658,7 +288,6 @@ class CommandEditor {
         if (!commandsTags || !commandsTags.lastChild) return;
         
         commandsTags.lastChild.remove();
-        this.validateCommandPatterns();
     }
 
     commandExistsInTags(command) {
@@ -696,8 +325,17 @@ class CommandEditor {
             return;
         }
 
-        if (!this.currentCommand || this.currentCommand.id === 'new') {
-            this.showError('Please save the command first before testing');
+        // REMOVED SAVE VALIDATION - Allow testing without saving
+        const commands = this.getCommandsFromTags();
+        const commandCode = document.getElementById('commandCode').value.trim();
+
+        if (commands.length === 0) {
+            this.showError('Please add at least one command pattern to test');
+            return;
+        }
+
+        if (!commandCode) {
+            this.showError('Please add command code to test');
             return;
         }
 
@@ -707,16 +345,23 @@ class CommandEditor {
         try {
             const token = localStorage.getItem('token');
             
-            const response = await fetch('/api/commands/test-input', {
+            const tempCommand = {
+                command_patterns: commands.join(','),
+                code: commandCode,
+                wait_for_answer: document.getElementById('waitForAnswer').checked,
+                answer_handler: document.getElementById('answerHandler').value || ''
+            };
+
+            const response = await fetch('/api/commands/test-temp', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({
-                    commandId: this.currentCommand.id,
-                    testInput: testInput,
-                    botToken: this.currentBot.token
+                    command: tempCommand,
+                    botToken: this.currentBot.token,
+                    testInput: testInput
                 })
             });
 
@@ -724,7 +369,7 @@ class CommandEditor {
 
             if (response.ok) {
                 this.showTestSuccess(`
-                    ✅ Command Test Executed Successfully!
+                    ✅ Test Command Executed Successfully!
 
                     🎯 Test Input: ${testInput}
                     🤖 Bot: ${this.currentBot.name}
@@ -907,9 +552,8 @@ class CommandEditor {
         advancedEditor.value = code;
         this.updateLineCount(code);
         
-        // Save initial state to history
-        this.saveToHistory(editorType, code);
-        
+        // Add code-editor-modal class for normal size
+        document.getElementById('codeEditorModal').classList.add('code-editor-modal');
         document.getElementById('codeEditorModal').style.display = 'flex';
         
         setTimeout(() => {
@@ -945,6 +589,23 @@ class CommandEditor {
     toggleAnswerHandler(show) {
         const section = document.getElementById('answerHandlerSection');
         section.style.display = show ? 'block' : 'none';
+    }
+
+    async showTemplates() {
+        const templatesContent = document.querySelector('.templates-content');
+        if (templatesContent) {
+            templatesContent.innerHTML = `
+                <div class="template-loading">
+                    <div class="spinner"></div>
+                    <p>Loading templates from server...</p>
+                </div>
+            `;
+        }
+
+        // Add templates-modal class for normal size
+        document.getElementById('templatesModal').classList.add('templates-modal');
+        document.getElementById('templatesModal').style.display = 'flex';
+        await this.loadTemplatesFromServer();
     }
 
     applyTemplate(template) {
@@ -1234,14 +895,19 @@ class CommandEditor {
             return false;
         }
 
-        if (!this.validateCommandPatterns() || !this.validateCommandCode()) {
-            this.showError('Please fix validation errors before saving');
-            return false;
-        }
-
         const commands = this.getCommandsFromTags();
         const commandPatterns = commands.join(',');
         const commandCode = document.getElementById('commandCode').value.trim();
+
+        if (commands.length === 0) {
+            this.showError('Please add at least one command pattern');
+            return false;
+        }
+
+        if (!commandCode) {
+            this.showError('Please add command code');
+            return false;
+        }
 
         const formData = {
             commandPatterns: commandPatterns,
@@ -1394,6 +1060,103 @@ class CommandEditor {
         } else {
             this.showError('Please select a command first');
         }
+    }
+
+    async loadTemplatesFromServer() {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch('/api/templates', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success) {
+                    this.templates = data.templates || {};
+                    this.populateTemplatesModal();
+                }
+            }
+        } catch (error) {
+            console.error('Failed to load templates:', error);
+        }
+    }
+
+    populateTemplatesModal() {
+        const templatesContent = document.querySelector('.templates-content');
+        if (!templatesContent) return;
+
+        // Mock templates for demonstration
+        const mockTemplates = {
+            basic: [
+                {
+                    name: "Welcome Message",
+                    patterns: "/start, start, hello",
+                    code: "const user = getUser();\nconst chatId = getChatId();\n\nbot.sendMessage(chatId, `🎉 Hello ${user.first_name}! Welcome to our bot!`);",
+                    description: "Simple welcome message with user info"
+                },
+                {
+                    name: "Help Command",
+                    patterns: "/help, help, commands",
+                    code: "const commands = [\n    '/start - Welcome message',\n    '/help - Show this help'\n].join('\\n');\n\nbot.sendMessage(getChatId(), `Available Commands:\\n${commands}`);",
+                    description: "Display available commands"
+                }
+            ],
+            interactive: [
+                {
+                    name: "Wait for Answer",
+                    patterns: "/survey, survey",
+                    code: "bot.sendMessage(getChatId(), 'Please tell us your favorite color:');\nwaitForAnswer();",
+                    description: "Ask question and wait for user response",
+                    waitForAnswer: true,
+                    answerHandler: "const answer = getAnswer();\nbot.sendMessage(getChatId(), `You said: ${answer}`);"
+                }
+            ]
+        };
+
+        let html = '';
+        for (const [category, templates] of Object.entries(mockTemplates)) {
+            const categoryId = `${category}-templates`;
+            const isActive = category === 'basic' ? 'active' : '';
+            
+            html += `
+                <div id="${categoryId}" class="template-category ${isActive}">
+                    <div class="templates-grid">
+                        ${templates.map(template => `
+                            <div class="template-card" data-template='${JSON.stringify(template).replace(/'/g, "&apos;")}'>
+                                <div class="template-icon">
+                                    <i class="fas fa-${this.getTemplateIcon(category)}"></i>
+                                </div>
+                                <h4>${this.escapeHtml(template.name)}</h4>
+                                <p>${this.escapeHtml(template.description)}</p>
+                                <div class="template-preview">
+                                    <strong>Patterns:</strong> ${this.escapeHtml(template.patterns)}
+                                    <div class="template-code-preview">
+                                        ${this.escapeHtml(template.code.substring(0, 100))}...
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        templatesContent.innerHTML = html;
+    }
+
+    getTemplateIcon(category) {
+        const icons = {
+            'basic': 'code',
+            'interactive': 'comments',
+            'media': 'image',
+            'buttons': 'th',
+            'data': 'database',
+            'http': 'cloud',
+            'advanced': 'cogs'
+        };
+        return icons[category] || 'code';
     }
 
     escapeHtml(unsafe) {
