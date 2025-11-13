@@ -1,4 +1,5 @@
-function executeCommandCode(bot, code, context) {
+// server/core/command-executor.js - ঠিক করা ভার্সন
+async function executeCommandCode(bot, code, context) {
     return new Promise(async (resolve, reject) => {
         try {
             const { msg, chatId, userId, username, first_name, botToken, userInput, User, Bot } = context;
@@ -63,7 +64,22 @@ function executeCommandCode(bot, code, context) {
                 Bot: Bot,
                 
                 // Utility functions
-                wait: (ms) => new Promise(resolve => setTimeout(resolve, ms))
+                wait: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
+                
+                // Wait for answer functionality
+                waitForAnswer: (question, options = {}) => {
+                    return new Promise((resolve) => {
+                        const nextCommandKey = `${botToken}_${userId}`;
+                        
+                        // Send question first
+                        bot.sendMessage(chatId, question, options).then(() => {
+                            // Set up handler for next message
+                            botManager.nextCommandHandlers.set(nextCommandKey, (answer) => {
+                                resolve(answer);
+                            });
+                        }).catch(reject);
+                    });
+                }
             };
 
             // Execute the command code in a safe context
@@ -85,10 +101,11 @@ function executeCommandCode(bot, code, context) {
             
             // Handle async commands
             if (result && typeof result.then === 'function') {
-                await result;
+                const finalResult = await result;
+                resolve(finalResult);
+            } else {
+                resolve(result);
             }
-            
-            resolve(result);
         } catch (error) {
             console.error('❌ Command execution error:', error);
             reject(error);
