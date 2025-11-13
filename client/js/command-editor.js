@@ -4,10 +4,7 @@ class CommandEditor {
         this.currentBot = null;
         this.currentCommand = null;
         this.commands = [];
-        this.codeHistory = [];
-        this.historyIndex = -1;
-        this.currentEditorType = null;
-        this.commandGroups = new Map();
+        this.templates = {};
         this.init();
     }
 
@@ -16,35 +13,59 @@ class CommandEditor {
         await this.loadBotInfo();
         this.setupEventListeners();
         await this.loadCommands();
+        await this.loadTemplates();
         this.setupCodeEditor();
         this.setupCommandsTags();
-        this.setupTemplateEvents();
     }
 
-    async checkAuth() {
-        const token = localStorage.getItem('token');
-        const userData = localStorage.getItem('user');
-
-        if (!token || !userData) {
-            window.location.href = 'login.html';
-            return;
-        }
-
+    async loadTemplates() {
         try {
-            const response = await fetch('/api/auth/verify', {
+            const token = localStorage.getItem('token');
+            const response = await fetch('/api/commands/templates/categories', {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
             });
 
-            if (!response.ok) {
-                throw new Error('Invalid token');
+            const data = await response.json();
+            if (data.success) {
+                this.templates = data.templates;
+                this.populateTemplatesModal();
             }
-
-            this.user = JSON.parse(userData);
         } catch (error) {
-            this.logout();
+            console.error('❌ Load templates error:', error);
         }
+    }
+
+    populateTemplatesModal() {
+        const templatesContent = document.querySelector('.templates-content');
+        if (!templatesContent) return;
+
+        let html = '';
+
+        for (const [category, templates] of Object.entries(this.templates)) {
+            const categoryId = `${category}-templates`;
+            const isActive = category === 'basic' ? 'active' : '';
+            
+            html += `
+                <div id="${categoryId}" class="template-category ${isActive}">
+                    <div class="templates-grid">
+                        ${templates.map(template => `
+                            <div class="template-card" data-template='${JSON.stringify(template).replace(/'/g, "&#39;")}'>
+                                <div class="template-icon">
+                                    <i class="fas fa-code"></i>
+                                </div>
+                                <h4>${this.escapeHtml(template.name)}</h4>
+                                <p>${this.escapeHtml(template.patterns)}</p>
+                                <div class="template-patterns">${this.escapeHtml(template.patterns)}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        templatesContent.innerHTML = html;
     }
 
     setupEventListeners() {
@@ -122,20 +143,7 @@ class CommandEditor {
 
         // Modal events
         this.setupModalEvents();
-        
-        // Template categories
         this.setupTemplateCategories();
-    }
-
-    setupTemplateEvents() {
-        // Template card click events
-        document.addEventListener('click', (e) => {
-            const templateCard = e.target.closest('.template-card');
-            if (templateCard) {
-                const templateName = templateCard.dataset.template;
-                this.applyTemplate(templateName);
-            }
-        });
     }
 
     setupCommandsTags() {
@@ -222,41 +230,9 @@ class CommandEditor {
     }
 
     setupCodeEditor() {
+        // Basic code editor setup
         const advancedEditor = document.getElementById('advancedCodeEditor');
         
-        // Editor functionality
-        document.getElementById('undoBtn').addEventListener('click', () => {
-            this.undoCode();
-        });
-
-        document.getElementById('redoBtn').addEventListener('click', () => {
-            this.redoCode();
-        });
-
-        document.getElementById('selectAllBtn').addEventListener('click', () => {
-            this.selectAllCode();
-        });
-
-        document.getElementById('cutBtn').addEventListener('click', () => {
-            this.cutSelectedCode();
-        });
-
-        document.getElementById('copyBtn').addEventListener('click', () => {
-            this.copySelectedCode();
-        });
-
-        document.getElementById('pasteBtn').addEventListener('click', () => {
-            this.pasteCode();
-        });
-
-        document.getElementById('clearBtn').addEventListener('click', () => {
-            this.clearAllCode();
-        });
-
-        document.getElementById('formatBtn').addEventListener('click', () => {
-            this.formatAdvancedCode();
-        });
-
         document.getElementById('cancelEdit').addEventListener('click', () => {
             this.closeCodeEditor();
         });
@@ -265,39 +241,8 @@ class CommandEditor {
             this.saveCodeFromEditor();
         });
 
-        // Real-time line counting
         advancedEditor.addEventListener('input', (e) => {
-            this.saveToHistory(e.target.value);
             this.updateLineCount(e.target.value);
-        });
-
-        // Keyboard shortcuts
-        advancedEditor.addEventListener('keydown', (e) => {
-            if (e.ctrlKey || e.metaKey) {
-                switch(e.key) {
-                    case 'z':
-                        e.preventDefault();
-                        this.undoCode();
-                        break;
-                    case 'y':
-                        e.preventDefault();
-                        this.redoCode();
-                        break;
-                    case 'a':
-                        e.preventDefault();
-                        this.selectAllCode();
-                        break;
-                    case 's':
-                        e.preventDefault();
-                        this.saveCodeFromEditor();
-                        break;
-                }
-            }
-            
-            if (e.key === 'Tab') {
-                e.preventDefault();
-                this.insertTab();
-            }
         });
 
         this.updateLineCount(advancedEditor.value);
@@ -308,147 +253,6 @@ class CommandEditor {
         const chars = code.length;
         document.getElementById('lineCount').textContent = `Line: ${lines}`;
         document.getElementById('charCount').textContent = `Chars: ${chars}`;
-    }
-
-    insertTab() {
-        const editor = document.getElementById('advancedCodeEditor');
-        const start = editor.selectionStart;
-        const end = editor.selectionEnd;
-        
-        editor.value = editor.value.substring(0, start) + '  ' + editor.value.substring(end);
-        editor.selectionStart = editor.selectionEnd = start + 2;
-        editor.focus();
-        
-        this.saveToHistory(editor.value);
-        this.updateLineCount(editor.value);
-    }
-
-    saveToHistory(code) {
-        this.codeHistory = this.codeHistory.slice(0, this.historyIndex + 1);
-        this.codeHistory.push(code);
-        this.historyIndex = this.codeHistory.length - 1;
-    }
-
-    undoCode() {
-        if (this.historyIndex > 0) {
-            this.historyIndex--;
-            const code = this.codeHistory[this.historyIndex];
-            document.getElementById('advancedCodeEditor').value = code;
-            this.updateLineCount(code);
-            this.showInfo('Undo performed');
-        } else {
-            this.showInfo('Nothing to undo');
-        }
-    }
-
-    redoCode() {
-        if (this.historyIndex < this.codeHistory.length - 1) {
-            this.historyIndex++;
-            const code = this.codeHistory[this.historyIndex];
-            document.getElementById('advancedCodeEditor').value = code;
-            this.updateLineCount(code);
-            this.showInfo('Redo performed');
-        } else {
-            this.showInfo('Nothing to redo');
-        }
-    }
-
-    selectAllCode() {
-        const editor = document.getElementById('advancedCodeEditor');
-        editor.select();
-        this.showInfo('All code selected');
-    }
-
-    cutSelectedCode() {
-        const editor = document.getElementById('advancedCodeEditor');
-        const selectedText = editor.value.substring(editor.selectionStart, editor.selectionEnd);
-        
-        if (selectedText) {
-            navigator.clipboard.writeText(selectedText).then(() => {
-                const start = editor.selectionStart;
-                const end = editor.selectionEnd;
-                editor.value = editor.value.substring(0, start) + editor.value.substring(end);
-                editor.selectionStart = editor.selectionEnd = start;
-                editor.focus();
-                
-                this.saveToHistory(editor.value);
-                this.updateLineCount(editor.value);
-                this.showSuccess(`Cut ${selectedText.length} characters!`);
-            });
-        } else {
-            this.showInfo('No text selected to cut');
-        }
-    }
-
-    copySelectedCode() {
-        const editor = document.getElementById('advancedCodeEditor');
-        const selectedText = editor.value.substring(editor.selectionStart, editor.selectionEnd);
-        
-        if (selectedText) {
-            navigator.clipboard.writeText(selectedText).then(() => {
-                this.showSuccess(`Copied ${selectedText.length} characters!`);
-            });
-        } else {
-            this.showInfo('No text selected to copy');
-        }
-    }
-
-    async pasteCode() {
-        try {
-            const text = await navigator.clipboard.readText();
-            const editor = document.getElementById('advancedCodeEditor');
-            const start = editor.selectionStart;
-            const end = editor.selectionEnd;
-            
-            editor.value = editor.value.substring(0, start) + text + editor.value.substring(end);
-            editor.selectionStart = editor.selectionEnd = start + text.length;
-            editor.focus();
-            
-            this.saveToHistory(editor.value);
-            this.updateLineCount(editor.value);
-            this.showSuccess(`Pasted ${text.length} characters!`);
-        } catch (err) {
-            this.showError('Failed to paste from clipboard');
-        }
-    }
-
-    clearAllCode() {
-        if (confirm('Are you sure you want to clear all code?')) {
-            const editor = document.getElementById('advancedCodeEditor');
-            editor.value = '';
-            editor.focus();
-            
-            this.saveToHistory('');
-            this.updateLineCount('');
-            this.showSuccess('Code cleared!');
-        }
-    }
-
-    formatAdvancedCode() {
-        const editor = document.getElementById('advancedCodeEditor');
-        const code = editor.value;
-        
-        try {
-            const formatted = this.formatJavaScript(code);
-            editor.value = formatted;
-            this.saveToHistory(formatted);
-            this.updateLineCount(formatted);
-            this.showSuccess('Code formatted!');
-        } catch (error) {
-            this.showError('Formatting failed');
-        }
-    }
-
-    formatJavaScript(code) {
-        return code
-            .replace(/\$\s*{\s*/g, '${')
-            .replace(/\s*}\s*/g, '}')
-            .replace(/(\w+)\s*\(\s*/g, '$1(')
-            .replace(/\s*\)/g, ')')
-            .replace(/\s*;/g, ';')
-            .replace(/\r\n/g, '\n')
-            .replace(/\n+/g, '\n')
-            .trim();
     }
 
     openCodeEditor(editorType) {
@@ -462,8 +266,6 @@ class CommandEditor {
         }
         
         document.getElementById('advancedCodeEditor').value = code;
-        this.codeHistory = [code];
-        this.historyIndex = 0;
         this.updateLineCount(code);
         document.getElementById('codeEditorModal').style.display = 'flex';
         
@@ -512,8 +314,16 @@ class CommandEditor {
             document.getElementById('templatesModal').style.display = 'none';
         });
 
-        document.getElementById('viewLogs')?.addEventListener('click', () => {
-            this.viewLogs();
+        // Template card click events
+        document.addEventListener('click', (e) => {
+            const templateCard = e.target.closest('.template-card');
+            if (templateCard) {
+                const templateData = templateCard.dataset.template;
+                if (templateData) {
+                    const template = JSON.parse(templateData);
+                    this.applyTemplate(template);
+                }
+            }
         });
 
         window.addEventListener('click', (e) => {
@@ -603,7 +413,6 @@ class CommandEditor {
 
             if (data.success) {
                 this.commands = data.commands || [];
-                this.groupCommandsByName();
                 this.displayCommands();
             } else {
                 this.showError('Failed to load commands');
@@ -613,17 +422,6 @@ class CommandEditor {
         } finally {
             this.showLoading(false);
         }
-    }
-
-    groupCommandsByName() {
-        this.commandGroups.clear();
-        
-        this.commands.forEach(command => {
-            if (!this.commandGroups.has(command.name)) {
-                this.commandGroups.set(command.name, []);
-            }
-            this.commandGroups.get(command.name).push(command);
-        });
     }
 
     displayCommands() {
@@ -643,48 +441,33 @@ class CommandEditor {
         emptyCommands.style.display = 'none';
 
         let html = '';
-        this.commandGroups.forEach((commands, commandName) => {
-            html += this.getCommandGroupHTML(commandName, commands);
+        this.commands.forEach(command => {
+            const isActive = command.is_active;
+            const isSelected = this.currentCommand?.id === command.id;
+            
+            html += `
+                <div class="command-group ${isSelected ? 'active' : ''}" 
+                     data-command-id="${command.id}">
+                    <div class="command-icon">
+                        <i class="fas fa-code"></i>
+                    </div>
+                    <div class="command-content">
+                        <div class="command-patterns">
+                            ${this.escapeHtml(command.command_patterns)}
+                        </div>
+                        <div class="command-meta">
+                            <span class="command-status ${isActive ? 'active' : 'inactive'}">
+                                <i class="fas fa-circle"></i>
+                                ${isActive ? 'Active' : 'Inactive'}
+                            </span>
+                            ${command.wait_for_answer ? '<span class="command-feature">⏳ Waits</span>' : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
         });
         
         commandsList.innerHTML = html;
-    }
-
-    getCommandGroupHTML(commandName, commands) {
-        const firstCommand = commands[0];
-        const isActive = firstCommand.is_active;
-        const isSelected = this.currentCommand?.name === commandName;
-        const patterns = commands.map(cmd => cmd.pattern);
-        
-        // Show all patterns separated by commas
-        const patternsText = patterns.join(', ');
-        
-        return `
-            <div class="command-group ${isSelected ? 'active' : ''}" 
-                 data-command-name="${this.escapeHtml(commandName)}">
-                <div class="command-icon">
-                    <i class="fas fa-code"></i>
-                </div>
-                <div class="command-content">
-                    <div class="command-header">
-                        <span class="command-name">${this.escapeHtml(commandName)}</span>
-                    </div>
-                    <div class="command-patterns">
-                        ${this.escapeHtml(patternsText)}
-                    </div>
-                    <div class="command-description">
-                        ${firstCommand.description || 'No description'}
-                    </div>
-                    <div class="command-meta">
-                        <span class="command-status ${isActive ? 'active' : 'inactive'}">
-                            <i class="fas fa-circle"></i>
-                            ${isActive ? 'Active' : 'Inactive'}
-                        </span>
-                        ${firstCommand.wait_for_answer ? '<span class="command-feature">⏳ Waits</span>' : ''}
-                    </div>
-                </div>
-            </div>
-        `;
     }
 
     filterCommands(searchTerm) {
@@ -697,14 +480,8 @@ class CommandEditor {
         }
 
         commandGroups.forEach(group => {
-            const commandName = group.querySelector('.command-name').textContent.toLowerCase();
             const commandPattern = group.querySelector('.command-patterns').textContent.toLowerCase();
-            const commandDesc = group.querySelector('.command-description').textContent.toLowerCase();
-            
-            const isVisible = commandName.includes(lowerSearch) || 
-                            commandPattern.includes(lowerSearch) ||
-                            commandDesc.includes(lowerSearch);
-            
+            const isVisible = commandPattern.includes(lowerSearch);
             group.style.display = isVisible ? 'block' : 'none';
         });
     }
@@ -712,9 +489,7 @@ class CommandEditor {
     addNewCommand() {
         this.currentCommand = {
             id: 'new',
-            name: 'New Command',
-            pattern: '/start',
-            description: '',
+            command_patterns: '/start',
             code: '// Write your command code here\nconst user = getUser();\nbot.sendMessage(`Hello ${user.first_name}! Welcome to our bot.`);',
             is_active: true,
             wait_for_answer: false,
@@ -725,24 +500,18 @@ class CommandEditor {
         this.populateCommandForm();
         
         setTimeout(() => {
-            document.getElementById('commandName').focus();
+            document.getElementById('moreCommands').focus();
         }, 100);
     }
 
-    async selectCommand(commandName) {
-        if (this.currentCommand?.name === commandName) return;
+    async selectCommand(commandId) {
+        if (this.currentCommand?.id === commandId) return;
 
         this.showLoading(true);
 
         try {
-            // Get the first command from the group to load
-            const commands = this.commandGroups.get(commandName);
-            if (!commands || commands.length === 0) return;
-
-            const firstCommand = commands[0];
-            
             const token = localStorage.getItem('token');
-            const response = await fetch(`/api/commands/${firstCommand.id}`, {
+            const response = await fetch(`/api/commands/${commandId}`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
@@ -751,14 +520,7 @@ class CommandEditor {
             const data = await response.json();
 
             if (data.success) {
-                // Combine all patterns from the group
-                const allPatterns = commands.map(cmd => cmd.pattern).join(', ');
-                this.currentCommand = {
-                    ...data.command,
-                    pattern: allPatterns,
-                    groupCommands: commands
-                };
-                
+                this.currentCommand = data.command;
                 this.showCommandEditor();
                 this.populateCommandForm();
                 
@@ -767,7 +529,7 @@ class CommandEditor {
                     group.classList.remove('active');
                 });
                 
-                const selectedGroup = document.querySelector(`[data-command-name="${commandName}"]`);
+                const selectedGroup = document.querySelector(`[data-command-id="${commandId}"]`);
                 if (selectedGroup) {
                     selectedGroup.classList.add('active');
                     selectedGroup.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -794,40 +556,27 @@ class CommandEditor {
     }
 
     populateCommandForm() {
-    if (!this.currentCommand) return;
-
-    document.getElementById('commandName').value = this.currentCommand.name;
-    document.getElementById('commandDescription').value = this.currentCommand.description || '';
-    
-    // Combine mainCommand and multipleCommand for display
-    let allCommands = [];
-    if (this.currentCommand.mainCommand) {
-        allCommands.push(this.currentCommand.mainCommand);
+        if (!this.currentCommand) return;
+        
+        this.setCommandsToTags(this.currentCommand.command_patterns);
+        document.getElementById('commandCode').value = this.currentCommand.code || '';
+        
+        const waitToggle = document.getElementById('waitForAnswer');
+        if (waitToggle) {
+            waitToggle.checked = this.currentCommand.wait_for_answer || false;
+            this.toggleAnswerHandler(waitToggle.checked);
+        }
+        
+        document.getElementById('answerHandler').value = this.currentCommand.answer_handler || '';
+        document.getElementById('currentCommandName').textContent = 'Command Editor';
+        document.getElementById('commandId').textContent = `ID: ${this.currentCommand.id}`;
+        
+        const statusBadge = document.getElementById('commandStatus');
+        statusBadge.textContent = this.currentCommand.is_active ? 'Active' : 'Inactive';
+        statusBadge.className = `status-badge ${this.currentCommand.is_active ? 'active' : 'inactive'}`;
+        
+        this.updateButtonStates();
     }
-    if (this.currentCommand.multipleCommand) {
-        const additional = this.currentCommand.multipleCommand.split(',').map(cmd => cmd.trim()).filter(cmd => cmd);
-        allCommands = [...allCommands, ...additional];
-    }
-    this.setCommandsToTags(allCommands);
-    
-    document.getElementById('commandCode').value = this.currentCommand.code || '';
-    
-    const waitToggle = document.getElementById('waitForAnswer');
-    if (waitToggle) {
-        waitToggle.checked = this.currentCommand.wait_for_answer || false;
-        this.toggleAnswerHandler(waitToggle.checked);
-    }
-    
-    document.getElementById('answerHandler').value = this.currentCommand.answer_handler || '';
-    document.getElementById('currentCommandName').textContent = this.currentCommand.name;
-    document.getElementById('commandId').textContent = `ID: ${this.currentCommand.id}`;
-    
-    const statusBadge = document.getElementById('commandStatus');
-    statusBadge.textContent = this.currentCommand.is_active ? 'Active' : 'Inactive';
-    statusBadge.className = `status-badge ${this.currentCommand.is_active ? 'active' : 'inactive'}`;
-    
-    this.updateButtonStates();
-}
 
     updateButtonStates() {
         const isNew = this.currentCommand?.id === 'new';
@@ -845,117 +594,107 @@ class CommandEditor {
     }
 
     async saveCommand() {
-    if (!this.currentCommand || !this.currentBot) {
-        this.showError('No command selected or bot not loaded');
-        return false;
-    }
-
-    const commands = this.getCommandsFromTags();
-    
-    if (commands.length === 0) {
-        this.showError('Please add at least one command pattern');
-        document.getElementById('moreCommands').focus();
-        return false;
-    }
-
-    const mainCommand = commands[0]; // First command is mainCommand
-    const multipleCommand = commands.slice(1).join(','); // Rest are multipleCommand
-    
-    const commandName = document.getElementById('commandName').value.trim();
-    
-    if (!commandName) {
-        this.showError('Command name is required');
-        document.getElementById('commandName').focus();
-        return false;
-    }
-
-    const formData = {
-        name: commandName,
-        mainCommand: mainCommand,
-        multipleCommand: multipleCommand,
-        description: document.getElementById('commandDescription').value.trim(),
-        code: document.getElementById('commandCode').value.trim(),
-        waitForAnswer: document.getElementById('waitForAnswer').checked,
-        answerHandler: document.getElementById('waitForAnswer').checked ? 
-                      document.getElementById('answerHandler').value.trim() : '',
-        botToken: this.currentBot.token
-    };
-
-    if (!formData.code) {
-        this.showError('Command code is required');
-        document.getElementById('commandCode').focus();
-        return false;
-    }
-
-    if (formData.waitForAnswer && !formData.answerHandler) {
-        this.showError('Answer handler code is required when "Wait for Answer" is enabled');
-        document.getElementById('answerHandler').focus();
-        return false;
-    }
-
-    this.showLoading(true);
-
-    try {
-        const token = localStorage.getItem('token');
-        let response;
-        let url;
-        let method;
-
-        if (this.currentCommand.id === 'new') {
-            url = '/api/commands';
-            method = 'POST';
-        } else {
-            url = `/api/commands/${this.currentCommand.id}`;
-            method = 'PUT';
-            formData.commandId = this.currentCommand.id;
-        }
-
-        response = await fetch(url, {
-            method: method,
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(formData)
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-            this.showSuccess('Command saved successfully!');
-            
-            await this.loadCommands();
-            
-            if (data.command) {
-                this.currentCommand = data.command;
-                this.populateCommandForm();
-                
-                // Auto-select the saved command
-                const commandGroup = document.querySelector(`[data-command-name="${this.currentCommand.name}"]`);
-                if (commandGroup) {
-                    commandGroup.click();
-                }
-            }
-            
-            return true;
-        } else {
-            this.showError(data.error || 'Failed to save command');
+        if (!this.currentCommand || !this.currentBot) {
+            this.showError('No command selected or bot not loaded');
             return false;
         }
-    } catch (error) {
-        this.showError('Network error while saving command');
-        return false;
-    } finally {
-        this.showLoading(false);
+
+        const commands = this.getCommandsFromTags();
+        
+        if (commands.length === 0) {
+            this.showError('Please add at least one command pattern');
+            document.getElementById('moreCommands').focus();
+            return false;
+        }
+
+        const commandPatterns = commands.join(',');
+        const commandCode = document.getElementById('commandCode').value.trim();
+
+        if (!commandCode) {
+            this.showError('Command code is required');
+            document.getElementById('commandCode').focus();
+            return false;
+        }
+
+        const formData = {
+            commandPatterns: commandPatterns,
+            code: commandCode,
+            waitForAnswer: document.getElementById('waitForAnswer').checked,
+            answerHandler: document.getElementById('waitForAnswer').checked ? 
+                          document.getElementById('answerHandler').value.trim() : '',
+            botToken: this.currentBot.token
+        };
+
+        if (formData.waitForAnswer && !formData.answerHandler) {
+            this.showError('Answer handler code is required when "Wait for Answer" is enabled');
+            document.getElementById('answerHandler').focus();
+            return false;
+        }
+
+        this.showLoading(true);
+
+        try {
+            const token = localStorage.getItem('token');
+            let response;
+            let url;
+            let method;
+
+            if (this.currentCommand.id === 'new') {
+                url = '/api/commands';
+                method = 'POST';
+            } else {
+                url = `/api/commands/${this.currentCommand.id}`;
+                method = 'PUT';
+            }
+
+            response = await fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.showSuccess('Command saved successfully!');
+                
+                await this.loadCommands();
+                
+                if (data.command) {
+                    this.currentCommand = data.command;
+                    this.populateCommandForm();
+                    
+                    // Auto-select the saved command
+                    setTimeout(() => {
+                        const commandGroup = document.querySelector(`[data-command-id="${this.currentCommand.id}"]`);
+                        if (commandGroup) {
+                            commandGroup.click();
+                        }
+                    }, 500);
+                }
+                
+                return true;
+            } else {
+                this.showError(data.error || 'Failed to save command');
+                return false;
+            }
+        } catch (error) {
+            this.showError('Network error while saving command');
+            return false;
+        } finally {
+            this.showLoading(false);
+        }
     }
-}
 
     async deleteCommand() {
         if (!this.currentCommand || this.currentCommand.id === 'new') {
             return;
         }
 
-        if (!confirm('Are you sure you want to delete this command and all its patterns?\n\nThis action cannot be undone.')) {
+        if (!confirm('Are you sure you want to delete this command?\n\nThis action cannot be undone.')) {
             return;
         }
 
@@ -971,7 +710,7 @@ class CommandEditor {
             });
 
             if (response.ok) {
-                this.showSuccess('Command and all patterns deleted successfully');
+                this.showSuccess('Command deleted successfully');
                 this.hideCommandEditor();
                 await this.loadCommands();
             } else {
@@ -1048,8 +787,7 @@ class CommandEditor {
             const token = localStorage.getItem('token');
             
             const tempCommand = {
-                name: commands[0],
-                pattern: commands.join(', '),
+                command_patterns: commands.join(','),
                 code: commandCode,
                 wait_for_answer: document.getElementById('waitForAnswer').checked,
                 answer_handler: document.getElementById('answerHandler').value || ''
@@ -1121,8 +859,7 @@ class CommandEditor {
             const token = localStorage.getItem('token');
             
             const tempCommand = {
-                name: commands[0] || 'Test Command',
-                pattern: testInput || commands.join(', '),
+                command_patterns: testInput || commands.join(','),
                 code: commandCode,
                 wait_for_answer: document.getElementById('waitForAnswer').checked,
                 answer_handler: document.getElementById('answerHandler').value || ''
@@ -1207,462 +944,54 @@ class CommandEditor {
         `;
     }
 
-    viewLogs() {
-        this.showInfo('Logs feature coming soon!');
-    }
-
-    formatCode() {
-        const code = document.getElementById('commandCode').value;
-        try {
-            const formatted = this.formatJavaScript(code);
-            document.getElementById('commandCode').value = formatted;
-            this.showSuccess('Code formatted successfully!');
-        } catch (error) {
-            this.showError('Formatting failed');
-        }
-    }
-
     showTemplates() {
         document.getElementById('templatesModal').style.display = 'flex';
     }
 
-    applyTemplate(templateName) {
-        let code = '';
-        let answerHandlerCode = '';
-        let patterns = '';
-        let description = '';
-        let waitForAnswer = false;
+    applyTemplate(template) {
+        this.setCommandsToTags(template.patterns);
+        document.getElementById('commandCode').value = template.code;
         
-        switch(templateName) {
-            case 'welcome':
-                patterns = '/start, start, hello';
-                description = 'Welcome message for new users';
-                code = `// Welcome message template
-const user = getUser();
-const welcomeMessage = \`Hello \${user.first_name}! 👋
-
-Welcome to our bot! Here's what you can do:
-• Use /help to see all commands
-• Use /info to get bot information
-
-Your User ID: \${user.id}
-Username: @\${user.username || 'Not set'}\`;
-
-bot.sendMessage(welcomeMessage, {
-    parse_mode: 'Markdown'
-});`;
-                break;
-                
-            case 'help':
-                patterns = '/help, help, commands';
-                description = 'Show available commands';
-                code = `// Help command template
-const helpText = \`🤖 *Bot Help Menu*
-
-*Available Commands:*
-• /start - Start the bot
-• /help - Show this help message
-• /info - Bot information
-
-*Features:*
-• Multiple command patterns
-• Interactive conversations
-• Media support
-
-*Need Help?*
-Contact support if you need assistance.\`;
-
-bot.sendMessage(helpText, {
-    parse_mode: 'Markdown'
-});`;
-                break;
-                
-            case 'info':
-                patterns = '/info, about, bot';
-                description = 'Show bot information';
-                code = `// Bot information template
-const botInfo = \`🤖 *Bot Information*
-
-*Name:* ${this.currentBot?.name || 'My Bot'}
-*Username:* @${this.currentBot?.username || 'mybot'}
-*Status:* ✅ Active
-*Version:* 2.0.0
-
-*Features:*
-• Advanced command system
-• User data management
-• Media support
-
-*Created with:* Bot Maker Pro\`;
-
-bot.sendMessage(botInfo, {
-    parse_mode: 'Markdown'
-});`;
-                break;
-                
-            case 'echo':
-                patterns = '/echo, echo, repeat';
-                description = 'Repeat user message';
-                code = `// Echo command
-const userMessage = message.text.replace('/echo', '').replace('/repeat', '').trim();
-if (userMessage) {
-    bot.sendMessage(\`You said: "\${userMessage}"\`);
-} else {
-    bot.sendMessage('Please send a message after the command. Example: /echo Hello World');
-}`;
-                break;
-                
-            case 'user_data':
-                patterns = '/data, /save, /get';
-                description = 'Manage user data';
-                code = `// User data management example
-
-// Save user data
-User.saveData('name', 'John Doe');
-User.saveData('age', '25');
-
-// Get user data
-const userName = User.getData('name');
-const userAge = User.getData('age');
-
-bot.sendMessage(\`User Data Saved!\\\\nName: \${userName}\\\\nAge: \${userAge}\`);`;
-                break;
-                
-            case 'inline_buttons':
-                patterns = '/menu, /buttons';
-                description = 'Show inline keyboard buttons';
-                code = `// Inline keyboard example
-const inlineKeyboard = {
-    inline_keyboard: [
-        [
-            {
-                text: "Button 1",
-                callback_data: "button_1"
-            },
-            {
-                text: "Button 2", 
-                callback_data: "button_2"
-            }
-        ],
-        [
-            {
-                text: "Visit Website",
-                url: "https://example.com"
-            }
-        ]
-    ]
-};
-
-bot.sendMessage("Choose an option:", {
-    reply_markup: inlineKeyboard
-});`;
-                break;
-                
-            case 'http_get':
-                patterns = '/fetch, /api';
-                description = 'Fetch data from API';
-                code = `// HTTP GET request example
-try {
-    bot.sendMessage("Fetching data from API...");
-    
-    const response = await HTTP.get("https://jsonplaceholder.typicode.com/posts/1");
-    
-    bot.sendMessage(\`📊 API Response:\\\\nTitle: \${response.title}\\\\nBody: \${response.body}\`);
-} catch (error) {
-    bot.sendMessage(\`❌ Error: \${error.message}\`);
-}`;
-                break;
-                
-            case 'conversation':
-                patterns = '/conversation, chat';
-                description = 'Interactive conversation';
-                waitForAnswer = true;
-                code = `// Interactive conversation - Part 1
-bot.sendMessage("Hello! What's your name?");
-
-// This will wait for user's answer automatically
-// The answer handler will process the response`;
-                
-                answerHandlerCode = `// Answer handler for conversation - Part 2
-const userName = userAnswer;
-if (userName && userName.trim()) {
-    bot.sendMessage(\`Nice to meet you, \${userName}!\`);
-} else {
-    bot.sendMessage("You didn't provide a name!");
-}`;
-                break;
-
-            case 'send_photo':
-                patterns = '/photo, picture, image';
-                description = 'Send photo with caption';
-                code = `// Send photo example
-bot.sendPhoto("https://via.placeholder.com/400x300", {
-    caption: "Here's a beautiful photo for you! 📸",
-    parse_mode: "Markdown"
-});`;
-                break;
-
-            case 'send_video':
-                patterns = '/video, clip, movie';
-                description = 'Send video with caption';
-                code = `// Send video example  
-bot.sendVideo("https://example.com/video.mp4", {
-    caption: "Check out this video! 🎥",
-    parse_mode: "Markdown"
-});`;
-                break;
-
-            case 'send_document':
-                patterns = '/document, file, doc';
-                description = 'Send document file';
-                code = `// Send document example
-bot.sendDocument("https://example.com/document.pdf", {
-    caption: "Here's your document! 📄",
-    parse_mode: "Markdown"
-});`;
-                break;
-                
-            case 'weather':
-                patterns = '/weather, climate';
-                description = 'Get weather information';
-                code = `// Weather API example
-try {
-    // Note: Replace YOUR_API_KEY with actual OpenWeatherMap API key
-    const weatherData = await HTTP.get("https://api.openweathermap.org/data/2.5/weather?q=London&appid=YOUR_API_KEY");
-    
-    const tempCelsius = (weatherData.main.temp - 273.15).toFixed(1);
-    
-    bot.sendMessage(\`🌤️ Weather in \${weatherData.name}:\\\\nTemperature: \${tempCelsius}°C\\\\nCondition: \${weatherData.weather[0].description}\`);
-} catch (error) {
-    bot.sendMessage(\`❌ Weather data unavailable: \${error.message}\`);
-}`;
-                break;
-                
-            case 'broadcast':
-                patterns = '/broadcast, announce';
-                description = 'Admin broadcast message';
-                code = `// Broadcast message (admin only)
-const user = getUser();
-
-// Check if user is admin (replace with actual admin check)
-if (user.id === 123456789) {
-    const message = "This is a broadcast message to all users!";
-    
-    // In real implementation, you would loop through all users
-    bot.sendMessage(\`📢 Broadcast Sent:\\\\n\${message}\`);
-} else {
-    bot.sendMessage("❌ Admin access required.");
-}`;
-                break;
-
-            case 'quiz':
-                patterns = '/quiz, test';
-                description = 'Simple quiz game';
-                code = `// Simple quiz example
-const questions = [
-    {
-        question: "What is 2+2?",
-        options: ["3", "4", "5", "6"],
-        correct: 1
-    },
-    {
-        question: "What is the capital of France?",
-        options: ["London", "Berlin", "Paris", "Madrid"],
-        correct: 2
-    }
-];
-
-// Save quiz state
-Bot.saveData('current_quiz', JSON.stringify({
-    currentQuestion: 0,
-    score: 0,
-    questions: questions
-}));
-
-// Ask first question
-askQuestion(0);
-
-function askQuestion(index) {
-    const question = questions[index];
-    const keyboard = {
-        inline_keyboard: question.options.map((option, i) => [
-            {
-                text: option,
-                callback_data: \`answer_\${index}_\${i}\`
-            }
-        ])
-    };
-    
-    bot.sendMessage(\`Question \${index + 1}: \${question.question}\`, {
-        reply_markup: keyboard
-    });
-}`;
-                break;
-
-            case 'feedback':
-                patterns = '/feedback, rate, review';
-                description = 'Collect user feedback';
-                waitForAnswer = true;
-                code = `// Feedback collection - Part 1
-bot.sendMessage("Please share your feedback about our bot:");`;
-                
-                answerHandlerCode = `// Feedback answer handler - Part 2
-const feedback = userAnswer;
-if (feedback && feedback.trim()) {
-    // Save feedback
-    const timestamp = new Date().toISOString();
-    User.saveData('last_feedback', feedback);
-    User.saveData('feedback_time', timestamp);
-    
-    bot.sendMessage("Thank you for your feedback! 💖\\\\nWe appreciate your input.");
-    
-    // Ask for rating
-    bot.sendMessage("How would you rate us from 1-5 stars?");
-    
-    const rating = await waitForAnswer(30000);
-    const ratingNum = parseInt(rating);
-    
-    if (!isNaN(ratingNum) && ratingNum >= 1 && ratingNum <= 5) {
-        User.saveData('rating', ratingNum.toString());
-        bot.sendMessage(\`Thanks for the \${'⭐'.repeat(ratingNum)} rating!\`);
-    } else {
-        bot.sendMessage("Thank you for your feedback!");
-    }
-} else {
-    bot.sendMessage("Feedback cannot be empty. Please try again.");
-}`;
-                break;
-
-            case 'registration':
-                patterns = '/register, signup';
-                description = 'User registration form';
-                waitForAnswer = true;
-                code = `// User registration - Part 1
-bot.sendMessage("Welcome to registration!\\\\nPlease enter your full name:");`;
-                
-                answerHandlerCode = `// Registration answer handler - Part 2
-const fullName = userAnswer;
-if (fullName && fullName.trim()) {
-    User.saveData('full_name', fullName);
-    
-    bot.sendMessage("Great! Now please enter your email:");
-    
-    const email = await waitForAnswer(30000);
-    
-    if (email && email.includes('@')) {
-        User.saveData('email', email);
-        
-        bot.sendMessage("Registration completed! ✅\\\\n\\\\nYour details:\\\\nName: " + fullName + "\\\\nEmail: " + email);
-        
-        // Save registration date
-        User.saveData('registered_at', new Date().toISOString());
-    } else {
-        bot.sendMessage("Invalid email format. Please start over with /register");
-    }
-} else {
-    bot.sendMessage("Name cannot be empty. Please try again with /register");
-}`;
-                break;
-
-            case 'calculator':
-                patterns = '/calc, calculate';
-                description = 'Simple calculator';
-                code = `// Simple calculator
-const expression = msg.text.replace('/calc', '').replace('/calculate', '').trim();
-
-if (!expression) {
-    bot.sendMessage("Usage: /calc 2+2\\\\nSupported operations: +, -, *, /");
-    return;
-}
-
-try {
-    // Basic safety check - only allow numbers and basic operators
-    if (!/^[0-9+\\-*/().\\s]+$/.test(expression)) {
-        bot.sendMessage("❌ Invalid characters in expression. Only numbers and + - * / are allowed.");
-        return;
-    }
-    
-    const result = eval(expression);
-    bot.sendMessage(\`🧮 Calculation: \${expression} = \${result}\`);
-} catch (error) {
-    bot.sendMessage("❌ Invalid mathematical expression. Please check your input.");
-}`;
-                break;
-
-            case 'joke':
-                patterns = '/joke, fun';
-                description = 'Tell a random joke';
-                code = `// Random joke generator
-const jokes = [
-    "Why don't scientists trust atoms? Because they make up everything!",
-    "Why did the scarecrow win an award? He was outstanding in his field!",
-    "Why don't eggs tell jokes? They'd crack each other up!",
-    "What do you call a fake noodle? An impasta!",
-    "Why did the math book look so sad? Because it had too many problems!"
-];
-
-const randomJoke = jokes[Math.floor(Math.random() * jokes.length)];
-bot.sendMessage(\`😂 \${randomJoke}\`);`;
-                break;
-
-            case 'timer':
-                patterns = '/timer, alarm';
-                description = 'Set a timer';
-                waitForAnswer = true;
-                code = `// Timer setup - Part 1
-bot.sendMessage("⏰ Timer Setup\\\\nHow many minutes for the timer?");`;
-                
-                answerHandlerCode = `// Timer answer handler - Part 2
-const minutes = parseInt(userAnswer);
-
-if (!isNaN(minutes) && minutes > 0 && minutes <= 60) {
-    const milliseconds = minutes * 60 * 1000;
-    
-    bot.sendMessage(\`⏰ Timer set for \${minutes} minutes. I'll notify you when time's up!\`);
-    
-    // Wait for the specified time
-    await wait(milliseconds);
-    
-    bot.sendMessage(\`🔔 Time's up! \${minutes} minutes have passed.\`);
-} else {
-    bot.sendMessage("❌ Please enter a valid number between 1 and 60 minutes.");
-}`;
-                break;
-
-            default:
-                patterns = '/template';
-                description = 'Basic command template';
-                code = `// Basic template
-const user = getUser();
-bot.sendMessage(\`Hello \${user.first_name}! This is a basic command.\`);`;
-        }
-        
-        // Apply template to form
-        if (this.currentCommand?.id === 'new') {
-            const templateDisplayName = templateName.split('_').map(word => 
-                word.charAt(0).toUpperCase() + word.slice(1)
-            ).join(' ');
-            document.getElementById('commandName').value = templateDisplayName;
-        }
-        
-        document.getElementById('commandDescription').value = description;
-        this.setCommandsToTags(patterns);
-        document.getElementById('commandCode').value = code;
-        
-        // Handle wait for answer toggle
-        const waitToggle = document.getElementById('waitForAnswer');
-        if (waitToggle) {
-            waitToggle.checked = waitForAnswer;
-            this.toggleAnswerHandler(waitForAnswer);
-        }
-        
-        // Set answer handler code if provided
-        if (answerHandlerCode) {
-            document.getElementById('answerHandler').value = answerHandlerCode;
+        if (template.waitForAnswer) {
+            document.getElementById('waitForAnswer').checked = true;
+            this.toggleAnswerHandler(true);
+            document.getElementById('answerHandler').value = template.answerHandler || '';
+        } else {
+            document.getElementById('waitForAnswer').checked = false;
+            this.toggleAnswerHandler(false);
         }
         
         document.getElementById('templatesModal').style.display = 'none';
         this.showSuccess('Template applied successfully!');
+    }
+
+    // ... rest of the methods (checkAuth, showLoading, showError, etc.) remain the same
+    // Please keep the existing methods for authentication, notifications, etc.
+
+    async checkAuth() {
+        const token = localStorage.getItem('token');
+        const userData = localStorage.getItem('user');
+
+        if (!token || !userData) {
+            window.location.href = 'login.html';
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/auth/verify', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Invalid token');
+            }
+
+            this.user = JSON.parse(userData);
+        } catch (error) {
+            this.logout();
+        }
     }
 
     logout() {
@@ -1678,11 +1007,11 @@ bot.sendMessage(\`Hello \${user.first_name}! This is a basic command.\`);`;
     }
 
     showError(message) {
-        commonApp?.showError(message) || this.showNotification(message, 'error');
+        this.showNotification(message, 'error');
     }
 
     showSuccess(message) {
-        commonApp?.showSuccess(message) || this.showNotification(message, 'success');
+        this.showNotification(message, 'success');
     }
 
     showInfo(message) {
@@ -1749,8 +1078,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('click', (e) => {
         const commandGroup = e.target.closest('.command-group');
         if (commandGroup) {
-            const commandName = commandGroup.dataset.commandName;
-            commandEditor.selectCommand(commandName);
+            const commandId = commandGroup.dataset.commandId;
+            commandEditor.selectCommand(commandId);
         }
     });
 });
