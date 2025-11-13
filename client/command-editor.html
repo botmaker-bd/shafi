@@ -280,105 +280,60 @@
     </div>
 
     <!-- Full Screen Code Editor Modal -->
-    <div id="codeEditorModal" class="modal fullscreen-modal">
-        <div class="modal-content fullscreen-content">
-            <div class="modal-header compact-header">
-                <div class="editor-toolbar">
-                    <div class="toolbar-group">
-                        <button class="btn-icon" id="undoBtn" title="Undo">
-                            <i class="fas fa-undo"></i>
-                            <span>Undo</span>
-                        </button>
-                        <button class="btn-icon" id="redoBtn" title="Redo">
-                            <i class="fas fa-redo"></i>
-                            <span>Redo</span>
-                        </button>
-                    </div>
-                    <div class="toolbar-group">
-                        <button class="btn-icon" id="selectAllBtn" title="Select All">
-                            <i class="fas fa-expand-arrows-alt"></i>
-                            <span>Select All</span>
-                        </button>
-                        <button class="btn-icon" id="cutBtn" title="Cut">
-                            <i class="fas fa-cut"></i>
-                            <span>Cut</span>
-                        </button>
-                        <button class="btn-icon" id="copyBtn" title="Copy">
-                            <i class="fas fa-copy"></i>
-                            <span>Copy</span>
-                        </button>
-                        <button class="btn-icon" id="pasteBtn" title="Paste">
-                            <i class="fas fa-paste"></i>
-                            <span>Paste</span>
-                        </button>
-                    </div>
-                    <div class="toolbar-group">
-                        <button class="btn-icon" id="clearBtn" title="Clear All">
-                            <i class="fas fa-eraser"></i>
-                            <span>Clear</span>
-                        </button>
-                        <button class="btn-icon" id="formatBtn" title="Format Code">
-                            <i class="fas fa-indent"></i>
-                            <span>Format</span>
-                        </button>
-                    </div>
-                </div>
-                <button class="modal-close">&times;</button>
+    <!-- Full Screen Code Editor Modal - UPDATED FOR NORMAL SIZE -->
+<div id="codeEditorModal" class="modal code-editor-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Code Editor</h3>
+            <button class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <textarea id="advancedCodeEditor" class="enhanced-code-editor" 
+                     placeholder="Write your code here..."></textarea>
+        </div>
+        <div class="modal-footer">
+            <div class="editor-info">
+                <span id="lineCount">Line: 1</span>
+                <span id="charCount">Chars: 0</span>
+                <span id="editorType">Editor: Main Code</span>
             </div>
-            <div class="modal-body fullscreen-body">
-                <textarea id="advancedCodeEditor" class="fullscreen-editor" 
-                         placeholder="Write your code here..."></textarea>
-            </div>
-            <div class="modal-footer">
-                <div class="editor-info">
-                    <span id="lineCount">Line: 1</span>
-                    <span id="charCount">Chars: 0</span>
-                    <span id="editorType">Editor: Main Code</span>
-                </div>
-                <div class="editor-actions">
-                    <button class="btn btn-secondary" id="cancelEdit">Cancel</button>
-                    <button class="btn btn-primary" id="saveCode">Save Code</button>
-                </div>
+            <div class="editor-actions">
+                <button class="btn btn-secondary" id="cancelEdit">Cancel</button>
+                <button class="btn btn-primary" id="saveCode">Save Code</button>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Templates Modal -->
-    <div id="templatesModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Code Templates</h3>
-                <button class="modal-close">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="templates-categories">
-                    <div class="category-tabs">
-                        <button class="category-tab active" data-category="basic">Basic</button>
-                        <button class="category-tab" data-category="interactive">Interactive</button>
-                        <button class="category-tab" data-category="media">Media</button>
-                        <button class="category-tab" data-category="buttons">Buttons</button>
-                        <button class="category-tab" data-category="data">Data</button>
-                        <button class="category-tab" data-category="http">HTTP</button>
-                        <button class="category-tab" data-category="advanced">Advanced</button>
-                    </div>
-                    
-                    <div class="templates-content">
-                        <div class="template-loading">
-                            <div class="spinner"></div>
-                            <p>Loading templates from server...</p>
-                        </div>
-                    </div>
+<!-- Templates Modal - UPDATED FOR NORMAL SIZE -->
+<div id="templatesModal" class="modal templates-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Code Templates</h3>
+            <button class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="templates-categories">
+                <div class="category-tabs">
+                    <button class="category-tab active" data-category="basic">Basic</button>
+                    <button class="category-tab" data-category="interactive">Interactive</button>
+                    <button class="category-tab" data-category="media">Media</button>
+                    <button class="category-tab" data-category="buttons">Buttons</button>
+                </div>
+                
+                <div class="templates-content">
+                    <!-- Templates will be loaded here -->
                 </div>
             </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" id="closeTemplates">Close</button>
-                <button class="btn btn-primary" id="refreshTemplates">
-                    <i class="fas fa-sync-alt"></i> Refresh Templates
-                </button>
-            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" id="closeTemplates">Close</button>
+            <button class="btn btn-primary" id="refreshTemplates">
+                <i class="fas fa-sync-alt"></i> Refresh Templates
+            </button>
         </div>
     </div>
-
+</div>
     <script src="js/common.js"></script>
     <script src="js/command-editor.js"></script>
 </body>
