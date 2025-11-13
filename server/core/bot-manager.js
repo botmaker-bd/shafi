@@ -295,103 +295,136 @@ class BotManager {
         }
     }
 
-    async executeCommandCode(bot, code, context) {
-        return new Promise(async (resolve, reject) => {
-            try {
-                const { msg, chatId, userId, username, first_name, botToken, userInput, User, Bot } = context;
-                
-                const botFunctions = {
-                    sendMessage: (text, options = {}) => {
-                        return bot.sendMessage(chatId, text, {
-                            parse_mode: 'HTML',
-                            ...options
-                        });
-                    },
-                    
-                    send: (text, options = {}) => {
-                        return bot.sendMessage(chatId, text, {
-                            parse_mode: 'HTML',
-                            ...options
-                        });
-                    },
-                    
-                    reply: (text, options = {}) => {
-                        return bot.sendMessage(chatId, text, {
-                            reply_to_message_id: msg.message_id,
-                            parse_mode: 'HTML',
-                            ...options
-                        });
-                    },
-                    
-                    sendPhoto: (photo, options = {}) => {
-                        return bot.sendPhoto(chatId, photo, {
-                            parse_mode: 'HTML',
-                            ...options
-                        });
-                    },
-                    
-                    sendDocument: (document, options = {}) => {
-                        return bot.sendDocument(chatId, document, {
-                            parse_mode: 'HTML',
-                            ...options
-                        });
-                    },
-                    
-                    getUser: () => ({
-                        id: userId,
-                        username: username,
-                        first_name: first_name,
-                        chat_id: chatId
-                    }),
-                    
-                    params: userInput,
-                    userInput: userInput,
-                    message: msg,
-                    User: User,
-                    Bot: Bot,
-                    
-                    wait: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
-                    
-                    waitForAnswer: (question, options = {}) => {
-                        return new Promise((resolve) => {
-                            const nextCommandKey = `${botToken}_${userId}`;
-                            
-                            bot.sendMessage(chatId, question, options).then(() => {
-                                this.nextCommandHandlers.set(nextCommandKey, (answer) => {
-                                    resolve(answer);
-                                });
-                            }).catch(reject);
-                        });
-                    }
-                };
+    // server/core/bot-manager.js - executeCommandCode ফাংশনটি এইভাবে পরিবর্তন করুন
 
-                const commandFunction = new Function(
-                    ...Object.keys(botFunctions),
-                    `
-                    "use strict";
-                    try {
-                        ${code}
-                    } catch (error) {
-                        console.error('Command execution error:', error);
-                        throw error;
-                    }
-                    `
-                );
-
-                const result = commandFunction(...Object.values(botFunctions));
+async executeCommandCode(bot, code, context) {
+    return new Promise(async (resolve, reject) => {
+        try {
+            const { msg, chatId, userId, username, first_name, botToken, userInput, User, Bot } = context;
+            
+            // Create safe execution environment with ALL available functions
+            const botFunctions = {
+                // Basic messaging - make bot available directly
+                bot: bot, // ✅ Add bot directly to the context
                 
-                if (result && typeof result.then === 'function') {
-                    const finalResult = await result;
-                    resolve(finalResult);
-                } else {
-                    resolve(result);
+                sendMessage: (text, options = {}) => {
+                    return bot.sendMessage(chatId, text, {
+                        parse_mode: 'HTML',
+                        ...options
+                    });
+                },
+                
+                send: (text, options = {}) => {
+                    return bot.sendMessage(chatId, text, {
+                        parse_mode: 'HTML',
+                        ...options
+                    });
+                },
+                
+                reply: (text, options = {}) => {
+                    return bot.sendMessage(chatId, text, {
+                        reply_to_message_id: msg.message_id,
+                        parse_mode: 'HTML',
+                        ...options
+                    });
+                },
+                
+                // Media messages
+                sendPhoto: (photo, options = {}) => {
+                    return bot.sendPhoto(chatId, photo, {
+                        parse_mode: 'HTML',
+                        ...options
+                    });
+                },
+                
+                sendDocument: (document, options = {}) => {
+                    return bot.sendDocument(chatId, document, {
+                        parse_mode: 'HTML',
+                        ...options
+                    });
+                },
+                
+                sendVideo: (video, options = {}) => {
+                    return bot.sendVideo(chatId, video, {
+                        parse_mode: 'HTML',
+                        ...options
+                    });
+                },
+                
+                sendAudio: (audio, options = {}) => {
+                    return bot.sendAudio(chatId, audio, {
+                        parse_mode: 'HTML',
+                        ...options
+                    });
+                },
+                
+                // User information
+                getUser: () => ({
+                    id: userId,
+                    username: username,
+                    first_name: first_name,
+                    chat_id: chatId
+                }),
+                
+                // Command parameters
+                params: userInput,
+                userInput: userInput,
+                
+                // Message object
+                message: msg,
+                
+                // Data storage
+                User: User,
+                Bot: Bot,
+                
+                // Utility functions
+                wait: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
+                
+                // Wait for answer functionality
+                waitForAnswer: (question, options = {}) => {
+                    return new Promise((resolve) => {
+                        const nextCommandKey = `${botToken}_${userId}`;
+                        
+                        bot.sendMessage(chatId, question, options).then(() => {
+                            this.nextCommandHandlers.set(nextCommandKey, (answer) => {
+                                resolve(answer);
+                            });
+                        }).catch(reject);
+                    });
                 }
-            } catch (error) {
-                console.error('❌ Command execution error:', error);
-                reject(error);
+            };
+
+            // Execute the command code in a safe context
+            const commandFunction = new Function(
+                ...Object.keys(botFunctions),
+                `
+                "use strict";
+                try {
+                    // User's command code
+                    ${code}
+                } catch (error) {
+                    console.error('Command execution error:', error);
+                    throw error;
+                }
+                `
+            );
+
+            // Call the function with all the bot functions as parameters
+            const result = commandFunction(...Object.values(botFunctions));
+            
+            // Handle async commands
+            if (result && typeof result.then === 'function') {
+                const finalResult = await result;
+                resolve(finalResult);
+            } else {
+                resolve(result);
             }
-        });
-    }
+        } catch (error) {
+            console.error('❌ Command execution error:', error);
+            reject(error);
+        }
+    });
+}
 
     // ... rest of the data storage methods remain the same
     async saveData(dataType, botToken, userId, key, value, metadata = {}) {
