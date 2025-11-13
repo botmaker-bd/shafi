@@ -302,6 +302,8 @@ router.delete('/:commandId', async (req, res) => {
 });
 
 // Test command execution
+// server/routes/commands.js - ঠিক করা ভার্সন
+// Test command execution
 router.post('/:commandId/test', async (req, res) => {
     try {
         const { commandId } = req.params;
@@ -331,6 +333,7 @@ router.post('/:commandId/test', async (req, res) => {
         }
 
         // Get bot instance
+        const botManager = require('../core/bot-manager');
         const bot = botManager.getBotInstance(botToken);
         if (!bot) {
             return res.status(400).json({ 
@@ -369,7 +372,7 @@ router.post('/:commandId/test', async (req, res) => {
         };
 
         // Execute command using the bot manager
-        const result = await botManager.executeCommand(bot, command, testMessage, true);
+        await botManager.executeCommand(bot, command, testMessage, true);
 
         console.log('✅ Command test executed successfully:', commandId);
 
@@ -377,7 +380,7 @@ router.post('/:commandId/test', async (req, res) => {
             success: true,
             message: 'Command test executed successfully! Check your admin Telegram account for results.',
             testInput: testText,
-            result: result || 'Command executed without return value'
+            result: 'Command executed successfully'
         });
 
     } catch (error) {
@@ -389,7 +392,6 @@ router.post('/:commandId/test', async (req, res) => {
         });
     }
 });
-
 // Temporary command test
 router.post('/test-temp', async (req, res) => {
     try {
