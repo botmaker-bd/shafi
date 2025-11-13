@@ -1,3 +1,4 @@
+// Enhanced Command Editor JavaScript
 class CommandEditor {
     constructor() {
         this.user = null;
@@ -5,6 +6,7 @@ class CommandEditor {
         this.currentCommand = null;
         this.commands = [];
         this.templates = {};
+        this.currentEditorType = 'main';
         this.init();
     }
 
@@ -13,33 +15,51 @@ class CommandEditor {
         await this.loadBotInfo();
         this.setupEventListeners();
         await this.loadCommands();
-        await this.loadTemplates();
         this.setupCodeEditor();
         this.setupCommandsTags();
     }
 
-    async loadTemplates() {
+    async loadTemplatesFromServer() {
         try {
+            this.showLoading(true);
             const token = localStorage.getItem('token');
-            const response = await fetch('/api/commands/templates/categories', {
+            const response = await fetch('/api/templates', {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
             });
 
-            const data = await response.json();
-            if (data.success) {
-                this.templates = data.templates;
-                this.populateTemplatesModal();
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success) {
+                    this.templates = data.templates;
+                    this.populateTemplatesModal();
+                    return true;
+                }
             }
+            throw new Error('Failed to load templates');
         } catch (error) {
-            console.error('❌ Load templates error:', error);
+            console.error('Load templates error:', error);
+            this.showTemplatesError('Failed to load templates from server');
+            return false;
+        } finally {
+            this.showLoading(false);
         }
     }
 
     populateTemplatesModal() {
         const templatesContent = document.querySelector('.templates-content');
         if (!templatesContent) return;
+
+        if (!this.templates || Object.keys(this.templates).length === 0) {
+            templatesContent.innerHTML = `
+                <div class="template-error">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>No templates available</p>
+                </div>
+            `;
+            return;
+        }
 
         let html = '';
 
@@ -53,11 +73,16 @@ class CommandEditor {
                         ${templates.map(template => `
                             <div class="template-card" data-template='${JSON.stringify(template).replace(/'/g, "&#39;")}'>
                                 <div class="template-icon">
-                                    <i class="fas fa-code"></i>
+                                    <i class="fas fa-${this.getTemplateIcon(category)}"></i>
                                 </div>
                                 <h4>${this.escapeHtml(template.name)}</h4>
-                                <p>${this.escapeHtml(template.patterns)}</p>
-                                <div class="template-patterns">${this.escapeHtml(template.patterns)}</div>
+                                <p>${this.escapeHtml(template.description)}</p>
+                                <div class="template-preview">
+                                    <strong>Patterns:</strong> ${this.escapeHtml(template.patterns)}
+                                    <div class="template-code-preview">
+                                        ${this.escapeHtml(template.code.substring(0, 100))}...
+                                    </div>
+                                </div>
                             </div>
                         `).join('')}
                     </div>
@@ -66,6 +91,38 @@ class CommandEditor {
         }
 
         templatesContent.innerHTML = html;
+    }
+
+    showTemplatesError(message) {
+        const templatesContent = document.querySelector('.templates-content');
+        if (templatesContent) {
+            templatesContent.innerHTML = `
+                <div class="template-error">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>${message}</p>
+                    <button class="btn btn-primary btn-small" id="retryTemplates">
+                        <i class="fas fa-redo"></i> Retry
+                    </button>
+                </div>
+            `;
+
+            document.getElementById('retryTemplates')?.addEventListener('click', () => {
+                this.loadTemplatesFromServer();
+            });
+        }
+    }
+
+    getTemplateIcon(category) {
+        const icons = {
+            'basic': 'code',
+            'interactive': 'comments',
+            'media': 'image',
+            'buttons': 'th',
+            'data': 'database',
+            'http': 'cloud',
+            'advanced': 'cogs'
+        };
+        return icons[category] || 'code';
     }
 
     setupEventListeners() {
@@ -109,8 +166,17 @@ class CommandEditor {
             this.testCommand();
         });
 
-        document.getElementById('runTestBtn').addEventListener('click', () => {
-            this.runCustomTest();
+        // Quick test button
+        document.getElementById('runQuickTestBtn').addEventListener('click', () => {
+            this.runQuickTest();
+        });
+
+        // Enter key for quick test
+        document.getElementById('quickTestInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.runQuickTest();
+            }
         });
 
         // Toggle switches
@@ -128,8 +194,12 @@ class CommandEditor {
         });
 
         // Templates
-        document.getElementById('showTemplates').addEventListener('click', () => {
-            this.showTemplates();
+        document.getElementById('showTemplates').addEventListener('click', async () => {
+            await this.showTemplates();
+        });
+
+        document.getElementById('refreshTemplates').addEventListener('click', async () => {
+            await this.loadTemplatesFromServer();
         });
 
         // Search
@@ -141,14 +211,135 @@ class CommandEditor {
             }, 300);
         });
 
+        // Copy result button
+        document.getElementById('copyResultBtn').addEventListener('click', () => {
+            this.copyTestResult();
+        });
+
         // Modal events
         this.setupModalEvents();
         this.setupTemplateCategories();
+
+        // Command group click events
+        document.addEventListener('click', (e) => {
+            const commandGroup = e.target.closest('.command-group');
+            if (commandGroup) {
+                const commandId = commandGroup.dataset.commandId;
+                if (commandId) {
+                    this.selectCommand(commandId);
+                }
+            }
+        });
+    }
+
+    async showTemplates() {
+        // Show loading state
+        const templatesContent = document.querySelector('.templates-content');
+        if (templatesContent) {
+            templatesContent.innerHTML = `
+                <div class="template-loading">
+                    <div class="spinner"></div>
+                    <p>Loading templates from server...</p>
+                </div>
+            `;
+        }
+
+        // Load templates from server
+        const success = await this.loadTemplatesFromServer();
+        
+        if (success) {
+            document.getElementById('templatesModal').style.display = 'flex';
+        }
+    }
+
+    setupModalEvents() {
+        const modals = ['testCommandModal', 'codeEditorModal', 'templatesModal'];
+        
+        modals.forEach(modalId => {
+            const modal = document.getElementById(modalId);
+            const closeBtn = modal?.querySelector('.modal-close');
+            
+            if (closeBtn) {
+                closeBtn.addEventListener('click', () => {
+                    modal.style.display = 'none';
+                });
+            }
+        });
+
+        document.getElementById('closeTestCommand')?.addEventListener('click', () => {
+            document.getElementById('testCommandModal').style.display = 'none';
+        });
+
+        document.getElementById('closeTemplates')?.addEventListener('click', () => {
+            document.getElementById('templatesModal').style.display = 'none';
+        });
+
+        // Template card click events
+        document.addEventListener('click', (e) => {
+            const templateCard = e.target.closest('.template-card');
+            if (templateCard) {
+                const templateData = templateCard.dataset.template;
+                if (templateData) {
+                    try {
+                        const template = JSON.parse(templateData);
+                        this.applyTemplate(template);
+                    } catch (error) {
+                        console.error('Error parsing template:', error);
+                    }
+                }
+            }
+        });
+
+        window.addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal')) {
+                e.target.style.display = 'none';
+            }
+        });
+    }
+
+    setupTemplateCategories() {
+        const categoryTabs = document.querySelectorAll('.category-tab');
+
+        categoryTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const category = tab.dataset.category;
+                
+                // Update tabs
+                categoryTabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                // Update content
+                const templateCategories = document.querySelectorAll('.template-category');
+                templateCategories.forEach(cat => cat.classList.remove('active'));
+                
+                const targetCategory = document.getElementById(`${category}-templates`);
+                if (targetCategory) {
+                    targetCategory.classList.add('active');
+                }
+            });
+        });
+    }
+
+    setupCodeEditor() {
+        const advancedEditor = document.getElementById('advancedCodeEditor');
+        
+        document.getElementById('cancelEdit').addEventListener('click', () => {
+            this.closeCodeEditor();
+        });
+
+        document.getElementById('saveCode').addEventListener('click', () => {
+            this.saveCodeFromEditor();
+        });
+
+        advancedEditor.addEventListener('input', (e) => {
+            this.updateLineCount(e.target.value);
+        });
+
+        this.updateLineCount(advancedEditor.value);
     }
 
     setupCommandsTags() {
         const moreCommandsInput = document.getElementById('moreCommands');
-        const commandsTags = document.getElementById('commandsTags');
 
         moreCommandsInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ',') {
@@ -229,30 +420,207 @@ class CommandEditor {
         });
     }
 
-    setupCodeEditor() {
-        // Basic code editor setup
-        const advancedEditor = document.getElementById('advancedCodeEditor');
+    async runQuickTest() {
+        const testInput = document.getElementById('quickTestInput').value.trim();
         
-        document.getElementById('cancelEdit').addEventListener('click', () => {
-            this.closeCodeEditor();
-        });
+        if (!testInput) {
+            this.showError('Please enter a command to test');
+            return;
+        }
 
-        document.getElementById('saveCode').addEventListener('click', () => {
-            this.saveCodeFromEditor();
-        });
+        if (!this.currentCommand) {
+            this.showError('Please save the command first before testing');
+            return;
+        }
 
-        advancedEditor.addEventListener('input', (e) => {
-            this.updateLineCount(e.target.value);
-        });
+        this.showTestModal();
+        this.showTestLoading();
 
-        this.updateLineCount(advancedEditor.value);
+        try {
+            const token = localStorage.getItem('token');
+            
+            const response = await fetch('/api/commands/test-input', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    commandId: this.currentCommand.id,
+                    testInput: testInput,
+                    botToken: this.currentBot.token
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.showTestSuccess(`
+                    ✅ Command Test Executed Successfully!
+
+                    🎯 Test Input: ${testInput}
+                    🤖 Bot: ${this.currentBot.name}
+                    📊 Status: Command executed successfully
+
+                    📨 Telegram Response:
+                    ${data.telegramResponse || 'Message sent to Telegram bot'}
+
+                    🔍 Execution Details:
+                    ${data.executionDetails || 'Command processed without errors'}
+
+                    💬 Bot Reply:
+                    ${data.botReply || 'Check your Telegram bot for the response'}
+                `);
+            } else {
+                this.showTestError(`
+                    ❌ Test Failed
+
+                    Error: ${data.error || 'Unknown error occurred'}
+                    ${data.details ? `Details: ${data.details}` : ''}
+                `);
+            }
+        } catch (error) {
+            this.showTestError(`
+                ❌ Network Error
+
+                Failed to connect to server: ${error.message}
+            `);
+        }
     }
 
-    updateLineCount(code) {
-        const lines = code.split('\n').length;
-        const chars = code.length;
-        document.getElementById('lineCount').textContent = `Line: ${lines}`;
-        document.getElementById('charCount').textContent = `Chars: ${chars}`;
+    async testCommand() {
+        if (!this.currentBot) {
+            this.showError('Bot information not loaded');
+            return;
+        }
+
+        const commands = this.getCommandsFromTags();
+        if (commands.length === 0) {
+            this.showError('Please add at least one command pattern to test');
+            return;
+        }
+
+        const commandCode = document.getElementById('commandCode').value.trim();
+        if (!commandCode) {
+            this.showError('Please add command code to test');
+            return;
+        }
+
+        this.showTestModal();
+        this.showTestLoading();
+
+        try {
+            const token = localStorage.getItem('token');
+            
+            const tempCommand = {
+                command_patterns: commands.join(','),
+                code: commandCode,
+                wait_for_answer: document.getElementById('waitForAnswer').checked,
+                answer_handler: document.getElementById('answerHandler').value || ''
+            };
+
+            const response = await fetch('/api/commands/test-temp', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    command: tempCommand,
+                    botToken: this.currentBot.token
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.showTestSuccess(`
+                    ✅ Test Command Sent Successfully!
+
+                    Commands: ${commands.join(', ')}
+                    Bot: ${this.currentBot.name}
+                    Status: Command executed without errors
+
+                    📨 Message sent to Telegram:
+                    ${data.telegramResponse || 'Check your bot for results'}
+
+                    🔍 Execution Result:
+                    ${data.executionResult || 'No specific result returned'}
+                `);
+            } else {
+                this.showTestError(`
+                    ❌ Test Failed
+
+                    Error: ${data.error || 'Unknown error occurred'}
+                    ${data.details ? `Details: ${data.details}` : ''}
+                `);
+            }
+        } catch (error) {
+            this.showTestError(`
+                ❌ Network Error
+
+                Failed to connect to server: ${error.message}
+            `);
+        }
+    }
+
+    showTestModal() {
+        document.getElementById('testCommandModal').style.display = 'flex';
+    }
+
+    showTestLoading() {
+        document.getElementById('testCommandResult').innerHTML = `
+            <div class="test-loading">
+                <div class="spinner"></div>
+                <p>Testing command execution...</p>
+            </div>
+        `;
+    }
+
+    showTestSuccess(html) {
+        const resultDiv = document.getElementById('testCommandResult');
+        resultDiv.innerHTML = `
+            <div class="test-success">
+                <div class="result-header">
+                    <h4>✅ Test Successful</h4>
+                </div>
+                <div class="test-result-container">
+                    <button class="copy-btn" onclick="commandEditor.copyTestResult()">
+                        <i class="fas fa-copy"></i> Copy
+                    </button>
+                    <div class="test-result-content">${html}</div>
+                </div>
+            </div>
+        `;
+    }
+
+    showTestError(html) {
+        const resultDiv = document.getElementById('testCommandResult');
+        resultDiv.innerHTML = `
+            <div class="test-error">
+                <div class="result-header">
+                    <h4>❌ Test Failed</h4>
+                </div>
+                <div class="test-result-container">
+                    <button class="copy-btn" onclick="commandEditor.copyTestResult()">
+                        <i class="fas fa-copy"></i> Copy
+                    </button>
+                    <div class="test-result-content">${html}</div>
+                </div>
+            </div>
+        `;
+    }
+
+    copyTestResult() {
+        const resultContent = document.querySelector('.test-result-content');
+        if (resultContent) {
+            const text = resultContent.textContent || resultContent.innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                this.showSuccess('Result copied to clipboard!');
+            }).catch(() => {
+                this.showError('Failed to copy result');
+            });
+        }
     }
 
     openCodeEditor(editorType) {
@@ -261,8 +629,10 @@ class CommandEditor {
         
         if (editorType === 'main') {
             code = document.getElementById('commandCode').value;
+            document.getElementById('editorType').textContent = 'Editor: Main Code';
         } else if (editorType === 'answer') {
             code = document.getElementById('answerHandler').value;
+            document.getElementById('editorType').textContent = 'Editor: Answer Handler';
         }
         
         document.getElementById('advancedCodeEditor').value = code;
@@ -272,6 +642,7 @@ class CommandEditor {
         setTimeout(() => {
             const editor = document.getElementById('advancedCodeEditor');
             editor.focus();
+            editor.setSelectionRange(0, 0);
         }, 100);
     }
 
@@ -289,72 +660,52 @@ class CommandEditor {
         }
         
         this.closeCodeEditor();
-        this.showSuccess('Code saved!');
+        this.showSuccess('Code saved successfully!');
     }
 
-    setupModalEvents() {
-        const modals = ['testCommandModal', 'codeEditorModal', 'templatesModal'];
-        
-        modals.forEach(modalId => {
-            const modal = document.getElementById(modalId);
-            const closeBtn = modal?.querySelector('.modal-close');
-            
-            if (closeBtn) {
-                closeBtn.addEventListener('click', () => {
-                    modal.style.display = 'none';
-                });
-            }
-        });
-
-        document.getElementById('closeTestCommand')?.addEventListener('click', () => {
-            document.getElementById('testCommandModal').style.display = 'none';
-        });
-
-        document.getElementById('closeTemplates')?.addEventListener('click', () => {
-            document.getElementById('templatesModal').style.display = 'none';
-        });
-
-        // Template card click events
-        document.addEventListener('click', (e) => {
-            const templateCard = e.target.closest('.template-card');
-            if (templateCard) {
-                const templateData = templateCard.dataset.template;
-                if (templateData) {
-                    const template = JSON.parse(templateData);
-                    this.applyTemplate(template);
-                }
-            }
-        });
-
-        window.addEventListener('click', (e) => {
-            if (e.target.classList.contains('modal')) {
-                e.target.style.display = 'none';
-            }
-        });
-    }
-
-    setupTemplateCategories() {
-        const categoryTabs = document.querySelectorAll('.category-tab');
-        const templateCategories = document.querySelectorAll('.template-category');
-
-        categoryTabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                const category = tab.dataset.category;
-                
-                // Update tabs
-                categoryTabs.forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-                
-                // Update content
-                templateCategories.forEach(cat => cat.classList.remove('active'));
-                document.getElementById(`${category}-templates`).classList.add('active');
-            });
-        });
+    updateLineCount(code) {
+        const lines = code.split('\n').length;
+        const chars = code.length;
+        document.getElementById('lineCount').textContent = `Line: ${lines}`;
+        document.getElementById('charCount').textContent = `Chars: ${chars}`;
     }
 
     toggleAnswerHandler(show) {
         const section = document.getElementById('answerHandlerSection');
         section.style.display = show ? 'block' : 'none';
+    }
+
+    applyTemplate(template) {
+        this.setCommandsToTags(template.patterns);
+        document.getElementById('commandCode').value = template.code;
+        
+        if (template.waitForAnswer) {
+            document.getElementById('waitForAnswer').checked = true;
+            this.toggleAnswerHandler(true);
+            document.getElementById('answerHandler').value = template.answerHandler || '';
+        } else {
+            document.getElementById('waitForAnswer').checked = false;
+            this.toggleAnswerHandler(false);
+        }
+        
+        document.getElementById('templatesModal').style.display = 'none';
+        this.showSuccess('Template applied successfully!');
+    }
+
+    async checkAuth() {
+        const token = localStorage.getItem('token');
+        const userData = localStorage.getItem('user');
+
+        if (!token || !userData) {
+            window.location.href = 'login.html';
+            return;
+        }
+
+        try {
+            this.user = JSON.parse(userData);
+        } catch (error) {
+            this.logout();
+        }
     }
 
     async loadBotInfo() {
@@ -403,7 +754,7 @@ class CommandEditor {
 
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch(`/api/commands/bot/${this.currentBot.token}`, {
+            const response = await fetch(`/api/commands/bot/${this.currentBot.id}`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
@@ -490,7 +841,7 @@ class CommandEditor {
         this.currentCommand = {
             id: 'new',
             command_patterns: '/start',
-            code: '// Write your command code here\nconst user = getUser();\nbot.sendMessage(`Hello ${user.first_name}! Welcome to our bot.`);',
+            code: '// Write your command code here\nconst user = getUser();\nconst chatId = getChatId();\n\nbot.sendMessage(chatId, `Hello ${user.first_name}! Welcome to our bot.`);',
             is_active: true,
             wait_for_answer: false,
             answer_handler: ''
@@ -568,7 +919,6 @@ class CommandEditor {
         }
         
         document.getElementById('answerHandler').value = this.currentCommand.answer_handler || '';
-        document.getElementById('currentCommandName').textContent = 'Command Editor';
         document.getElementById('commandId').textContent = `ID: ${this.currentCommand.id}`;
         
         const statusBadge = document.getElementById('commandStatus');
@@ -762,301 +1112,12 @@ class CommandEditor {
         }
     }
 
-    async testCommand() {
-        if (!this.currentBot) {
-            this.showError('Bot information not loaded');
-            return;
-        }
-
-        const commands = this.getCommandsFromTags();
-        if (commands.length === 0) {
-            this.showError('Please add at least one command to test');
-            return;
-        }
-
-        const commandCode = document.getElementById('commandCode').value.trim();
-        if (!commandCode) {
-            this.showError('Please add command code to test');
-            return;
-        }
-
-        this.showTestModal();
-        this.showTestLoading();
-
-        try {
-            const token = localStorage.getItem('token');
-            
-            const tempCommand = {
-                command_patterns: commands.join(','),
-                code: commandCode,
-                wait_for_answer: document.getElementById('waitForAnswer').checked,
-                answer_handler: document.getElementById('answerHandler').value || ''
-            };
-
-            const response = await fetch('/api/commands/test-temp', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    command: tempCommand,
-                    botToken: this.currentBot.token
-                })
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                this.showTestSuccess(`
-                    <h4>✅ Test Command Sent Successfully!</h4>
-                    <div class="test-details">
-                        <p><strong>Commands:</strong> ${commands.join(', ')}</p>
-                        <p><strong>Bot:</strong> ${this.currentBot.name}</p>
-                        <p><strong>Status:</strong> Command executed without errors</p>
-                    </div>
-                    <p class="test-message">Check your Telegram bot for the test results.</p>
-                `);
-            } else {
-                this.showTestError(`
-                    <h4>❌ Test Failed</h4>
-                    <p><strong>Error:</strong> ${data.error || 'Unknown error occurred'}</p>
-                    ${data.details ? `<p><strong>Details:</strong> ${data.details}</p>` : ''}
-                `);
-            }
-        } catch (error) {
-            this.showTestError(`
-                <h4>❌ Network Error</h4>
-                <p>Failed to connect to server: ${error.message}</p>
-            `);
-        }
-    }
-
-    async runCustomTest() {
-        if (!this.currentBot) {
-            this.showError('Bot information not loaded');
-            return;
-        }
-
-        const testInput = document.getElementById('testInput').value.trim();
-        const commands = this.getCommandsFromTags();
-        
-        if (!testInput && commands.length === 0) {
-            this.showError('Please add commands or enter test input');
-            return;
-        }
-
-        const commandCode = document.getElementById('commandCode').value.trim();
-        if (!commandCode) {
-            this.showError('Please add command code to test');
-            return;
-        }
-
-        this.showTestModal();
-        this.showTestLoading();
-
-        try {
-            const token = localStorage.getItem('token');
-            
-            const tempCommand = {
-                command_patterns: testInput || commands.join(','),
-                code: commandCode,
-                wait_for_answer: document.getElementById('waitForAnswer').checked,
-                answer_handler: document.getElementById('answerHandler').value || ''
-            };
-
-            const response = await fetch('/api/commands/test-temp', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    command: tempCommand,
-                    botToken: this.currentBot.token,
-                    testInput: testInput
-                })
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                this.showTestSuccess(`
-                    <h4>✅ Test Command Executed Successfully!</h4>
-                    <div class="test-details">
-                        <p><strong>Test Input:</strong> ${testInput || commands.join(', ')}</p>
-                        <p><strong>Bot:</strong> ${this.currentBot.name}</p>
-                        <p><strong>Result:</strong> ${data.result || 'Command executed successfully'}</p>
-                    </div>
-                    <p class="test-message">Command executed without errors.</p>
-                `);
-            } else {
-                this.showTestError(`
-                    <h4>❌ Test Failed</h4>
-                    <div class="error-details">
-                        <p><strong>Error:</strong> ${data.error || 'Unknown error occurred'}</p>
-                        ${data.details ? `<p><strong>Details:</strong> ${data.details}</p>` : ''}
-                    </div>
-                `);
-            }
-        } catch (error) {
-            this.showTestError(`
-                <h4>❌ Network Error</h4>
-                <p>Failed to connect to server: ${error.message}</p>
-            `);
-        }
-    }
-
-    async quickTest() {
+    quickTest() {
         if (this.currentCommand) {
-            await this.testCommand();
+            this.testCommand();
         } else {
             this.showError('Please select a command first');
         }
-    }
-
-    showTestModal() {
-        document.getElementById('testCommandModal').style.display = 'flex';
-    }
-
-    showTestLoading() {
-        document.getElementById('testCommandResult').innerHTML = `
-            <div class="test-loading">
-                <div class="spinner"></div>
-                <p>Testing command execution...</p>
-            </div>
-        `;
-    }
-
-    showTestSuccess(html) {
-        document.getElementById('testCommandResult').innerHTML = `
-            <div class="test-success">
-                ${html}
-            </div>
-        `;
-    }
-
-    showTestError(html) {
-        document.getElementById('testCommandResult').innerHTML = `
-            <div class="test-error">
-                ${html}
-            </div>
-        `;
-    }
-
-    showTemplates() {
-        document.getElementById('templatesModal').style.display = 'flex';
-    }
-
-    applyTemplate(template) {
-        this.setCommandsToTags(template.patterns);
-        document.getElementById('commandCode').value = template.code;
-        
-        if (template.waitForAnswer) {
-            document.getElementById('waitForAnswer').checked = true;
-            this.toggleAnswerHandler(true);
-            document.getElementById('answerHandler').value = template.answerHandler || '';
-        } else {
-            document.getElementById('waitForAnswer').checked = false;
-            this.toggleAnswerHandler(false);
-        }
-        
-        document.getElementById('templatesModal').style.display = 'none';
-        this.showSuccess('Template applied successfully!');
-    }
-
-    // ... rest of the methods (checkAuth, showLoading, showError, etc.) remain the same
-    // Please keep the existing methods for authentication, notifications, etc.
-
-    async checkAuth() {
-        const token = localStorage.getItem('token');
-        const userData = localStorage.getItem('user');
-
-        if (!token || !userData) {
-            window.location.href = 'login.html';
-            return;
-        }
-
-        try {
-            const response = await fetch('/api/auth/verify', {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error('Invalid token');
-            }
-
-            this.user = JSON.parse(userData);
-        } catch (error) {
-            this.logout();
-        }
-    }
-
-    logout() {
-        localStorage.clear();
-        window.location.href = 'index.html';
-    }
-
-    showLoading(show) {
-        const overlay = document.getElementById('loadingOverlay');
-        if (overlay) {
-            overlay.style.display = show ? 'flex' : 'none';
-        }
-    }
-
-    showError(message) {
-        this.showNotification(message, 'error');
-    }
-
-    showSuccess(message) {
-        this.showNotification(message, 'success');
-    }
-
-    showInfo(message) {
-        this.showNotification(message, 'info');
-    }
-
-    showNotification(message, type = 'info') {
-        const existing = document.querySelector('.notification');
-        if (existing) existing.remove();
-
-        const notification = document.createElement('div');
-        notification.className = `notification notification-${type}`;
-        notification.innerHTML = `
-            <div class="notification-content">
-                <i class="fas fa-${type === 'error' ? 'exclamation-triangle' : type === 'success' ? 'check-circle' : 'info-circle'}"></i>
-                <span class="notification-message">${message}</span>
-                <button class="notification-close">&times;</button>
-            </div>
-        `;
-
-        Object.assign(notification.style, {
-            position: 'fixed',
-            top: '20px',
-            right: '20px',
-            background: type === 'error' ? '#ef4444' : type === 'success' ? '#10b981' : '#3b82f6',
-            color: 'white',
-            padding: '1rem 1.5rem',
-            borderRadius: '0.5rem',
-            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-            zIndex: '10000',
-            maxWidth: '400px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem'
-        });
-
-        notification.querySelector('.notification-close').addEventListener('click', () => {
-            notification.remove();
-        });
-
-        document.body.appendChild(notification);
-
-        setTimeout(() => {
-            notification.remove();
-        }, 5000);
     }
 
     escapeHtml(unsafe) {
@@ -1067,34 +1128,38 @@ class CommandEditor {
             .replace(/"/g, "&quot;")
             .replace(/'/g, "&#039;");
     }
+
+    showLoading(show) {
+        const overlay = document.getElementById('loadingOverlay');
+        if (overlay) {
+            overlay.style.display = show ? 'flex' : 'none';
+        }
+    }
+
+    showError(message) {
+        if (commonApp) {
+            commonApp.showError(message);
+        } else {
+            alert(message);
+        }
+    }
+
+    showSuccess(message) {
+        if (commonApp) {
+            commonApp.showSuccess(message);
+        } else {
+            alert(message);
+        }
+    }
+
+    logout() {
+        localStorage.clear();
+        window.location.href = 'index.html';
+    }
 }
 
 // Initialize command editor
-// client/js/command-editor.js - ঠিক করা ভার্সন
-// Initialize command editor - এই অংশটি ঠিক করুন
 let commandEditor;
-
 document.addEventListener('DOMContentLoaded', () => {
     commandEditor = new CommandEditor();
-    
-    // Add click event for command groups - এই অংশ যোগ করুন
-    document.addEventListener('click', (e) => {
-        const commandGroup = e.target.closest('.command-group');
-        if (commandGroup) {
-            const commandId = commandGroup.dataset.commandId;
-            if (commandId && commandEditor.selectCommand) {
-                commandEditor.selectCommand(commandId);
-            }
-        }
-    });
-    
-    // Add event listener for waitForAnswer toggle
-    const waitForAnswerToggle = document.getElementById('waitForAnswer');
-    if (waitForAnswerToggle) {
-        waitForAnswerToggle.addEventListener('change', (e) => {
-            if (commandEditor && commandEditor.toggleAnswerHandler) {
-                commandEditor.toggleAnswerHandler(e.target.checked);
-            }
-        });
-    }
 });
