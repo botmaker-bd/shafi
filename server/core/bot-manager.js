@@ -302,12 +302,13 @@ async executeCommandCode(bot, code, context) {
         try {
             const { msg, chatId, userId, username, first_name, botToken, userInput, User, Bot } = context;
             
-            // Create safe execution environment with ALL available functions
+            // Create safe execution environment with PROPER function binding
             const botFunctions = {
                 // Basic messaging - make bot available directly
-                bot: bot, // ✅ Add bot directly to the context
+                bot: bot,
                 
                 sendMessage: (text, options = {}) => {
+                    console.log(`📤 Sending message to chat ${chatId}: "${text.substring(0, 50)}..."`);
                     return bot.sendMessage(chatId, text, {
                         parse_mode: 'HTML',
                         ...options
@@ -315,6 +316,7 @@ async executeCommandCode(bot, code, context) {
                 },
                 
                 send: (text, options = {}) => {
+                    console.log(`📤 Sending message to chat ${chatId}: "${text.substring(0, 50)}..."`);
                     return bot.sendMessage(chatId, text, {
                         parse_mode: 'HTML',
                         ...options
@@ -322,6 +324,7 @@ async executeCommandCode(bot, code, context) {
                 },
                 
                 reply: (text, options = {}) => {
+                    console.log(`📤 Replying to message ${msg.message_id}: "${text.substring(0, 50)}..."`);
                     return bot.sendMessage(chatId, text, {
                         reply_to_message_id: msg.message_id,
                         parse_mode: 'HTML',
@@ -331,6 +334,7 @@ async executeCommandCode(bot, code, context) {
                 
                 // Media messages
                 sendPhoto: (photo, options = {}) => {
+                    console.log(`🖼️ Sending photo to chat ${chatId}`);
                     return bot.sendPhoto(chatId, photo, {
                         parse_mode: 'HTML',
                         ...options
@@ -338,6 +342,7 @@ async executeCommandCode(bot, code, context) {
                 },
                 
                 sendDocument: (document, options = {}) => {
+                    console.log(`📄 Sending document to chat ${chatId}`);
                     return bot.sendDocument(chatId, document, {
                         parse_mode: 'HTML',
                         ...options
@@ -345,6 +350,7 @@ async executeCommandCode(bot, code, context) {
                 },
                 
                 sendVideo: (video, options = {}) => {
+                    console.log(`🎥 Sending video to chat ${chatId}`);
                     return bot.sendVideo(chatId, video, {
                         parse_mode: 'HTML',
                         ...options
@@ -352,6 +358,7 @@ async executeCommandCode(bot, code, context) {
                 },
                 
                 sendAudio: (audio, options = {}) => {
+                    console.log(`🎵 Sending audio to chat ${chatId}`);
                     return bot.sendAudio(chatId, audio, {
                         parse_mode: 'HTML',
                         ...options
@@ -359,12 +366,16 @@ async executeCommandCode(bot, code, context) {
                 },
                 
                 // User information
-                getUser: () => ({
-                    id: userId,
-                    username: username,
-                    first_name: first_name,
-                    chat_id: chatId
-                }),
+                getUser: () => {
+                    const userInfo = {
+                        id: userId,
+                        username: username,
+                        first_name: first_name,
+                        chat_id: chatId
+                    };
+                    console.log(`👤 User info:`, userInfo);
+                    return userInfo;
+                },
                 
                 // Command parameters
                 params: userInput,
@@ -378,15 +389,23 @@ async executeCommandCode(bot, code, context) {
                 Bot: Bot,
                 
                 // Utility functions
-                wait: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
+                wait: (ms) => {
+                    console.log(`⏳ Waiting for ${ms}ms`);
+                    return new Promise(resolve => setTimeout(resolve, ms));
+                },
                 
                 // Wait for answer functionality
                 waitForAnswer: (question, options = {}) => {
+                    console.log(`⏳ Setting up wait for answer: "${question.substring(0, 50)}..."`);
                     return new Promise((resolve) => {
                         const nextCommandKey = `${botToken}_${userId}`;
                         
-                        bot.sendMessage(chatId, question, options).then(() => {
+                        bot.sendMessage(chatId, question, {
+                            parse_mode: 'HTML',
+                            ...options
+                        }).then(() => {
                             this.nextCommandHandlers.set(nextCommandKey, (answer) => {
+                                console.log(`✅ Received answer: "${answer}"`);
                                 resolve(answer);
                             });
                         }).catch(reject);
@@ -409,18 +428,24 @@ async executeCommandCode(bot, code, context) {
                 `
             );
 
+            console.log(`🔧 Executing command code with ${Object.keys(botFunctions).length} available functions`);
+            console.log(`📝 Code preview: ${code.substring(0, 100)}...`);
+
             // Call the function with all the bot functions as parameters
             const result = commandFunction(...Object.values(botFunctions));
             
             // Handle async commands
             if (result && typeof result.then === 'function') {
                 const finalResult = await result;
+                console.log(`✅ Async command completed with result:`, finalResult);
                 resolve(finalResult);
             } else {
+                console.log(`✅ Command completed with result:`, result);
                 resolve(result);
             }
         } catch (error) {
             console.error('❌ Command execution error:', error);
+            console.error('❌ Error stack:', error.stack);
             reject(error);
         }
     });
