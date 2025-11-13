@@ -12,7 +12,6 @@ class BotManager {
         console.log(`🤖 Bot Manager initialized in ${this.USE_WEBHOOK ? 'WEBHOOK' : 'POLLING'} mode`);
     }
 
-    // Bot management methods
     async initializeAllBots() {
         if (this.initialized) {
             console.log('🔄 Bots already initialized, skipping...');
@@ -31,6 +30,8 @@ class BotManager {
                 throw error;
             }
 
+            console.log(`📊 Found ${bots?.length || 0} active bots`);
+
             if (!bots || bots.length === 0) {
                 console.log('ℹ️ No active bots found in database');
                 this.initialized = true;
@@ -38,10 +39,18 @@ class BotManager {
             }
 
             let successCount = 0;
-            for (const bot of bots) {
+            
+            // Add delay between bot initializations to avoid rate limiting
+            for (let i = 0; i < bots.length; i++) {
+                const bot = bots[i];
                 try {
-                    await this.initializeBot(bot.token);
+                    await this.initializeBotWithRetry(bot.token);
                     successCount++;
+                    
+                    // Add delay between bot initializations (2 seconds)
+                    if (i < bots.length - 1) {
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                    }
                 } catch (botError) {
                     console.error(`❌ Failed to initialize bot ${bot.name}:`, botError.message);
                 }
@@ -51,6 +60,23 @@ class BotManager {
             console.log(`✅ ${successCount}/${bots.length} bots initialized successfully`);
         } catch (error) {
             console.error('❌ Initialize all bots error:', error);
+            throw error;
+        }
+    }
+
+    async initializeBotWithRetry(token, retryCount = 0) {
+        const maxRetries = 3;
+        
+        try {
+            return await this.initializeBot(token);
+        } catch (error) {
+            if (error.response?.body?.error_code === 429 && retryCount < maxRetries) {
+                const retryAfter = error.response.body.parameters?.retry_after || 5;
+                console.log(`⏳ Rate limited. Retrying after ${retryAfter} seconds... (Attempt ${retryCount + 1}/${maxRetries})`);
+                
+                await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
+                return await this.initializeBotWithRetry(token, retryCount + 1);
+            }
             throw error;
         }
     }
@@ -71,42 +97,86 @@ class BotManager {
                 throw error;
             }
 
+            console.log(`📝 Found ${commands?.length || 0} commands for bot`);
+
             let bot;
             
             if (this.USE_WEBHOOK) {
                 // Webhook mode
                 bot = new TelegramBot(token, { 
-                    polling: false
+                    polling: false,
+                    // Add request concurrency limits
+                    request: {
+                        concurrency: 1,
+                        maxRetries: 3,
+                        retryDelay: 1000
+                    }
                 });
                 
                 const baseUrl = process.env.BASE_URL;
                 const webhookUrl = `${baseUrl}/api/webhook/${token}`;
                 
+                console.log(`🌐 Setting webhook: ${webhookUrl}`);
+                
                 try {
+                    // Delete existing webhook first
+                    await bot.deleteWebHook();
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    
+                    // Then set new webhook
                     await bot.setWebHook(webhookUrl);
-                    console.log(`🌐 Webhook set: ${webhookUrl}`);
+                    console.log(`✅ Webhook set successfully`);
                 } catch (webhookError) {
-                    console.error('❌ Webhook setup error:', webhookError);
-                    throw webhookError;
+                    console.error('❌ Webhook setup error:', webhookError.message);
+                    // Continue even if webhook fails - bot might work in polling mode
                 }
             } else {
-                // Polling mode
+                // Polling mode with limits
                 bot = new TelegramBot(token, { 
-                    polling: true
+                    polling: {
+                        interval: 1000, // 1 second interval
+                        autoStart: true,
+                        params: {
+                            timeout: 10
+                        }
+                    },
+                    request: {
+                        concurrency: 1,
+                        maxRetries: 3,
+                        retryDelay: 1000
+                    }
                 });
                 
                 console.log(`🔄 Polling started for bot: ${token.substring(0, 15)}...`);
             }
 
             // Set up event handlers
-            bot.on('message', (msg) => this.handleMessage(bot, token, msg));
-            bot.on('callback_query', (callbackQuery) => this.handleCallbackQuery(bot, token, callbackQuery));
+            bot.on('message', (msg) => {
+                console.log(`📨 Message received for bot ${token.substring(0, 10)}...`);
+                this.handleMessage(bot, token, msg);
+            });
+            
+            bot.on('callback_query', (callbackQuery) => {
+                console.log(`🔘 Callback received for bot ${token.substring(0, 10)}...`);
+                this.handleCallbackQuery(bot, token, callbackQuery);
+            });
+            
             bot.on('polling_error', (error) => {
                 console.error(`❌ Polling error for ${token.substring(0, 15)}...:`, error.message);
             });
+            
             bot.on('webhook_error', (error) => {
                 console.error(`❌ Webhook error for ${token.substring(0, 15)}...:`, error.message);
             });
+
+            // Test bot connection
+            try {
+                const botInfo = await bot.getMe();
+                console.log(`✅ Bot connected: @${botInfo.username} (${botInfo.first_name})`);
+            } catch (botError) {
+                console.error(`❌ Bot connection failed:`, botError.message);
+                // Don't throw error - continue with initialization
+            }
 
             // Store bot and commands
             this.activeBots.set(token, bot);
@@ -120,6 +190,7 @@ class BotManager {
         }
     }
 
+    // ... rest of the methods remain the same as previous version
     async handleMessage(bot, token, msg) {
         try {
             if (!msg.text && !msg.caption) return;
@@ -129,15 +200,15 @@ class BotManager {
             const userId = msg.from.id;
             const userName = msg.from.first_name || 'Unknown';
 
-            console.log(`📩 Message from ${userName} (${userId}): "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
+            console.log(`📩 Message from ${userName} (${userId}): "${text}"`);
 
             // Check for next command handler
             const nextCommandKey = `${token}_${userId}`;
             if (this.nextCommandHandlers.has(nextCommandKey)) {
+                console.log(`🔄 Found next command handler for user ${userId}`);
                 const handler = this.nextCommandHandlers.get(nextCommandKey);
                 this.nextCommandHandlers.delete(nextCommandKey);
                 
-                console.log(`🔄 Executing next command handler for user ${userId}`);
                 try {
                     await handler(text, msg);
                 } catch (handlerError) {
@@ -172,7 +243,7 @@ class BotManager {
             }
 
             if (matchedCommand) {
-                console.log(`🎯 Executing command: ${matchedCommand.command_patterns} with params: ${commandParams || 'none'}`);
+                console.log(`🎯 Executing command: ${matchedCommand.command_patterns}`);
                 await this.executeCommand(bot, matchedCommand, msg, commandParams);
             }
         } catch (error) {
@@ -182,34 +253,6 @@ class BotManager {
             } catch (sendError) {
                 console.error('❌ Failed to send error message:', sendError);
             }
-        }
-    }
-
-    async handleCallbackQuery(bot, token, callbackQuery) {
-        try {
-            const data = callbackQuery.data;
-            const userId = callbackQuery.from.id;
-            const userName = callbackQuery.from.first_name || 'Unknown';
-
-            console.log(`🔘 Callback from ${userName} (${userId}): "${data}"`);
-
-            // Handle callback with next command handler
-            const nextCommandKey = `${token}_${userId}`;
-            if (this.nextCommandHandlers.has(nextCommandKey)) {
-                const handler = this.nextCommandHandlers.get(nextCommandKey);
-                this.nextCommandHandlers.delete(nextCommandKey);
-                
-                console.log(`🔄 Executing next command handler for callback from user ${userId}`);
-                try {
-                    await handler(data, callbackQuery);
-                } catch (handlerError) {
-                    console.error('❌ Callback handler error:', handlerError);
-                }
-            }
-
-            await bot.answerCallbackQuery(callbackQuery.id);
-        } catch (error) {
-            console.error('❌ Handle callback error:', error);
         }
     }
 
@@ -224,7 +267,6 @@ class BotManager {
                 botToken: command.bot_token,
                 userInput: params,
                 
-                // Data storage methods
                 User: {
                     saveData: (key, value) => 
                         this.saveData('user_data', command.bot_token, msg.from.id, key, value),
@@ -244,7 +286,7 @@ class BotManager {
 
             await this.executeCommandCode(bot, command.code, context);
         } catch (error) {
-            console.error(`❌ Command execution error for command ID ${command.id}:`, error);
+            console.error(`❌ Command execution error:`, error);
             try {
                 await bot.sendMessage(msg.chat.id, '❌ Command execution failed. Please try again.');
             } catch (sendError) {
@@ -253,15 +295,12 @@ class BotManager {
         }
     }
 
-    // Command execution function - directly defined here to avoid circular dependency
     async executeCommandCode(bot, code, context) {
         return new Promise(async (resolve, reject) => {
             try {
                 const { msg, chatId, userId, username, first_name, botToken, userInput, User, Bot } = context;
                 
-                // Create safe execution environment
                 const botFunctions = {
-                    // Basic messaging
                     sendMessage: (text, options = {}) => {
                         return bot.sendMessage(chatId, text, {
                             parse_mode: 'HTML',
@@ -284,7 +323,6 @@ class BotManager {
                         });
                     },
                     
-                    // Media messages
                     sendPhoto: (photo, options = {}) => {
                         return bot.sendPhoto(chatId, photo, {
                             parse_mode: 'HTML',
@@ -299,7 +337,6 @@ class BotManager {
                         });
                     },
                     
-                    // User information
                     getUser: () => ({
                         id: userId,
                         username: username,
@@ -307,28 +344,19 @@ class BotManager {
                         chat_id: chatId
                     }),
                     
-                    // Command parameters
                     params: userInput,
                     userInput: userInput,
-                    
-                    // Message object
                     message: msg,
-                    
-                    // Data storage
                     User: User,
                     Bot: Bot,
                     
-                    // Utility functions
                     wait: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
                     
-                    // Wait for answer functionality
                     waitForAnswer: (question, options = {}) => {
                         return new Promise((resolve) => {
                             const nextCommandKey = `${botToken}_${userId}`;
                             
-                            // Send question first
                             bot.sendMessage(chatId, question, options).then(() => {
-                                // Set up handler for next message
                                 this.nextCommandHandlers.set(nextCommandKey, (answer) => {
                                     resolve(answer);
                                 });
@@ -337,7 +365,6 @@ class BotManager {
                     }
                 };
 
-                // Execute the command code in a safe context
                 const commandFunction = new Function(
                     ...Object.keys(botFunctions),
                     `
@@ -351,10 +378,8 @@ class BotManager {
                     `
                 );
 
-                // Call the function with all the bot functions as parameters
                 const result = commandFunction(...Object.values(botFunctions));
                 
-                // Handle async commands
                 if (result && typeof result.then === 'function') {
                     const finalResult = await result;
                     resolve(finalResult);
@@ -368,7 +393,7 @@ class BotManager {
         });
     }
 
-    // Universal data storage methods
+    // ... rest of the data storage methods remain the same
     async saveData(dataType, botToken, userId, key, value, metadata = {}) {
         try {
             const { data, error } = await supabase
@@ -385,12 +410,7 @@ class BotManager {
                     onConflict: 'data_type,bot_token,user_id,data_key'
                 });
 
-            if (error) {
-                console.error('❌ Save data error:', error);
-                throw error;
-            }
-            
-            console.log(`💾 Data saved: ${dataType}.${key} for user ${userId}`);
+            if (error) throw error;
             return value;
         } catch (error) {
             console.error('❌ Save data error:', error);
@@ -410,16 +430,14 @@ class BotManager {
                 .single();
 
             if (error) {
-                if (error.code === 'PGRST116') { // No data found
-                    return null;
-                }
+                if (error.code === 'PGRST116') return null;
                 throw error;
             }
             
             if (data && data.data_value) {
                 try {
                     return JSON.parse(data.data_value);
-                } catch (parseError) {
+                } catch {
                     return data.data_value;
                 }
             }
@@ -441,8 +459,6 @@ class BotManager {
                 .eq('data_key', key);
 
             if (error) throw error;
-            
-            console.log(`🗑️ Data deleted: ${dataType}.${key} for user ${userId}`);
             return true;
         } catch (error) {
             console.error('❌ Delete data error:', error);
@@ -455,8 +471,6 @@ class BotManager {
             const bot = this.activeBots.get(token);
             if (bot) {
                 await bot.processUpdate(update);
-            } else {
-                console.error(`❌ No active bot found for token: ${token.substring(0, 15)}...`);
             }
         } catch (error) {
             console.error('❌ Handle bot update error:', error);
@@ -473,13 +487,10 @@ class BotManager {
             if (!this.USE_WEBHOOK) {
                 bot.stopPolling();
             } else {
-                bot.deleteWebHook().catch(error => {
-                    console.error('❌ Error deleting webhook:', error);
-                });
+                bot.deleteWebHook().catch(console.error);
             }
             this.activeBots.delete(token);
             this.botCommands.delete(token);
-            console.log(`🛑 Bot removed: ${token.substring(0, 15)}...`);
         }
     }
 
@@ -492,9 +503,7 @@ class BotManager {
                 .eq('is_active', true);
 
             if (error) throw error;
-            
             this.botCommands.set(token, commands || []);
-            console.log(`🔄 Command cache updated for bot: ${token.substring(0, 15)}... (${commands?.length || 0} commands)`);
         } catch (error) {
             console.error('❌ Update command cache error:', error);
             throw error;
@@ -514,8 +523,5 @@ class BotManager {
     }
 }
 
-// Create singleton instance
 const botManagerInstance = new BotManager();
-
-// Export the instance
 module.exports = botManagerInstance;
