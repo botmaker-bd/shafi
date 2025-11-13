@@ -794,29 +794,40 @@ class CommandEditor {
     }
 
     populateCommandForm() {
-        if (!this.currentCommand) return;
+    if (!this.currentCommand) return;
 
-        document.getElementById('commandName').value = this.currentCommand.name;
-        document.getElementById('commandDescription').value = this.currentCommand.description || '';
-        this.setCommandsToTags(this.currentCommand.pattern);
-        document.getElementById('commandCode').value = this.currentCommand.code || '';
-        
-        const waitToggle = document.getElementById('waitForAnswer');
-        if (waitToggle) {
-            waitToggle.checked = this.currentCommand.wait_for_answer || false;
-            this.toggleAnswerHandler(waitToggle.checked);
-        }
-        
-        document.getElementById('answerHandler').value = this.currentCommand.answer_handler || '';
-        document.getElementById('currentCommandName').textContent = this.currentCommand.name;
-        document.getElementById('commandId').textContent = `ID: ${this.currentCommand.id}`;
-        
-        const statusBadge = document.getElementById('commandStatus');
-        statusBadge.textContent = this.currentCommand.is_active ? 'Active' : 'Inactive';
-        statusBadge.className = `status-badge ${this.currentCommand.is_active ? 'active' : 'inactive'}`;
-        
-        this.updateButtonStates();
+    document.getElementById('commandName').value = this.currentCommand.name;
+    document.getElementById('commandDescription').value = this.currentCommand.description || '';
+    
+    // Combine mainCommand and multipleCommand for display
+    let allCommands = [];
+    if (this.currentCommand.mainCommand) {
+        allCommands.push(this.currentCommand.mainCommand);
     }
+    if (this.currentCommand.multipleCommand) {
+        const additional = this.currentCommand.multipleCommand.split(',').map(cmd => cmd.trim()).filter(cmd => cmd);
+        allCommands = [...allCommands, ...additional];
+    }
+    this.setCommandsToTags(allCommands);
+    
+    document.getElementById('commandCode').value = this.currentCommand.code || '';
+    
+    const waitToggle = document.getElementById('waitForAnswer');
+    if (waitToggle) {
+        waitToggle.checked = this.currentCommand.wait_for_answer || false;
+        this.toggleAnswerHandler(waitToggle.checked);
+    }
+    
+    document.getElementById('answerHandler').value = this.currentCommand.answer_handler || '';
+    document.getElementById('currentCommandName').textContent = this.currentCommand.name;
+    document.getElementById('commandId').textContent = `ID: ${this.currentCommand.id}`;
+    
+    const statusBadge = document.getElementById('commandStatus');
+    statusBadge.textContent = this.currentCommand.is_active ? 'Active' : 'Inactive';
+    statusBadge.className = `status-badge ${this.currentCommand.is_active ? 'active' : 'inactive'}`;
+    
+    this.updateButtonStates();
+}
 
     updateButtonStates() {
         const isNew = this.currentCommand?.id === 'new';
@@ -834,101 +845,110 @@ class CommandEditor {
     }
 
     async saveCommand() {
-        if (!this.currentCommand || !this.currentBot) {
-            this.showError('No command selected or bot not loaded');
-            return false;
-        }
-
-        const commands = this.getCommandsFromTags();
-        
-        if (commands.length === 0) {
-            this.showError('Please add at least one command pattern');
-            document.getElementById('moreCommands').focus();
-            return false;
-        }
-
-        const commandPattern = commands.join(', ');
-        const commandName = document.getElementById('commandName').value.trim();
-        
-        if (!commandName) {
-            this.showError('Command name is required');
-            document.getElementById('commandName').focus();
-            return false;
-        }
-
-        const formData = {
-            name: commandName,
-            pattern: commandPattern,
-            description: document.getElementById('commandDescription').value.trim(),
-            code: document.getElementById('commandCode').value.trim(),
-            waitForAnswer: document.getElementById('waitForAnswer').checked,
-            answerHandler: document.getElementById('waitForAnswer').checked ? 
-                          document.getElementById('answerHandler').value.trim() : '',
-            botToken: this.currentBot.token
-        };
-
-        if (!formData.code) {
-            this.showError('Command code is required');
-            document.getElementById('commandCode').focus();
-            return false;
-        }
-
-        if (formData.waitForAnswer && !formData.answerHandler) {
-            this.showError('Answer handler code is required when "Wait for Answer" is enabled');
-            document.getElementById('answerHandler').focus();
-            return false;
-        }
-
-        this.showLoading(true);
-
-        try {
-            const token = localStorage.getItem('token');
-            let response;
-            let url;
-            let method;
-
-            if (this.currentCommand.id === 'new') {
-                url = '/api/commands';
-                method = 'POST';
-            } else {
-                url = `/api/commands/${this.currentCommand.id}`;
-                method = 'PUT';
-                formData.commandId = this.currentCommand.id;
-            }
-
-            response = await fetch(url, {
-                method: method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(formData)
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                this.showSuccess('Command saved successfully!');
-                
-                await this.loadCommands();
-                
-                if (data.command) {
-                    this.currentCommand = Array.isArray(data.command) ? data.command[0] : data.command;
-                    this.populateCommandForm();
-                }
-                
-                return true;
-            } else {
-                this.showError(data.error || 'Failed to save command');
-                return false;
-            }
-        } catch (error) {
-            this.showError('Network error while saving command');
-            return false;
-        } finally {
-            this.showLoading(false);
-        }
+    if (!this.currentCommand || !this.currentBot) {
+        this.showError('No command selected or bot not loaded');
+        return false;
     }
+
+    const commands = this.getCommandsFromTags();
+    
+    if (commands.length === 0) {
+        this.showError('Please add at least one command pattern');
+        document.getElementById('moreCommands').focus();
+        return false;
+    }
+
+    const mainCommand = commands[0]; // First command is mainCommand
+    const multipleCommand = commands.slice(1).join(','); // Rest are multipleCommand
+    
+    const commandName = document.getElementById('commandName').value.trim();
+    
+    if (!commandName) {
+        this.showError('Command name is required');
+        document.getElementById('commandName').focus();
+        return false;
+    }
+
+    const formData = {
+        name: commandName,
+        mainCommand: mainCommand,
+        multipleCommand: multipleCommand,
+        description: document.getElementById('commandDescription').value.trim(),
+        code: document.getElementById('commandCode').value.trim(),
+        waitForAnswer: document.getElementById('waitForAnswer').checked,
+        answerHandler: document.getElementById('waitForAnswer').checked ? 
+                      document.getElementById('answerHandler').value.trim() : '',
+        botToken: this.currentBot.token
+    };
+
+    if (!formData.code) {
+        this.showError('Command code is required');
+        document.getElementById('commandCode').focus();
+        return false;
+    }
+
+    if (formData.waitForAnswer && !formData.answerHandler) {
+        this.showError('Answer handler code is required when "Wait for Answer" is enabled');
+        document.getElementById('answerHandler').focus();
+        return false;
+    }
+
+    this.showLoading(true);
+
+    try {
+        const token = localStorage.getItem('token');
+        let response;
+        let url;
+        let method;
+
+        if (this.currentCommand.id === 'new') {
+            url = '/api/commands';
+            method = 'POST';
+        } else {
+            url = `/api/commands/${this.currentCommand.id}`;
+            method = 'PUT';
+            formData.commandId = this.currentCommand.id;
+        }
+
+        response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(formData)
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            this.showSuccess('Command saved successfully!');
+            
+            await this.loadCommands();
+            
+            if (data.command) {
+                this.currentCommand = data.command;
+                this.populateCommandForm();
+                
+                // Auto-select the saved command
+                const commandGroup = document.querySelector(`[data-command-name="${this.currentCommand.name}"]`);
+                if (commandGroup) {
+                    commandGroup.click();
+                }
+            }
+            
+            return true;
+        } else {
+            this.showError(data.error || 'Failed to save command');
+            return false;
+        }
+    } catch (error) {
+        this.showError('Network error while saving command');
+        return false;
+    } finally {
+        this.showLoading(false);
+    }
+}
 
     async deleteCommand() {
         if (!this.currentCommand || this.currentCommand.id === 'new') {
