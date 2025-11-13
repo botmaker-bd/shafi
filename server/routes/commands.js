@@ -301,8 +301,8 @@ router.delete('/:commandId', async (req, res) => {
     }
 });
 
-// Test command execution
-// server/routes/commands.js - ঠিক করা ভার্সন
+// server/routes/commands.js - test function এ এই পরিবর্তন করুন
+
 // Test command execution
 router.post('/:commandId/test', async (req, res) => {
     try {
@@ -371,17 +371,27 @@ router.post('/:commandId/test', async (req, res) => {
             text: testText
         };
 
-        // Execute command using the bot manager
-        await botManager.executeCommand(bot, command, testMessage, true);
+        console.log(`🔧 Starting command test execution for command ID: ${commandId}`);
+        
+        try {
+            // Execute command using the bot manager
+            await botManager.executeCommand(bot, command, testMessage, testText);
+            
+            console.log('✅ Command test executed successfully:', commandId);
 
-        console.log('✅ Command test executed successfully:', commandId);
-
-        res.json({
-            success: true,
-            message: 'Command test executed successfully! Check your admin Telegram account for results.',
-            testInput: testText,
-            result: 'Command executed successfully'
-        });
+            res.json({
+                success: true,
+                message: 'Command test executed successfully! Check your admin Telegram account for results.',
+                testInput: testText,
+                result: 'Command executed successfully'
+            });
+        } catch (executionError) {
+            console.error('❌ Command execution failed:', executionError);
+            res.status(500).json({ 
+                success: false,
+                error: 'Command execution failed: ' + executionError.message
+            });
+        }
 
     } catch (error) {
         console.error('❌ Test command error:', error);
@@ -392,6 +402,7 @@ router.post('/:commandId/test', async (req, res) => {
         });
     }
 });
+
 // Temporary command test
 router.post('/test-temp', async (req, res) => {
     try {
