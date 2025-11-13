@@ -1,4 +1,4 @@
-// Enhanced Command Editor JavaScript - Fixed Version
+// Enhanced Command Editor JavaScript - Fixed Version with Logging
 class CommandEditor {
     constructor() {
         this.user = null;
@@ -11,57 +11,71 @@ class CommandEditor {
     }
 
     async init() {
+        console.log('🚀 CommandEditor initialization started');
         await this.checkAuth();
         await this.loadBotInfo();
         this.setupEventListeners();
         await this.loadCommands();
         this.setupCodeEditor();
         this.setupCommandsTags();
+        console.log('✅ CommandEditor initialization completed');
     }
 
     setupEventListeners() {
+        console.log('🔧 Setting up event listeners');
+        
         // Navigation
         document.getElementById('backToBots')?.addEventListener('click', () => {
+            console.log('🔙 Back to bots clicked');
             window.location.href = 'bot-management.html';
         });
 
         document.getElementById('quickTest')?.addEventListener('click', () => {
+            console.log('⚡ Quick test clicked');
             this.quickTest();
         });
 
         // Command actions
         document.getElementById('addCommandBtn')?.addEventListener('click', () => {
+            console.log('➕ Add command button clicked');
             this.addNewCommand();
         });
 
         document.getElementById('createFirstCommand')?.addEventListener('click', () => {
+            console.log('🆕 Create first command clicked');
             this.addNewCommand();
         });
 
         document.getElementById('addFirstCommand')?.addEventListener('click', () => {
+            console.log('🆕 Add first command clicked');
             this.addNewCommand();
         });
 
         // Form actions
         document.getElementById('saveCommandBtn')?.addEventListener('click', (e) => {
             e.preventDefault();
+            console.log('💾 Save command clicked');
             this.saveCommand();
         });
 
         document.getElementById('deleteCommandBtn')?.addEventListener('click', () => {
+            console.log('🗑️ Delete command clicked');
             this.deleteCommand();
         });
 
         document.getElementById('toggleCommandBtn')?.addEventListener('click', () => {
+            console.log('🔘 Toggle command clicked');
             this.toggleCommand();
         });
 
         document.getElementById('testCommandBtn')?.addEventListener('click', () => {
+            console.log('🧪 Test command clicked');
             this.testCommand();
         });
 
-        // Quick test button - REMOVED SAVE VALIDATION
+        // Quick test button
         document.getElementById('runQuickTestBtn')?.addEventListener('click', () => {
+            console.log('🎯 Run quick test clicked');
             this.runQuickTest();
         });
 
@@ -69,30 +83,36 @@ class CommandEditor {
         document.getElementById('quickTestInput')?.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
+                console.log('↩️ Quick test input enter pressed');
                 this.runQuickTest();
             }
         });
 
         // Toggle switches
         document.getElementById('waitForAnswer')?.addEventListener('change', (e) => {
+            console.log('⏳ Wait for answer toggled:', e.target.checked);
             this.toggleAnswerHandler(e.target.checked);
         });
 
-        // Code editor buttons - UPDATED FOR NORMAL MODAL
+        // Code editor buttons
         document.getElementById('openEditor')?.addEventListener('click', () => {
+            console.log('📝 Open main code editor');
             this.openCodeEditor('main');
         });
 
         document.getElementById('openAnswerEditor')?.addEventListener('click', () => {
+            console.log('📝 Open answer handler editor');
             this.openCodeEditor('answer');
         });
 
-        // Templates - UPDATED FOR NORMAL MODAL
+        // Templates
         document.getElementById('showTemplates')?.addEventListener('click', async () => {
+            console.log('📋 Show templates clicked');
             await this.showTemplates();
         });
 
         document.getElementById('refreshTemplates')?.addEventListener('click', async () => {
+            console.log('🔄 Refresh templates clicked');
             await this.loadTemplatesFromServer();
         });
 
@@ -101,21 +121,27 @@ class CommandEditor {
         document.getElementById('commandSearch')?.addEventListener('input', (e) => {
             clearTimeout(searchTimeout);
             searchTimeout = setTimeout(() => {
+                console.log('🔍 Command search:', e.target.value);
                 this.filterCommands(e.target.value);
             }, 300);
         });
 
         // Copy result button
         document.getElementById('copyResultBtn')?.addEventListener('click', () => {
+            console.log('📋 Copy result clicked');
             this.copyTestResult();
         });
 
         // Modal events
         this.setupModalEvents();
         this.setupTemplateCategories();
+        
+        console.log('✅ Event listeners setup completed');
     }
 
     setupModalEvents() {
+        console.log('🔧 Setting up modal events');
+        
         const modals = ['testCommandModal', 'codeEditorModal', 'templatesModal'];
         
         modals.forEach(modalId => {
@@ -124,16 +150,19 @@ class CommandEditor {
             
             if (closeBtn) {
                 closeBtn.addEventListener('click', () => {
+                    console.log(`❌ Close ${modalId} clicked`);
                     modal.style.display = 'none';
                 });
             }
         });
 
         document.getElementById('closeTestCommand')?.addEventListener('click', () => {
+            console.log('❌ Close test command modal clicked');
             document.getElementById('testCommandModal').style.display = 'none';
         });
 
         document.getElementById('closeTemplates')?.addEventListener('click', () => {
+            console.log('❌ Close templates modal clicked');
             document.getElementById('templatesModal').style.display = 'none';
         });
 
@@ -144,11 +173,12 @@ class CommandEditor {
                 const templateData = templateCard.dataset.template;
                 if (templateData) {
                     try {
+                        console.log('📋 Template card clicked');
                         const cleanData = templateData.replace(/&apos;/g, "'");
                         const template = JSON.parse(cleanData);
                         this.applyTemplate(template);
                     } catch (error) {
-                        console.error('Error parsing template:', error);
+                        console.error('❌ Error parsing template:', error);
                         this.showError('Failed to apply template: ' + error.message);
                     }
                 }
@@ -157,17 +187,23 @@ class CommandEditor {
 
         window.addEventListener('click', (e) => {
             if (e.target.classList.contains('modal')) {
+                console.log('🌐 Modal background clicked');
                 e.target.style.display = 'none';
             }
         });
+        
+        console.log('✅ Modal events setup completed');
     }
 
     setupTemplateCategories() {
+        console.log('🔧 Setting up template categories');
+        
         const categoryTabs = document.querySelectorAll('.category-tab');
 
         categoryTabs.forEach(tab => {
             tab.addEventListener('click', () => {
                 const category = tab.dataset.category;
+                console.log(`📑 Template category clicked: ${category}`);
                 
                 // Update tabs
                 categoryTabs.forEach(t => t.classList.remove('active'));
@@ -186,17 +222,24 @@ class CommandEditor {
     }
 
     setupCodeEditor() {
+        console.log('🔧 Setting up code editor');
+        
         const advancedEditor = document.getElementById('advancedCodeEditor');
         
-        if (!advancedEditor) return;
+        if (!advancedEditor) {
+            console.error('❌ Advanced code editor element not found');
+            return;
+        }
 
         // Cancel button
         document.getElementById('cancelEdit')?.addEventListener('click', () => {
+            console.log('❌ Cancel edit clicked');
             this.closeCodeEditor();
         });
 
         // Save button
         document.getElementById('saveCode')?.addEventListener('click', () => {
+            console.log('💾 Save code from editor clicked');
             this.saveCodeFromEditor();
         });
 
@@ -206,16 +249,23 @@ class CommandEditor {
         });
 
         this.updateLineCount(advancedEditor.value);
+        console.log('✅ Code editor setup completed');
     }
 
     setupCommandsTags() {
+        console.log('🔧 Setting up commands tags');
+        
         const moreCommandsInput = document.getElementById('moreCommands');
-        if (!moreCommandsInput) return;
+        if (!moreCommandsInput) {
+            console.error('❌ More commands input element not found');
+            return;
+        }
 
         moreCommandsInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ',') {
                 e.preventDefault();
                 const command = moreCommandsInput.value.trim();
+                console.log(`🏷️ Adding command tag: ${command}`);
                 if (command) {
                     this.addCommandTag(command);
                     moreCommandsInput.value = '';
@@ -223,6 +273,7 @@ class CommandEditor {
             }
             
             if (e.key === 'Backspace' && moreCommandsInput.value === '') {
+                console.log('⌫ Removing last command tag');
                 this.removeLastCommandTag();
             }
         });
@@ -230,6 +281,7 @@ class CommandEditor {
         moreCommandsInput.addEventListener('blur', () => {
             const command = moreCommandsInput.value.trim();
             if (command) {
+                console.log(`🏷️ Adding command tag from blur: ${command}`);
                 this.addCommandTag(command);
                 moreCommandsInput.value = '';
             }
@@ -239,6 +291,7 @@ class CommandEditor {
             e.preventDefault();
             const pastedText = e.clipboardData.getData('text');
             const commands = pastedText.split(/[,|\n]/).map(cmd => cmd.trim()).filter(cmd => cmd);
+            console.log(`📋 Pasting commands:`, commands);
             
             commands.forEach(command => {
                 if (command && !this.commandExistsInTags(command)) {
@@ -248,13 +301,23 @@ class CommandEditor {
             
             moreCommandsInput.value = '';
         });
+        
+        console.log('✅ Commands tags setup completed');
     }
 
     addCommandTag(command) {
-        if (!command || this.commandExistsInTags(command)) return;
+        if (!command || this.commandExistsInTags(command)) {
+            console.log(`⚠️ Command tag already exists or empty: ${command}`);
+            return;
+        }
 
         const commandsTags = document.getElementById('commandsTags');
-        if (!commandsTags) return;
+        if (!commandsTags) {
+            console.error('❌ Commands tags container not found');
+            return;
+        }
+
+        console.log(`🏷️ Creating command tag: ${command}`);
 
         const tag = document.createElement('div');
         tag.className = 'command-tag';
@@ -266,6 +329,7 @@ class CommandEditor {
         `;
         
         tag.querySelector('.remove-tag').addEventListener('click', () => {
+            console.log(`🗑️ Removing command tag: ${command}`);
             tag.remove();
         });
         
@@ -274,24 +338,37 @@ class CommandEditor {
 
     removeLastCommandTag() {
         const commandsTags = document.getElementById('commandsTags');
-        if (!commandsTags || !commandsTags.lastChild) return;
+        if (!commandsTags || !commandsTags.lastChild) {
+            console.log('⚠️ No command tags to remove');
+            return;
+        }
         
+        console.log('🗑️ Removing last command tag');
         commandsTags.lastChild.remove();
     }
 
     commandExistsInTags(command) {
         const tags = Array.from(document.querySelectorAll('.command-tag .tag-text'));
-        return tags.some(tag => tag.textContent.trim() === command);
+        const exists = tags.some(tag => tag.textContent.trim() === command);
+        console.log(`🔍 Command exists in tags: ${command} -> ${exists}`);
+        return exists;
     }
 
     getCommandsFromTags() {
         const tags = Array.from(document.querySelectorAll('.command-tag .tag-text'));
-        return tags.map(tag => tag.textContent.trim()).filter(cmd => cmd);
+        const commands = tags.map(tag => tag.textContent.trim()).filter(cmd => cmd);
+        console.log(`📋 Getting commands from tags:`, commands);
+        return commands;
     }
 
     setCommandsToTags(commands) {
         const commandsTags = document.getElementById('commandsTags');
-        if (!commandsTags) return;
+        if (!commandsTags) {
+            console.error('❌ Commands tags container not found');
+            return;
+        }
+        
+        console.log(`🏷️ Setting commands to tags:`, commands);
         
         commandsTags.innerHTML = '';
         
@@ -308,13 +385,13 @@ class CommandEditor {
 
     async runQuickTest() {
         const testInput = document.getElementById('quickTestInput').value.trim();
+        console.log(`🎯 Running quick test with input: ${testInput}`);
         
         if (!testInput) {
             this.showError('Please enter a command to test');
             return;
         }
 
-        // REMOVED SAVE VALIDATION - Allow testing without saving
         const commands = this.getCommandsFromTags();
         const commandCode = document.getElementById('commandCode').value.trim();
 
@@ -327,6 +404,12 @@ class CommandEditor {
             this.showError('Please add command code to test');
             return;
         }
+
+        console.log(`🧪 Quick test parameters:`, {
+            commands,
+            codeLength: commandCode.length,
+            waitForAnswer: document.getElementById('waitForAnswer').checked
+        });
 
         this.showTestModal();
         this.showTestLoading();
@@ -341,6 +424,7 @@ class CommandEditor {
                 answer_handler: document.getElementById('answerHandler').value || ''
             };
 
+            console.log('📤 Sending quick test request to server');
             const response = await fetch('/api/commands/test-temp', {
                 method: 'POST',
                 headers: {
@@ -355,6 +439,7 @@ class CommandEditor {
             });
 
             const data = await response.json();
+            console.log('📥 Quick test response:', data);
 
             if (response.ok) {
                 this.showTestSuccess(`
@@ -382,6 +467,7 @@ class CommandEditor {
                 `);
             }
         } catch (error) {
+            console.error('❌ Quick test network error:', error);
             this.showTestError(`
                 ❌ Network Error
 
@@ -391,6 +477,8 @@ class CommandEditor {
     }
 
     async testCommand() {
+        console.log('🧪 Testing current command');
+        
         if (!this.currentBot) {
             this.showError('Bot information not loaded');
             return;
@@ -408,6 +496,12 @@ class CommandEditor {
             return;
         }
 
+        console.log(`🧪 Test command parameters:`, {
+            commands,
+            codeLength: commandCode.length,
+            currentCommand: this.currentCommand
+        });
+
         this.showTestModal();
         this.showTestLoading();
 
@@ -421,6 +515,7 @@ class CommandEditor {
                 answer_handler: document.getElementById('answerHandler').value || ''
             };
 
+            console.log('📤 Sending test command request to server');
             const response = await fetch('/api/commands/test-temp', {
                 method: 'POST',
                 headers: {
@@ -434,6 +529,7 @@ class CommandEditor {
             });
 
             const data = await response.json();
+            console.log('📥 Test command response:', data);
 
             if (response.ok) {
                 this.showTestSuccess(`
@@ -458,6 +554,7 @@ class CommandEditor {
                 `);
             }
         } catch (error) {
+            console.error('❌ Test command network error:', error);
             this.showTestError(`
                 ❌ Network Error
 
@@ -467,10 +564,12 @@ class CommandEditor {
     }
 
     showTestModal() {
+        console.log('📊 Showing test modal');
         document.getElementById('testCommandModal').style.display = 'flex';
     }
 
     showTestLoading() {
+        console.log('⏳ Showing test loading');
         document.getElementById('testCommandResult').innerHTML = `
             <div class="test-loading">
                 <div class="spinner"></div>
@@ -480,6 +579,7 @@ class CommandEditor {
     }
 
     showTestSuccess(html) {
+        console.log('✅ Showing test success');
         const resultDiv = document.getElementById('testCommandResult');
         resultDiv.innerHTML = `
             <div class="test-success">
@@ -497,6 +597,7 @@ class CommandEditor {
     }
 
     showTestError(html) {
+        console.log('❌ Showing test error');
         const resultDiv = document.getElementById('testCommandResult');
         resultDiv.innerHTML = `
             <div class="test-error">
@@ -514,6 +615,7 @@ class CommandEditor {
     }
 
     copyTestResult() {
+        console.log('📋 Copying test result');
         const resultContent = document.querySelector('.test-result-content');
         if (resultContent) {
             const text = resultContent.textContent || resultContent.innerText;
@@ -526,6 +628,7 @@ class CommandEditor {
     }
 
     openCodeEditor(editorType) {
+        console.log(`📝 Opening code editor for: ${editorType}`);
         this.currentEditorType = editorType;
         let code = '';
         
@@ -541,7 +644,6 @@ class CommandEditor {
         advancedEditor.value = code;
         this.updateLineCount(code);
         
-        // Add code-editor-modal class for normal size
         document.getElementById('codeEditorModal').classList.add('code-editor-modal');
         document.getElementById('codeEditorModal').style.display = 'flex';
         
@@ -552,10 +654,12 @@ class CommandEditor {
     }
 
     closeCodeEditor() {
+        console.log('❌ Closing code editor');
         document.getElementById('codeEditorModal').style.display = 'none';
     }
 
     saveCodeFromEditor() {
+        console.log('💾 Saving code from editor');
         const code = document.getElementById('advancedCodeEditor').value;
         
         if (this.currentEditorType === 'main') {
@@ -576,11 +680,13 @@ class CommandEditor {
     }
 
     toggleAnswerHandler(show) {
+        console.log(`⏳ Toggle answer handler: ${show}`);
         const section = document.getElementById('answerHandlerSection');
         section.style.display = show ? 'block' : 'none';
     }
 
     async showTemplates() {
+        console.log('📋 Showing templates modal');
         const templatesContent = document.querySelector('.templates-content');
         if (templatesContent) {
             templatesContent.innerHTML = `
@@ -591,13 +697,13 @@ class CommandEditor {
             `;
         }
 
-        // Add templates-modal class for normal size
         document.getElementById('templatesModal').classList.add('templates-modal');
         document.getElementById('templatesModal').style.display = 'flex';
         await this.loadTemplatesFromServer();
     }
 
     applyTemplate(template) {
+        console.log('📋 Applying template:', template.name);
         this.setCommandsToTags(template.patterns);
         document.getElementById('commandCode').value = template.code;
         
@@ -615,24 +721,31 @@ class CommandEditor {
     }
 
     async checkAuth() {
+        console.log('🔐 Checking authentication');
         const token = localStorage.getItem('token');
         const userData = localStorage.getItem('user');
 
         if (!token || !userData) {
+            console.log('❌ No token or user data found, redirecting to login');
             window.location.href = 'login.html';
             return;
         }
 
         try {
             this.user = JSON.parse(userData);
+            console.log('✅ User authenticated:', this.user.email);
         } catch (error) {
+            console.error('❌ Error parsing user data:', error);
             this.logout();
         }
     }
 
     async loadBotInfo() {
+        console.log('🤖 Loading bot info');
         const urlParams = new URLSearchParams(window.location.search);
         const botId = urlParams.get('bot');
+
+        console.log('📝 URL parameters:', { botId });
 
         if (!botId) {
             this.showError('No bot specified');
@@ -642,6 +755,8 @@ class CommandEditor {
 
         try {
             const token = localStorage.getItem('token');
+            console.log('📤 Fetching bot info for ID:', botId);
+            
             const response = await fetch(`/api/bots/${botId}`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -649,15 +764,19 @@ class CommandEditor {
             });
 
             const data = await response.json();
+            console.log('📥 Bot info response:', data);
 
             if (data.success) {
                 this.currentBot = data.bot;
+                console.log('✅ Bot loaded successfully:', this.currentBot.name);
                 this.updateBotInfo();
             } else {
+                console.error('❌ Bot not found in response');
                 this.showError('Bot not found');
                 window.location.href = 'bot-management.html';
             }
         } catch (error) {
+            console.error('❌ Failed to load bot info:', error);
             this.showError('Failed to load bot info');
         }
     }
@@ -666,16 +785,24 @@ class CommandEditor {
         if (this.currentBot) {
             document.getElementById('botName').textContent = `Commands - ${this.currentBot.name}`;
             document.getElementById('botUsername').textContent = `@${this.currentBot.username}`;
+            console.log('✅ Bot info updated in UI');
         }
     }
 
     async loadCommands() {
-        if (!this.currentBot) return;
+        console.log('📋 Loading commands');
+        
+        if (!this.currentBot) {
+            console.error('❌ No current bot available');
+            return;
+        }
 
         this.showLoading(true);
 
         try {
             const token = localStorage.getItem('token');
+            console.log('📤 Fetching commands for bot:', this.currentBot.id);
+            
             const response = await fetch(`/api/commands/bot/${this.currentBot.id}`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -683,15 +810,18 @@ class CommandEditor {
             });
 
             const data = await response.json();
+            console.log('📥 Commands response:', data);
 
             if (data.success) {
                 this.commands = data.commands || [];
+                console.log(`✅ Loaded ${this.commands.length} commands`);
                 this.displayCommands();
             } else {
+                console.error('❌ Failed to load commands:', data.error);
                 this.showError('Failed to load commands');
             }
         } catch (error) {
-            console.error('Error loading commands:', error);
+            console.error('❌ Error loading commands:', error);
             this.showError('Network error while loading commands');
         } finally {
             this.showLoading(false);
@@ -699,16 +829,25 @@ class CommandEditor {
     }
 
     displayCommands() {
+        console.log('📋 Displaying commands in UI');
+        
         const commandsList = document.getElementById('commandsList');
         const emptyCommands = document.getElementById('emptyCommands');
         const noCommandSelected = document.getElementById('noCommandSelected');
 
+        console.log('🔍 DOM elements:', {
+            commandsList: !!commandsList,
+            emptyCommands: !!emptyCommands,
+            noCommandSelected: !!noCommandSelected
+        });
+
         if (!commandsList || !emptyCommands || !noCommandSelected) {
-            console.error('Required DOM elements not found');
+            console.error('❌ Required DOM elements not found');
             return;
         }
 
         if (!this.commands || this.commands.length === 0) {
+            console.log('📭 No commands to display, showing empty state');
             commandsList.style.display = 'none';
             emptyCommands.style.display = 'block';
             noCommandSelected.style.display = 'block';
@@ -716,6 +855,7 @@ class CommandEditor {
             return;
         }
 
+        console.log(`📝 Displaying ${this.commands.length} commands`);
         commandsList.style.display = 'block';
         emptyCommands.style.display = 'none';
 
@@ -754,20 +894,24 @@ class CommandEditor {
         });
         
         commandsList.innerHTML = html;
+        console.log('✅ Commands HTML generated and inserted');
         
         // Add click event listeners to command groups
         this.setupCommandClickEvents();
     }
 
     setupCommandClickEvents() {
+        console.log('🔧 Setting up command click events');
         const commandGroups = document.querySelectorAll('.command-group');
+        console.log(`🎯 Found ${commandGroups.length} command groups`);
         
-        commandGroups.forEach(group => {
+        commandGroups.forEach((group, index) => {
             group.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 
                 const commandId = group.dataset.commandId;
+                console.log(`🖱️ Command group clicked: ${commandId} (index: ${index})`);
                 if (commandId) {
                     this.selectCommand(commandId);
                 }
@@ -776,23 +920,30 @@ class CommandEditor {
     }
 
     filterCommands(searchTerm) {
+        console.log(`🔍 Filtering commands with: "${searchTerm}"`);
         const commandGroups = document.querySelectorAll('.command-group');
         const lowerSearch = searchTerm.toLowerCase().trim();
 
         if (!lowerSearch) {
+            console.log('🔍 No search term, showing all commands');
             commandGroups.forEach(group => group.style.display = 'block');
             return;
         }
 
+        let visibleCount = 0;
         commandGroups.forEach(group => {
             const commandPattern = group.querySelector('.command-patterns').textContent.toLowerCase();
             const commandName = group.querySelector('.command-name').textContent.toLowerCase();
             const isVisible = commandPattern.includes(lowerSearch) || commandName.includes(lowerSearch);
             group.style.display = isVisible ? 'block' : 'none';
+            if (isVisible) visibleCount++;
         });
+
+        console.log(`🔍 Filter result: ${visibleCount} commands visible`);
     }
 
     addNewCommand() {
+        console.log('🆕 Creating new command');
         this.currentCommand = {
             id: 'new',
             command_patterns: '/start',
@@ -811,12 +962,19 @@ class CommandEditor {
     }
 
     async selectCommand(commandId) {
-        if (this.currentCommand?.id === commandId) return;
+        console.log(`🎯 Selecting command: ${commandId}`);
+        
+        if (this.currentCommand?.id === commandId) {
+            console.log('⚠️ Command already selected');
+            return;
+        }
 
         this.showLoading(true);
 
         try {
             const token = localStorage.getItem('token');
+            console.log(`📤 Fetching command details: ${commandId}`);
+            
             const response = await fetch(`/api/commands/${commandId}`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -824,9 +982,11 @@ class CommandEditor {
             });
 
             const data = await response.json();
+            console.log('📥 Command details response:', data);
 
             if (data.success) {
                 this.currentCommand = data.command;
+                console.log('✅ Command loaded successfully');
                 this.showCommandEditor();
                 this.populateCommandForm();
                 
@@ -839,11 +999,14 @@ class CommandEditor {
                 if (selectedGroup) {
                     selectedGroup.classList.add('active');
                     selectedGroup.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    console.log('✅ Command selection updated in UI');
                 }
             } else {
+                console.error('❌ Failed to load command:', data.error);
                 this.showError('Failed to load command');
             }
         } catch (error) {
+            console.error('❌ Network error while loading command:', error);
             this.showError('Network error while loading command');
         } finally {
             this.showLoading(false);
@@ -851,18 +1014,25 @@ class CommandEditor {
     }
 
     showCommandEditor() {
+        console.log('📝 Showing command editor');
         document.getElementById('noCommandSelected').style.display = 'none';
         document.getElementById('commandEditor').style.display = 'block';
     }
 
     hideCommandEditor() {
+        console.log('📝 Hiding command editor');
         document.getElementById('noCommandSelected').style.display = 'block';
         document.getElementById('commandEditor').style.display = 'none';
         this.currentCommand = null;
     }
 
     populateCommandForm() {
-        if (!this.currentCommand) return;
+        console.log('📝 Populating command form');
+        
+        if (!this.currentCommand) {
+            console.error('❌ No current command to populate');
+            return;
+        }
         
         this.setCommandsToTags(this.currentCommand.command_patterns);
         document.getElementById('commandCode').value = this.currentCommand.code || '';
@@ -881,12 +1051,15 @@ class CommandEditor {
         statusBadge.className = `status-badge ${this.currentCommand.is_active ? 'active' : 'inactive'}`;
         
         this.updateButtonStates();
+        console.log('✅ Command form populated');
     }
 
     updateButtonStates() {
         const isNew = this.currentCommand?.id === 'new';
         const deleteBtn = document.getElementById('deleteCommandBtn');
         const toggleBtn = document.getElementById('toggleCommandBtn');
+        
+        console.log(`🔘 Updating button states - isNew: ${isNew}`);
         
         if (deleteBtn) {
             deleteBtn.disabled = isNew;
@@ -899,7 +1072,10 @@ class CommandEditor {
     }
 
     async saveCommand() {
+        console.log('💾 Saving command');
+        
         if (!this.currentCommand || !this.currentBot) {
+            console.error('❌ No command selected or bot not loaded');
             this.showError('No command selected or bot not loaded');
             return false;
         }
@@ -907,6 +1083,12 @@ class CommandEditor {
         const commands = this.getCommandsFromTags();
         const commandPatterns = commands.join(',');
         const commandCode = document.getElementById('commandCode').value.trim();
+
+        console.log('📋 Save command data:', {
+            commandsCount: commands.length,
+            codeLength: commandCode.length,
+            waitForAnswer: document.getElementById('waitForAnswer').checked
+        });
 
         if (commands.length === 0) {
             this.showError('Please add at least one command pattern');
@@ -944,11 +1126,14 @@ class CommandEditor {
             if (this.currentCommand.id === 'new') {
                 url = '/api/commands';
                 method = 'POST';
+                console.log('🆕 Creating new command');
             } else {
                 url = `/api/commands/${this.currentCommand.id}`;
                 method = 'PUT';
+                console.log('✏️ Updating existing command');
             }
 
+            console.log('📤 Sending save request:', { url, method });
             response = await fetch(url, {
                 method: method,
                 headers: {
@@ -959,6 +1144,7 @@ class CommandEditor {
             });
 
             const data = await response.json();
+            console.log('📥 Save response:', data);
 
             if (response.ok) {
                 this.showSuccess('Command saved successfully!');
@@ -979,10 +1165,12 @@ class CommandEditor {
                 
                 return true;
             } else {
+                console.error('❌ Save failed:', data.error);
                 this.showError(data.error || 'Failed to save command');
                 return false;
             }
         } catch (error) {
+            console.error('❌ Network error while saving command:', error);
             this.showError('Network error while saving command: ' + error.message);
             return false;
         } finally {
@@ -991,11 +1179,15 @@ class CommandEditor {
     }
 
     async deleteCommand() {
+        console.log('🗑️ Deleting command');
+        
         if (!this.currentCommand || this.currentCommand.id === 'new') {
+            console.log('⚠️ No command to delete or command is new');
             return;
         }
 
         if (!confirm('Are you sure you want to delete this command?\n\nThis action cannot be undone.')) {
+            console.log('❌ Delete cancelled by user');
             return;
         }
 
@@ -1003,6 +1195,8 @@ class CommandEditor {
 
         try {
             const token = localStorage.getItem('token');
+            console.log(`📤 Sending delete request for command: ${this.currentCommand.id}`);
+            
             const response = await fetch(`/api/commands/${this.currentCommand.id}`, {
                 method: 'DELETE',
                 headers: {
@@ -1011,14 +1205,17 @@ class CommandEditor {
             });
 
             if (response.ok) {
+                console.log('✅ Command deleted successfully');
                 this.showSuccess('Command deleted successfully');
                 this.hideCommandEditor();
                 await this.loadCommands();
             } else {
                 const data = await response.json();
+                console.error('❌ Delete failed:', data.error);
                 this.showError(data.error || 'Failed to delete command');
             }
         } catch (error) {
+            console.error('❌ Network error while deleting command:', error);
             this.showError('Network error while deleting command');
         } finally {
             this.showLoading(false);
@@ -1026,11 +1223,15 @@ class CommandEditor {
     }
 
     async toggleCommand() {
+        console.log('🔘 Toggling command status');
+        
         if (!this.currentCommand || this.currentCommand.id === 'new') {
+            console.log('⚠️ No command to toggle or command is new');
             return;
         }
 
         const newStatus = !this.currentCommand.is_active;
+        console.log(`🔄 Toggling command to: ${newStatus ? 'active' : 'inactive'}`);
 
         this.showLoading(true);
 
@@ -1052,11 +1253,14 @@ class CommandEditor {
                 this.currentCommand.is_active = newStatus;
                 this.populateCommandForm();
                 await this.loadCommands();
+                console.log(`✅ Command ${newStatus ? 'activated' : 'deactivated'} successfully`);
                 this.showSuccess(`Command ${newStatus ? 'activated' : 'deactivated'} successfully!`);
             } else {
+                console.error('❌ Toggle command failed');
                 this.showError('Failed to toggle command status');
             }
         } catch (error) {
+            console.error('❌ Network error while toggling command:', error);
             this.showError('Network error while toggling command');
         } finally {
             this.showLoading(false);
@@ -1064,14 +1268,17 @@ class CommandEditor {
     }
 
     quickTest() {
+        console.log('⚡ Quick test triggered');
         if (this.currentCommand) {
             this.testCommand();
         } else {
+            console.log('⚠️ No command selected for quick test');
             this.showError('Please select a command first');
         }
     }
 
     async loadTemplatesFromServer() {
+        console.log('📋 Loading templates from server');
         try {
             const token = localStorage.getItem('token');
             const response = await fetch('/api/templates', {
@@ -1084,17 +1291,22 @@ class CommandEditor {
                 const data = await response.json();
                 if (data.success) {
                     this.templates = data.templates || {};
+                    console.log('✅ Templates loaded successfully');
                     this.populateTemplatesModal();
                 }
             }
         } catch (error) {
-            console.error('Failed to load templates:', error);
+            console.error('❌ Failed to load templates:', error);
         }
     }
 
     populateTemplatesModal() {
+        console.log('📋 Populating templates modal');
         const templatesContent = document.querySelector('.templates-content');
-        if (!templatesContent) return;
+        if (!templatesContent) {
+            console.error('❌ Templates content container not found');
+            return;
+        }
 
         // Mock templates for demonstration
         const mockTemplates = {
@@ -1153,6 +1365,7 @@ class CommandEditor {
         }
 
         templatesContent.innerHTML = html;
+        console.log(`✅ Templates modal populated with ${Object.keys(mockTemplates).length} categories`);
     }
 
     getTemplateIcon(category) {
@@ -1180,6 +1393,7 @@ class CommandEditor {
     }
 
     showLoading(show) {
+        console.log(`⏳ Loading overlay: ${show ? 'show' : 'hide'}`);
         const overlay = document.getElementById('loadingOverlay');
         if (overlay) {
             overlay.style.display = show ? 'flex' : 'none';
@@ -1187,6 +1401,7 @@ class CommandEditor {
     }
 
     showError(message) {
+        console.error('❌ Showing error:', message);
         if (typeof commonApp !== 'undefined' && commonApp.showError) {
             commonApp.showError(message);
         } else {
@@ -1195,6 +1410,7 @@ class CommandEditor {
     }
 
     showSuccess(message) {
+        console.log('✅ Showing success:', message);
         if (typeof commonApp !== 'undefined' && commonApp.showSuccess) {
             commonApp.showSuccess(message);
         } else {
@@ -1203,6 +1419,7 @@ class CommandEditor {
     }
 
     logout() {
+        console.log('🚪 Logging out');
         localStorage.clear();
         window.location.href = 'index.html';
     }
@@ -1211,10 +1428,12 @@ class CommandEditor {
 // Initialize command editor with error handling
 let commandEditor;
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('📄 DOM Content Loaded - Initializing CommandEditor');
     try {
         commandEditor = new CommandEditor();
+        console.log('🎉 CommandEditor initialized successfully');
     } catch (error) {
-        console.error('Failed to initialize command editor:', error);
+        console.error('💥 Failed to initialize command editor:', error);
         alert('Failed to initialize command editor. Please refresh the page.');
     }
 });
