@@ -1,178 +1,8 @@
 const express = require('express');
 const supabase = require('../config/supabase');
 const botManager = require('../core/bot-manager');
-const templateLoader = require('../core/template-loader');
 
 const router = express.Router();
-
-// Get all templates
-router.get('/templates', async (req, res) => {
-    try {
-        const templates = templateLoader.getAllTemplates();
-        
-        res.json({
-            success: true,
-            templates: templates,
-            styles: {
-                bot_style: "bot.sendMessage() - Direct bot API calls",
-                api_style: "Api.sendMessage() - Wrapped API calls", 
-                both_styles: "Both styles available"
-            }
-        });
-    } catch (error) {
-        console.error('❌ Get templates error:', error);
-        res.status(500).json({ 
-            success: false,
-            error: 'Failed to fetch templates' 
-        });
-    }
-});
-
-// Apply template
-router.post('/apply-template', async (req, res) => {
-    try {
-        const { category, templateName, botToken } = req.body;
-        
-        const template = templateLoader.getTemplate(category, templateName);
-        if (!template) {
-            return res.status(404).json({ 
-                success: false,
-                error: 'Template not found' 
-            });
-        }
-
-        // Save template as command
-        const { data: command, error } = await supabase
-            .from('commands')
-            .insert([{
-                bot_token: botToken,
-                command_patterns: template.patterns,
-                code: template.code,
-                is_active: true,
-                name: template.name
-            }])
-            .select('*')
-            .single();
-
-        if (error) throw error;
-
-        // Update command cache
-        await botManager.updateCommandCache(botToken);
-
-        res.json({
-            success: true,
-            message: 'Template applied successfully!',
-            command: command,
-            template: template
-        });
-
-    } catch (error) {
-        console.error('❌ Apply template error:', error);
-        res.status(500).json({ 
-            success: false,
-            error: 'Failed to apply template' 
-        });
-    }
-});
-
-// Generate AI code
-router.post('/generate-code', async (req, res) => {
-    try {
-        const { prompt, style = 'both' } = req.body;
-        
-        if (!prompt) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'Prompt is required' 
-            });
-        }
-
-        const generatedCode = generateAICode(prompt, style);
-        
-        res.json({
-            success: true,
-            generatedCode: generatedCode,
-            prompt: prompt,
-            style: style
-        });
-
-    } catch (error) {
-        console.error('❌ Generate code error:', error);
-        res.status(500).json({ 
-            success: false,
-            error: 'Failed to generate code' 
-        });
-    }
-});
-
-function generateAICode(prompt, style) {
-    const lowerPrompt = prompt.toLowerCase();
-    
-    if (style === 'bot') {
-        return generateBotStyleCode(lowerPrompt, prompt);
-    } else if (style === 'api') {
-        return generateApiStyleCode(lowerPrompt, prompt);
-    } else {
-        return generateBothStylesCode(lowerPrompt, prompt);
-    }
-}
-
-function generateBotStyleCode(lowerPrompt, originalPrompt) {
-    if (lowerPrompt.includes('welcome')) {
-        return `// Welcome message - bot style
-const user = getUser();
-bot.sendMessage(\`Hello \${user.first_name}! 👋 Welcome to our bot!\`);`;
-    }
-    
-    if (lowerPrompt.includes('button')) {
-        return `// Inline keyboard - bot style
-bot.sendMessage("Choose option:", {
-    reply_markup: {
-        inline_keyboard: [
-            [{ text: "Option 1", callback_data: "opt1" }]
-        ]
-    }
-});`;
-    }
-
-    return `// Generated code for: "${originalPrompt}" - bot style
-const user = getUser();
-bot.sendMessage(\`Hello \${user.first_name}! You said: "${originalPrompt}"\`);`;
-}
-
-function generateApiStyleCode(lowerPrompt, originalPrompt) {
-    if (lowerPrompt.includes('welcome')) {
-        return `// Welcome message - Api style
-const user = Api.getUser();
-Api.sendMessage(\`Hello \${user.first_name}! 👋 Welcome to our bot!\`);`;
-    }
-    
-    if (lowerPrompt.includes('button')) {
-        return `// Inline keyboard - Api style
-Api.sendKeyboard("Choose option:", [
-    [{ text: "Option 1", callback_data: "opt1" }]
-]);`;
-    }
-
-    return `// Generated code for: "${originalPrompt}" - Api style
-const user = Api.getUser();
-Api.sendMessage(\`Hello \${user.first_name}! You said: "${originalPrompt}"\`);`;
-}
-
-function generateBothStylesCode(lowerPrompt, originalPrompt) {
-    return `// Generated code for: "${originalPrompt}"
-// Both styles available - choose your preference!
-
-// bot style (direct API calls)
-const user = getUser();
-bot.sendMessage(\`Hello \${user.first_name}! You said: "${originalPrompt}"\`);
-
-// Api style (wrapped API calls)  
-const user2 = Api.getUser();
-Api.sendMessage(\`Hello \${user2.first_name}! You said: "${originalPrompt}"\`);
-
-// Both work the same way! Choose the style you prefer.`;
-}
 
 // Get commands for bot
 router.get('/bot/:botToken', async (req, res) => {
@@ -471,9 +301,7 @@ router.delete('/:commandId', async (req, res) => {
     }
 });
 
-// server/routes/commands.js - test function এ এই পরিবর্তন করুন
-
-// Test command execution
+// ✅ FIXED: Test command execution
 router.post('/:commandId/test', async (req, res) => {
     try {
         const { commandId } = req.params;
@@ -502,8 +330,7 @@ router.post('/:commandId/test', async (req, res) => {
             });
         }
 
-        // Get bot instance
-        const botManager = require('../core/bot-manager');
+        // ✅ FIXED: Use the correct method name
         const bot = botManager.getBotInstance(botToken);
         if (!bot) {
             return res.status(400).json({ 
@@ -573,7 +400,7 @@ router.post('/:commandId/test', async (req, res) => {
     }
 });
 
-// Temporary command test
+// ✅ FIXED: Temporary command test
 router.post('/test-temp', async (req, res) => {
     try {
         const { command, botToken, testInput } = req.body;
@@ -585,7 +412,7 @@ router.post('/test-temp', async (req, res) => {
             });
         }
 
-        // Get bot instance
+        // ✅ FIXED: Use the correct method name
         const bot = botManager.getBotInstance(botToken);
         if (!bot) {
             return res.status(400).json({ 
@@ -624,7 +451,7 @@ router.post('/test-temp', async (req, res) => {
         };
 
         // Execute command using the bot manager
-        const result = await botManager.executeCommand(bot, command, testMessage, true);
+        const result = await botManager.executeCommand(bot, command, testMessage, testText);
 
         res.json({
             success: true,
@@ -724,6 +551,7 @@ const helpText = \`🤖 *Bot Help Menu*
 • Multiple command patterns
 • Interactive conversations
 • Media support
+• Python code execution
 
 *Need Help?*
 Contact support if you need assistance.\`;
@@ -731,57 +559,22 @@ Contact support if you need assistance.\`;
 bot.sendMessage(helpText, {
     parse_mode: 'Markdown'
 });`
-                },
-                {
-                    id: 'info',
-                    name: 'Info Command',
-                    patterns: '/info,info,about,status',
-                    code: `// Bot information template
-const botInfo = \`🤖 *Bot Information*
-
-*Name:* Demo Bot
-*Status:* ✅ Active
-*Version:* 2.0.0
-
-*Features:*
-• Advanced command system
-• User data management
-• Media support
-
-*Created with:* Bot Maker Pro\`;
-
-bot.sendMessage(botInfo, {
-    parse_mode: 'Markdown'
-});`
                 }
             ],
-            interactive: [
+            python: [
                 {
-                    id: 'conversation',
-                    name: 'Interactive Conversation',
-                    patterns: '/conversation,chat,talk',
-                    code: `// Interactive conversation - Part 1
-bot.sendMessage("Hello! What's your name?");`,
-                    waitForAnswer: true,
-                    answerHandler: `// Answer handler for conversation - Part 2
-const userName = userAnswer;
-if (userName && userName.trim()) {
-    bot.sendMessage(\`Nice to meet you, \${userName}!\`);
-} else {
-    bot.sendMessage("You didn't provide a name!");
-}`
-                }
-            ],
-            media: [
-                {
-                    id: 'send_photo',
-                    name: 'Send Photo',
-                    patterns: '/photo,picture,image',
-                    code: `// Send photo example
-bot.sendPhoto("https://via.placeholder.com/400x300", {
-    caption: "Here's a beautiful photo for you! 📸",
-    parse_mode: "Markdown"
-});`
+                    id: 'python_calc',
+                    name: 'Python Calculator',
+                    patterns: '/calc,calculate,math',
+                    code: `// Python calculator
+const result = await bot.runPython(\`
+num1 = 10
+num2 = 5
+result = num1 + num2
+print(f"Calculation: {num1} + {num2} = {result}")
+\`);
+
+bot.sendMessage(\`🐍 Python Result:\\n\\n\${result}\`);`
                 }
             ]
         };
