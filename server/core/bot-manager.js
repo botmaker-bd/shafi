@@ -15,7 +15,7 @@ class BotManager {
         console.log(`🤖 Bot Manager initialized in ${this.USE_WEBHOOK ? 'WEBHOOK' : 'POLLING'} mode`);
     }
 
-    // ✅ ADD THIS MISSING METHOD
+    // ✅ ADD MISSING METHODS
     async initializeAllBots() {
         if (this.initialized) {
             console.log('🔄 Bots already initialized, skipping...');
@@ -63,6 +63,23 @@ class BotManager {
         } catch (error) {
             console.error('❌ Initialize all bots error:', error);
             throw error;
+        }
+    }
+
+    // ✅ ADD THIS MISSING METHOD
+    getBotInstance(token) {
+        return this.activeBots.get(token);
+    }
+
+    // ✅ ADD THIS MISSING METHOD
+    async handleBotUpdate(token, update) {
+        try {
+            const bot = this.activeBots.get(token);
+            if (bot) {
+                await bot.processUpdate(update);
+            }
+        } catch (error) {
+            console.error('❌ Handle bot update error:', error);
         }
     }
 
