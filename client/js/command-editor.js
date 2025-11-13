@@ -58,7 +58,6 @@ class CommandEditor {
         const templatesContent = document.querySelector('.templates-content');
         if (!templatesContent) return;
 
-        // Check if templates are empty or not loaded properly
         if (!this.templates || Object.keys(this.templates).length === 0) {
             this.showTemplatesError('No templates available from server');
             return;
@@ -112,8 +111,6 @@ class CommandEditor {
         }
 
         templatesContent.innerHTML = html;
-        
-        // Re-attach event listeners to category tabs
         this.setupTemplateCategories();
     }
 
@@ -374,7 +371,6 @@ class CommandEditor {
                 const templateData = templateCard.dataset.template;
                 if (templateData) {
                     try {
-                        // Replace &apos; with ' before parsing
                         const cleanData = templateData.replace(/&apos;/g, "'");
                         const template = JSON.parse(cleanData);
                         this.applyTemplate(template);
@@ -511,12 +507,11 @@ class CommandEditor {
         });
     }
 
-    // Enhanced Undo/Redo implementation
     saveToHistory(editorType, content) {
         if (!this.editorHistory[editorType]) return;
         
         this.editorHistory[editorType].past.push(content);
-        this.editorHistory[editorType].future = []; // Clear redo stack
+        this.editorHistory[editorType].future = [];
     }
 
     undo(editorType) {
@@ -564,7 +559,6 @@ class CommandEditor {
         
         let code = editor.value;
         
-        // Basic formatting - add proper indentation
         const lines = code.split('\n');
         let formattedLines = [];
         let indentLevel = 0;
@@ -576,15 +570,12 @@ class CommandEditor {
                 continue;
             }
             
-            // Decrease indent for closing braces
             if (line.includes('}') || line.includes(')')) {
                 indentLevel = Math.max(0, indentLevel - 1);
             }
             
-            // Add current line with proper indentation
             formattedLines.push('    '.repeat(indentLevel) + line);
             
-            // Increase indent for opening braces
             if (line.includes('{') || line.includes('(')) {
                 indentLevel++;
             }
@@ -610,7 +601,6 @@ class CommandEditor {
                 }
             }
             
-            // Backspace to remove last tag
             if (e.key === 'Backspace' && moreCommandsInput.value === '') {
                 this.removeLastCommandTag();
             }
@@ -698,8 +688,545 @@ class CommandEditor {
         });
     }
 
-    // Rest of the methods remain largely the same but with additional error handling
-    // ... [previous methods like runQuickTest, testCommand, etc.]
+    async runQuickTest() {
+        const testInput = document.getElementById('quickTestInput').value.trim();
+        
+        if (!testInput) {
+            this.showError('Please enter a command to test');
+            return;
+        }
+
+        if (!this.currentCommand || this.currentCommand.id === 'new') {
+            this.showError('Please save the command first before testing');
+            return;
+        }
+
+        this.showTestModal();
+        this.showTestLoading();
+
+        try {
+            const token = localStorage.getItem('token');
+            
+            const response = await fetch('/api/commands/test-input', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    commandId: this.currentCommand.id,
+                    testInput: testInput,
+                    botToken: this.currentBot.token
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.showTestSuccess(`
+                    ✅ Command Test Executed Successfully!
+
+                    🎯 Test Input: ${testInput}
+                    🤖 Bot: ${this.currentBot.name}
+                    📊 Status: Command executed successfully
+
+                    📨 Telegram Response:
+                    ${data.telegramResponse || 'Message sent to Telegram bot'}
+
+                    🔍 Execution Details:
+                    ${data.executionDetails || 'Command processed without errors'}
+
+                    💬 Bot Reply:
+                    ${data.botReply || 'Check your Telegram bot for the response'}
+                `);
+            } else {
+                this.showTestError(`
+                    ❌ Test Failed
+
+                    Error: ${data.error || 'Unknown error occurred'}
+                    ${data.details ? `Details: ${data.details}` : ''}
+                `);
+            }
+        } catch (error) {
+            this.showTestError(`
+                ❌ Network Error
+
+                Failed to connect to server: ${error.message}
+            `);
+        }
+    }
+
+    async testCommand() {
+        if (!this.currentBot) {
+            this.showError('Bot information not loaded');
+            return;
+        }
+
+        const commands = this.getCommandsFromTags();
+        if (commands.length === 0) {
+            this.showError('Please add at least one command pattern to test');
+            return;
+        }
+
+        const commandCode = document.getElementById('commandCode').value.trim();
+        if (!commandCode) {
+            this.showError('Please add command code to test');
+            return;
+        }
+
+        this.showTestModal();
+        this.showTestLoading();
+
+        try {
+            const token = localStorage.getItem('token');
+            
+            const tempCommand = {
+                command_patterns: commands.join(','),
+                code: commandCode,
+                wait_for_answer: document.getElementById('waitForAnswer').checked,
+                answer_handler: document.getElementById('answerHandler').value || ''
+            };
+
+            const response = await fetch('/api/commands/test-temp', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    command: tempCommand,
+                    botToken: this.currentBot.token
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.showTestSuccess(`
+                    ✅ Test Command Sent Successfully!
+
+                    Commands: ${commands.join(', ')}
+                    Bot: ${this.currentBot.name}
+                    Status: Command executed without errors
+
+                    📨 Message sent to Telegram:
+                    ${data.telegramResponse || 'Check your bot for results'}
+
+                    🔍 Execution Result:
+                    ${data.executionResult || 'No specific result returned'}
+                `);
+            } else {
+                this.showTestError(`
+                    ❌ Test Failed
+
+                    Error: ${data.error || 'Unknown error occurred'}
+                    ${data.details ? `Details: ${data.details}` : ''}
+                `);
+            }
+        } catch (error) {
+            this.showTestError(`
+                ❌ Network Error
+
+                Failed to connect to server: ${error.message}
+            `);
+        }
+    }
+
+    showTestModal() {
+        document.getElementById('testCommandModal').style.display = 'flex';
+    }
+
+    showTestLoading() {
+        document.getElementById('testCommandResult').innerHTML = `
+            <div class="test-loading">
+                <div class="spinner"></div>
+                <p>Testing command execution...</p>
+            </div>
+        `;
+    }
+
+    showTestSuccess(html) {
+        const resultDiv = document.getElementById('testCommandResult');
+        resultDiv.innerHTML = `
+            <div class="test-success">
+                <div class="result-header">
+                    <h4>✅ Test Successful</h4>
+                </div>
+                <div class="test-result-container">
+                    <button class="copy-btn" onclick="commandEditor.copyTestResult()">
+                        <i class="fas fa-copy"></i> Copy
+                    </button>
+                    <div class="test-result-content">${html}</div>
+                </div>
+            </div>
+        `;
+    }
+
+    showTestError(html) {
+        const resultDiv = document.getElementById('testCommandResult');
+        resultDiv.innerHTML = `
+            <div class="test-error">
+                <div class="result-header">
+                    <h4>❌ Test Failed</h4>
+                </div>
+                <div class="test-result-container">
+                    <button class="copy-btn" onclick="commandEditor.copyTestResult()">
+                        <i class="fas fa-copy"></i> Copy
+                    </button>
+                    <div class="test-result-content">${html}</div>
+                </div>
+            </div>
+        `;
+    }
+
+    copyTestResult() {
+        const resultContent = document.querySelector('.test-result-content');
+        if (resultContent) {
+            const text = resultContent.textContent || resultContent.innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                this.showSuccess('Result copied to clipboard!');
+            }).catch(() => {
+                this.showError('Failed to copy result');
+            });
+        }
+    }
+
+    openCodeEditor(editorType) {
+        this.currentEditorType = editorType;
+        let code = '';
+        
+        if (editorType === 'main') {
+            code = document.getElementById('commandCode').value;
+            document.getElementById('editorType').textContent = 'Editor: Main Code';
+        } else if (editorType === 'answer') {
+            code = document.getElementById('answerHandler').value;
+            document.getElementById('editorType').textContent = 'Editor: Answer Handler';
+        }
+        
+        const advancedEditor = document.getElementById('advancedCodeEditor');
+        advancedEditor.value = code;
+        this.updateLineCount(code);
+        
+        // Save initial state to history
+        this.saveToHistory(editorType, code);
+        
+        document.getElementById('codeEditorModal').style.display = 'flex';
+        
+        setTimeout(() => {
+            advancedEditor.focus();
+            advancedEditor.setSelectionRange(0, 0);
+        }, 100);
+    }
+
+    closeCodeEditor() {
+        document.getElementById('codeEditorModal').style.display = 'none';
+    }
+
+    saveCodeFromEditor() {
+        const code = document.getElementById('advancedCodeEditor').value;
+        
+        if (this.currentEditorType === 'main') {
+            document.getElementById('commandCode').value = code;
+        } else if (this.currentEditorType === 'answer') {
+            document.getElementById('answerHandler').value = code;
+        }
+        
+        this.closeCodeEditor();
+        this.showSuccess('Code saved successfully!');
+    }
+
+    updateLineCount(code) {
+        const lines = code.split('\n').length;
+        const chars = code.length;
+        document.getElementById('lineCount').textContent = `Line: ${lines}`;
+        document.getElementById('charCount').textContent = `Chars: ${chars}`;
+    }
+
+    toggleAnswerHandler(show) {
+        const section = document.getElementById('answerHandlerSection');
+        section.style.display = show ? 'block' : 'none';
+    }
+
+    applyTemplate(template) {
+        this.setCommandsToTags(template.patterns);
+        document.getElementById('commandCode').value = template.code;
+        
+        if (template.waitForAnswer) {
+            document.getElementById('waitForAnswer').checked = true;
+            this.toggleAnswerHandler(true);
+            document.getElementById('answerHandler').value = template.answerHandler || '';
+        } else {
+            document.getElementById('waitForAnswer').checked = false;
+            this.toggleAnswerHandler(false);
+        }
+        
+        document.getElementById('templatesModal').style.display = 'none';
+        this.showSuccess('Template applied successfully!');
+    }
+
+    async checkAuth() {
+        const token = localStorage.getItem('token');
+        const userData = localStorage.getItem('user');
+
+        if (!token || !userData) {
+            window.location.href = 'login.html';
+            return;
+        }
+
+        try {
+            this.user = JSON.parse(userData);
+        } catch (error) {
+            this.logout();
+        }
+    }
+
+    async loadBotInfo() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const botId = urlParams.get('bot');
+
+        if (!botId) {
+            this.showError('No bot specified');
+            window.location.href = 'bot-management.html';
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/bots/${botId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                this.currentBot = data.bot;
+                this.updateBotInfo();
+            } else {
+                this.showError('Bot not found');
+                window.location.href = 'bot-management.html';
+            }
+        } catch (error) {
+            this.showError('Failed to load bot info');
+        }
+    }
+
+    updateBotInfo() {
+        if (this.currentBot) {
+            document.getElementById('botName').textContent = `Commands - ${this.currentBot.name}`;
+            document.getElementById('botUsername').textContent = `@${this.currentBot.username}`;
+        }
+    }
+
+    async loadCommands() {
+        if (!this.currentBot) return;
+
+        this.showLoading(true);
+
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/commands/bot/${this.currentBot.id}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                this.commands = data.commands || [];
+                this.displayCommands();
+            } else {
+                this.showError('Failed to load commands');
+            }
+        } catch (error) {
+            this.showError('Network error while loading commands');
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    displayCommands() {
+        const commandsList = document.getElementById('commandsList');
+        const emptyCommands = document.getElementById('emptyCommands');
+        const noCommandSelected = document.getElementById('noCommandSelected');
+
+        if (!commandsList || !emptyCommands || !noCommandSelected) {
+            console.error('Required DOM elements not found');
+            return;
+        }
+
+        if (!this.commands || this.commands.length === 0) {
+            commandsList.style.display = 'none';
+            emptyCommands.style.display = 'block';
+            noCommandSelected.style.display = 'block';
+            document.getElementById('commandEditor').style.display = 'none';
+            return;
+        }
+
+        commandsList.style.display = 'block';
+        emptyCommands.style.display = 'none';
+
+        let html = '';
+        this.commands.forEach(command => {
+            const isActive = command.is_active;
+            const isSelected = this.currentCommand?.id === command.id;
+            const patterns = command.command_patterns || '';
+            const shortPatterns = patterns.length > 30 ? patterns.substring(0, 30) + '...' : patterns;
+            
+            html += `
+                <div class="command-group ${isSelected ? 'active' : ''}" 
+                     data-command-id="${command.id}">
+                    <div class="command-icon">
+                        <i class="fas fa-code"></i>
+                    </div>
+                    <div class="command-content">
+                        <div class="command-header">
+                            <div class="command-name">${this.escapeHtml(patterns.split(',')[0] || 'Unnamed Command')}</div>
+                            <div class="command-patterns">${this.escapeHtml(shortPatterns)}</div>
+                        </div>
+                        <div class="command-description">
+                            ${command.code ? this.escapeHtml(command.code.substring(0, 100) + (command.code.length > 100 ? '...' : '')) : 'No code'}
+                        </div>
+                        <div class="command-meta">
+                            <span class="command-status ${isActive ? 'active' : 'inactive'}">
+                                <i class="fas fa-circle"></i>
+                                ${isActive ? 'Active' : 'Inactive'}
+                            </span>
+                            ${command.wait_for_answer ? '<span class="command-feature">⏳ Waits</span>' : ''}
+                            <span class="command-id">ID: ${command.id}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        commandsList.innerHTML = html;
+    }
+
+    filterCommands(searchTerm) {
+        const commandGroups = document.querySelectorAll('.command-group');
+        const lowerSearch = searchTerm.toLowerCase().trim();
+
+        if (!lowerSearch) {
+            commandGroups.forEach(group => group.style.display = 'block');
+            return;
+        }
+
+        commandGroups.forEach(group => {
+            const commandPattern = group.querySelector('.command-patterns').textContent.toLowerCase();
+            const commandName = group.querySelector('.command-name').textContent.toLowerCase();
+            const isVisible = commandPattern.includes(lowerSearch) || commandName.includes(lowerSearch);
+            group.style.display = isVisible ? 'block' : 'none';
+        });
+    }
+
+    addNewCommand() {
+        this.currentCommand = {
+            id: 'new',
+            command_patterns: '/start',
+            code: '// Write your command code here\nconst user = getUser();\nconst chatId = getChatId();\n\nbot.sendMessage(chatId, `Hello ${user.first_name}! Welcome to our bot.`);',
+            is_active: true,
+            wait_for_answer: false,
+            answer_handler: ''
+        };
+
+        this.showCommandEditor();
+        this.populateCommandForm();
+        
+        setTimeout(() => {
+            document.getElementById('moreCommands').focus();
+        }, 100);
+    }
+
+    async selectCommand(commandId) {
+        if (this.currentCommand?.id === commandId) return;
+
+        this.showLoading(true);
+
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/commands/${commandId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                this.currentCommand = data.command;
+                this.showCommandEditor();
+                this.populateCommandForm();
+                
+                // Update UI selection
+                document.querySelectorAll('.command-group').forEach(group => {
+                    group.classList.remove('active');
+                });
+                
+                const selectedGroup = document.querySelector(`[data-command-id="${commandId}"]`);
+                if (selectedGroup) {
+                    selectedGroup.classList.add('active');
+                    selectedGroup.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            } else {
+                this.showError('Failed to load command');
+            }
+        } catch (error) {
+            this.showError('Network error while loading command');
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    showCommandEditor() {
+        document.getElementById('noCommandSelected').style.display = 'none';
+        document.getElementById('commandEditor').style.display = 'block';
+    }
+
+    hideCommandEditor() {
+        document.getElementById('noCommandSelected').style.display = 'block';
+        document.getElementById('commandEditor').style.display = 'none';
+        this.currentCommand = null;
+    }
+
+    populateCommandForm() {
+        if (!this.currentCommand) return;
+        
+        this.setCommandsToTags(this.currentCommand.command_patterns);
+        document.getElementById('commandCode').value = this.currentCommand.code || '';
+        
+        const waitToggle = document.getElementById('waitForAnswer');
+        if (waitToggle) {
+            waitToggle.checked = this.currentCommand.wait_for_answer || false;
+            this.toggleAnswerHandler(waitToggle.checked);
+        }
+        
+        document.getElementById('answerHandler').value = this.currentCommand.answer_handler || '';
+        document.getElementById('commandId').textContent = `ID: ${this.currentCommand.id}`;
+        
+        const statusBadge = document.getElementById('commandStatus');
+        statusBadge.textContent = this.currentCommand.is_active ? 'Active' : 'Inactive';
+        statusBadge.className = `status-badge ${this.currentCommand.is_active ? 'active' : 'inactive'}`;
+        
+        this.updateButtonStates();
+    }
+
+    updateButtonStates() {
+        const isNew = this.currentCommand?.id === 'new';
+        const deleteBtn = document.getElementById('deleteCommandBtn');
+        const toggleBtn = document.getElementById('toggleCommandBtn');
+        
+        if (deleteBtn) {
+            deleteBtn.disabled = isNew;
+        }
+        
+        if (toggleBtn) {
+            toggleBtn.textContent = this.currentCommand?.is_active ? ' Deactivate' : ' Activate';
+            toggleBtn.innerHTML = `<i class="fas fa-power-off"></i> ${this.currentCommand?.is_active ? 'Deactivate' : 'Activate'}`;
+        }
+    }
 
     async saveCommand() {
         if (!this.currentCommand || !this.currentBot) {
@@ -707,7 +1234,6 @@ class CommandEditor {
             return false;
         }
 
-        // Validate form before saving
         if (!this.validateCommandPatterns() || !this.validateCommandCode()) {
             this.showError('Please fix validation errors before saving');
             return false;
@@ -789,7 +1315,87 @@ class CommandEditor {
         }
     }
 
-    // Utility methods
+    async deleteCommand() {
+        if (!this.currentCommand || this.currentCommand.id === 'new') {
+            return;
+        }
+
+        if (!confirm('Are you sure you want to delete this command?\n\nThis action cannot be undone.')) {
+            return;
+        }
+
+        this.showLoading(true);
+
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/commands/${this.currentCommand.id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (response.ok) {
+                this.showSuccess('Command deleted successfully');
+                this.hideCommandEditor();
+                await this.loadCommands();
+            } else {
+                const data = await response.json();
+                this.showError(data.error || 'Failed to delete command');
+            }
+        } catch (error) {
+            this.showError('Network error while deleting command');
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    async toggleCommand() {
+        if (!this.currentCommand || this.currentCommand.id === 'new') {
+            return;
+        }
+
+        const newStatus = !this.currentCommand.is_active;
+
+        this.showLoading(true);
+
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/commands/${this.currentCommand.id}/toggle`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    isActive: newStatus,
+                    botToken: this.currentBot.token
+                })
+            });
+
+            if (response.ok) {
+                this.currentCommand.is_active = newStatus;
+                this.populateCommandForm();
+                await this.loadCommands();
+                this.showSuccess(`Command ${newStatus ? 'activated' : 'deactivated'} successfully!`);
+            } else {
+                this.showError('Failed to toggle command status');
+            }
+        } catch (error) {
+            this.showError('Network error while toggling command');
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    quickTest() {
+        if (this.currentCommand) {
+            this.testCommand();
+        } else {
+            this.showError('Please select a command first');
+        }
+    }
+
     escapeHtml(unsafe) {
         if (unsafe === null || unsafe === undefined) return '';
         return unsafe
@@ -822,6 +1428,11 @@ class CommandEditor {
         } else {
             alert('Success: ' + message);
         }
+    }
+
+    logout() {
+        localStorage.clear();
+        window.location.href = 'index.html';
     }
 }
 
