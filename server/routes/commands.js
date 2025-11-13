@@ -1,8 +1,178 @@
 const express = require('express');
 const supabase = require('../config/supabase');
 const botManager = require('../core/bot-manager');
+const templateLoader = require('../core/template-loader');
 
 const router = express.Router();
+
+// Get all templates
+router.get('/templates', async (req, res) => {
+    try {
+        const templates = templateLoader.getAllTemplates();
+        
+        res.json({
+            success: true,
+            templates: templates,
+            styles: {
+                bot_style: "bot.sendMessage() - Direct bot API calls",
+                api_style: "Api.sendMessage() - Wrapped API calls", 
+                both_styles: "Both styles available"
+            }
+        });
+    } catch (error) {
+        console.error('❌ Get templates error:', error);
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to fetch templates' 
+        });
+    }
+});
+
+// Apply template
+router.post('/apply-template', async (req, res) => {
+    try {
+        const { category, templateName, botToken } = req.body;
+        
+        const template = templateLoader.getTemplate(category, templateName);
+        if (!template) {
+            return res.status(404).json({ 
+                success: false,
+                error: 'Template not found' 
+            });
+        }
+
+        // Save template as command
+        const { data: command, error } = await supabase
+            .from('commands')
+            .insert([{
+                bot_token: botToken,
+                command_patterns: template.patterns,
+                code: template.code,
+                is_active: true,
+                name: template.name
+            }])
+            .select('*')
+            .single();
+
+        if (error) throw error;
+
+        // Update command cache
+        await botManager.updateCommandCache(botToken);
+
+        res.json({
+            success: true,
+            message: 'Template applied successfully!',
+            command: command,
+            template: template
+        });
+
+    } catch (error) {
+        console.error('❌ Apply template error:', error);
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to apply template' 
+        });
+    }
+});
+
+// Generate AI code
+router.post('/generate-code', async (req, res) => {
+    try {
+        const { prompt, style = 'both' } = req.body;
+        
+        if (!prompt) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Prompt is required' 
+            });
+        }
+
+        const generatedCode = generateAICode(prompt, style);
+        
+        res.json({
+            success: true,
+            generatedCode: generatedCode,
+            prompt: prompt,
+            style: style
+        });
+
+    } catch (error) {
+        console.error('❌ Generate code error:', error);
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to generate code' 
+        });
+    }
+});
+
+function generateAICode(prompt, style) {
+    const lowerPrompt = prompt.toLowerCase();
+    
+    if (style === 'bot') {
+        return generateBotStyleCode(lowerPrompt, prompt);
+    } else if (style === 'api') {
+        return generateApiStyleCode(lowerPrompt, prompt);
+    } else {
+        return generateBothStylesCode(lowerPrompt, prompt);
+    }
+}
+
+function generateBotStyleCode(lowerPrompt, originalPrompt) {
+    if (lowerPrompt.includes('welcome')) {
+        return `// Welcome message - bot style
+const user = getUser();
+bot.sendMessage(\`Hello \${user.first_name}! 👋 Welcome to our bot!\`);`;
+    }
+    
+    if (lowerPrompt.includes('button')) {
+        return `// Inline keyboard - bot style
+bot.sendMessage("Choose option:", {
+    reply_markup: {
+        inline_keyboard: [
+            [{ text: "Option 1", callback_data: "opt1" }]
+        ]
+    }
+});`;
+    }
+
+    return `// Generated code for: "${originalPrompt}" - bot style
+const user = getUser();
+bot.sendMessage(\`Hello \${user.first_name}! You said: "${originalPrompt}"\`);`;
+}
+
+function generateApiStyleCode(lowerPrompt, originalPrompt) {
+    if (lowerPrompt.includes('welcome')) {
+        return `// Welcome message - Api style
+const user = Api.getUser();
+Api.sendMessage(\`Hello \${user.first_name}! 👋 Welcome to our bot!\`);`;
+    }
+    
+    if (lowerPrompt.includes('button')) {
+        return `// Inline keyboard - Api style
+Api.sendKeyboard("Choose option:", [
+    [{ text: "Option 1", callback_data: "opt1" }]
+]);`;
+    }
+
+    return `// Generated code for: "${originalPrompt}" - Api style
+const user = Api.getUser();
+Api.sendMessage(\`Hello \${user.first_name}! You said: "${originalPrompt}"\`);`;
+}
+
+function generateBothStylesCode(lowerPrompt, originalPrompt) {
+    return `// Generated code for: "${originalPrompt}"
+// Both styles available - choose your preference!
+
+// bot style (direct API calls)
+const user = getUser();
+bot.sendMessage(\`Hello \${user.first_name}! You said: "${originalPrompt}"\`);
+
+// Api style (wrapped API calls)  
+const user2 = Api.getUser();
+Api.sendMessage(\`Hello \${user2.first_name}! You said: "${originalPrompt}"\`);
+
+// Both work the same way! Choose the style you prefer.`;
+}
 
 // Get commands for bot
 router.get('/bot/:botToken', async (req, res) => {
