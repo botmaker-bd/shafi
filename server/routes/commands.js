@@ -509,7 +509,7 @@ router.get('/templates/categories', async (req, res) => {
                 {
                     id: 'welcome',
                     name: 'Welcome Message',
-                    patterns: '/start, start, hello',
+                    patterns: '/start,start,hello,hi',
                     code: `// Welcome message template
 const user = getUser();
 const welcomeMessage = \`Hello \${user.first_name}! 👋
@@ -528,7 +528,7 @@ bot.sendMessage(welcomeMessage, {
                 {
                     id: 'help',
                     name: 'Help Command',
-                    patterns: '/help, help, commands',
+                    patterns: '/help,help,commands,menu',
                     code: `// Help command template
 const helpText = \`🤖 *Bot Help Menu*
 
@@ -548,13 +548,35 @@ Contact support if you need assistance.\`;
 bot.sendMessage(helpText, {
     parse_mode: 'Markdown'
 });`
+                },
+                {
+                    id: 'info',
+                    name: 'Info Command',
+                    patterns: '/info,info,about,status',
+                    code: `// Bot information template
+const botInfo = \`🤖 *Bot Information*
+
+*Name:* Demo Bot
+*Status:* ✅ Active
+*Version:* 2.0.0
+
+*Features:*
+• Advanced command system
+• User data management
+• Media support
+
+*Created with:* Bot Maker Pro\`;
+
+bot.sendMessage(botInfo, {
+    parse_mode: 'Markdown'
+});`
                 }
             ],
             interactive: [
                 {
                     id: 'conversation',
                     name: 'Interactive Conversation',
-                    patterns: '/conversation, chat, talk',
+                    patterns: '/conversation,chat,talk',
                     code: `// Interactive conversation - Part 1
 bot.sendMessage("Hello! What's your name?");`,
                     waitForAnswer: true,
@@ -571,7 +593,7 @@ if (userName && userName.trim()) {
                 {
                     id: 'send_photo',
                     name: 'Send Photo',
-                    patterns: '/photo, picture, image',
+                    patterns: '/photo,picture,image',
                     code: `// Send photo example
 bot.sendPhoto("https://via.placeholder.com/400x300", {
     caption: "Here's a beautiful photo for you! 📸",
