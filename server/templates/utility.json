@@ -1,0 +1,14 @@
+[
+    {
+        "name": "Random Number Generator",
+        "patterns": "/random, rng, dice",
+        "code": "// Random number generator\nconst min = 1;\nconst max = 100;\nconst randomNum = Math.floor(Math.random() * (max - min + 1)) + min;\n\nbot.sendMessage(`🎲 Random number between ${min} and ${max}: *${randomNum}*`);",
+        "description": "Generate random numbers"
+    },
+    {
+        "name": "Text Formatter",
+        "patterns": "/format, text, style",
+        "code": "// Text formatter template\nconst userText = message.text.replace(/^\\\\/format\\\\s*/, '');\n\nif (!userText.trim()) {\n    return bot.sendMessage('Please provide text to format. Example: /format Hello World');\n}\n\nconst formattedText = `*Bold:* **${userText}**\\\\n_Italic:_ _${userText}_\\\\n\\`Code:\\` \\`${userText}\\`\\\\n~~Strikethrough:~~ ~~${userText}~~`;\n\nbot.sendMessage(formattedText);",
+        "description": "Format text with Markdown"
+    }
+]
