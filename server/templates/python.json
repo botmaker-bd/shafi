@@ -1,0 +1,20 @@
+[
+    {
+        "name": "Python Calculator",
+        "patterns": "/calc, calculate, math",
+        "code": "// Python calculator template\nconst result = await bot.runPython(`\nnum1 = 10\nnum2 = 5\nresult = num1 + num2\nprint(f\"Calculation: {num1} + {num2} = {result}\")\n`);\n\nbot.sendMessage(`🐍 Python Result:\\\\n\\\\n${result}`);",
+        "description": "Execute Python code for calculations"
+    },
+    {
+        "name": "Python Data Analysis",
+        "patterns": "/analyze, data, stats",
+        "code": "// Python data analysis template\nconst result = await bot.runPython(`\nimport random\n\n# Generate sample data\ndata = [random.randint(1, 100) for _ in range(10)]\n\n# Calculate statistics\nmean = sum(data) / len(data)\nmaximum = max(data)\nminimum = min(data)\n\nprint(f\"Data: {data}\")\nprint(f\"Mean: {mean:.2f}\")\nprint(f\"Max: {maximum}\")\nprint(f\"Min: {minimum}\")\n`);\n\nbot.sendMessage(`📊 Python Analysis:\\\\n\\\\n${result}`);",
+        "description": "Data analysis with Python"
+    },
+    {
+        "name": "Python Web Scraper",
+        "patterns": "/scrape, extract, crawl",
+        "code": "// Python web scraper template\nconst result = await bot.runPython(`\ntry:\n    import requests\n    from bs4 import BeautifulSoup\n    \n    # Example: Scrape website title\n    response = requests.get('https://example.com')\n    soup = BeautifulSoup(response.text, 'html.parser')\n    title = soup.title.string if soup.title else 'No title found'\n    \n    print(f\"Website Title: {title}\")\n    \nexcept Exception as e:\n    print(f\"Error: {e}\")\n`);\n\nbot.sendMessage(`🌐 Web Scraping Result:\\\\n\\\\n${result}`);",
+        "description": "Web scraping with Python libraries"
+    }
+]
