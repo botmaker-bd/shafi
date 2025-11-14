@@ -646,6 +646,95 @@
     word-break: break-all;
 }
 
+/* Enhanced Error Display Styles */
+.test-error .error-content {
+    background: rgba(239, 68, 68, 0.05);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    margin-top: 1rem;
+}
+
+.test-error .error-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(239, 68, 68, 0.1);
+}
+
+.test-error .error-title {
+    font-weight: 600;
+    color: var(--error-color);
+    font-size: 0.9rem;
+}
+
+.btn-copy-error {
+    background: var(--error-color);
+    color: white;
+    border: none;
+    padding: 0.375rem 0.75rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.btn-copy-error:hover {
+    background: #dc2626;
+    transform: translateY(-1px);
+}
+
+.btn-copy-error:active {
+    transform: translateY(0);
+}
+
+.test-error .error-message {
+    font-family: 'Courier New', monospace;
+    background: rgba(0, 0, 0, 0.05);
+    padding: 0.75rem;
+    border-radius: var(--radius-sm);
+    border-left: 3px solid var(--error-color);
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.test-error .error-details {
+    background: rgba(0, 0, 0, 0.03);
+    padding: 0.75rem;
+    border-radius: var(--radius-sm);
+    border-left: 3px solid var(--warning-color);
+    margin-bottom: 0.5rem;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    color: var(--text-secondary);
+}
+
+.test-error .error-stack {
+    background: rgba(0, 0, 0, 0.02);
+    padding: 0.75rem;
+    border-radius: var(--radius-sm);
+    border-left: 3px solid var(--info-color);
+    font-size: 0.75rem;
+    line-height: 1.3;
+    color: var(--text-muted);
+    font-family: 'Courier New', monospace;
+    max-height: 150px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+}
+
+/* Success state for copy button */
+.btn-copy-error.copied {
+    background: var(--success-color) !important;
+}
+
 /* Test Results Styles */
 .test-success, .test-error {
     padding: 1.5rem;
@@ -692,6 +781,29 @@
 
 .test-loading .spinner {
     margin-bottom: 1rem;
+}
+
+/* Template loading states */
+.templates-loading {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+}
+
+.templates-loading .spinner {
+    margin-bottom: 1rem;
+}
+
+.template-category.empty {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+}
+
+.template-category.empty i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
 }
 
 /* Responsive Design */
@@ -757,6 +869,23 @@
     
     .btn-icon span {
         display: none;
+    }
+    
+    .test-error .error-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    .btn-copy-error {
+        align-self: flex-end;
+    }
+    
+    .test-error .error-message,
+    .test-error .error-details,
+    .test-error .error-stack {
+        font-size: 0.8rem;
+        padding: 0.5rem;
     }
 }
 
