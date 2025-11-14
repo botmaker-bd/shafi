@@ -17,8 +17,9 @@ router.get('/', async (req, res) => {
                 const categoryPath = path.join(templatesDir, `${category}.json`);
                 const data = await fs.readFile(categoryPath, 'utf8');
                 templates[category] = JSON.parse(data);
+                console.log(`✅ Loaded ${templates[category].length} templates from ${category}.json`);
             } catch (error) {
-                console.log(`No templates found for category: ${category}`);
+                console.log(`❌ No templates found for category: ${category}`, error.message);
                 templates[category] = [];
             }
         }
@@ -28,7 +29,7 @@ router.get('/', async (req, res) => {
             templates: templates
         });
     } catch (error) {
-        console.error('Template loading error:', error);
+        console.error('❌ Template loading error:', error);
         res.status(500).json({
             success: false,
             error: 'Failed to load templates'
