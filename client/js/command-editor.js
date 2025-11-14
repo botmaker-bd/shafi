@@ -5,6 +5,7 @@ class CommandEditor {
         this.currentCommand = null;
         this.commands = [];
         this.templates = {};
+        this.availableCategories = [];
         this.init();
     }
 
@@ -31,63 +32,75 @@ class CommandEditor {
             
             if (data.success) {
                 this.templates = data.templates;
-                console.log('✅ Templates loaded successfully:', Object.keys(this.templates));
+                this.availableCategories = data.categories || Object.keys(this.templates);
+                
+                console.log('✅ Templates loaded successfully:', {
+                    categories: this.availableCategories,
+                    totalTemplates: data.totalTemplates,
+                    totalCategories: data.totalCategories
+                });
+                
+                this.populateTemplatesModal();
             } else {
-                console.error('❌ Failed to load templates from server');
-                // Fallback to default templates
+                console.error('❌ Failed to load templates from server:', data.error);
                 this.templates = this.getDefaultTemplates();
+                this.availableCategories = Object.keys(this.templates);
+                this.populateTemplatesModal();
             }
             
-            this.populateTemplatesModal();
         } catch (error) {
             console.error('❌ Load templates error:', error);
-            // Fallback to default templates
             this.templates = this.getDefaultTemplates();
+            this.availableCategories = Object.keys(this.templates);
             this.populateTemplatesModal();
         }
     }
 
-    getDefaultTemplates() {
-        return {
-            basic: [
-                {
-                    "name": "Welcome Message",
-                    "patterns": "/start, start, hello",
-                    "code": "// Welcome message template\nconst user = getUser();\nconst chatId = getChatId();\n\nbot.sendMessage(chatId, `🎉 Hello ${user.first_name}! Welcome to our bot!\\\\n\\\\n🤖 I can help you with:\\\\n/start - Show this welcome message\\\\n/help - Get help\\\\n/info - Bot information\\\\n\\\\nChoose a command or type your message!`);",
-                    "description": "Simple welcome message with user info"
-                },
-                {
-                    "name": "Help Command",
-                    "patterns": "/help, help, commands",
-                    "code": "// Help command template\nconst helpText = `🤖 *Bot Help Menu*\n\n*Available Commands:*\n• /start - Start the bot\n• /help - Show this help message\n• /info - Bot information\n\n*Features:*\n• Multiple command patterns\n• Interactive conversations\n• Media support\n• Python code execution\n\n*Need Help?*\nContact support if you need assistance.`;\n\nbot.sendMessage(helpText, {\n    parse_mode: 'Markdown'\n});",
-                    "description": "Display available commands"
-                }
-            ],
-            interactive: [
-                {
-                    "name": "Interactive Conversation",
-                    "patterns": "/conversation, chat, talk",
-                    "code": "// Interactive conversation template\nconst user = getUser();\n\n// Ask first question\nawait bot.sendMessage(`Hello ${user.first_name}! Let's have a conversation. What's your favorite color?`);\n\n// Wait for answer\nconst colorAnswer = await waitForAnswer('Please tell me your favorite color:');\n\n// Ask second question\nawait bot.sendMessage(`Great choice! ${colorAnswer} is a beautiful color. What's your favorite food?`);\n\nconst foodAnswer = await waitForAnswer('Please tell me your favorite food:');\n\n// Save user preferences\nawait User.saveData('favorite_color', colorAnswer);\nawait User.saveData('favorite_food', foodAnswer);\n\n// Show summary\nbot.sendMessage(`Thanks for chatting! I'll remember that you like ${colorAnswer} and ${foodAnswer}.`);",
-                    "description": "Multiple questions with wait for answer",
-                    "waitForAnswer": true,
-                    "answerHandler": "// Answer handler for conversation\nconst userAnswer = message.text;\nconst currentQuestion = await User.getData('current_question');\n\nif (currentQuestion === 'color') {\n    await User.saveData('favorite_color', userAnswer);\n    await User.saveData('current_question', 'food');\n    bot.sendMessage(`Nice! ${userAnswer} is a great color. Now, what's your favorite food?`);\n} else if (currentQuestion === 'food') {\n    await User.saveData('favorite_food', userAnswer);\n    await User.deleteData('current_question');\n    \n    const favoriteColor = await User.getData('favorite_color');\n    bot.sendMessage(`Perfect! So you like ${favoriteColor} and ${userAnswer}. Thanks for sharing!`);\n}"
-                }
-            ]
-        };
-    }
-
     populateTemplatesModal() {
         const templatesContent = document.querySelector('.templates-content');
-        if (!templatesContent) return;
+        const categoryTabs = document.querySelector('.category-tabs');
+        
+        if (!templatesContent || !categoryTabs) {
+            console.error('❌ Templates modal elements not found');
+            return;
+        }
 
-        let html = '';
+        // Clear existing content
+        templatesContent.innerHTML = '';
+        categoryTabs.innerHTML = '';
 
-        for (const [category, templates] of Object.entries(this.templates)) {
-            const categoryId = `${category}-templates`;
-            const isActive = category === 'basic' ? 'active' : '';
+        // Create category tabs dynamically
+        this.availableCategories.forEach((category, index) => {
+            const tab = document.createElement('button');
+            tab.className = `category-tab ${index === 0 ? 'active' : ''}`;
+            tab.dataset.category = category;
+            tab.innerHTML = `
+                <i class="fas fa-${this.getTemplateIcon(category)}"></i>
+                ${this.formatCategoryName(category)}
+            `;
+            categoryTabs.appendChild(tab);
+        });
+
+        // Create template categories dynamically
+        this.availableCategories.forEach((category, index) => {
+            const categoryDiv = document.createElement('div');
+            categoryDiv.id = `${category}-templates`;
+            categoryDiv.className = `template-category ${index === 0 ? 'active' : ''}`;
             
-            html += `
-                <div id="${categoryId}" class="template-category ${isActive}">
+            const templates = this.templates[category] || [];
+            
+            if (templates.length === 0) {
+                categoryDiv.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">
+                            <i class="fas fa-code"></i>
+                        </div>
+                        <h3>No Templates Available</h3>
+                        <p>No templates found for ${this.formatCategoryName(category)} category.</p>
+                    </div>
+                `;
+            } else {
+                categoryDiv.innerHTML = `
                     <div class="templates-grid">
                         ${templates.map(template => `
                             <div class="template-card" data-template='${JSON.stringify(template).replace(/'/g, "&#39;")}'>
@@ -97,307 +110,66 @@ class CommandEditor {
                                 <h4>${this.escapeHtml(template.name)}</h4>
                                 <p>${this.escapeHtml(template.description)}</p>
                                 <div class="template-patterns">${this.escapeHtml(template.patterns)}</div>
+                                <div class="template-meta">
+                                    <span class="template-category-badge">${this.formatCategoryName(category)}</span>
+                                    ${template.waitForAnswer ? '<span class="template-feature">⏳ Interactive</span>' : ''}
+                                </div>
                             </div>
                         `).join('')}
                     </div>
-                </div>
-            `;
-        }
+                `;
+            }
+            
+            templatesContent.appendChild(categoryDiv);
+        });
 
-        templatesContent.innerHTML = html;
+        // Re-setup category tab events
+        this.setupTemplateCategories();
+    }
+
+    formatCategoryName(category) {
+        return category.charAt(0).toUpperCase() + category.slice(1);
     }
 
     getTemplateIcon(category) {
         const icons = {
             'basic': 'code',
             'interactive': 'comments',
-            'media': 'image',
-            'buttons': 'th',
+            'media': 'images',
+            'buttons': 'th-large',
             'data': 'database',
-            'http': 'cloud',
-            'advanced': 'cogs'
+            'http': 'cloud-download-alt',
+            'advanced': 'cogs',
+            'python': 'python',
+            'utility': 'tools',
+            'games': 'gamepad',
+            'payment': 'credit-card',
+            'social': 'share-alt'
         };
         return icons[category] || 'code';
     }
 
-    setupEventListeners() {
-        // Navigation
-        document.getElementById('backToBots').addEventListener('click', () => {
-            window.location.href = 'bot-management.html';
-        });
-
-        document.getElementById('quickTest').addEventListener('click', () => {
-            this.quickTest();
-        });
-
-        // Command actions
-        document.getElementById('addCommandBtn').addEventListener('click', () => {
-            this.addNewCommand();
-        });
-
-        document.getElementById('createFirstCommand').addEventListener('click', () => {
-            this.addNewCommand();
-        });
-
-        document.getElementById('addFirstCommand').addEventListener('click', () => {
-            this.addNewCommand();
-        });
-
-        // Form actions
-        document.getElementById('saveCommandBtn').addEventListener('click', (e) => {
-            e.preventDefault();
-            this.saveCommand();
-        });
-
-        document.getElementById('deleteCommandBtn').addEventListener('click', () => {
-            this.deleteCommand();
-        });
-
-        document.getElementById('toggleCommandBtn').addEventListener('click', () => {
-            this.toggleCommand();
-        });
-
-        document.getElementById('testCommandBtn').addEventListener('click', () => {
-            this.testCommand();
-        });
-
-        document.getElementById('runTestBtn').addEventListener('click', () => {
-            this.runCustomTest();
-        });
-
-        // Toggle switches
-        document.getElementById('waitForAnswer').addEventListener('change', (e) => {
-            this.toggleAnswerHandler(e.target.checked);
-        });
-
-        // Code editor buttons
-        document.getElementById('openEditor').addEventListener('click', () => {
-            this.openCodeEditor('main');
-        });
-
-        document.getElementById('openAnswerEditor').addEventListener('click', () => {
-            this.openCodeEditor('answer');
-        });
-
-        // Templates
-        document.getElementById('showTemplates').addEventListener('click', () => {
-            this.showTemplates();
-        });
-
-        // Search
-        let searchTimeout;
-        document.getElementById('commandSearch').addEventListener('input', (e) => {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                this.filterCommands(e.target.value);
-            }, 300);
-        });
-
-        // Modal events
-        this.setupModalEvents();
-        this.setupTemplateCategories();
-        
-        // Command list click events
-        document.addEventListener('click', (e) => {
-            const commandGroup = e.target.closest('.command-group');
-            if (commandGroup) {
-                const commandId = commandGroup.dataset.commandId;
-                if (commandId) {
-                    this.selectCommand(commandId);
+    getDefaultTemplates() {
+        return {
+            'basic': [
+                {
+                    "name": "Welcome Message",
+                    "patterns": "/start, start, hello",
+                    "code": "// Welcome message template\nconst user = getUser();\nconst chatId = getChatId();\n\nbot.sendMessage(chatId, `🎉 Hello ${user.first_name}! Welcome to our bot!\\\\n\\\\n🤖 I can help you with:\\\\n/start - Show this welcome message\\\\n/help - Get help\\\\n/info - Bot information\\\\n\\\\nChoose a command or type your message!`);",
+                    "description": "Simple welcome message with user info"
                 }
-            }
-        });
-    }
-
-    setupCommandsTags() {
-        const moreCommandsInput = document.getElementById('moreCommands');
-        const commandsTags = document.getElementById('commandsTags');
-
-        moreCommandsInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ',') {
-                e.preventDefault();
-                const command = moreCommandsInput.value.trim();
-                if (command) {
-                    this.addCommandTag(command);
-                    moreCommandsInput.value = '';
+            ],
+            'interactive': [
+                {
+                    "name": "Interactive Conversation",
+                    "patterns": "/conversation, chat, talk",
+                    "code": "// Interactive conversation template\nconst user = getUser();\n\n// Ask first question\nawait bot.sendMessage(`Hello ${user.first_name}! Let's have a conversation. What's your favorite color?`);\n\n// Wait for answer\nconst colorAnswer = await waitForAnswer('Please tell me your favorite color:');\n\n// Show response\nbot.sendMessage(`Great choice! ${colorAnswer} is a beautiful color.`);",
+                    "description": "Simple interactive conversation",
+                    "waitForAnswer": true,
+                    "answerHandler": "// Simple answer handler\nconst userAnswer = message.text;\nbot.sendMessage(`You said: ${userAnswer}`);"
                 }
-            }
-        });
-
-        moreCommandsInput.addEventListener('blur', () => {
-            const command = moreCommandsInput.value.trim();
-            if (command) {
-                this.addCommandTag(command);
-                moreCommandsInput.value = '';
-            }
-        });
-
-        moreCommandsInput.addEventListener('paste', (e) => {
-            e.preventDefault();
-            const pastedText = e.clipboardData.getData('text');
-            const commands = pastedText.split(',').map(cmd => cmd.trim()).filter(cmd => cmd);
-            
-            commands.forEach(command => {
-                if (command && !this.commandExistsInTags(command)) {
-                    this.addCommandTag(command);
-                }
-            });
-            
-            moreCommandsInput.value = '';
-        });
-    }
-
-    addCommandTag(command) {
-        if (!command || this.commandExistsInTags(command)) return;
-
-        const commandsTags = document.getElementById('commandsTags');
-        const tag = document.createElement('div');
-        tag.className = 'command-tag';
-        tag.innerHTML = `
-            <span class="tag-text">${this.escapeHtml(command)}</span>
-            <button type="button" class="remove-tag">
-                <i class="fas fa-times"></i>
-            </button>
-        `;
-        
-        tag.querySelector('.remove-tag').addEventListener('click', () => {
-            tag.remove();
-        });
-        
-        commandsTags.appendChild(tag);
-    }
-
-    commandExistsInTags(command) {
-        const tags = Array.from(document.querySelectorAll('.command-tag .tag-text'));
-        return tags.some(tag => tag.textContent.trim() === command);
-    }
-
-    getCommandsFromTags() {
-        const tags = Array.from(document.querySelectorAll('.command-tag .tag-text'));
-        return tags.map(tag => tag.textContent.trim()).filter(cmd => cmd);
-    }
-
-    setCommandsToTags(commands) {
-        const commandsTags = document.getElementById('commandsTags');
-        commandsTags.innerHTML = '';
-        
-        if (typeof commands === 'string') {
-            commands = commands.split(',').map(cmd => cmd.trim()).filter(cmd => cmd);
-        }
-        
-        commands.forEach(command => {
-            if (command) {
-                this.addCommandTag(command);
-            }
-        });
-    }
-
-    setupCodeEditor() {
-        const advancedEditor = document.getElementById('advancedCodeEditor');
-        
-        document.getElementById('cancelEdit').addEventListener('click', () => {
-            this.closeCodeEditor();
-        });
-
-        document.getElementById('saveCode').addEventListener('click', () => {
-            this.saveCodeFromEditor();
-        });
-
-        advancedEditor.addEventListener('input', (e) => {
-            this.updateLineCount(e.target.value);
-        });
-
-        this.updateLineCount(advancedEditor.value);
-    }
-
-    updateLineCount(code) {
-        const lines = code.split('\n').length;
-        const chars = code.length;
-        document.getElementById('lineCount').textContent = `Line: ${lines}`;
-        document.getElementById('charCount').textContent = `Chars: ${chars}`;
-    }
-
-    openCodeEditor(editorType) {
-        this.currentEditorType = editorType;
-        let code = '';
-        
-        if (editorType === 'main') {
-            code = document.getElementById('commandCode').value;
-        } else if (editorType === 'answer') {
-            code = document.getElementById('answerHandler').value;
-        }
-        
-        document.getElementById('advancedCodeEditor').value = code;
-        this.updateLineCount(code);
-        document.getElementById('codeEditorModal').style.display = 'flex';
-        
-        setTimeout(() => {
-            const editor = document.getElementById('advancedCodeEditor');
-            editor.focus();
-        }, 100);
-    }
-
-    closeCodeEditor() {
-        document.getElementById('codeEditorModal').style.display = 'none';
-    }
-
-    saveCodeFromEditor() {
-        const code = document.getElementById('advancedCodeEditor').value;
-        
-        if (this.currentEditorType === 'main') {
-            document.getElementById('commandCode').value = code;
-        } else if (this.currentEditorType === 'answer') {
-            document.getElementById('answerHandler').value = code;
-        }
-        
-        this.closeCodeEditor();
-        this.showSuccess('Code saved!');
-    }
-
-    setupModalEvents() {
-        const modals = ['testCommandModal', 'codeEditorModal', 'templatesModal'];
-        
-        modals.forEach(modalId => {
-            const modal = document.getElementById(modalId);
-            const closeBtn = modal?.querySelector('.modal-close');
-            
-            if (closeBtn) {
-                closeBtn.addEventListener('click', () => {
-                    modal.style.display = 'none';
-                });
-            }
-        });
-
-        document.getElementById('closeTestCommand')?.addEventListener('click', () => {
-            document.getElementById('testCommandModal').style.display = 'none';
-        });
-
-        document.getElementById('closeTemplates')?.addEventListener('click', () => {
-            document.getElementById('templatesModal').style.display = 'none';
-        });
-
-        // Template card click events
-        document.addEventListener('click', (e) => {
-            const templateCard = e.target.closest('.template-card');
-            if (templateCard) {
-                const templateData = templateCard.dataset.template;
-                if (templateData) {
-                    try {
-                        const template = JSON.parse(templateData);
-                        this.applyTemplate(template);
-                    } catch (error) {
-                        console.error('Error parsing template:', error);
-                        this.showError('Failed to load template');
-                    }
-                }
-            }
-        });
-
-        window.addEventListener('click', (e) => {
-            if (e.target.classList.contains('modal')) {
-                e.target.style.display = 'none';
-            }
-        });
+            ]
+        };
     }
 
     setupTemplateCategories() {
@@ -407,6 +179,8 @@ class CommandEditor {
         categoryTabs.forEach(tab => {
             tab.addEventListener('click', () => {
                 const category = tab.dataset.category;
+                
+                if (!category) return;
                 
                 // Update tabs
                 categoryTabs.forEach(t => t.classList.remove('active'));
