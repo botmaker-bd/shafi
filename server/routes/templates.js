@@ -7,26 +7,32 @@ const path = require('path');
 router.get('/', async (req, res) => {
     try {
         const templatesDir = path.join(__dirname, '../templates');
-        
-        // Define template categories (updated with python)
-        const categories = ['basic', 'interactive', 'media', 'buttons', 'data', 'http', 'advanced', 'python'];
         const templates = {};
 
-        for (const category of categories) {
+        // Read all files in templates directory
+        const files = await fs.readdir(templatesDir);
+        
+        // Filter only .json files and extract category names
+        const jsonFiles = files.filter(file => file.endsWith('.json'));
+        
+        console.log(`📁 Found ${jsonFiles.length} template files:`, jsonFiles);
+
+        for (const file of jsonFiles) {
             try {
-                const categoryPath = path.join(templatesDir, `${category}.json`);
-                const data = await fs.readFile(categoryPath, 'utf8');
+                const category = file.replace('.json', '');
+                const filePath = path.join(templatesDir, file);
+                const data = await fs.readFile(filePath, 'utf8');
                 templates[category] = JSON.parse(data);
-                console.log(`✅ Loaded ${templates[category].length} templates from ${category}.json`);
+                console.log(`✅ Loaded ${templates[category].length} templates from ${file}`);
             } catch (error) {
-                console.log(`❌ No templates found for category: ${category}`, error.message);
-                templates[category] = [];
+                console.log(`❌ Error loading template file: ${file}`, error.message);
             }
         }
 
         res.json({
             success: true,
-            templates: templates
+            templates: templates,
+            totalCategories: Object.keys(templates).length
         });
     } catch (error) {
         console.error('❌ Template loading error:', error);
