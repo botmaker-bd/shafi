@@ -1,0 +1,38 @@
+[
+    {
+        "name": "Admin Panel",
+        "patterns": "/admin, panel, control",
+        "code": "// Admin panel template\nconst user = getUser();\n\n// Check if user is admin (you need to implement this)\nconst isAdmin = await User.getData('is_admin');\nif (!isAdmin) {\n    return bot.sendMessage('❌ Access denied. Admin privileges required.');\n}\n\n// Admin commands\nconst adminCommands = [\n    '/stats - Bot statistics',\n    '/broadcast - Send message to all users',\n    '/users - List all users',\n    '/logs - View error logs'\n];\n\nbot.sendMessage(`🔧 *Admin Panel*\\\\n\\\\nAvailable commands:\\\\n${adminCommands.join('\\\\n')}`);",
+        "description": "Admin-only commands and controls"
+    },
+    {
+        "name": "Broadcast Message",
+        "patterns": "/broadcast, announce, notify",
+        "code": "// Broadcast message template (Admin only)\nconst user = getUser();\n\n// Check admin privileges\nconst isAdmin = await User.getData('is_admin');\nif (!isAdmin) {\n    return bot.sendMessage('❌ Admin access required for broadcast.');\n}\n\n// Get broadcast message from user input\nconst broadcastMessage = message.text.replace(/^\\\\/broadcast\\\\s*/, '');\n\nif (!broadcastMessage.trim()) {\n    return bot.sendMessage('Please provide a message to broadcast. Example: /broadcast Hello everyone!');\n}\n\n// In a real implementation, you would get all users from database\nbot.sendMessage(`📢 *Broadcast Message*\\\\n\\\\n${broadcastMessage}\\\\n\\\\n_This message was sent to all users._`);",
+        "description": "Send message to all users"
+    },
+    {
+        "name": "Message Scheduler",
+        "patterns": "/schedule, timer, delay",
+        "code": "// Message scheduler template\nconst user = getUser();\n\n// Schedule a message after 5 seconds\nbot.sendMessage('⏰ Message scheduled for 5 seconds from now...');\n\nawait wait(5000); // Wait for 5 seconds\n\nbot.sendMessage(`🔔 Scheduled message for ${user.first_name}! This message was sent after a 5-second delay.`);",
+        "description": "Schedule messages with delays"
+    },
+    {
+        "name": "Error Handler",
+        "patterns": "/error, debug, test",
+        "code": "// Error handling template\ntry {\n    // Some operation that might fail\n    const riskyOperation = () => {\n        // Simulate an error\n        throw new Error('Something went wrong!');\n    };\n    \n    riskyOperation();\n    \n} catch (error) {\n    // Log the error\n    console.error('Command execution error:', error);\n    \n    // Send user-friendly error message\n    bot.sendMessage(`❌ Oops! Something went wrong.\\\\n\\\\nError: ${error.message}\\\\n\\\\nPlease try again or contact support if the problem persists.`);\n    \n    // You can also log errors to your database\n    await Bot.saveData(`error_${Date.now()}`, {\n        userId: user.id,\n        error: error.message,\n        timestamp: new Date().toISOString()\n    });\n}",
+        "description": "Comprehensive error handling"
+    },
+    {
+        "name": "Multi-language Support",
+        "patterns": "/lang, language, translate",
+        "code": "// Multi-language support template\nconst user = getUser();\n\n// Get user's preferred language\nconst userLanguage = await User.getData('language') || 'english';\n\n// Language dictionary\nconst translations = {\n    english: {\n        welcome: 'Welcome!',\n        help: 'Help message',\n        error: 'An error occurred'\n    },\n    spanish: {\n        welcome: '¡Bienvenido!',\n        help: 'Mensaje de ayuda', \n        error: 'Ocurrió un error'\n    },\n    french: {\n        welcome: 'Bienvenue!',\n        help: 'Message d\\'aide',\n        error: 'Une erreur est survenue'\n    }\n};\n\nconst t = translations[userLanguage] || translations.english;\n\nbot.sendMessage(`${t.welcome} ${user.first_name}!\\\\n\\\\nCurrent language: ${userLanguage}`);",
+        "description": "Multi-language bot support"
+    },
+    {
+        "name": "Rate Limiter",
+        "patterns": "/rate, limit, throttle",
+        "code": "// Rate limiting template\nconst user = getUser();\nconst now = Date.now();\n\n// Get user's last command time\nconst lastCommand = await User.getData('last_command_time') || 0;\nconst cooldown = 5000; // 5 seconds cooldown\n\nif (now - lastCommand < cooldown) {\n    const remaining = Math.ceil((cooldown - (now - lastCommand)) / 1000);\n    return bot.sendMessage(`⏳ Please wait ${remaining} seconds before using this command again.`);\n}\n\n// Update last command time\nawait User.saveData('last_command_time', now);\n\n// Process the command\nbot.sendMessage('✅ Command executed successfully!');",
+        "description": "Prevent command spam with rate limiting"
+    }
+]
