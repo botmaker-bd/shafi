@@ -20,18 +20,91 @@ class CommandEditor {
 
     async loadTemplates() {
         try {
-            const token = localStorage.getItem('token');
-            const response = await fetch('/api/commands/templates/categories', {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
+            // Load templates from server or use default templates
+            this.templates = {
+                basic: [
+                    {
+                        name: "Welcome Message",
+                        patterns: "/start, start, hello",
+                        code: `// Welcome message template
+const user = getUser();
+const chatId = getChatId();
 
-            const data = await response.json();
-            if (data.success) {
-                this.templates = data.templates;
-                this.populateTemplatesModal();
-            }
+bot.sendMessage(chatId, \`🎉 Hello \${user.first_name}! Welcome to our bot!\\\\n\\\\n🤖 I can help you with:\\\\n/start - Show this welcome message\\\\n/help - Get help\\\\n/info - Bot information\\\\n\\\\nChoose a command or type your message!\`);`,
+                        description: "Simple welcome message with user info"
+                    },
+                    {
+                        name: "Help Command",
+                        patterns: "/help, help, commands",
+                        code: `// Help command template
+const helpText = \`🤖 *Bot Help Menu*
+
+*Available Commands:*
+• /start - Start the bot
+• /help - Show this help message
+• /info - Bot information
+
+*Features:*
+• Multiple command patterns
+• Interactive conversations
+• Media support
+• Python code execution
+
+*Need Help?*
+Contact support if you need assistance.\`;
+
+bot.sendMessage(helpText, {
+    parse_mode: 'Markdown'
+});`,
+                        description: "Display available commands"
+                    }
+                ],
+                interactive: [
+                    {
+                        name: "Interactive Conversation",
+                        patterns: "/conversation, chat, talk",
+                        code: `// Interactive conversation template
+const user = getUser();
+
+// Ask first question
+await bot.sendMessage(\`Hello \${user.first_name}! Let's have a conversation. What's your favorite color?\`);
+
+// Wait for answer
+const colorAnswer = await waitForAnswer('Please tell me your favorite color:');
+
+// Ask second question
+await bot.sendMessage(\`Great choice! \${colorAnswer} is a beautiful color. What's your favorite food?\`);
+
+const foodAnswer = await waitForAnswer('Please tell me your favorite food:');
+
+// Save user preferences
+await User.saveData('favorite_color', colorAnswer);
+await User.saveData('favorite_food', foodAnswer);
+
+// Show summary
+bot.sendMessage(\`Thanks for chatting! I'll remember that you like \${colorAnswer} and \${foodAnswer}.\`);`,
+                        description: "Multiple questions with wait for answer",
+                        waitForAnswer: true,
+                        answerHandler: `// Answer handler for conversation
+const userAnswer = message.text;
+const currentQuestion = await User.getData('current_question');
+
+if (currentQuestion === 'color') {
+    await User.saveData('favorite_color', userAnswer);
+    await User.saveData('current_question', 'food');
+    bot.sendMessage(\`Nice! \${userAnswer} is a great color. Now, what's your favorite food?\`);
+} else if (currentQuestion === 'food') {
+    await User.saveData('favorite_food', userAnswer);
+    await User.deleteData('current_question');
+    
+    const favoriteColor = await User.getData('favorite_color');
+    bot.sendMessage(\`Perfect! So you like \${favoriteColor} and \${userAnswer}. Thanks for sharing!\`);
+}`
+                    }
+                ]
+            };
+            
+            this.populateTemplatesModal();
         } catch (error) {
             console.error('❌ Load templates error:', error);
         }
@@ -56,7 +129,7 @@ class CommandEditor {
                                     <i class="fas fa-code"></i>
                                 </div>
                                 <h4>${this.escapeHtml(template.name)}</h4>
-                                <p>${this.escapeHtml(template.patterns)}</p>
+                                <p>${this.escapeHtml(template.description)}</p>
                                 <div class="template-patterns">${this.escapeHtml(template.patterns)}</div>
                             </div>
                         `).join('')}
@@ -144,6 +217,17 @@ class CommandEditor {
         // Modal events
         this.setupModalEvents();
         this.setupTemplateCategories();
+        
+        // Command list click events
+        document.addEventListener('click', (e) => {
+            const commandGroup = e.target.closest('.command-group');
+            if (commandGroup) {
+                const commandId = commandGroup.dataset.commandId;
+                if (commandId) {
+                    this.selectCommand(commandId);
+                }
+            }
+        });
     }
 
     setupCommandsTags() {
@@ -444,6 +528,8 @@ class CommandEditor {
         this.commands.forEach(command => {
             const isActive = command.is_active;
             const isSelected = this.currentCommand?.id === command.id;
+            const patterns = command.command_patterns.split(',').slice(0, 2).join(', ');
+            const hasMorePatterns = command.command_patterns.split(',').length > 2;
             
             html += `
                 <div class="command-group ${isSelected ? 'active' : ''}" 
@@ -452,15 +538,18 @@ class CommandEditor {
                         <i class="fas fa-code"></i>
                     </div>
                     <div class="command-content">
-                        <div class="command-patterns">
-                            ${this.escapeHtml(command.command_patterns)}
+                        <div class="command-header">
+                            <div class="command-name">${this.escapeHtml(command.command_patterns.split(',')[0])}</div>
+                            <div class="command-patterns">${this.escapeHtml(patterns)}${hasMorePatterns ? '...' : ''}</div>
                         </div>
+                        ${command.description ? `<div class="command-description">${this.escapeHtml(command.description)}</div>` : ''}
                         <div class="command-meta">
                             <span class="command-status ${isActive ? 'active' : 'inactive'}">
                                 <i class="fas fa-circle"></i>
                                 ${isActive ? 'Active' : 'Inactive'}
                             </span>
                             ${command.wait_for_answer ? '<span class="command-feature">⏳ Waits</span>' : ''}
+                            <span class="command-id">ID: ${command.id.substring(0, 8)}...</span>
                         </div>
                     </div>
                 </div>
@@ -480,8 +569,9 @@ class CommandEditor {
         }
 
         commandGroups.forEach(group => {
-            const commandPattern = group.querySelector('.command-patterns').textContent.toLowerCase();
-            const isVisible = commandPattern.includes(lowerSearch);
+            const commandName = group.querySelector('.command-name').textContent.toLowerCase();
+            const commandPatterns = group.querySelector('.command-patterns').textContent.toLowerCase();
+            const isVisible = commandName.includes(lowerSearch) || commandPatterns.includes(lowerSearch);
             group.style.display = isVisible ? 'block' : 'none';
         });
     }
@@ -491,6 +581,7 @@ class CommandEditor {
             id: 'new',
             command_patterns: '/start',
             code: '// Write your command code here\nconst user = getUser();\nbot.sendMessage(`Hello ${user.first_name}! Welcome to our bot.`);',
+            description: '',
             is_active: true,
             wait_for_answer: false,
             answer_handler: ''
@@ -498,6 +589,10 @@ class CommandEditor {
 
         this.showCommandEditor();
         this.populateCommandForm();
+        
+        // Set initial command name and patterns
+        document.getElementById('commandName').value = 'Welcome Command';
+        document.getElementById('commandDescription').value = 'Welcome message for new users';
         
         setTimeout(() => {
             document.getElementById('moreCommands').focus();
@@ -558,6 +653,10 @@ class CommandEditor {
     populateCommandForm() {
         if (!this.currentCommand) return;
         
+        // Set command name and description
+        document.getElementById('commandName').value = this.currentCommand.command_patterns.split(',')[0] || '';
+        document.getElementById('commandDescription').value = this.currentCommand.description || '';
+        
         this.setCommandsToTags(this.currentCommand.command_patterns);
         document.getElementById('commandCode').value = this.currentCommand.code || '';
         
@@ -568,7 +667,7 @@ class CommandEditor {
         }
         
         document.getElementById('answerHandler').value = this.currentCommand.answer_handler || '';
-        document.getElementById('currentCommandName').textContent = 'Command Editor';
+        document.getElementById('currentCommandName').textContent = this.currentCommand.command_patterns.split(',')[0] || 'Command Editor';
         document.getElementById('commandId').textContent = `ID: ${this.currentCommand.id}`;
         
         const statusBadge = document.getElementById('commandStatus');
@@ -599,6 +698,8 @@ class CommandEditor {
             return false;
         }
 
+        const commandName = document.getElementById('commandName').value.trim();
+        const commandDescription = document.getElementById('commandDescription').value.trim();
         const commands = this.getCommandsFromTags();
         
         if (commands.length === 0) {
@@ -619,6 +720,7 @@ class CommandEditor {
         const formData = {
             commandPatterns: commandPatterns,
             code: commandCode,
+            description: commandDescription,
             waitForAnswer: document.getElementById('waitForAnswer').checked,
             answerHandler: document.getElementById('waitForAnswer').checked ? 
                           document.getElementById('answerHandler').value.trim() : '',
@@ -949,6 +1051,10 @@ class CommandEditor {
     }
 
     applyTemplate(template) {
+        // Set command name based on template
+        document.getElementById('commandName').value = template.name;
+        document.getElementById('commandDescription').value = template.description || '';
+        
         this.setCommandsToTags(template.patterns);
         document.getElementById('commandCode').value = template.code;
         
@@ -964,9 +1070,6 @@ class CommandEditor {
         document.getElementById('templatesModal').style.display = 'none';
         this.showSuccess('Template applied successfully!');
     }
-
-    // ... rest of the methods (checkAuth, showLoading, showError, etc.) remain the same
-    // Please keep the existing methods for authentication, notifications, etc.
 
     async checkAuth() {
         const token = localStorage.getItem('token');
@@ -1070,23 +1173,10 @@ class CommandEditor {
 }
 
 // Initialize command editor
-// client/js/command-editor.js - ঠিক করা ভার্সন
-// Initialize command editor - এই অংশটি ঠিক করুন
 let commandEditor;
 
 document.addEventListener('DOMContentLoaded', () => {
     commandEditor = new CommandEditor();
-    
-    // Add click event for command groups - এই অংশ যোগ করুন
-    document.addEventListener('click', (e) => {
-        const commandGroup = e.target.closest('.command-group');
-        if (commandGroup) {
-            const commandId = commandGroup.dataset.commandId;
-            if (commandId && commandEditor.selectCommand) {
-                commandEditor.selectCommand(commandId);
-            }
-        }
-    });
     
     // Add event listener for waitForAnswer toggle
     const waitForAnswerToggle = document.getElementById('waitForAnswer');
