@@ -86,8 +86,7 @@ app.use(express.static(path.join(__dirname, '../client'), {
     extensions: ['html', 'htm'] // Auto-add extensions
 }));
 
-// Import and use routes with error handling
-// server/index.js - লাইন ৪৮ এর পরে যোগ করুন
+// server/index.js - এই লাইনগুলো আছে কিনা চেক করুন
 try {
     const authRoutes = require('./routes/auth');
     const botRoutes = require('./routes/bots');
@@ -95,7 +94,7 @@ try {
     const adminRoutes = require('./routes/admin');
     const passwordRoutes = require('./routes/password');
     const webhookRoutes = require('./routes/webhook');
-    const templateRoutes = require('./routes/templates'); // ✅ এই লাইন যোগ করুন
+    const templateRoutes = require('./routes/templates'); // ✅ এই লাইন থাকতে হবে
 
     app.use('/api/auth', authRoutes);
     app.use('/api/bots', botRoutes);
@@ -103,7 +102,7 @@ try {
     app.use('/api/admin', adminRoutes);
     app.use('/api/password', passwordRoutes);
     app.use('/api/webhook', webhookRoutes);
-    app.use('/api/templates', templateRoutes); // ✅ এই লাইন যোগ করুন
+    app.use('/api/templates', templateRoutes); // ✅ এই লাইন থাকতে হবে
     
     console.log('✅ All routes loaded successfully');
 } catch (error) {
