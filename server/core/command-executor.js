@@ -74,6 +74,7 @@ async function executeCommandCode(bot, code, context) {
                         // Send question first
                         bot.sendMessage(chatId, question, options).then(() => {
                             // Set up handler for next message
+                            const botManager = require('./bot-manager');
                             botManager.nextCommandHandlers.set(nextCommandKey, (answer) => {
                                 resolve(answer);
                             });
