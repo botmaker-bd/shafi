@@ -686,36 +686,36 @@
     margin-bottom: 0;
 }
 
-.test-loading {
-    text-align: center;
-    padding: 2rem;
-}
+/*.test-loading {*/
+    /*text-align: center;*/
+    /*padding: 2rem;*/
+/*}*/
 
-.test-loading .spinner {
-    margin-bottom: 1rem;
-}
+/*.test-loading .spinner {*/
+    /*margin-bottom: 1rem;*/
+/*}*/
 
 /* Copy Button Styles */
-.copy-btn {
-    position: absolute;
-    top: 0.75rem;
-    right: 0.75rem;
-    background: rgba(255, 255, 255, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: var(--radius-sm);
-    color: white;
-    padding: 0.25rem 0.5rem;
-    font-size: 0.75rem;
-    cursor: pointer;
-    transition: var(--transition);
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-}
-
-.copy-btn:hover {
-    background: rgba(255, 255, 255, 0.3);
-}
+/*.copy-btn {*/
+    /*position: absolute;*/
+    /*top: 0.75rem;*/
+    /*right: 0.75rem;*/
+    /*background: rgba(255, 255, 255, 0.2);*/
+    /*border: 1px solid rgba(255, 255, 255, 0.3);*/
+    /*border-radius: var(--radius-sm);*/
+    /*color: white;*/
+    /*padding: 0.25rem 0.5rem;*/
+    /*font-size: 0.75rem;*/
+    /*cursor: pointer;*/
+    /*transition: var(--transition);*/
+    /*display: flex;*/
+    /*align-items: center;*/
+    /*gap: 0.25rem;*/
+/*}*/
+/**/
+/*.copy-btn:hover {*/
+    /*background: rgba(255, 255, 255, 0.3);*/
+/*}*/
 
 .test-error .copy-btn {
     background: rgba(255, 255, 255, 0.1);
@@ -801,4 +801,165 @@
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+
+
+
+/* Enhanced Test Result Styles */
+.telegram-response {
+    background: linear-gradient(135deg, #0088cc, #00a2ff);
+    color: white;
+    padding: 1rem;
+    border-radius: var(--radius-lg);
+    margin-bottom: 1rem;
+    border-left: 4px solid #0088cc;
+}
+
+.execution-details {
+    background: var(--bg-tertiary);
+    padding: 1rem;
+    border-radius: var(--radius-lg);
+    margin-bottom: 1rem;
+    border-left: 4px solid var(--warning-color);
+}
+
+.bot-reply {
+    background: linear-gradient(135deg, var(--success-color), #10b981);
+    color: white;
+    padding: 1rem;
+    border-radius: var(--radius-lg);
+    margin-bottom: 1rem;
+    border-left: 4px solid var(--success-color);
+}
+
+.error-response {
+    background: linear-gradient(135deg, var(--error-color), #ef4444);
+    color: white;
+    padding: 1rem;
+    border-radius: var(--radius-lg);
+    margin-bottom: 1rem;
+    border-left: 4px solid var(--error-color);
+}
+
+.response-section {
+    margin-bottom: 1.5rem;
+}
+
+.response-section:last-child {
+    margin-bottom: 0;
+}
+
+.response-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+.response-content {
+    font-family: 'Courier New', monospace;
+    font-size: 0.875rem;
+    white-space: pre-wrap;
+    line-height: 1.4;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 0.75rem;
+    border-radius: var(--radius-md);
+    margin-top: 0.5rem;
+}
+
+.telegram-response .response-content {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.bot-reply .response-content {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.test-result-grid {
+    display: grid;
+    gap: 1rem;
+}
+
+.test-result-item {
+    background: var(--bg-tertiary);
+    padding: 1rem;
+    border-radius: var(--radius-lg);
+    border-left: 4px solid var(--primary-color);
+}
+
+.test-result-item.success {
+    border-left-color: var(--success-color);
+}
+
+.test-result-item.error {
+    border-left-color: var(--error-color);
+}
+
+.test-result-item.warning {
+    border-left-color: var(--warning-color);
+}
+
+.result-icon {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.result-title {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.result-content {
+    font-size: 0.875rem;
+    line-height: 1.4;
+}
+
+/* Enhanced loading states */
+.test-loading {
+    text-align: center;
+    padding: 3rem;
+    color: var(--text-muted);
+}
+
+.test-loading .spinner {
+    margin: 0 auto 1rem;
+}
+
+/* Copy button enhancements */
+.copy-btn {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: rgba(255, 255, 255, 0.9);
+    color: var(--text-primary);
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: var(--transition);
+    backdrop-filter: blur(10px);
+}
+
+.copy-btn:hover {
+    background: white;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Response type indicators */
+.response-type {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    margin-bottom: 0.5rem;
 }
