@@ -1,0 +1,32 @@
+[
+    {
+        "name": "HTTP GET Request",
+        "patterns": "/fetch, get, api",
+        "code": "// HTTP GET request template\ntry {\n    const response = await HTTP.get('https://api.github.com/users/octocat');\n    const userData = JSON.parse(response);\n    \n    bot.sendMessage(`GitHub User Info:\\\\n\\\\n👤 Name: ${userData.name}\\\\n📝 Bio: ${userData.bio}\\\\n📊 Followers: ${userData.followers}\\\\n🏠 Location: ${userData.location}`);\n} catch (error) {\n    bot.sendMessage(`❌ Error fetching data: ${error.message}`);\n}",
+        "description": "Fetch data from API"
+    },
+    {
+        "name": "HTTP POST Request",
+        "patterns": "/post, send, submit",
+        "code": "// HTTP POST request template\ntry {\n    const postData = {\n        name: 'John Doe',\n        email: 'john@example.com',\n        message: 'Hello from Telegram Bot!'\n    };\n    \n    const response = await HTTP.post('https://api.example.com/contact', postData);\n    const result = JSON.parse(response);\n    \n    bot.sendMessage('✅ Data submitted successfully!');\n} catch (error) {\n    bot.sendMessage(`❌ Error submitting data: ${error.message}`);\n}",
+        "description": "Send data to API"
+    },
+    {
+        "name": "Weather API",
+        "patterns": "/weather, climate, temp",
+        "code": "// Weather API template\ntry {\n    // Replace with your weather API\n    const apiKey = 'YOUR_API_KEY';\n    const city = 'London';\n    const response = await HTTP.get(`https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric`);\n    const weatherData = JSON.parse(response);\n    \n    const weatherInfo = `🌤️ *Weather in ${weatherData.name}*\\\\n\\\\n🌡️ Temperature: ${weatherData.main.temp}°C\\\\n💧 Humidity: ${weatherData.main.humidity}%\\\\n🌬️ Wind: ${weatherData.wind.speed} m/s\\\\n☁️ Condition: ${weatherData.weather[0].description}`;\n    \n    bot.sendMessage(weatherInfo);\n} catch (error) {\n    bot.sendMessage(`❌ Weather data unavailable: ${error.message}`);\n}",
+        "description": "Get weather information"
+    },
+    {
+        "name": "News API",
+        "patterns": "/news, headlines, articles",
+        "code": "// News API template\ntry {\n    // Replace with your news API\n    const apiKey = 'YOUR_API_KEY';\n    const response = await HTTP.get(`https://newsapi.org/v2/top-headlines?country=us&apiKey=${apiKey}`);\n    const newsData = JSON.parse(response);\n    \n    if (newsData.articles && newsData.articles.length > 0) {\n        const topNews = newsData.articles.slice(0, 3);\n        let newsText = '📰 *Top News Headlines*\\\\n\\\\n';\n        \n        topNews.forEach((article, index) => {\n            newsText += `${index + 1}. ${article.title}\\\\nSource: ${article.source.name}\\\\n\\\\n`;\n        });\n        \n        bot.sendMessage(newsText);\n    } else {\n        bot.sendMessage('No news articles found.');\n    }\n} catch (error) {\n    bot.sendMessage(`❌ News unavailable: ${error.message}`);\n}",
+        "description": "Fetch latest news"
+    },
+    {
+        "name": "Currency Converter",
+        "patterns": "/currency, convert, exchange",
+        "code": "// Currency converter template\ntry {\n    const fromCurrency = 'USD';\n    const toCurrency = 'EUR';\n    const amount = 100;\n    \n    const response = await HTTP.get(`https://api.exchangerate-api.com/v4/latest/${fromCurrency}`);\n    const rates = JSON.parse(response);\n    \n    if (rates.rates && rates.rates[toCurrency]) {\n        const rate = rates.rates[toCurrency];\n        const converted = (amount * rate).toFixed(2);\n        \n        bot.sendMessage(`💱 *Currency Conversion*\\\\n\\\\n${amount} ${fromCurrency} = ${converted} ${toCurrency}\\\\n📈 Exchange Rate: 1 ${fromCurrency} = ${rate} ${toCurrency}`);\n    } else {\n        bot.sendMessage('Currency conversion rate not available.');\n    }\n} catch (error) {\n    bot.sendMessage(`❌ Conversion failed: ${error.message}`);\n}",
+        "description": "Convert currencies using API"
+    }
+]
