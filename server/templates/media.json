@@ -1,0 +1,32 @@
+[
+    {
+        "name": "Send Photo",
+        "patterns": "/photo, picture, image",
+        "code": "// Send photo template\nconst photoUrl = 'https://example.com/image.jpg'; // Replace with your image URL\nconst caption = 'Here\\'s a beautiful image for you! 🌄';\n\nbot.sendPhoto(photoUrl, {\n    caption: caption,\n    parse_mode: 'HTML'\n});",
+        "description": "Send image with caption"
+    },
+    {
+        "name": "Send Video",
+        "patterns": "/video, clip, movie",
+        "code": "// Send video template\nconst videoUrl = 'https://example.com/video.mp4'; // Replace with your video URL\nconst caption = 'Check out this amazing video! 🎥';\n\nbot.sendVideo(videoUrl, {\n    caption: caption,\n    parse_mode: 'HTML'\n});",
+        "description": "Send video file with caption"
+    },
+    {
+        "name": "Send Document",
+        "patterns": "/document, file, doc",
+        "code": "// Send document template\nconst documentUrl = 'https://example.com/document.pdf'; // Replace with your document URL\nconst caption = 'Here is the document you requested! 📄';\n\nbot.sendDocument(documentUrl, {\n    caption: caption,\n    parse_mode: 'HTML'\n});",
+        "description": "Send file/document to user"
+    },
+    {
+        "name": "Send Audio",
+        "patterns": "/audio, music, song",
+        "code": "// Send audio template\nconst audioUrl = 'https://example.com/audio.mp3'; // Replace with your audio URL\nconst caption = 'Enjoy this audio track! 🎵';\n\nbot.sendAudio(audioUrl, {\n    caption: caption,\n    parse_mode: 'HTML'\n});",
+        "description": "Send audio file to user"
+    },
+    {
+        "name": "Media Gallery",
+        "patterns": "/gallery, media, photos",
+        "code": "// Media gallery template\nconst mediaGroup = [\n    {\n        type: 'photo',\n        media: 'https://example.com/photo1.jpg',\n        caption: 'First beautiful photo 📸'\n    },\n    {\n        type: 'photo', \n        media: 'https://example.com/photo2.jpg',\n        caption: 'Second amazing shot 🌅'\n    }\n];\n\nbot.sendMediaGroup(mediaGroup);",
+        "description": "Send multiple media files"
+    }
+]
