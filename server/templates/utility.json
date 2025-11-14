@@ -1,0 +1,20 @@
+[
+    {
+        "id": "data_management",
+        "name": "Data Management",
+        "patterns": "/mydata, profile, stats, info",
+        "description": "Comprehensive user data management and statistics",
+        "code": "const user = getUser();\n\n// Get user data\nconst userData = {\n    joinDate: User.getData('join_date') || new Date().toISOString(),\n    commandCount: User.getData('command_count') || 0,\n    lastActive: User.getData('last_active') || new Date().toISOString(),\n    preferences: User.getData('preferences') || {},\n    customData: User.getData('custom_data') || {}\n};\n\n// Update usage stats\nUser.saveData('command_count', (userData.commandCount || 0) + 1);\nUser.saveData('last_active', new Date().toISOString());\n\nconst dataText = `👤 *Your Data Profile*\\n\\n` +\n`🆔 *User ID:* \\`${user.id}\\`\\n` +\n`👋 *Name:* ${user.first_name}${user.last_name ? ' ' + user.last_name : ''}\\n` +\n`📛 *Username:* ${user.username ? '@' + user.username : 'Not set'}\\n\\n` +\n`📊 *Usage Statistics:*\\n` +\n`• Commands Used: ${userData.commandCount}\\n` +\n`• Joined: ${new Date(userData.joinDate).toLocaleDateString()}\\n` +\n`• Last Active: ${new Date(userData.lastActive).toLocaleString()}\\n\\n` +\n`💾 *Storage Used:* ${JSON.stringify(userData).length} bytes`;\n\nconst dataButtons = [\n    [\n        { text: \"📈 Usage Stats\", callback_data: \"data_stats\" },\n        { text: \"⚙️ Preferences\", callback_data: \"data_prefs\" }\n    ],\n    [\n        { text: \"🗑️ Clear Data\", callback_data: \"data_clear\" },\n        { text: \"📤 Export Data\", callback_data: \"data_export\" }\n    ],\n    [\n        { text: \"🔄 Refresh\", callback_data: \"data_refresh\" }\n    ]\n];\n\nbot.sendMessage(dataText, {\n    parse_mode: 'Markdown',\n    reply_markup: { inline_keyboard: dataButtons }\n});",
+        "waitForAnswer": false,
+        "answerHandler": ""
+    },
+    {
+        "id": "settings_manager",
+        "name": "Settings Manager",
+        "patterns": "/settings, config, options, prefs",
+        "description": "User settings and configuration management",
+        "code": "// Get current settings\nconst currentSettings = User.getData('user_settings') || {\n    notifications: true,\n    language: 'english',\n    theme: 'auto',\n    privacy: 'standard'\n};\n\nconst settingsText = `⚙️ *Settings Manager*\\n\\n` +\n`Current Configuration:\\n\\n` +\n`🔔 *Notifications:* ${currentSettings.notifications ? '✅ Enabled' : '❌ Disabled'}\\n` +\n`🌐 *Language:* ${currentSettings.language}\\n` +\n`🎨 *Theme:* ${currentSettings.theme}\\n` +\n`🔒 *Privacy:* ${currentSettings.privacy}\\n\\n` +\n`Use buttons below to modify settings:`;\n\nconst settingsButtons = [\n    [\n        { \n            text: currentSettings.notifications ? \"🔔 Notifications: ON\" : \"🔕 Notifications: OFF\", \n            callback_data: \"toggle_notifications\" \n        }\n    ],\n    [\n        { text: \"🌐 Language\", callback_data: \"change_language\" },\n        { text: \"🎨 Theme\", callback_data: \"change_theme\" }\n    ],\n    [\n        { text: \"🔒 Privacy\", callback_data: \"change_privacy\" },\n        { text: \"📊 Data\", callback_data: \"data_settings\" }\n    ],\n    [\n        { text: \"💾 Save\", callback_data: \"save_settings\" },\n        { text: \"🔄 Reset\", callback_data: \"reset_settings\" }\n    ]\n];\n\nbot.sendMessage(settingsText, {\n    parse_mode: 'Markdown',\n    reply_markup: { inline_keyboard: settingsButtons }\n});",
+        "waitForAnswer": false,
+        "answerHandler": ""
+    }
+]
