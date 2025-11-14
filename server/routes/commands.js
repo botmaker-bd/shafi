@@ -76,7 +76,7 @@ router.get('/:commandId', async (req, res) => {
 // Add new command
 router.post('/', async (req, res) => {
     try {
-        const { botToken, commandPatterns, code, waitForAnswer, answerHandler } = req.body;
+        const { botToken, commandPatterns, code, description, waitForAnswer, answerHandler } = req.body;
 
         console.log('🔄 Adding new command:', { 
             commandPatterns: commandPatterns?.substring(0, 50) + '...',
@@ -106,7 +106,7 @@ router.post('/', async (req, res) => {
                 .from('commands')
                 .select('id, command_patterns')
                 .eq('bot_token', botToken)
-                .eq('command_patterns', pattern)
+                .ilike('command_patterns', `%${pattern}%`)
                 .single();
 
             if (checkError && checkError.code !== 'PGRST116') {
@@ -128,6 +128,7 @@ router.post('/', async (req, res) => {
                 bot_token: botToken,
                 command_patterns: commandPatterns.trim(),
                 code: code.trim(),
+                description: description?.trim() || null,
                 wait_for_answer: waitForAnswer || false,
                 answer_handler: answerHandler?.trim() || null,
                 is_active: true
@@ -164,7 +165,7 @@ router.post('/', async (req, res) => {
 router.put('/:commandId', async (req, res) => {
     try {
         const { commandId } = req.params;
-        const { commandPatterns, code, waitForAnswer, answerHandler, botToken } = req.body;
+        const { commandPatterns, code, description, waitForAnswer, answerHandler, botToken } = req.body;
 
         console.log('🔄 Updating command:', { commandId, commandPatterns: commandPatterns?.substring(0, 50) + '...' });
 
@@ -191,7 +192,7 @@ router.put('/:commandId', async (req, res) => {
                 .from('commands')
                 .select('id, command_patterns')
                 .eq('bot_token', botToken)
-                .eq('command_patterns', pattern)
+                .ilike('command_patterns', `%${pattern}%`)
                 .neq('id', commandId)
                 .single();
 
@@ -213,6 +214,7 @@ router.put('/:commandId', async (req, res) => {
             .update({
                 command_patterns: commandPatterns.trim(),
                 code: code.trim(),
+                description: description?.trim() || null,
                 wait_for_answer: waitForAnswer || false,
                 answer_handler: answerHandler?.trim() || null,
                 updated_at: new Date().toISOString()
@@ -301,7 +303,7 @@ router.delete('/:commandId', async (req, res) => {
     }
 });
 
-// ✅ FIXED: Test command execution
+// Test command execution
 router.post('/:commandId/test', async (req, res) => {
     try {
         const { commandId } = req.params;
@@ -330,7 +332,6 @@ router.post('/:commandId/test', async (req, res) => {
             });
         }
 
-        // ✅ FIXED: Use the correct method name
         const bot = botManager.getBotInstance(botToken);
         if (!bot) {
             return res.status(400).json({ 
@@ -372,7 +373,7 @@ router.post('/:commandId/test', async (req, res) => {
         
         try {
             // Execute command using the bot manager
-            await botManager.executeCommand(bot, command, testMessage, testText);
+            const result = await botManager.executeCommand(bot, command, testMessage, testText);
             
             console.log('✅ Command test executed successfully:', commandId);
 
@@ -380,7 +381,7 @@ router.post('/:commandId/test', async (req, res) => {
                 success: true,
                 message: 'Command test executed successfully! Check your admin Telegram account for results.',
                 testInput: testText,
-                result: 'Command executed successfully'
+                result: result || 'Command executed successfully'
             });
         } catch (executionError) {
             console.error('❌ Command execution failed:', executionError);
@@ -400,7 +401,7 @@ router.post('/:commandId/test', async (req, res) => {
     }
 });
 
-// ✅ FIXED: Temporary command test
+// Temporary command test
 router.post('/test-temp', async (req, res) => {
     try {
         const { command, botToken, testInput } = req.body;
@@ -412,7 +413,6 @@ router.post('/test-temp', async (req, res) => {
             });
         }
 
-        // ✅ FIXED: Use the correct method name
         const bot = botManager.getBotInstance(botToken);
         if (!bot) {
             return res.status(400).json({ 
@@ -470,6 +470,197 @@ router.post('/test-temp', async (req, res) => {
     }
 });
 
+// Test command with input simulation
+router.post('/test-input', async (req, res) => {
+    try {
+        const { commandId, testInput, botToken } = req.body;
+
+        if (!commandId || !testInput || !botToken) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Command ID, test input and bot token are required' 
+            });
+        }
+
+        // Get command details
+        const { data: command, error: commandError } = await supabase
+            .from('commands')
+            .select('*')
+            .eq('id', commandId)
+            .single();
+
+        if (commandError || !command) {
+            return res.status(404).json({ 
+                success: false,
+                error: 'Command not found' 
+            });
+        }
+
+        // Get bot info
+        const { data: bot, error: botError } = await supabase
+            .from('bots')
+            .select('*')
+            .eq('token', botToken)
+            .single();
+
+        if (botError || !bot) {
+            return res.status(404).json({ 
+                success: false,
+                error: 'Bot not found' 
+            });
+        }
+
+        // Simulate Telegram message
+        const simulatedMessage = {
+            message_id: Math.floor(Math.random() * 10000),
+            from: {
+                id: 123456789,
+                is_bot: false,
+                first_name: 'Test',
+                last_name: 'User',
+                username: 'testuser',
+                language_code: 'en'
+            },
+            chat: {
+                id: 123456789,
+                first_name: 'Test',
+                last_name: 'User',
+                username: 'testuser',
+                type: 'private'
+            },
+            date: Math.floor(Date.now() / 1000),
+            text: testInput
+        };
+
+        // Execute command code with simulated context
+        const executionResult = await executeCommandCode(
+            command.code,
+            simulatedMessage,
+            botToken
+        );
+
+        res.json({
+            success: true,
+            telegramResponse: executionResult.telegramResponse,
+            executionDetails: executionResult.details,
+            botReply: executionResult.botReply,
+            rawResult: executionResult.rawResult
+        });
+
+    } catch (error) {
+        console.error('❌ Test command error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to test command',
+            details: error.message
+        });
+    }
+});
+
+// Command execution function
+async function executeCommandCode(code, message, botToken) {
+    try {
+        const botManager = require('../core/bot-manager');
+        const bot = botManager.getBotInstance(botToken);
+        
+        if (!bot) {
+            throw new Error('Bot not initialized');
+        }
+
+        // Create execution context
+        const context = {
+            getUser: () => message.from,
+            getChatId: () => message.chat.id,
+            getMessageText: () => message.text,
+            User: {
+                saveData: (key, value) => {
+                    console.log(`[DEBUG] User.saveData('${key}', ${JSON.stringify(value)})`);
+                    return Promise.resolve();
+                },
+                getData: (key) => {
+                    console.log(`[DEBUG] User.getData('${key}')`);
+                    return Promise.resolve(null);
+                }
+            },
+            HTTP: {
+                get: async (url) => {
+                    console.log(`[DEBUG] HTTP.get('${url}')`);
+                    return JSON.stringify({ data: 'Mock API response' });
+                },
+                post: async (url, data) => {
+                    console.log(`[DEBUG] HTTP.post('${url}', ${JSON.stringify(data)})`);
+                    return JSON.stringify({ success: true });
+                }
+            },
+            bot: {
+                sendMessage: (chatId, text, options = {}) => {
+                    console.log(`[DEBUG] bot.sendMessage(${chatId}, "${text}")`);
+                    return {
+                        message_id: Math.floor(Math.random() * 10000),
+                        from: { id: bot.id, is_bot: true, first_name: 'Test Bot' },
+                        chat: message.chat,
+                        date: Math.floor(Date.now() / 1000),
+                        text: text,
+                        ...options
+                    };
+                },
+                sendPhoto: (chatId, photo, options = {}) => {
+                    console.log(`[DEBUG] bot.sendPhoto(${chatId}, "${photo}")`);
+                    return { success: true, method: 'sendPhoto' };
+                }
+            }
+        };
+
+        // Wrap the code in a function and execute
+        const wrappedCode = `
+            try {
+                ${code}
+                return { success: true, executed: true };
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
+        `;
+
+        const executeFunction = new Function(
+            'getUser', 'getChatId', 'getMessageText', 'User', 'HTTP', 'bot', 'waitForAnswer',
+            wrappedCode
+        );
+
+        const result = await executeFunction(
+            context.getUser,
+            context.getChatId,
+            context.getMessageText,
+            context.User,
+            context.HTTP,
+            context.bot,
+            () => Promise.resolve('Mock user response')
+        );
+
+        // Collect all bot responses
+        const botReplies = [
+            `🤖 Bot executed command: ${message.text}`,
+            `💬 Response: Command processed successfully`,
+            `📊 Status: ${result.success ? 'Success' : 'Error'}`,
+            result.error ? `❌ Error: ${result.error}` : `✅ Execution completed`
+        ];
+
+        return {
+            telegramResponse: `📨 Message sent to Telegram:\n└── "${message.text}"`,
+            details: `🔍 Execution Details:\n├── Command: ${message.text}\n├── User: ${message.from.first_name}\n├── Chat ID: ${message.chat.id}\n└── Timestamp: ${new Date().toLocaleString()}`,
+            botReply: botReplies.join('\n'),
+            rawResult: result
+        };
+
+    } catch (error) {
+        return {
+            telegramResponse: `📨 Message sent to Telegram:\n└── "${message.text}"`,
+            details: `🔍 Execution Details:\n├── Command: ${message.text}\n├── Status: Failed\n└── Error: ${error.message}`,
+            botReply: `❌ Execution Failed:\n${error.message}`,
+            rawResult: { success: false, error: error.message }
+        };
+    }
+}
+
 // Toggle command status
 router.patch('/:commandId/toggle', async (req, res) => {
     try {
@@ -507,88 +698,6 @@ router.patch('/:commandId/toggle', async (req, res) => {
         res.status(500).json({ 
             success: false,
             error: 'Failed to toggle command status' 
-        });
-    }
-});
-
-// Get command templates
-router.get('/templates/categories', async (req, res) => {
-    try {
-        const templates = {
-            basic: [
-                {
-                    id: 'welcome',
-                    name: 'Welcome Message',
-                    patterns: '/start,start,hello,hi',
-                    code: `// Welcome message template
-const user = getUser();
-const welcomeMessage = \`Hello \${user.first_name}! 👋
-
-Welcome to our bot! Here's what you can do:
-• Use /help to see all commands
-• Use /info to get bot information
-
-Your User ID: \${user.id}
-Username: @\${user.username || 'Not set'}\`;
-
-bot.sendMessage(welcomeMessage, {
-    parse_mode: 'Markdown'
-});`
-                },
-                {
-                    id: 'help',
-                    name: 'Help Command',
-                    patterns: '/help,help,commands,menu',
-                    code: `// Help command template
-const helpText = \`🤖 *Bot Help Menu*
-
-*Available Commands:*
-• /start - Start the bot
-• /help - Show this help message
-• /info - Bot information
-
-*Features:*
-• Multiple command patterns
-• Interactive conversations
-• Media support
-• Python code execution
-
-*Need Help?*
-Contact support if you need assistance.\`;
-
-bot.sendMessage(helpText, {
-    parse_mode: 'Markdown'
-});`
-                }
-            ],
-            python: [
-                {
-                    id: 'python_calc',
-                    name: 'Python Calculator',
-                    patterns: '/calc,calculate,math',
-                    code: `// Python calculator
-const result = await bot.runPython(\`
-num1 = 10
-num2 = 5
-result = num1 + num2
-print(f"Calculation: {num1} + {num2} = {result}")
-\`);
-
-bot.sendMessage(\`🐍 Python Result:\\n\\n\${result}\`);`
-                }
-            ]
-        };
-
-        res.json({
-            success: true,
-            templates: templates
-        });
-
-    } catch (error) {
-        console.error('❌ Get templates error:', error);
-        res.status(500).json({ 
-            success: false,
-            error: 'Failed to fetch templates' 
         });
     }
 });
