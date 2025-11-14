@@ -686,125 +686,14 @@
     margin-bottom: 0;
 }
 
-/*.test-loading {*/
-    /*text-align: center;*/
-    /*padding: 2rem;*/
-/*}*/
-
-/*.test-loading .spinner {*/
-    /*margin-bottom: 1rem;*/
-/*}*/
-
-/* Copy Button Styles */
-/*.copy-btn {*/
-    /*position: absolute;*/
-    /*top: 0.75rem;*/
-    /*right: 0.75rem;*/
-    /*background: rgba(255, 255, 255, 0.2);*/
-    /*border: 1px solid rgba(255, 255, 255, 0.3);*/
-    /*border-radius: var(--radius-sm);*/
-    /*color: white;*/
-    /*padding: 0.25rem 0.5rem;*/
-    /*font-size: 0.75rem;*/
-    /*cursor: pointer;*/
-    /*transition: var(--transition);*/
-    /*display: flex;*/
-    /*align-items: center;*/
-    /*gap: 0.25rem;*/
-/*}*/
-/**/
-/*.copy-btn:hover {*/
-    /*background: rgba(255, 255, 255, 0.3);*/
-/*}*/
-
-.test-error .copy-btn {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.2);
+.test-loading {
+    text-align: center;
+    padding: 2rem;
 }
 
-.test-error .copy-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
+.test-loading .spinner {
+    margin-bottom: 1rem;
 }
-
-/* Responsive Design */
-@media (max-width: 1024px) {
-    .editor-layout {
-        grid-template-columns: 1fr;
-    }
-    
-    .commands-sidebar {
-        height: auto;
-        max-height: 400px;
-    }
-}
-
-@media (max-width: 768px) {
-    .editor-header {
-        flex-direction: column;
-        gap: 1rem;
-        align-items: stretch;
-    }
-    
-    .editor-actions {
-        width: 100%;
-        justify-content: stretch;
-    }
-    
-    .editor-actions .btn {
-        flex: 1;
-        justify-content: center;
-    }
-    
-    .command-form {
-        padding: 1rem;
-    }
-    
-    .command-group .command-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.5rem;
-    }
-    
-    .command-group .command-patterns {
-        max-width: 100%;
-        align-self: flex-start;
-    }
-    
-    .command-group .command-meta {
-        gap: 0.5rem;
-    }
-    
-    .templates-grid {
-        grid-template-columns: 1fr;
-    }
-    
-    .test-input-container {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    
-    .editor-toolbar {
-        justify-content: center;
-    }
-    
-    .btn-icon span {
-        display: none;
-    }
-}
-
-@keyframes slideIn {
-    from {
-        opacity: 0;
-        transform: translateY(-5px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-
-
 
 /* Enhanced Test Result Styles */
 .telegram-response {
@@ -962,4 +851,94 @@
     border-radius: var(--radius-sm);
     font-size: 0.75rem;
     margin-bottom: 0.5rem;
+}
+
+/* Text colors for status */
+.text-success {
+    color: var(--success-color);
+}
+
+.text-error {
+    color: var(--error-color);
+}
+
+.text-warning {
+    color: var(--warning-color);
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .editor-layout {
+        grid-template-columns: 1fr;
+    }
+    
+    .commands-sidebar {
+        height: auto;
+        max-height: 400px;
+    }
+}
+
+@media (max-width: 768px) {
+    .editor-header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch;
+    }
+    
+    .editor-actions {
+        width: 100%;
+        justify-content: stretch;
+    }
+    
+    .editor-actions .btn {
+        flex: 1;
+        justify-content: center;
+    }
+    
+    .command-form {
+        padding: 1rem;
+    }
+    
+    .command-group .command-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    .command-group .command-patterns {
+        max-width: 100%;
+        align-self: flex-start;
+    }
+    
+    .command-group .command-meta {
+        gap: 0.5rem;
+    }
+    
+    .templates-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .test-input-container {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .editor-toolbar {
+        justify-content: center;
+    }
+    
+    .btn-icon span {
+        display: none;
+    }
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
