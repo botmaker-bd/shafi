@@ -432,13 +432,23 @@ bot.sendMessage(\`Hello \${user.first_name}! You said: "${prompt}"\`);
         return null;
     }
 
-    async sendError(bot, chatId, error) {
-        try {
-            await bot.sendMessage(chatId, `❌ Error: ${error.message}`);
-        } catch (sendError) {
-            console.error('❌ Failed to send error message:', sendError);
-        }
+    // server/core/bot-manager.js - sendError মেথডে যোগ করুন
+async sendError(bot, chatId, error) {
+    try {
+        const errorMessage = `
+❌ *Error Occurred*
+
+*Message:* ${error.message}
+*Type:* ${error.name}
+
+We've logged this error and will fix it soon.
+        `.trim();
+        
+        await bot.sendMessage(chatId, errorMessage, { parse_mode: 'Markdown' });
+    } catch (sendError) {
+        console.error('❌ Failed to send error message:', sendError);
     }
+}
 
     // Data storage methods
     async saveData(dataType, botToken, userId, key, value, metadata = {}) {
@@ -526,21 +536,32 @@ bot.sendMessage(\`Hello \${user.first_name}! You said: "${prompt}"\`);
         }
     }
 
-    async updateCommandCache(token) {
-        try {
-            const { data: commands, error } = await supabase
-                .from('commands')
-                .select('*')
-                .eq('bot_token', token)
-                .eq('is_active', true);
+    // server/core/bot-manager.js - updateCommandCache মেথডে যোগ করুন
+async updateCommandCache(token) {
+    try {
+        const { data: commands, error } = await supabase
+            .from('commands')
+            .select('*')
+            .eq('bot_token', token)
+            .eq('is_active', true);
 
-            if (error) throw error;
-            this.botCommands.set(token, commands || []);
-        } catch (error) {
+        if (error) {
             console.error('❌ Update command cache error:', error);
-            throw error;
+            return;
         }
+
+        // Clear existing cache
+        this.botCommands.set(token, []);
+        
+        // Add new commands
+        if (commands && Array.isArray(commands)) {
+            this.botCommands.set(token, commands);
+            console.log(`✅ Updated command cache for bot ${token.substring(0,10)}...: ${commands.length} commands`);
+        }
+    } catch (error) {
+        console.error('❌ Command cache update failed:', error);
     }
+}
 
     getBotStatus() {
         return {
