@@ -70,33 +70,6 @@ try:
 except ImportError:
     requests = None
 
-try:
-    import pandas as pd
-except ImportError:
-    pd = None
-
-try:
-    import numpy as np
-except ImportError:
-    np = None
-
-try:
-    from bs4 import BeautifulSoup
-except ImportError:
-    BeautifulSoup = None
-
-try:
-    from PIL import Image
-except ImportError:
-    Image = None
-
-try:
-    import telethon
-    from telethon import TelegramClient
-except ImportError:
-    telethon = None
-    TelegramClient = None
-
 # Input data handling
 input_data = None
 if len(sys.argv) > 1 and sys.argv[1].strip():
@@ -105,32 +78,33 @@ if len(sys.argv) > 1 and sys.argv[1].strip():
     except json.JSONDecodeError:
         input_data = sys.argv[1]
 
-# Result storage
-result = None
-error_info = None
-
+# User code execution
 try:
-    # User code execution
+    # User's code will be inserted here
     ${code}
     
+    # If no result variable, check for output
+    if 'result' not in locals() and 'result' not in globals():
+        result = "Code executed successfully"
+        
 except Exception as e:
     error_info = {
         "error": str(e),
         "type": type(e).__name__,
         "traceback": traceback.format_exc()
     }
-
-# Output results
-if error_info:
     print(json.dumps({"success": False, **error_info}))
     sys.exit(1)
 else:
-    output = {"success": True}
-    if result is not None:
-        output["result"] = result
-    elif 'result' in locals():
-        output["result"] = locals()['result']
-    print(json.dumps(output))
+    # Convert result to JSON-serializable format
+    import json
+    try:
+        json.dumps(result)
+        output_result = result
+    except:
+        output_result = str(result)
+    
+    print(json.dumps({"success": True, "result": output_result}))
 `;
 
                 fs.writeFileSync(tempFile, pythonTemplate);
