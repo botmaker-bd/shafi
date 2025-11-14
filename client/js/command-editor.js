@@ -868,75 +868,75 @@ class CommandEditor {
         }
     }
 
-    async testCommand() {
-        if (!this.currentBot) {
-            this.showError('Bot information not loaded');
-            return;
-        }
+    // async testCommand() {
+        // if (!this.currentBot) {
+            // this.showError('Bot information not loaded');
+            // return;
+        // }
 
-        const commands = this.getCommandsFromTags();
-        if (commands.length === 0) {
-            this.showError('Please add at least one command to test');
-            return;
-        }
+        // const commands = this.getCommandsFromTags();
+        // if (commands.length === 0) {
+            // this.showError('Please add at least one command to test');
+            // return;
+        // }
 
-        const commandCode = document.getElementById('commandCode').value.trim();
-        if (!commandCode) {
-            this.showError('Please add command code to test');
-            return;
-        }
+        // const commandCode = document.getElementById('commandCode').value.trim();
+        // if (!commandCode) {
+            // this.showError('Please add command code to test');
+            // return;
+        // }
 
-        this.showTestModal();
-        this.showTestLoading();
+        // this.showTestModal();
+        // this.showTestLoading();
 
-        try {
-            const token = localStorage.getItem('token');
+        // try {
+            // const token = localStorage.getItem('token');
             
-            const tempCommand = {
-                command_patterns: commands.join(','),
-                code: commandCode,
-                wait_for_answer: document.getElementById('waitForAnswer').checked,
-                answer_handler: document.getElementById('answerHandler').value || ''
-            };
+            // const tempCommand = {
+                // command_patterns: commands.join(','),
+                // code: commandCode,
+                // wait_for_answer: document.getElementById('waitForAnswer').checked,
+                // answer_handler: document.getElementById('answerHandler').value || ''
+            // };
 
-            const response = await fetch('/api/commands/test-temp', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    command: tempCommand,
-                    botToken: this.currentBot.token
-                })
-            });
+            // const response = await fetch('/api/commands/test-temp', {
+                // method: 'POST',
+                // headers: {
+                    // 'Content-Type': 'application/json',
+                    // 'Authorization': `Bearer ${token}`
+                // },
+                // body: JSON.stringify({
+                    // command: tempCommand,
+                    // botToken: this.currentBot.token
+                // })
+            // });
 
-            const data = await response.json();
+            // const data = await response.json();
 
-            if (response.ok) {
-                this.showTestSuccess(`
-                    <h4>✅ Test Command Sent Successfully!</h4>
-                    <div class="test-details">
-                        <p><strong>Commands:</strong> ${commands.join(', ')}</p>
-                        <p><strong>Bot:</strong> ${this.currentBot.name}</p>
-                        <p><strong>Status:</strong> Command executed without errors</p>
-                    </div>
-                    <p class="test-message">Check your Telegram bot for the test results.</p>
-                `);
-            } else {
-                this.showTestError(`
-                    <h4>❌ Test Failed</h4>
-                    <p><strong>Error:</strong> ${data.error || 'Unknown error occurred'}</p>
-                    ${data.details ? `<p><strong>Details:</strong> ${data.details}</p>` : ''}
-                `);
-            }
-        } catch (error) {
-            this.showTestError(`
-                <h4>❌ Network Error</h4>
-                <p>Failed to connect to server: ${error.message}</p>
-            `);
-        }
-    }
+            // if (response.ok) {
+                // this.showTestSuccess(`
+                    // <h4>✅ Test Command Sent Successfully!</h4>
+                    // <div class="test-details">
+                        // <p><strong>Commands:</strong> ${commands.join(', ')}</p>
+                        // <p><strong>Bot:</strong> ${this.currentBot.name}</p>
+                        // <p><strong>Status:</strong> Command executed without errors</p>
+                    // </div>
+                    // <p class="test-message">Check your Telegram bot for the test results.</p>
+                // `);
+            // } else {
+                // this.showTestError(`
+                    // <h4>❌ Test Failed</h4>
+                    // <p><strong>Error:</strong> ${data.error || 'Unknown error occurred'}</p>
+                    // ${data.details ? `<p><strong>Details:</strong> ${data.details}</p>` : ''}
+                // `);
+            // }
+        // } catch (error) {
+            // this.showTestError(`
+                // <h4>❌ Network Error</h4>
+                // <p>Failed to connect to server: ${error.message}</p>
+            // `);
+        // }
+    // }
 
     async runCustomTest() {
         if (!this.currentBot) {
@@ -1013,6 +1013,323 @@ class CommandEditor {
             `);
         }
     }
+    
+    // Updated test methods in CommandEditor class
+
+async runQuickTest() {
+    const testInput = document.getElementById('quickTestInput').value.trim();
+    
+    if (!testInput) {
+        this.showError('Please enter a command to test');
+        return;
+    }
+
+    if (!this.currentCommand || this.currentCommand.id === 'new') {
+        this.showError('Please save the command first before testing');
+        return;
+    }
+
+    this.showTestModal();
+    this.showTestLoading();
+
+    try {
+        const token = localStorage.getItem('token');
+        
+        const response = await fetch('/api/commands/test-input', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                commandId: this.currentCommand.id,
+                testInput: testInput,
+                botToken: this.currentBot.token
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            this.showDetailedTestResult(data, testInput);
+        } else {
+            this.showTestError(`
+                ❌ Test Failed
+
+                Error: ${data.error || 'Unknown error occurred'}
+                ${data.details ? `Details: ${data.details}` : ''}
+            `);
+        }
+    } catch (error) {
+        this.showTestError(`
+            ❌ Network Error
+
+            Failed to connect to server: ${error.message}
+        `);
+    }
+}
+
+async testCommand() {
+    if (!this.currentBot) {
+        this.showError('Bot information not loaded');
+        return;
+    }
+
+    const commands = this.getCommandsFromTags();
+    if (commands.length === 0) {
+        this.showError('Please add at least one command pattern to test');
+        return;
+    }
+
+    const commandCode = document.getElementById('commandCode').value.trim();
+    if (!commandCode) {
+        this.showError('Please add command code to test');
+        return;
+    }
+
+    this.showTestModal();
+    this.showTestLoading();
+
+    try {
+        const token = localStorage.getItem('token');
+        
+        const tempCommand = {
+            command_patterns: commands.join(','),
+            code: commandCode,
+            wait_for_answer: document.getElementById('waitForAnswer').checked,
+            answer_handler: document.getElementById('answerHandler').value || ''
+        };
+
+        const response = await fetch('/api/commands/test-temp', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                command: tempCommand,
+                botToken: this.currentBot.token,
+                testInput: commands[0] // Use first command pattern for testing
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            this.showDetailedTestResult(data, commands[0]);
+        } else {
+            this.showTestError(`
+                ❌ Test Failed
+
+                Error: ${data.error || 'Unknown error occurred'}
+                ${data.details ? `Details: ${data.details}` : ''}
+            `);
+        }
+    } catch (error) {
+        this.showTestError(`
+            ❌ Network Error
+
+            Failed to connect to server: ${error.message}
+        `);
+    }
+}
+
+showDetailedTestResult(data, testInput) {
+    const resultDiv = document.getElementById('testCommandResult');
+    
+    // Determine result type
+    const isSuccess = data.success && !data.rawResult?.error;
+    const hasTelegramResponse = data.telegramResponse && data.telegramResponse !== 'Command executed without return value';
+    const hasBotReply = data.botReply && data.botReply !== 'Command executed without return value';
+
+    let html = `
+        <div class="test-result-container">
+            <button class="copy-btn" onclick="commandEditor.copyTestResult()">
+                <i class="fas fa-copy"></i> Copy
+            </button>
+            
+            <div class="result-header">
+                <h4 class="${isSuccess ? 'text-success' : 'text-error'}">
+                    ${isSuccess ? '✅ Test Successful' : '⚠️ Test Completed with Issues'}
+                </h4>
+            </div>
+
+            <div class="test-result-grid">
+    `;
+
+    // Telegram Request Section
+    html += `
+        <div class="test-result-item ${isSuccess ? 'success' : 'warning'}">
+            <div class="result-title">
+                <i class="fas fa-paper-plane"></i>
+                <span>Telegram Request</span>
+                <span class="response-type">📤 Outgoing</span>
+            </div>
+            <div class="result-content">
+                <strong>Message:</strong> ${testInput}<br>
+                <strong>Bot:</strong> ${this.currentBot.name}<br>
+                <strong>Time:</strong> ${new Date().toLocaleString()}
+            </div>
+        </div>
+    `;
+
+    // Telegram Response Section
+    if (hasTelegramResponse) {
+        html += `
+            <div class="test-result-item success">
+                <div class="result-title">
+                    <i class="fas fa-reply"></i>
+                    <span>Telegram Response</span>
+                    <span class="response-type">📥 Incoming</span>
+                </div>
+                <div class="result-content">
+                    ${data.telegramResponse.replace(/\n/g, '<br>')}
+                </div>
+            </div>
+        `;
+    }
+
+    // Execution Details Section
+    if (data.executionDetails) {
+        html += `
+            <div class="test-result-item">
+                <div class="result-title">
+                    <i class="fas fa-cogs"></i>
+                    <span>Execution Details</span>
+                    <span class="response-type">🔧 Technical</span>
+                </div>
+                <div class="result-content">
+                    ${data.executionDetails.replace(/\n/g, '<br>')}
+                </div>
+            </div>
+        `;
+    }
+
+    // Bot Reply Section
+    if (hasBotReply) {
+        const replyType = data.botReply.includes('❌') || data.botReply.includes('Error') ? 'error' : 'success';
+        html += `
+            <div class="test-result-item ${replyType}">
+                <div class="result-title">
+                    <i class="fas fa-robot"></i>
+                    <span>Bot Response</span>
+                    <span class="response-type">🤖 AI</span>
+                </div>
+                <div class="result-content">
+                    ${data.botReply.replace(/\n/g, '<br>')}
+                </div>
+            </div>
+        `;
+    }
+
+    // Raw Result Section (for debugging)
+    if (data.rawResult) {
+        html += `
+            <div class="test-result-item">
+                <div class="result-title">
+                    <i class="fas fa-code"></i>
+                    <span>Raw Execution Result</span>
+                    <span class="response-type">📊 Debug</span>
+                </div>
+                <div class="result-content">
+                    <pre style="font-size: 0.75rem; margin: 0;">${JSON.stringify(data.rawResult, null, 2)}</pre>
+                </div>
+            </div>
+        `;
+    }
+
+    html += `
+            </div>
+
+            <div class="test-summary" style="margin-top: 1rem; padding: 1rem; background: var(--bg-secondary); border-radius: var(--radius-md);">
+                <div class="result-title">
+                    <i class="fas fa-chart-bar"></i>
+                    <span>Test Summary</span>
+                </div>
+                <div class="result-content">
+                    <strong>Status:</strong> ${isSuccess ? '✅ Success' : '⚠️ Completed with issues'}<br>
+                    <strong>Command:</strong> ${testInput}<br>
+                    <strong>Bot:</strong> ${this.currentBot.name}<br>
+                    <strong>Execution Time:</strong> ${new Date().toLocaleString()}<br>
+                    ${data.rawResult?.error ? `<strong>Error:</strong> ${data.rawResult.error}` : ''}
+                </div>
+            </div>
+        </div>
+    `;
+
+    resultDiv.innerHTML = html;
+}
+
+showTestError(html) {
+    const resultDiv = document.getElementById('testCommandResult');
+    resultDiv.innerHTML = `
+        <div class="test-error">
+            <div class="result-header">
+                <h4>❌ Test Failed</h4>
+            </div>
+            <div class="test-result-container">
+                <button class="copy-btn" onclick="commandEditor.copyTestResult()">
+                    <i class="fas fa-copy"></i> Copy
+                </button>
+                <div class="test-result-grid">
+                    <div class="test-result-item error">
+                        <div class="result-title">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <span>Error Details</span>
+                        </div>
+                        <div class="result-content">${html.replace(/\n/g, '<br>')}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Enhanced copy function
+copyTestResult() {
+    const resultContainer = document.querySelector('.test-result-container');
+    if (!resultContainer) return;
+
+    let text = '🤖 Bot Maker Pro - Test Results\n';
+    text += '='.repeat(50) + '\n\n';
+
+    // Collect all result items
+    const resultItems = resultContainer.querySelectorAll('.test-result-item');
+    resultItems.forEach(item => {
+        const title = item.querySelector('.result-title')?.textContent?.trim();
+        const content = item.querySelector('.result-content')?.textContent?.trim();
+        
+        if (title && content) {
+            text += `📋 ${title}:\n`;
+            text += content + '\n';
+            text += '-'.repeat(30) + '\n\n';
+        }
+    });
+
+    // Add summary if available
+    const summary = resultContainer.querySelector('.test-summary');
+    if (summary) {
+        const summaryContent = summary.querySelector('.result-content')?.textContent?.trim();
+        if (summaryContent) {
+            text += '📊 Test Summary:\n';
+            text += summaryContent + '\n';
+        }
+    }
+
+    navigator.clipboard.writeText(text).then(() => {
+        this.showSuccess('Test results copied to clipboard!');
+    }).catch(() => {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        this.showSuccess('Test results copied to clipboard!');
+    });
+}
+
 
     async quickTest() {
         if (this.currentCommand) {
@@ -1043,16 +1360,16 @@ class CommandEditor {
         `;
     }
 
-    showTestError(html) {
-        document.getElementById('testCommandResult').innerHTML = `
-            <div class="test-error">
-                <button class="copy-btn" onclick="commandEditor.copyErrorToClipboard(this)">
-                    <i class="fas fa-copy"></i> Copy Error
-                </button>
-                ${html}
-            </div>
-        `;
-    }
+    // showTestError(html) {
+        // document.getElementById('testCommandResult').innerHTML = `
+            // <div class="test-error">
+                // <button class="copy-btn" onclick="commandEditor.copyErrorToClipboard(this)">
+                    // <i class="fas fa-copy"></i> Copy Error
+                // </button>
+                // ${html}
+            // </div>
+        // `;
+    // }
 
     copyErrorToClipboard(button) {
         const errorElement = button.closest('.test-error');
