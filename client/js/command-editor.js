@@ -20,94 +20,60 @@ class CommandEditor {
 
     async loadTemplates() {
         try {
-            // Load templates from server or use default templates
-            this.templates = {
-                basic: [
-                    {
-                        name: "Welcome Message",
-                        patterns: "/start, start, hello",
-                        code: `// Welcome message template
-const user = getUser();
-const chatId = getChatId();
+            const token = localStorage.getItem('token');
+            const response = await fetch('/api/templates', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
 
-bot.sendMessage(chatId, \`🎉 Hello \${user.first_name}! Welcome to our bot!\\\\n\\\\n🤖 I can help you with:\\\\n/start - Show this welcome message\\\\n/help - Get help\\\\n/info - Bot information\\\\n\\\\nChoose a command or type your message!\`);`,
-                        description: "Simple welcome message with user info"
-                    },
-                    {
-                        name: "Help Command",
-                        patterns: "/help, help, commands",
-                        code: `// Help command template
-const helpText = \`🤖 *Bot Help Menu*
-
-*Available Commands:*
-• /start - Start the bot
-• /help - Show this help message
-• /info - Bot information
-
-*Features:*
-• Multiple command patterns
-• Interactive conversations
-• Media support
-• Python code execution
-
-*Need Help?*
-Contact support if you need assistance.\`;
-
-bot.sendMessage(helpText, {
-    parse_mode: 'Markdown'
-});`,
-                        description: "Display available commands"
-                    }
-                ],
-                interactive: [
-                    {
-                        name: "Interactive Conversation",
-                        patterns: "/conversation, chat, talk",
-                        code: `// Interactive conversation template
-const user = getUser();
-
-// Ask first question
-await bot.sendMessage(\`Hello \${user.first_name}! Let's have a conversation. What's your favorite color?\`);
-
-// Wait for answer
-const colorAnswer = await waitForAnswer('Please tell me your favorite color:');
-
-// Ask second question
-await bot.sendMessage(\`Great choice! \${colorAnswer} is a beautiful color. What's your favorite food?\`);
-
-const foodAnswer = await waitForAnswer('Please tell me your favorite food:');
-
-// Save user preferences
-await User.saveData('favorite_color', colorAnswer);
-await User.saveData('favorite_food', foodAnswer);
-
-// Show summary
-bot.sendMessage(\`Thanks for chatting! I'll remember that you like \${colorAnswer} and \${foodAnswer}.\`);`,
-                        description: "Multiple questions with wait for answer",
-                        waitForAnswer: true,
-                        answerHandler: `// Answer handler for conversation
-const userAnswer = message.text;
-const currentQuestion = await User.getData('current_question');
-
-if (currentQuestion === 'color') {
-    await User.saveData('favorite_color', userAnswer);
-    await User.saveData('current_question', 'food');
-    bot.sendMessage(\`Nice! \${userAnswer} is a great color. Now, what's your favorite food?\`);
-} else if (currentQuestion === 'food') {
-    await User.saveData('favorite_food', userAnswer);
-    await User.deleteData('current_question');
-    
-    const favoriteColor = await User.getData('favorite_color');
-    bot.sendMessage(\`Perfect! So you like \${favoriteColor} and \${userAnswer}. Thanks for sharing!\`);
-}`
-                    }
-                ]
-            };
+            const data = await response.json();
+            
+            if (data.success) {
+                this.templates = data.templates;
+                console.log('✅ Templates loaded successfully:', Object.keys(this.templates));
+            } else {
+                console.error('❌ Failed to load templates from server');
+                // Fallback to default templates
+                this.templates = this.getDefaultTemplates();
+            }
             
             this.populateTemplatesModal();
         } catch (error) {
             console.error('❌ Load templates error:', error);
+            // Fallback to default templates
+            this.templates = this.getDefaultTemplates();
+            this.populateTemplatesModal();
         }
+    }
+
+    getDefaultTemplates() {
+        return {
+            basic: [
+                {
+                    "name": "Welcome Message",
+                    "patterns": "/start, start, hello",
+                    "code": "// Welcome message template\nconst user = getUser();\nconst chatId = getChatId();\n\nbot.sendMessage(chatId, `🎉 Hello ${user.first_name}! Welcome to our bot!\\\\n\\\\n🤖 I can help you with:\\\\n/start - Show this welcome message\\\\n/help - Get help\\\\n/info - Bot information\\\\n\\\\nChoose a command or type your message!`);",
+                    "description": "Simple welcome message with user info"
+                },
+                {
+                    "name": "Help Command",
+                    "patterns": "/help, help, commands",
+                    "code": "// Help command template\nconst helpText = `🤖 *Bot Help Menu*\n\n*Available Commands:*\n• /start - Start the bot\n• /help - Show this help message\n• /info - Bot information\n\n*Features:*\n• Multiple command patterns\n• Interactive conversations\n• Media support\n• Python code execution\n\n*Need Help?*\nContact support if you need assistance.`;\n\nbot.sendMessage(helpText, {\n    parse_mode: 'Markdown'\n});",
+                    "description": "Display available commands"
+                }
+            ],
+            interactive: [
+                {
+                    "name": "Interactive Conversation",
+                    "patterns": "/conversation, chat, talk",
+                    "code": "// Interactive conversation template\nconst user = getUser();\n\n// Ask first question\nawait bot.sendMessage(`Hello ${user.first_name}! Let's have a conversation. What's your favorite color?`);\n\n// Wait for answer\nconst colorAnswer = await waitForAnswer('Please tell me your favorite color:');\n\n// Ask second question\nawait bot.sendMessage(`Great choice! ${colorAnswer} is a beautiful color. What's your favorite food?`);\n\nconst foodAnswer = await waitForAnswer('Please tell me your favorite food:');\n\n// Save user preferences\nawait User.saveData('favorite_color', colorAnswer);\nawait User.saveData('favorite_food', foodAnswer);\n\n// Show summary\nbot.sendMessage(`Thanks for chatting! I'll remember that you like ${colorAnswer} and ${foodAnswer}.`);",
+                    "description": "Multiple questions with wait for answer",
+                    "waitForAnswer": true,
+                    "answerHandler": "// Answer handler for conversation\nconst userAnswer = message.text;\nconst currentQuestion = await User.getData('current_question');\n\nif (currentQuestion === 'color') {\n    await User.saveData('favorite_color', userAnswer);\n    await User.saveData('current_question', 'food');\n    bot.sendMessage(`Nice! ${userAnswer} is a great color. Now, what's your favorite food?`);\n} else if (currentQuestion === 'food') {\n    await User.saveData('favorite_food', userAnswer);\n    await User.deleteData('current_question');\n    \n    const favoriteColor = await User.getData('favorite_color');\n    bot.sendMessage(`Perfect! So you like ${favoriteColor} and ${userAnswer}. Thanks for sharing!`);\n}"
+                }
+            ]
+        };
     }
 
     populateTemplatesModal() {
@@ -126,7 +92,7 @@ if (currentQuestion === 'color') {
                         ${templates.map(template => `
                             <div class="template-card" data-template='${JSON.stringify(template).replace(/'/g, "&#39;")}'>
                                 <div class="template-icon">
-                                    <i class="fas fa-code"></i>
+                                    <i class="fas fa-${this.getTemplateIcon(category)}"></i>
                                 </div>
                                 <h4>${this.escapeHtml(template.name)}</h4>
                                 <p>${this.escapeHtml(template.description)}</p>
@@ -139,6 +105,19 @@ if (currentQuestion === 'color') {
         }
 
         templatesContent.innerHTML = html;
+    }
+
+    getTemplateIcon(category) {
+        const icons = {
+            'basic': 'code',
+            'interactive': 'comments',
+            'media': 'image',
+            'buttons': 'th',
+            'data': 'database',
+            'http': 'cloud',
+            'advanced': 'cogs'
+        };
+        return icons[category] || 'code';
     }
 
     setupEventListeners() {
@@ -314,7 +293,6 @@ if (currentQuestion === 'color') {
     }
 
     setupCodeEditor() {
-        // Basic code editor setup
         const advancedEditor = document.getElementById('advancedCodeEditor');
         
         document.getElementById('cancelEdit').addEventListener('click', () => {
@@ -404,8 +382,13 @@ if (currentQuestion === 'color') {
             if (templateCard) {
                 const templateData = templateCard.dataset.template;
                 if (templateData) {
-                    const template = JSON.parse(templateData);
-                    this.applyTemplate(template);
+                    try {
+                        const template = JSON.parse(templateData);
+                        this.applyTemplate(template);
+                    } catch (error) {
+                        console.error('Error parsing template:', error);
+                        this.showError('Failed to load template');
+                    }
                 }
             }
         });
@@ -431,7 +414,10 @@ if (currentQuestion === 'color') {
                 
                 // Update content
                 templateCategories.forEach(cat => cat.classList.remove('active'));
-                document.getElementById(`${category}-templates`).classList.add('active');
+                const targetCategory = document.getElementById(`${category}-templates`);
+                if (targetCategory) {
+                    targetCategory.classList.add('active');
+                }
             });
         });
     }
