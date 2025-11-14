@@ -1,12 +1,15 @@
-// server/core/command-executor.js - ঠিক করা ভার্সন
+// server/core/command-executor.js - সম্পূর্ণ ঠিক করা ভার্সন
 async function executeCommandCode(bot, code, context) {
     return new Promise(async (resolve, reject) => {
         try {
             const { msg, chatId, userId, username, first_name, botToken, userInput, User, Bot } = context;
             
-            // Create safe execution environment
-            const botFunctions = {
-                // Basic messaging
+            // Create comprehensive execution environment
+            const executionEnv = {
+                // ✅ Bot instance - সরাসরি bot object
+                bot: bot,
+                
+                // ✅ Bot functions with proper context
                 sendMessage: (text, options = {}) => {
                     return bot.sendMessage(chatId, text, {
                         parse_mode: 'HTML',
@@ -29,7 +32,7 @@ async function executeCommandCode(bot, code, context) {
                     });
                 },
                 
-                // Media messages
+                // Media functions
                 sendPhoto: (photo, options = {}) => {
                     return bot.sendPhoto(chatId, photo, {
                         parse_mode: 'HTML',
@@ -37,8 +40,22 @@ async function executeCommandCode(bot, code, context) {
                     });
                 },
                 
+                sendVideo: (video, options = {}) => {
+                    return bot.sendVideo(chatId, video, {
+                        parse_mode: 'HTML',
+                        ...options
+                    });
+                },
+                
                 sendDocument: (document, options = {}) => {
                     return bot.sendDocument(chatId, document, {
+                        parse_mode: 'HTML',
+                        ...options
+                    });
+                },
+                
+                sendAudio: (audio, options = {}) => {
+                    return bot.sendAudio(chatId, audio, {
                         parse_mode: 'HTML',
                         ...options
                     });
@@ -52,12 +69,12 @@ async function executeCommandCode(bot, code, context) {
                     chat_id: chatId
                 }),
                 
-                // Command parameters
+                // Command context
                 params: userInput,
                 userInput: userInput,
-                
-                // Message object
                 message: msg,
+                chatId: chatId,
+                userId: userId,
                 
                 // Data storage
                 User: User,
@@ -68,11 +85,14 @@ async function executeCommandCode(bot, code, context) {
                 
                 // Wait for answer functionality
                 waitForAnswer: (question, options = {}) => {
-                    return new Promise((resolve) => {
+                    return new Promise((resolve, reject) => {
                         const nextCommandKey = `${botToken}_${userId}`;
                         
                         // Send question first
-                        bot.sendMessage(chatId, question, options).then(() => {
+                        bot.sendMessage(chatId, question, {
+                            parse_mode: 'HTML',
+                            ...options
+                        }).then(() => {
                             // Set up handler for next message
                             const botManager = require('./bot-manager');
                             botManager.nextCommandHandlers.set(nextCommandKey, (answer) => {
@@ -80,25 +100,65 @@ async function executeCommandCode(bot, code, context) {
                             });
                         }).catch(reject);
                     });
+                },
+                
+                // HTTP functions (if available)
+                HTTP: {
+                    get: async (url, options = {}) => {
+                        const axios = require('axios');
+                        try {
+                            const response = await axios.get(url, options);
+                            return response.data;
+                        } catch (error) {
+                            throw new Error(`HTTP GET failed: ${error.message}`);
+                        }
+                    },
+                    post: async (url, data = {}, options = {}) => {
+                        const axios = require('axios');
+                        try {
+                            const response = await axios.post(url, data, options);
+                            return response.data;
+                        } catch (error) {
+                            throw new Error(`HTTP POST failed: ${error.message}`);
+                        }
+                    }
+                },
+                
+                // Python runner (if available)
+                runPython: async (pythonCode) => {
+                    try {
+                        const pythonRunner = require('./python-runner');
+                        return await pythonRunner.runPythonCode(pythonCode);
+                    } catch (error) {
+                        throw new Error(`Python execution failed: ${error.message}`);
+                    }
                 }
             };
 
-            // Execute the command code in a safe context
-            const commandFunction = new Function(
-                ...Object.keys(botFunctions),
-                `
-                "use strict";
+            // ✅ IMPORTANT: Create a function that exposes ALL variables to the execution context
+            const executionCode = `
+                // Inject all variables into the execution context
+                const { ${Object.keys(executionEnv).join(', ')} } = this.executionEnv;
+                
+                // User code execution
                 try {
                     ${code}
                 } catch (error) {
                     console.error('Command execution error:', error);
                     throw error;
                 }
-                `
-            );
+            `;
 
-            // Call the function with all the bot functions as parameters
-            const result = commandFunction(...Object.values(botFunctions));
+            // Create execution context with all variables
+            const executionContext = {
+                executionEnv: executionEnv
+            };
+
+            // Execute the command code
+            const commandFunction = new Function(executionCode);
+            const boundFunction = commandFunction.bind(executionContext);
+            
+            const result = boundFunction();
             
             // Handle async commands
             if (result && typeof result.then === 'function') {
@@ -107,6 +167,7 @@ async function executeCommandCode(bot, code, context) {
             } else {
                 resolve(result);
             }
+
         } catch (error) {
             console.error('❌ Command execution error:', error);
             reject(error);
