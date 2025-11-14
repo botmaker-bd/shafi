@@ -2,6 +2,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const supabase = require('../config/supabase');
 const pythonRunner = require('./python-runner');
 const ApiWrapper = require('./api-wrapper');
+const { executeCommandCode } = require('./command-executor');
 
 class BotManager {
     constructor() {
@@ -80,6 +81,23 @@ class BotManager {
             }
         } catch (error) {
             console.error('❌ Handle bot update error:', error);
+        }
+    }
+
+    // ✅ ADD THIS MISSING METHOD - Command execution
+    async executeCommand(bot, command, msg, userInput = null) {
+        try {
+            console.log(`🔧 Executing command: ${command.command_patterns}`);
+            
+            const context = this.createExecutionContext(bot, command, msg, userInput);
+            const result = await executeCommandCode(bot, command.code, context);
+            
+            console.log(`✅ Command executed successfully: ${command.command_patterns}`);
+            return result;
+        } catch (error) {
+            console.error(`❌ Command execution error for ${command.command_patterns}:`, error);
+            await this.sendError(bot, msg.chat.id, error);
+            throw error;
         }
     }
 
@@ -236,7 +254,7 @@ class BotManager {
             // Find and execute matching command
             const command = await this.findMatchingCommand(token, text, msg);
             if (command) {
-                await this.executeCommand(bot, command, msg);
+                await this.executeCommand(bot, command, msg, text);
             }
 
         } catch (error) {
@@ -250,7 +268,7 @@ class BotManager {
             const caption = msg.caption || '';
             const command = await this.findMatchingCommand(token, caption, msg);
             if (command) {
-                await this.executeCommand(bot, command, msg);
+                await this.executeCommand(bot, command, msg, caption);
             }
         } catch (error) {
             console.error(`❌ Handle ${mediaType} error:`, error);
@@ -358,17 +376,7 @@ bot.sendMessage(\`Hello \${user.first_name}! You said: "${prompt}"\`);
 // Alternative: Api.sendMessage(\`Hello \${user.first_name}! You said: "${prompt}"\`);`;
     }
 
-    async executeCommand(bot, command, msg, params = null) {
-        try {
-            const context = this.createExecutionContext(bot, command, msg, params);
-            await this.executeCommandCode(bot, command.code, context);
-        } catch (error) {
-            console.error(`❌ Command execution error:`, error);
-            await this.sendError(bot, msg.chat.id, error);
-        }
-    }
-
-    createExecutionContext(bot, command, msg, params = null) {
+    createExecutionContext(bot, command, msg, userInput = null) {
         const baseContext = {
             msg: msg,
             chatId: msg.chat.id,
@@ -376,7 +384,7 @@ bot.sendMessage(\`Hello \${user.first_name}! You said: "${prompt}"\`);
             username: msg.from.username,
             first_name: msg.from.first_name,
             botToken: command.bot_token,
-            userInput: params,
+            userInput: userInput,
             nextCommandHandlers: this.nextCommandHandlers,
             pythonRunner: pythonRunner,
             
@@ -404,45 +412,6 @@ bot.sendMessage(\`Hello \${user.first_name}! You said: "${prompt}"\`);
             sendMessage: (text, options) => apiWrapper.sendMessage(text, options),
             getUser: () => apiWrapper.getUser()
         };
-    }
-
-    async executeCommandCode(bot, code, context) {
-        return new Promise(async (resolve, reject) => {
-            try {
-                const commandFunction = new Function(
-                    'bot', 'Api', 'sendMessage', 'getUser', 'User', 'Bot', 'runPython', 'wait', 'waitForAnswer',
-                    `
-                    "use strict";
-                    try {
-                        ${code}
-                    } catch (error) {
-                        console.error('Command execution error:', error);
-                        throw error;
-                    }
-                    `
-                );
-
-                const result = commandFunction(
-                    context.bot,
-                    context.Api,  
-                    context.sendMessage,
-                    context.getUser,
-                    context.User,
-                    context.Bot,
-                    context.pythonRunner.runPythonCode.bind(context.pythonRunner),
-                    (ms) => new Promise(resolve => setTimeout(resolve, ms)),
-                    context.bot.waitForAnswer.bind(context.bot)
-                );
-                
-                if (result && typeof result.then === 'function') {
-                    await result;
-                }
-                
-                resolve(result);
-            } catch (error) {
-                reject(error);
-            }
-        });
     }
 
     async findMatchingCommand(token, text, msg) {
