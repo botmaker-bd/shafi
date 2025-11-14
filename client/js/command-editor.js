@@ -21,38 +21,28 @@ class CommandEditor {
     async loadTemplates() {
         try {
             const token = localStorage.getItem('token');
-            if (!token) {
-                throw new Error('No authentication token found');
-            }
-
-            const response = await fetch('/api/templates', {
+            const response = await fetch('/api/templates', { // ✅ সঠিক endpoint
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
             });
 
             if (!response.ok) {
-                if (response.status === 401) {
-                    this.logout();
-                    return;
-                }
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
             const data = await response.json();
             if (data.success) {
                 this.templates = data.templates;
+                console.log(`✅ Loaded ${Object.keys(this.templates).length} template categories`);
                 this.populateTemplatesModal();
-                
-                if (Object.keys(this.templates).length > 0) {
-                    console.log(`✅ Loaded ${Object.keys(this.templates).length} template categories`);
-                }
             } else {
                 throw new Error(data.error || 'Failed to load templates');
             }
         } catch (error) {
             console.error('❌ Load templates error:', error);
-            this.showInfo('Templates not available: ' + error.message);
+            this.showError('Failed to load templates: ' + error.message);
+            // Fallback empty templates
             this.templates = {};
             this.populateTemplatesModal();
         }
@@ -60,57 +50,155 @@ class CommandEditor {
 
     populateTemplatesModal() {
         const templatesContent = document.querySelector('.templates-content');
-        if (!templatesContent) {
-            console.error('❌ Templates content container not found');
+        const categoryTabsContainer = document.querySelector('.category-tabs');
+        
+        if (!templatesContent || !categoryTabsContainer) {
+            console.error('❌ Templates modal elements not found');
             return;
         }
 
-        let html = '';
+        // Clear existing content
+        templatesContent.innerHTML = '';
+        categoryTabsContainer.innerHTML = '';
 
-        for (const [category, templates] of Object.entries(this.templates)) {
+        // If no templates available
+        if (!this.templates || Object.keys(this.templates).length === 0) {
+            templatesContent.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <i class="fas fa-layer-group"></i>
+                    </div>
+                    <h3>No Templates Available</h3>
+                    <p>Templates could not be loaded. Please check your connection.</p>
+                </div>
+            `;
+            return;
+        }
+
+        let categoriesHTML = '';
+        let templatesHTML = '';
+        let firstCategory = true;
+
+        // Generate category tabs and template content
+        Object.entries(this.templates).forEach(([category, templates]) => {
             if (!Array.isArray(templates) || templates.length === 0) {
                 console.warn(`⚠️ No templates found for category: ${category}`);
-                continue;
+                return;
             }
 
             const categoryId = `${category}-templates`;
-            const isActive = category === 'basic' ? 'active' : '';
+            const isActive = firstCategory ? 'active' : '';
+            const displayName = this.formatCategoryName(category);
             
-            html += `
+            // Category tab
+            categoriesHTML += `
+                <button class="category-tab ${isActive}" data-category="${category}">
+                    ${displayName}
+                </button>
+            `;
+
+            // Template category content
+            templatesHTML += `
                 <div id="${categoryId}" class="template-category ${isActive}">
                     <div class="templates-grid">
-                        ${templates.map(template => {
-                            if (!template || typeof template !== 'object') {
-                                return '<!-- Invalid template -->';
-                            }
-                            
-                            const safeTemplate = {
-                                id: template.id || 'unknown',
-                                name: template.name || 'Unnamed Template',
-                                patterns: template.patterns || '/unknown',
-                                code: template.code || '// No code',
-                                description: template.description || 'No description',
-                                waitForAnswer: Boolean(template.waitForAnswer),
-                                answerHandler: template.answerHandler || ''
-                            };
-
-                            return `
-                                <div class="template-card" data-template='${JSON.stringify(safeTemplate).replace(/'/g, "&#39;")}'>
-                                    <div class="template-icon">
-                                        <i class="fas fa-code"></i>
-                                    </div>
-                                    <h4>${this.escapeHtml(safeTemplate.name)}</h4>
-                                    <p>${this.escapeHtml(safeTemplate.description)}</p>
-                                    <div class="template-patterns">${this.escapeHtml(safeTemplate.patterns)}</div>
-                                </div>
-                            `;
-                        }).join('')}
+                        ${templates.map(template => this.createTemplateCard(template)).join('')}
                     </div>
                 </div>
             `;
+
+            firstCategory = false;
+        });
+
+        categoryTabsContainer.innerHTML = categoriesHTML;
+        templatesContent.innerHTML = templatesHTML;
+
+        // Setup category tab events
+        this.setupTemplateCategories();
+    }
+
+    createTemplateCard(template) {
+        if (!template || typeof template !== 'object') {
+            return '<!-- Invalid template -->';
+        }
+        
+        const safeTemplate = {
+            id: template.id || 'unknown',
+            name: template.name || 'Unnamed Template',
+            patterns: template.patterns || '/unknown',
+            code: template.code || '// No code',
+            description: template.description || 'No description available',
+            waitForAnswer: Boolean(template.waitForAnswer),
+            answerHandler: template.answerHandler || ''
+        };
+
+        // Get appropriate icon based on template name/type
+        const templateIcon = this.getTemplateIcon(safeTemplate.name);
+
+        return `
+            <div class="template-card" data-template='${JSON.stringify(safeTemplate).replace(/'/g, "&#39;")}'>
+                <div class="template-icon">
+                    <i class="${templateIcon}"></i>
+                </div>
+                <h4>${this.escapeHtml(safeTemplate.name)}</h4>
+                <p>${this.escapeHtml(safeTemplate.description)}</p>
+                <div class="template-patterns">${this.escapeHtml(safeTemplate.patterns)}</div>
+            </div>
+        `;
+    }
+
+    getTemplateIcon(templateName) {
+        const iconMap = {
+            'welcome': 'fas fa-hand-wave',
+            'help': 'fas fa-question-circle',
+            'info': 'fas fa-info-circle',
+            'echo': 'fas fa-comment-alt',
+            'conversation': 'fas fa-comments',
+            'registration': 'fas fa-user-plus',
+            'feedback': 'fas fa-star',
+            'quiz': 'fas fa-brain',
+            'photo': 'fas fa-image',
+            'video': 'fas fa-video',
+            'document': 'fas fa-file',
+            'buttons': 'fas fa-th',
+            'keyboard': 'fas fa-keyboard',
+            'url': 'fas fa-link',
+            'data': 'fas fa-database',
+            'cleanup': 'fas fa-broom',
+            'export': 'fas fa-file-export',
+            'http': 'fas fa-cloud-download-alt',
+            'weather': 'fas fa-cloud-sun',
+            'news': 'fas fa-newspaper',
+            'admin': 'fas fa-shield-alt',
+            'broadcast': 'fas fa-bullhorn',
+            'scheduler': 'fas fa-clock',
+            'error': 'fas fa-bug',
+            'calculator': 'fas fa-calculator',
+            'python': 'fab fa-python'
+        };
+
+        const lowerName = templateName.toLowerCase();
+        for (const [key, icon] of Object.entries(iconMap)) {
+            if (lowerName.includes(key)) {
+                return icon;
+            }
         }
 
-        templatesContent.innerHTML = html || '<div class="empty-state"><p>No templates available</p></div>';
+        return 'fas fa-code'; // Default icon
+    }
+
+    formatCategoryName(category) {
+        const nameMap = {
+            'basic': 'Basic',
+            'interactive': 'Interactive',
+            'media': 'Media',
+            'buttons': 'Buttons',
+            'data': 'Data',
+            'http': 'HTTP',
+            'advanced': 'Advanced',
+            'python': 'Python'
+        };
+        
+        return nameMap[category] || category.charAt(0).toUpperCase() + category.slice(1);
     }
 
     setupEventListeners() {
@@ -1131,21 +1219,6 @@ class CommandEditor {
         if (!modal) {
             this.showError('Templates modal not found');
             return;
-        }
-        
-        // Reset to basic category when opening
-        const categoryTabs = document.querySelectorAll('.category-tab');
-        const templateCategories = document.querySelectorAll('.template-category');
-        
-        categoryTabs.forEach(tab => tab.classList.remove('active'));
-        templateCategories.forEach(cat => cat.classList.remove('active'));
-        
-        const basicTab = document.querySelector('.category-tab[data-category="basic"]');
-        const basicCategory = document.getElementById('basic-templates');
-        
-        if (basicTab && basicCategory) {
-            basicTab.classList.add('active');
-            basicCategory.classList.add('active');
         }
         
         modal.style.display = 'flex';
