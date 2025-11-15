@@ -84,12 +84,13 @@ class BotManager {
         }
     }
 
-// server/core/bot-manager.js - executeCommand মেথড
+    // ✅ ADD THIS MISSING METHOD - Command execution
+    // server/core/bot-manager.js - executeCommand মেথড
 async executeCommand(bot, command, msg, userInput = null) {
     try {
         console.log(`🔧 Executing command: ${command.command_patterns} for chat: ${msg.chat.id}`);
         
-        // Create enhanced execution context
+        // Create enhanced execution context with ASYNC methods
         const context = {
             msg: msg,
             chatId: msg.chat.id,
@@ -102,7 +103,7 @@ async executeCommand(bot, command, msg, userInput = null) {
             userInput: userInput,
             nextCommandHandlers: this.nextCommandHandlers,
             
-            // ✅ CORRECTED: Async User methods that return Promises
+            // ✅ CORRECTED: ASYNC User methods
             User: {
                 // Basic CRUD - now properly async
                 saveData: async (key, value) => {
@@ -138,7 +139,7 @@ async executeCommand(bot, command, msg, userInput = null) {
                 }
             },
             
-            // ✅ CORRECTED: Async Bot methods
+            // ✅ CORRECTED: ASYNC Bot methods
             Bot: {
                 saveData: async (key, value) => {
                     return await this.saveData('bot_data', command.bot_token, null, key, value);
