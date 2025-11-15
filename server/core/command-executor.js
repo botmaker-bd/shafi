@@ -5,68 +5,64 @@ async function executeCommandCode(botInstance, code, context) {
             const { msg, chatId, userId, username, first_name, botToken, userInput } = context;
             
             // Create COMPREHENSIVE execution environment
-            const executionEnv = {
-                // === TELEGRAM BOT METHODS ===
-                bot: botInstance,
-                
-                // === API WRAPPER INSTANCE ===
-                Api: new (require('./api-wrapper'))(botInstance, context),
-                
-                // === USER INFORMATION ===
-                getUser: () => ({
-                    id: userId,
-                    username: username,
-                    first_name: first_name,
-                    chat_id: chatId
-                }),
-                
-                // === MESSAGE CONTEXT ===
-                msg: msg,
-                chatId: chatId,
-                userId: userId,
-                userInput: userInput,
-                params: userInput,
-                
-                // === DATA STORAGE ===
-                User: {
-                    // Synchronous versions for template compatibility
-                    saveData: (key, value) => context.User.saveData(key, value),
-                    getData: (key) => context.User.getData(key),
-                    deleteData: (key) => context.User.deleteData(key),
-                    
-                    // Async versions with proper handling
-                    saveDataAsync: async (key, value) => await context.User.saveData(key, value),
-                    getDataAsync: async (key) => await context.User.getData(key),
-                    deleteDataAsync: async (key) => await context.User.deleteData(key)
-                },
-                Bot: context.Bot,
-                
-                // === UTILITY FUNCTIONS ===
-                wait: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
-                
-                // === HTTP CLIENT ===
-                HTTP: {
-                    get: async (url, options = {}) => {
-                        const axios = require('axios');
-                        try {
-                            const response = await axios.get(url, options);
-                            return response.data;
-                        } catch (error) {
-                            throw new Error(`HTTP GET failed: ${error.message}`);
-                        }
-                    },
-                    post: async (url, data = {}, options = {}) => {
-                        const axios = require('axios');
-                        try {
-                            const response = await axios.post(url, data, options);
-                            return response.data;
-                        } catch (error) {
-                            throw new Error(`HTTP POST failed: ${error.message}`);
-                        }
-                    }
-                }
-            };
-
+// Create COMPREHENSIVE execution environment with proper nextCommandHandlers
+const executionEnv = {
+    // === TELEGRAM BOT METHODS ===
+    bot: botInstance,
+    
+    // === API WRAPPER INSTANCE ===
+    Api: new (require('./api-wrapper'))(botInstance, {
+        ...context,
+        nextCommandHandlers: context.nextCommandHandlers // Ensure this is passed correctly
+    }),
+    
+    // === USER INFORMATION ===
+    getUser: () => ({
+        id: userId,
+        username: username,
+        first_name: first_name,
+        chat_id: chatId
+    }),
+    
+    // === MESSAGE CONTEXT ===
+    msg: msg,
+    chatId: chatId,
+    userId: userId,
+    userInput: userInput,
+    params: userInput,
+    
+    // === DATA STORAGE ===
+    User: context.User,
+    Bot: context.Bot,
+    
+    // === NEXT COMMAND HANDLERS (CRITICAL) ===
+    nextCommandHandlers: context.nextCommandHandlers,
+    
+    // === UTILITY FUNCTIONS ===
+    wait: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
+    
+    // === HTTP CLIENT ===
+    HTTP: {
+        get: async (url, options = {}) => {
+            const axios = require('axios');
+            try {
+                const response = await axios.get(url, options);
+                return response.data;
+            } catch (error) {
+                throw new Error(`HTTP GET failed: ${error.message}`);
+            }
+        },
+        post: async (url, data = {}, options = {}) => {
+            const axios = require('axios');
+            try {
+                const response = await axios.post(url, data, options);
+                return response.data;
+            } catch (error) {
+                throw new Error(`HTTP POST failed: ${error.message}`);
+            }
+        }
+    }
+};
             // Create SHORTCUT functions that call the Api wrapper
             const shortcuts = {
                 // Message shortcuts
