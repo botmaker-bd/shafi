@@ -229,24 +229,33 @@ class ApiWrapper {
         this.wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
         // Wait for answer with timeout - FIXED VERSION
-// Wait for answer with timeout - FIXED AND IMPROVED
+// Wait for answer with timeout - COMPLETELY FIXED VERSION
 this.waitForAnswer = (question, options = {}) => {
     return new Promise(async (resolve, reject) => {
+        // Validate context and botToken
+        if (!this.context || !this.context.botToken) {
+            console.error('❌ waitForAnswer: Missing context or botToken');
+            reject(new Error('Bot token not available in context'));
+            return;
+        }
+
         const timeout = options.timeout || 60000; // 60 seconds default
         const nextCommandKey = `${this.context.botToken}_${this.context.userId}`;
         
         console.log(`⏳ Setting up waitForAnswer for key: ${nextCommandKey}`);
         console.log(`📝 Question: "${question}"`);
+        console.log(`👤 User ID: ${this.context.userId}`);
+        console.log(`🤖 Bot Token: ${this.context.botToken.substring(0, 15)}...`);
         console.log(`⏰ Timeout: ${timeout}ms`);
         
         // Clear any existing handler first
-        if (this.context.nextCommandHandlers.has(nextCommandKey)) {
+        if (this.context.nextCommandHandlers && this.context.nextCommandHandlers.has(nextCommandKey)) {
             this.context.nextCommandHandlers.delete(nextCommandKey);
             console.log(`🔄 Cleared existing handler for: ${nextCommandKey}`);
         }
 
         const timeoutId = setTimeout(() => {
-            if (this.context.nextCommandHandlers.has(nextCommandKey)) {
+            if (this.context.nextCommandHandlers && this.context.nextCommandHandlers.has(nextCommandKey)) {
                 this.context.nextCommandHandlers.delete(nextCommandKey);
                 console.log(`❌ Wait for answer TIMEOUT for user ${this.context.userId}`);
             }
@@ -262,6 +271,11 @@ this.waitForAnswer = (question, options = {}) => {
             });
             
             console.log(`✅ Question sent successfully, setting handler for: ${nextCommandKey}`);
+            
+            // Validate nextCommandHandlers exists
+            if (!this.context.nextCommandHandlers) {
+                throw new Error('nextCommandHandlers not available in context');
+            }
             
             // Set up the handler for user's response
             this.context.nextCommandHandlers.set(nextCommandKey, (answer, answerMsg) => {
@@ -286,7 +300,9 @@ this.waitForAnswer = (question, options = {}) => {
         } catch (error) {
             console.error(`❌ Failed to set up waitForAnswer:`, error);
             clearTimeout(timeoutId);
-            this.context.nextCommandHandlers.delete(nextCommandKey);
+            if (this.context.nextCommandHandlers) {
+                this.context.nextCommandHandlers.delete(nextCommandKey);
+            }
             reject(new Error(`Failed to set up wait for answer: ${error.message}`));
         }
     });
