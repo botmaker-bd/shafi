@@ -4,7 +4,7 @@
         "name": "Media Gallery", 
         "patterns": "/gallery, photos, images, media",
         "description": "Send multiple media files in a gallery format",
-        "code": "// Single photo with caption\nbot.sendPhoto('https://picsum.photos/400/300', {\n    caption: '📸 Sample Image\\n\\nThis is a demo image from our gallery!',\n    parse_mode: 'Markdown'\n});\n\n// Follow up with navigation options\nconst navButtons = [\n    [{ text: \"🔄 More Photos\", callback_data: \"more_photos\" }],\n    [{ text: \"📁 File Gallery\", callback_data: \"file_gallery\" }]\n];\n\nbot.sendMessage(\"Explore more content:\", {\n    reply_markup: { inline_keyboard: navButtons }\n});",
+        "code": "// Single photo with caption\nApi.sendPhoto('https://picsum.photos/400/300', {\n    caption: '📸 Sample Image\\\\n\\\\nThis is a demo image from our gallery!',\n    parse_mode: 'Markdown'\n});\n\n// Follow up with navigation options\nconst navButtons = [\n    [{ text: \"🔄 More Photos\", callback_data: \"more_photos\" }],\n    [{ text: \"📁 File Gallery\", callback_data: \"file_gallery\" }]\n];\n\nApi.sendMessage(\"Explore more content:\", {\n    reply_markup: { inline_keyboard: navButtons }\n});",
         "waitForAnswer": false,
         "answerHandler": ""
     }
