@@ -229,46 +229,65 @@ class ApiWrapper {
         this.wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
         // Wait for answer with timeout - FIXED VERSION
+// Wait for answer with timeout - FIXED AND IMPROVED
 this.waitForAnswer = (question, options = {}) => {
     return new Promise(async (resolve, reject) => {
-        const timeout = options.timeout || 30000; // 30 seconds default
+        const timeout = options.timeout || 60000; // 60 seconds default
         const nextCommandKey = `${this.context.botToken}_${this.context.userId}`;
         
         console.log(`⏳ Setting up waitForAnswer for key: ${nextCommandKey}`);
+        console.log(`📝 Question: "${question}"`);
+        console.log(`⏰ Timeout: ${timeout}ms`);
         
+        // Clear any existing handler first
+        if (this.context.nextCommandHandlers.has(nextCommandKey)) {
+            this.context.nextCommandHandlers.delete(nextCommandKey);
+            console.log(`🔄 Cleared existing handler for: ${nextCommandKey}`);
+        }
+
         const timeoutId = setTimeout(() => {
             if (this.context.nextCommandHandlers.has(nextCommandKey)) {
                 this.context.nextCommandHandlers.delete(nextCommandKey);
-                console.log(`❌ Wait for answer timeout for user ${this.context.userId}`);
+                console.log(`❌ Wait for answer TIMEOUT for user ${this.context.userId}`);
             }
-            reject(new Error('Wait for answer timeout (30 seconds)'));
+            reject(new Error(`Wait for answer timeout (${timeout/1000} seconds)`));
         }, timeout);
 
         try {
-            // Send the question first
+            // Send the question to user
+            console.log(`📤 Sending question to user ${this.context.userId}`);
             await this.sendMessage(this.context.chatId, question, {
                 parse_mode: 'HTML',
                 ...options
             });
             
-            console.log(`✅ Question sent, setting up handler for: ${nextCommandKey}`);
+            console.log(`✅ Question sent successfully, setting handler for: ${nextCommandKey}`);
             
-            // Set up the handler for the user's response
+            // Set up the handler for user's response
             this.context.nextCommandHandlers.set(nextCommandKey, (answer, answerMsg) => {
-                console.log(`✅ User answered: "${answer}"`);
+                console.log(`🎉 USER RESPONSE RECEIVED: "${answer}"`);
                 clearTimeout(timeoutId);
-                resolve({
+                
+                // Create response object
+                const response = {
                     text: answer,
                     message: answerMsg,
                     userId: this.context.userId,
-                    chatId: this.context.chatId
-                });
+                    chatId: this.context.chatId,
+                    timestamp: new Date().toISOString()
+                };
+                
+                console.log(`✅ Resolving waitForAnswer with user response`);
+                resolve(response);
             });
             
+            console.log(`🔧 Handler set successfully. Active handlers: ${this.context.nextCommandHandlers.size}`);
+            
         } catch (error) {
+            console.error(`❌ Failed to set up waitForAnswer:`, error);
             clearTimeout(timeoutId);
             this.context.nextCommandHandlers.delete(nextCommandKey);
-            reject(new Error(`Failed to send question: ${error.message}`));
+            reject(new Error(`Failed to set up wait for answer: ${error.message}`));
         }
     });
 };
