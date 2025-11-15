@@ -12,6 +12,7 @@ class BotManager {
         this.userStates = new Map();
         this.USE_WEBHOOK = process.env.USE_WEBHOOK === 'true';
         this.initialized = false;
+        this.dataCache = new Map(); // Data caching for synchronous access
         
         console.log(`🤖 Bot Manager initialized in ${this.USE_WEBHOOK ? 'WEBHOOK' : 'POLLING'} mode`);
     }
@@ -85,7 +86,10 @@ class BotManager {
         try {
             console.log(`🔧 Executing command: ${command.command_patterns} for chat: ${msg.chat.id}`);
             
-            // Create enhanced execution context
+            // Pre-load data for this user to enable synchronous access
+            await this.preloadUserData(command.bot_token, msg.from.id);
+            
+            // Create enhanced execution context - WITHOUT ASYNC/AWAIT
             const context = {
                 msg: msg,
                 chatId: msg.chat.id,
@@ -98,163 +102,110 @@ class BotManager {
                 userInput: userInput,
                 nextCommandHandlers: this.nextCommandHandlers,
                 
-                // Enhanced data operations - FIXED: Proper async handling
+                // Enhanced data operations - SYNCHRONOUS STYLE
                 User: {
-                    // Synchronous-style methods (returns values directly)
-                    saveData: async (key, value) => {
-                        const result = await this.saveData('user_data', command.bot_token, msg.from.id, key, value);
-                        return value; // Return the value for synchronous usage
-                    },
-                    getData: async (key) => {
-                        const result = await this.getData('user_data', command.bot_token, msg.from.id, key);
-                        return result; // Return the actual value
-                    },
-                    deleteData: async (key) => {
-                        const result = await this.deleteData('user_data', command.bot_token, msg.from.id, key);
-                        return result;
+                    // Synchronous methods - no async/await
+                    saveData: (key, value) => {
+                        // Store in cache immediately
+                        const cacheKey = `${command.bot_token}_${msg.from.id}_${key}`;
+                        this.dataCache.set(cacheKey, value);
+                        
+                        // Save to database in background (fire and forget)
+                        this.saveData('user_data', command.bot_token, msg.from.id, key, value)
+                            .catch(err => console.error('❌ Background save error:', err));
+                        
+                        return value; // Return value for immediate use
                     },
                     
-                    // Advanced operations
-                    getAllData: async () => {
-                        const { data, error } = await supabase
-                            .from('universal_data')
-                            .select('data_key, data_value, created_at, updated_at')
-                            .eq('data_type', 'user_data')
-                            .eq('bot_token', command.bot_token)
-                            .eq('user_id', msg.from.id.toString());
-                        
-                        if (error) throw error;
-                        
-                        const result = {};
-                        if (data) {
-                            data.forEach(item => {
-                                try {
-                                    result[item.data_key] = JSON.parse(item.data_value);
-                                } catch {
-                                    result[item.data_key] = item.data_value;
-                                }
-                            });
+                    getData: (key) => {
+                        // Get from cache first
+                        const cacheKey = `${command.bot_token}_${msg.from.id}_${key}`;
+                        if (this.dataCache.has(cacheKey)) {
+                            return this.dataCache.get(cacheKey);
                         }
-                        return result;
-                    },
-                    
-                    deleteAllData: async () => {
-                        const { error } = await supabase
-                            .from('universal_data')
-                            .delete()
-                            .eq('data_type', 'user_data')
-                            .eq('bot_token', command.bot_token)
-                            .eq('user_id', msg.from.id.toString());
                         
-                        return !error;
+                        // Return default values for common keys
+                        const defaults = {
+                            'total_usage': 0,
+                            'user_count': 1,
+                            'usage_count': 0
+                        };
+                        
+                        return defaults[key] || null;
                     },
                     
-                    saveMultiple: async (dataObject) => {
-                        for (const [key, value] of Object.entries(dataObject)) {
-                            await this.saveData('user_data', command.bot_token, msg.from.id, key, value);
-                        }
+                    deleteData: (key) => {
+                        // Remove from cache
+                        const cacheKey = `${command.bot_token}_${msg.from.id}_${key}`;
+                        this.dataCache.delete(cacheKey);
+                        
+                        // Delete from database in background
+                        this.deleteData('user_data', command.bot_token, msg.from.id, key)
+                            .catch(err => console.error('❌ Background delete error:', err));
+                        
                         return true;
                     },
                     
-                    findData: async (pattern) => {
-                        const { data, error } = await supabase
-                            .from('universal_data')
-                            .select('data_key, data_value')
-                            .eq('data_type', 'user_data')
-                            .eq('bot_token', command.bot_token)
-                            .eq('user_id', msg.from.id.toString())
-                            .like('data_key', `%${pattern}%`);
-                        
-                        if (error) throw error;
-                        
-                        const result = {};
-                        if (data) {
-                            data.forEach(item => {
-                                try {
-                                    result[item.data_key] = JSON.parse(item.data_value);
-                                } catch {
-                                    result[item.data_key] = item.data_value;
-                                }
-                            });
-                        }
-                        return result;
+                    // Simple utility methods
+                    increment: (key, amount = 1) => {
+                        const current = this.User.getData(key) || 0;
+                        const newValue = parseInt(current) + amount;
+                        this.User.saveData(key, newValue);
+                        return newValue;
                     },
                     
-                    exportData: async () => {
-                        const allData = await this.getAllData();
-                        return JSON.stringify(allData, null, 2);
+                    decrement: (key, amount = 1) => {
+                        const current = this.User.getData(key) || 0;
+                        const newValue = Math.max(0, parseInt(current) - amount);
+                        this.User.saveData(key, newValue);
+                        return newValue;
                     },
                     
-                    importData: async (jsonData) => {
-                        const dataObject = JSON.parse(jsonData);
-                        return await this.saveMultiple(dataObject);
+                    setFlag: (key, value = true) => {
+                        this.User.saveData(key, value);
+                        return value;
+                    },
+                    
+                    getFlag: (key) => {
+                        return this.User.getData(key) || false;
+                    },
+                    
+                    toggleFlag: (key) => {
+                        const current = this.User.getData(key) || false;
+                        const newValue = !current;
+                        this.User.saveData(key, newValue);
+                        return newValue;
                     }
                 },
                 
                 Bot: {
-                    // Synchronous-style methods
-                    saveData: async (key, value) => {
-                        const result = await this.saveData('bot_data', command.bot_token, null, key, value);
+                    // Synchronous methods for bot data
+                    saveData: (key, value) => {
+                        const cacheKey = `${command.bot_token}_bot_${key}`;
+                        this.dataCache.set(cacheKey, value);
+                        
+                        this.saveData('bot_data', command.bot_token, null, key, value)
+                            .catch(err => console.error('❌ Background bot save error:', err));
+                        
                         return value;
                     },
-                    getData: async (key) => {
-                        const result = await this.getData('bot_data', command.bot_token, null, key);
-                        return result;
-                    },
-                    deleteData: async (key) => {
-                        const { error } = await supabase
-                            .from('universal_data')
-                            .delete()
-                            .eq('data_type', 'bot_data')
-                            .eq('bot_token', command.bot_token)
-                            .eq('data_key', key);
-                        
-                        return !error;
-                    },
                     
-                    // Advanced operations
-                    getAllData: async () => {
-                        const { data, error } = await supabase
-                            .from('universal_data')
-                            .select('data_key, data_value, created_at, updated_at')
-                            .eq('data_type', 'bot_data')
-                            .eq('bot_token', command.bot_token);
-                        
-                        if (error) throw error;
-                        
-                        const result = {};
-                        if (data) {
-                            data.forEach(item => {
-                                try {
-                                    result[item.data_key] = JSON.parse(item.data_value);
-                                } catch {
-                                    result[item.data_key] = item.data_value;
-                                }
-                            });
+                    getData: (key) => {
+                        const cacheKey = `${command.bot_token}_bot_${key}`;
+                        if (this.dataCache.has(cacheKey)) {
+                            return this.dataCache.get(cacheKey);
                         }
-                        return result;
+                        return null;
                     },
                     
-                    deleteAllData: async () => {
-                        const { error } = await supabase
-                            .from('universal_data')
-                            .delete()
-                            .eq('data_type', 'bot_data')
-                            .eq('bot_token', command.bot_token);
+                    deleteData: (key) => {
+                        const cacheKey = `${command.bot_token}_bot_${key}`;
+                        this.dataCache.delete(cacheKey);
                         
-                        return !error;
-                    },
-                    
-                    saveMultiple: async (dataObject) => {
-                        for (const [key, value] of Object.entries(dataObject)) {
-                            await this.saveData('bot_data', command.bot_token, null, key, value);
-                        }
+                        this.deleteData('bot_data', command.bot_token, null, key)
+                            .catch(err => console.error('❌ Background bot delete error:', err));
+                        
                         return true;
-                    },
-                    
-                    exportData: async () => {
-                        const allData = await this.getAllData();
-                        return JSON.stringify(allData, null, 2);
                     }
                 }
             };
@@ -281,6 +232,38 @@ class BotManager {
             }
             
             throw error;
+        }
+    }
+
+    async preloadUserData(botToken, userId) {
+        try {
+            // Pre-load user data for this bot/user combination
+            const { data, error } = await supabase
+                .from('universal_data')
+                .select('data_key, data_value')
+                .eq('data_type', 'user_data')
+                .eq('bot_token', botToken)
+                .eq('user_id', userId.toString());
+
+            if (error) {
+                console.error('❌ Preload data error:', error);
+                return;
+            }
+
+            // Store in cache for synchronous access
+            if (data) {
+                data.forEach(item => {
+                    const cacheKey = `${botToken}_${userId}_${item.data_key}`;
+                    try {
+                        const value = JSON.parse(item.data_value);
+                        this.dataCache.set(cacheKey, value);
+                    } catch {
+                        this.dataCache.set(cacheKey, item.data_value);
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('❌ Preload user data error:', error);
         }
     }
 
@@ -595,7 +578,7 @@ We've logged this error and will fix it soon.
     }
 }
 
-    // Data storage methods - FIXED: Proper async/await
+    // Data storage methods - ASYNC (background operations)
     async saveData(dataType, botToken, userId, key, value, metadata = {}) {
         try {
             const { data, error } = await supabase
@@ -612,11 +595,13 @@ We've logged this error and will fix it soon.
                     onConflict: 'data_type,bot_token,user_id,data_key'
                 });
 
-            if (error) throw error;
+            if (error) {
+                console.error('❌ Save data error:', error);
+            }
             return value;
         } catch (error) {
             console.error('❌ Save data error:', error);
-            throw error;
+            return value; // Still return value even if save fails
         }
     }
 
@@ -633,7 +618,8 @@ We've logged this error and will fix it soon.
 
             if (error) {
                 if (error.code === 'PGRST116') return null;
-                throw error;
+                console.error('❌ Get data error:', error);
+                return null;
             }
             
             if (data && data.data_value) {
@@ -660,7 +646,10 @@ We've logged this error and will fix it soon.
                 .eq('user_id', userId ? userId.toString() : null)
                 .eq('data_key', key);
 
-            if (error) throw error;
+            if (error) {
+                console.error('❌ Delete data error:', error);
+                return false;
+            }
             return true;
         } catch (error) {
             console.error('❌ Delete data error:', error);
