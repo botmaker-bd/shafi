@@ -161,59 +161,51 @@ class CommandEditor {
         console.log('✅ Templates modal populated successfully');
     }
 
-    createTemplateCard(template) {// Updated createTemplateCard method in command-editor.js
-createTemplateCard(template) {
-    if (!template || typeof template !== 'object') {
-        console.error('❌ Invalid template object:', template);
-        return '<div class="template-card invalid">Invalid Template</div>';
-    }
-    
-    // Validate required fields
-    if (!template.id || !template.name || !template.code) {
-        console.error('❌ Template missing required fields:', template);
-        return '<div class="template-card invalid">Invalid Template Data</div>';
-    }
+    createTemplateCard(template) {
+        if (!template || typeof template !== 'object') {
+            console.error('❌ Invalid template object:', template);
+            return '<div class="template-card invalid">Invalid Template</div>';
+        }
+        
+        // Validate required fields
+        if (!template.id || !template.name || !template.code) {
+            console.error('❌ Template missing required fields:', template);
+            return '<div class="template-card invalid">Invalid Template Data</div>';
+        }
 
-    const safeTemplate = {
-        id: template.id,
-        name: template.name,
-        patterns: template.patterns || '/command',
-        code: template.code,
-        description: template.description || 'No description available',
-        waitForAnswer: Boolean(template.waitForAnswer),
-        answerHandler: template.answerHandler || ''
-    };
+        const safeTemplate = {
+            id: template.id,
+            name: template.name,
+            patterns: template.patterns || '/command',
+            code: template.code,
+            description: template.description || 'No description available',
+            waitForAnswer: Boolean(template.waitForAnswer),
+            answerHandler: template.answerHandler || ''
+        };
 
-    // Get appropriate icon
-    const templateIcon = this.getTemplateIcon(safeTemplate.name);
+        // Get appropriate icon
+        const templateIcon = this.getTemplateIcon(safeTemplate.name);
 
-    // FIXED: Simple JSON stringification without complex escaping
-    const templateJson = JSON.stringify(safeTemplate);
+        // FIXED: Simple JSON stringification without complex escaping
+        const templateJson = JSON.stringify(safeTemplate);
 
-    return `
-        <div class="template-card" data-template-id="${safeTemplate.id}">
-            <div class="template-card-content">
-                <div class="template-icon-container">
-                    <div class="template-icon"><i class="${templateIcon}"></i></div>
-                    <div class="template-icon"><i class="${templateIcon}"></i></div>
-                    <div class="template-icon"><i class="${templateIcon}"></i></div>
-                    <div class="template-icon"><i class="${templateIcon}"></i></div>
+        return `
+            <div class="template-card" data-template-id="${safeTemplate.id}">
+                <div class="template-icon">
+                    <i class="${templateIcon}"></i>
                 </div>
-                <div class="template-info">
-                    <h4>${this.escapeHtml(safeTemplate.name)}</h4>
-                    <p>${this.escapeHtml(safeTemplate.description)}</p>
-                    <div class="template-patterns">${this.escapeHtml(safeTemplate.patterns)}</div>
-                    <div class="template-footer">
-                        <span class="template-type">${safeTemplate.waitForAnswer ? 'Interactive' : 'Simple'}</span>
-                        <button class="btn-apply" data-template='${this.escapeHtml(templateJson)}'>
-                            <i class="fas fa-check"></i> Apply
-                        </button>
-                    </div>
+                <h4>${this.escapeHtml(safeTemplate.name)}</h4>
+                <p>${this.escapeHtml(safeTemplate.description)}</p>
+                <div class="template-patterns">${this.escapeHtml(safeTemplate.patterns)}</div>
+                <div class="template-footer">
+                    <span class="template-type">${safeTemplate.waitForAnswer ? 'Interactive' : 'Simple'}</span>
+                    <button class="btn-apply" data-template='${this.escapeHtml(templateJson)}'>
+                        Apply Template
+                    </button>
                 </div>
             </div>
-        </div>
-    `;
-}
+        `;
+    }
 
     setupTemplateEvents() {
         // Template apply button events
