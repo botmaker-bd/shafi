@@ -1,4 +1,4 @@
-// server/core/command-executor.js - COMPLETELY FIXED
+// server/core/command-executor.js
 const ApiWrapper = require('./api-wrapper');
 
 async function executeCommandCode(botInstance, code, context) {
@@ -46,12 +46,13 @@ async function executeCommandCode(botInstance, code, context) {
                     chat_id: chatId
                 }),
 
-                // Message data
+                // User input variables
                 msg: msg,
                 chatId: chatId,
                 userId: userId,
                 userInput: userInput,
                 params: userInput,
+                text: userInput,
                 
                 // Data storage
                 User: context.User,
@@ -59,13 +60,6 @@ async function executeCommandCode(botInstance, code, context) {
                 
                 // Utility functions
                 wait: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
-                
-                // ✅ NEW: runCommand function for instant execution
-                runCommand: (commandPattern) => {
-                    console.log(`🔄 runCommand called: ${commandPattern}`);
-                    // This will be handled by the command router
-                    return `Command ${commandPattern} queued for execution`;
-                },
                 
                 // HTTP client
                 HTTP: {
@@ -92,72 +86,46 @@ async function executeCommandCode(botInstance, code, context) {
 
             console.log('🚀 Executing user command code...');
 
-            // ✅ FIXED: Simple execution without complex async detection
+            // Execute user code
             const executeUserCode = () => {
                 try {
-                    // Extract variables for user code
                     const { 
                         bot, Api, Bot, getUser, User,
-                        msg, chatId, userId, userInput, params,
-                        wait, HTTP, runCommand
+                        msg, chatId, userId, userInput, params, text,
+                        wait, HTTP
                     } = executionEnv;
 
                     console.log('📊 User code execution starting...');
 
-                    let result;
+                    // Execute user code directly
+                    const syncFunction = new Function(`
+                        const { 
+                            bot, Api, Bot, getUser, User,
+                            msg, chatId, userId, userInput, params, text,
+                            wait, HTTP
+                        } = this;
+                        
+                        try {
+                            ${code}
+                            return typeof result !== 'undefined' ? result : "Command executed successfully";
+                        } catch (error) {
+                            console.error('User code error:', error);
+                            return "Command executed with errors";
+                        }
+                    `);
                     
-                    // Check if code contains Python execution
-                    if (code.includes('runPython') || code.includes('python')) {
-                        console.log('🐍 Python code detected');
-                        // For Python code, use async execution
-                        const asyncFunction = new Function(`
-                            const { 
-                                bot, Api, Bot, getUser, User,
-                                msg, chatId, userId, userInput, params,
-                                wait, HTTP, runCommand
-                            } = this;
-                            
-                            return (async () => {
-                                try {
-                                    ${code}
-                                    return typeof result !== 'undefined' ? result : "Command executed successfully";
-                                } catch (error) {
-                                    throw error;
-                                }
-                            })();
-                        `);
-                        result = asyncFunction.call(executionEnv);
-                    } else {
-                        // For regular JavaScript code
-                        const syncFunction = new Function(`
-                            const { 
-                                bot, Api, Bot, getUser, User,
-                                msg, chatId, userId, userInput, params,
-                                wait, HTTP, runCommand
-                            } = this;
-                            
-                            try {
-                                ${code}
-                                return typeof result !== 'undefined' ? result : "Command executed successfully";
-                            } catch (error) {
-                                throw error;
-                            }
-                        `);
-                        result = syncFunction.call(executionEnv);
-                    }
-
-                    return result;
+                    return syncFunction.call(executionEnv);
                     
                 } catch (error) {
                     console.error('❌ User code execution error:', error);
-                    throw error;
+                    return "Command execution failed";
                 }
             };
 
             // Execute the user code
-            const result = await executeUserCode();
+            const result = executeUserCode();
             
-            console.log('✅ Command execution completed successfully');
+            console.log('✅ Command execution completed');
             console.log(`📦 Result:`, result);
             console.log(`✅ ========== COMMAND EXECUTION COMPLETE ==========\n`);
             
