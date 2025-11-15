@@ -1,19 +1,10 @@
 [
     {
         "id": "media_gallery",
-        "name": "Media Gallery",
+        "name": "Media Gallery", 
         "patterns": "/gallery, photos, images, media",
         "description": "Send multiple media files in a gallery format",
-        "code": "// Media gallery with multiple files\nconst mediaGallery = [\n    {\n        type: 'photo',\n        media: 'https://picsum.photos/400/300?random=1',\n        caption: 'Beautiful landscape #1 🌄'\n    },\n    {\n        type: 'photo', \n        media: 'https://picsum.photos/400/300?random=2',\n        caption: 'Beautiful landscape #2 🏞️'\n    },\n    {\n        type: 'photo',\n        media: 'https://picsum.photos/400/300?random=3',\n        caption: 'Beautiful landscape #3 🌅'\n    }\n];\n\n// Send media group\nbot.sendMediaGroup(mediaGallery.map(item => ({\n    type: item.type,\n    media: item.media,\n    caption: item.caption\n})));\n\n// Follow up with navigation buttons\nconst navButtons = [\n    [{ text: \"⬅️ Previous\", callback_data: \"gallery_prev\" }, { text: \"Next ➡️\", callback_data: \"gallery_next\" }],\n    [{ text: \"📥 Download All\", callback_data: \"download_all\" }, { text: \"🔄 Refresh\", callback_data: \"refresh_gallery\" }]\n];\n\nbot.sendMessage(\"Use the buttons below to navigate the gallery:\", {\n    reply_markup: { inline_keyboard: navButtons }\n});",
-        "waitForAnswer": false,
-        "answerHandler": ""
-    },
-    {
-        "id": "file_downloader",
-        "name": "File Downloader",
-        "patterns": "/download, file, getfile, document",
-        "description": "Send files with download options and file information",
-        "code": "const files = {\n    pdf: {\n        url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',\n        name: 'Sample_Document.pdf',\n        size: '15.2 KB',\n        description: 'Sample PDF document for testing'\n    },\n    image: {\n        url: 'https://picsum.photos/800/600',\n        name: 'Sample_Image.jpg', \n        size: '45.7 KB',\n        description: 'High quality sample image'\n    },\n    text: {\n        url: 'https://filesamples.com/samples/document/txt/sample3.txt',\n        name: 'Sample_Text.txt',\n        size: '1.1 KB',\n        description: 'Sample text file with content'\n    }\n};\n\nconst fileText = `📁 *File Download Center*\\n\\nAvailable files for download:\\n\\n` + \nObject.entries(files).map(([key, file]) => \n    `📄 *${file.name}*\\n` +\n    `📏 Size: ${file.size}\\n` +\n    `📝 ${file.description}`\n).join('\\n\\n');\n\nconst fileButtons = Object.entries(files).map(([key, file]) => [\n    { \n        text: `📥 Download ${file.name}`, \n        callback_data: `download_${key}` \n    }\n]);\n\nfileButtons.push([{ text: \"🔄 Refresh List\", callback_data: \"refresh_files\" }]);\n\nbot.sendMessage(fileText, {\n    parse_mode: 'Markdown',\n    reply_markup: { inline_keyboard: fileButtons }\n});",
+        "code": "// Single photo with caption\nbot.sendPhoto('https://picsum.photos/400/300', {\n    caption: '📸 Sample Image\\n\\nThis is a demo image from our gallery!',\n    parse_mode: 'Markdown'\n});\n\n// Follow up with navigation options\nconst navButtons = [\n    [{ text: \"🔄 More Photos\", callback_data: \"more_photos\" }],\n    [{ text: \"📁 File Gallery\", callback_data: \"file_gallery\" }]\n];\n\nbot.sendMessage(\"Explore more content:\", {\n    reply_markup: { inline_keyboard: navButtons }\n});",
         "waitForAnswer": false,
         "answerHandler": ""
     }
