@@ -5,6 +5,7 @@ class CommandEditor {
         this.currentCommand = null;
         this.commands = [];
         this.templates = {};
+        this.originalCode = ''; // Track original code for save button state
         this.init();
     }
 
@@ -383,6 +384,265 @@ class CommandEditor {
         this.setupModalEvents();
     }
 
+    setupCodeEditor() {
+        const advancedEditor = document.getElementById('advancedCodeEditor');
+        if (!advancedEditor) {
+            console.error('❌ Advanced code editor not found');
+            return;
+        }
+        
+        // Setup both cancel buttons
+        const cancelEditBtn = document.getElementById('cancelEdit');
+        const cancelEditTopBtn = document.getElementById('cancelEditTop');
+        
+        // Setup both save buttons
+        const saveCodeBtn = document.getElementById('saveCode');
+        const saveCodeTopBtn = document.getElementById('saveCodeTop');
+        
+        if (cancelEditBtn) {
+            cancelEditBtn.addEventListener('click', () => {
+                this.closeCodeEditor();
+            });
+        }
+        
+        if (cancelEditTopBtn) {
+            cancelEditTopBtn.addEventListener('click', () => {
+                this.closeCodeEditor();
+            });
+        }
+        
+        if (saveCodeBtn) {
+            saveCodeBtn.addEventListener('click', () => {
+                this.saveCodeFromEditor();
+            });
+        }
+        
+        if (saveCodeTopBtn) {
+            saveCodeTopBtn.addEventListener('click', () => {
+                this.saveCodeFromEditor();
+            });
+        }
+
+        // Setup toolbar buttons
+        this.setupToolbarButtons();
+
+        advancedEditor.addEventListener('input', (e) => {
+            this.updateEditorStats(e.target.value);
+            this.updateSaveButtonState();
+        });
+
+        // Initial stats update
+        this.updateEditorStats(advancedEditor.value);
+        this.updateSaveButtonState();
+    }
+
+    setupToolbarButtons() {
+        const editor = document.getElementById('advancedCodeEditor');
+        
+        // Undo/Redo functionality
+        document.getElementById('undoBtn').addEventListener('click', () => {
+            document.execCommand('undo');
+            editor.focus();
+        });
+        
+        document.getElementById('redoBtn').addEventListener('click', () => {
+            document.execCommand('redo');
+            editor.focus();
+        });
+        
+        // Select All
+        document.getElementById('selectAllBtn').addEventListener('click', () => {
+            editor.select();
+            editor.focus();
+        });
+        
+        // Cut
+        document.getElementById('cutBtn').addEventListener('click', () => {
+            document.execCommand('cut');
+            editor.focus();
+        });
+        
+        // Copy
+        document.getElementById('copyBtn').addEventListener('click', () => {
+            document.execCommand('copy');
+            editor.focus();
+        });
+        
+        // Paste
+        document.getElementById('pasteBtn').addEventListener('click', async () => {
+            try {
+                const text = await navigator.clipboard.readText();
+                editor.setRangeText(text, editor.selectionStart, editor.selectionEnd, 'end');
+                this.updateEditorStats(editor.value);
+                this.updateSaveButtonState();
+            } catch (err) {
+                document.execCommand('paste');
+            }
+            editor.focus();
+        });
+        
+        // Clear
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            if (confirm('Are you sure you want to clear all code?')) {
+                editor.value = '';
+                this.updateEditorStats('');
+                this.updateSaveButtonState();
+                editor.focus();
+            }
+        });
+        
+        // Format (basic indentation)
+        document.getElementById('formatBtn').addEventListener('click', () => {
+            this.formatCode();
+            editor.focus();
+        });
+    }
+
+    updateEditorStats(code) {
+        const lines = code.split('\n').length;
+        const chars = code.length;
+        const words = code.trim() ? code.trim().split(/\s+/).length : 0;
+        
+        const lineCountEl = document.getElementById('lineCount');
+        const charCountEl = document.getElementById('charCount');
+        const wordCountEl = document.getElementById('wordCount');
+        
+        if (lineCountEl) lineCountEl.textContent = `Lines: ${lines}`;
+        if (charCountEl) charCountEl.textContent = `Chars: ${chars}`;
+        if (wordCountEl) wordCountEl.textContent = `Words: ${words}`;
+    }
+
+    updateSaveButtonState() {
+        const advancedEditor = document.getElementById('advancedCodeEditor');
+        const saveBtn = document.getElementById('saveCode');
+        const saveTopBtn = document.getElementById('saveCodeTop');
+        
+        // Check if content has changed
+        const hasChanged = advancedEditor.value !== this.originalCode;
+        const hasContent = advancedEditor.value.trim().length > 0;
+        
+        const shouldEnable = hasContent && hasChanged;
+        
+        if (saveBtn) {
+            saveBtn.disabled = !shouldEnable;
+            saveBtn.style.opacity = shouldEnable ? '1' : '0.6';
+            if (shouldEnable) {
+                saveBtn.classList.add('btn-pulse');
+            } else {
+                saveBtn.classList.remove('btn-pulse');
+            }
+        }
+        
+        if (saveTopBtn) {
+            saveTopBtn.disabled = !shouldEnable;
+            saveTopBtn.style.opacity = shouldEnable ? '1' : '0.6';
+            if (shouldEnable) {
+                saveTopBtn.classList.add('btn-pulse');
+            } else {
+                saveTopBtn.classList.remove('btn-pulse');
+            }
+        }
+    }
+
+    formatCode() {
+        const editor = document.getElementById('advancedCodeEditor');
+        let code = editor.value;
+        
+        // Basic formatting - add proper indentation
+        const lines = code.split('\n');
+        let formattedLines = [];
+        let indentLevel = 0;
+        
+        for (let line of lines) {
+            const trimmedLine = line.trim();
+            
+            // Decrease indent for closing braces
+            if (trimmedLine.endsWith('}') || trimmedLine.endsWith(']') || trimmedLine.endsWith(')')) {
+                indentLevel = Math.max(0, indentLevel - 1);
+            }
+            
+            // Add current line with proper indentation
+            formattedLines.push('    '.repeat(indentLevel) + trimmedLine);
+            
+            // Increase indent for opening braces
+            if (trimmedLine.endsWith('{') || trimmedLine.endsWith('[') || trimmedLine.endsWith('(')) {
+                indentLevel++;
+            }
+        }
+        
+        editor.value = formattedLines.join('\n');
+        this.updateEditorStats(editor.value);
+        this.updateSaveButtonState();
+        
+        this.showSuccess('Code formatted!');
+    }
+
+    openCodeEditor(editorType) {
+        this.currentEditorType = editorType;
+        let code = '';
+        
+        if (editorType === 'main') {
+            const commandCodeEl = document.getElementById('commandCode');
+            code = commandCodeEl ? commandCodeEl.value : '';
+        } else if (editorType === 'answer') {
+            const answerHandlerEl = document.getElementById('answerHandler');
+            code = answerHandlerEl ? answerHandlerEl.value : '';
+        }
+        
+        const advancedEditor = document.getElementById('advancedCodeEditor');
+        if (advancedEditor) {
+            advancedEditor.value = code;
+            this.originalCode = code; // Store original code for change detection
+            this.updateEditorStats(code);
+            this.updateSaveButtonState();
+        }
+        
+        const codeEditorModal = document.getElementById('codeEditorModal');
+        if (codeEditorModal) {
+            codeEditorModal.style.display = 'flex';
+            // Prevent body scroll
+            document.body.style.overflow = 'hidden';
+        }
+        
+        setTimeout(() => {
+            const editor = document.getElementById('advancedCodeEditor');
+            if (editor) {
+                editor.focus();
+                // Move cursor to end
+                editor.setSelectionRange(editor.value.length, editor.value.length);
+            }
+        }, 100);
+    }
+
+    closeCodeEditor() {
+        const codeEditorModal = document.getElementById('codeEditorModal');
+        if (codeEditorModal) {
+            codeEditorModal.style.display = 'none';
+            // Restore body scroll
+            document.body.style.overflow = '';
+        }
+    }
+
+    saveCodeFromEditor() {
+        const advancedEditor = document.getElementById('advancedCodeEditor');
+        if (!advancedEditor) return;
+        
+        const code = advancedEditor.value;
+        
+        if (this.currentEditorType === 'main') {
+            const commandCodeEl = document.getElementById('commandCode');
+            if (commandCodeEl) commandCodeEl.value = code;
+        } else if (this.currentEditorType === 'answer') {
+            const answerHandlerEl = document.getElementById('answerHandler');
+            if (answerHandlerEl) answerHandlerEl.value = code;
+        }
+        
+        this.originalCode = code; // Update original code after save
+        this.updateSaveButtonState();
+        this.closeCodeEditor();
+        this.showSuccess('Code saved successfully!');
+    }
+
     setupCommandsTags() {
         const moreCommandsInput = document.getElementById('moreCommands');
         const commandsTags = document.getElementById('commandsTags');
@@ -477,102 +737,6 @@ class CommandEditor {
         }
     }
 
-    setupCodeEditor() {
-        const advancedEditor = document.getElementById('advancedCodeEditor');
-        if (!advancedEditor) {
-            console.error('❌ Advanced code editor not found');
-            return;
-        }
-        
-        const cancelEditBtn = document.getElementById('cancelEdit');
-        const saveCodeBtn = document.getElementById('saveCode');
-        
-        if (cancelEditBtn) {
-            cancelEditBtn.addEventListener('click', () => {
-                this.closeCodeEditor();
-            });
-        }
-        
-        if (saveCodeBtn) {
-            saveCodeBtn.addEventListener('click', () => {
-                this.saveCodeFromEditor();
-            });
-        }
-
-        advancedEditor.addEventListener('input', (e) => {
-            this.updateLineCount(e.target.value);
-        });
-
-        this.updateLineCount(advancedEditor.value);
-    }
-
-    updateLineCount(code) {
-        const lines = code.split('\n').length;
-        const chars = code.length;
-        
-        const lineCountEl = document.getElementById('lineCount');
-        const charCountEl = document.getElementById('charCount');
-        
-        if (lineCountEl) lineCountEl.textContent = `Line: ${lines}`;
-        if (charCountEl) charCountEl.textContent = `Chars: ${chars}`;
-    }
-
-    openCodeEditor(editorType) {
-        this.currentEditorType = editorType;
-        let code = '';
-        
-        if (editorType === 'main') {
-            const commandCodeEl = document.getElementById('commandCode');
-            code = commandCodeEl ? commandCodeEl.value : '';
-        } else if (editorType === 'answer') {
-            const answerHandlerEl = document.getElementById('answerHandler');
-            code = answerHandlerEl ? answerHandlerEl.value : '';
-        }
-        
-        const advancedEditor = document.getElementById('advancedCodeEditor');
-        if (advancedEditor) {
-            advancedEditor.value = code;
-            this.updateLineCount(code);
-        }
-        
-        const codeEditorModal = document.getElementById('codeEditorModal');
-        if (codeEditorModal) {
-            codeEditorModal.style.display = 'flex';
-        }
-        
-        setTimeout(() => {
-            const editor = document.getElementById('advancedCodeEditor');
-            if (editor) {
-                editor.focus();
-            }
-        }, 100);
-    }
-
-    closeCodeEditor() {
-        const codeEditorModal = document.getElementById('codeEditorModal');
-        if (codeEditorModal) {
-            codeEditorModal.style.display = 'none';
-        }
-    }
-
-    saveCodeFromEditor() {
-        const advancedEditor = document.getElementById('advancedCodeEditor');
-        if (!advancedEditor) return;
-        
-        const code = advancedEditor.value;
-        
-        if (this.currentEditorType === 'main') {
-            const commandCodeEl = document.getElementById('commandCode');
-            if (commandCodeEl) commandCodeEl.value = code;
-        } else if (this.currentEditorType === 'answer') {
-            const answerHandlerEl = document.getElementById('answerHandler');
-            if (answerHandlerEl) answerHandlerEl.value = code;
-        }
-        
-        this.closeCodeEditor();
-        this.showSuccess('Code saved!');
-    }
-
     setupModalEvents() {
         const modals = ['testCommandModal', 'codeEditorModal', 'templatesModal'];
         
@@ -584,6 +748,9 @@ class CommandEditor {
             if (closeBtn) {
                 closeBtn.addEventListener('click', () => {
                     modal.style.display = 'none';
+                    if (modalId === 'codeEditorModal') {
+                        document.body.style.overflow = '';
+                    }
                 });
             }
             
@@ -591,6 +758,9 @@ class CommandEditor {
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape' && modal.style.display === 'flex') {
                     modal.style.display = 'none';
+                    if (modalId === 'codeEditorModal') {
+                        document.body.style.overflow = '';
+                    }
                 }
             });
         });
@@ -618,6 +788,7 @@ class CommandEditor {
         window.addEventListener('click', (e) => {
             if (e.target.classList.contains('modal')) {
                 e.target.style.display = 'none';
+                document.body.style.overflow = '';
             }
         });
     }
