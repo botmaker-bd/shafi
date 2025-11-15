@@ -274,9 +274,11 @@
     </div>
 
     <!-- Full Screen Code Editor Modal -->
-    <div id="codeEditorModal" class="modal fullscreen-modal">
-        <div class="modal-content fullscreen-content">
-            <div class="modal-header compact-header">
+    <!-- Full Screen Code Editor Modal -->
+<div id="codeEditorModal" class="modal fullscreen-modal">
+    <div class="modal-content fullscreen-content">
+        <div class="modal-header compact-header">
+            <div class="editor-header-content">
                 <div class="editor-toolbar">
                     <div class="toolbar-group">
                         <button class="btn-icon" id="undoBtn" title="Undo">
@@ -287,12 +289,12 @@
                             <i class="fas fa-redo"></i>
                             <span>Redo</span>
                         </button>
-                    </div>
-                    <div class="toolbar-group">
                         <button class="btn-icon" id="selectAllBtn" title="Select All">
                             <i class="fas fa-expand-arrows-alt"></i>
                             <span>Select All</span>
                         </button>
+                    </div>
+                    <div class="toolbar-group">
                         <button class="btn-icon" id="cutBtn" title="Cut">
                             <i class="fas fa-cut"></i>
                             <span>Cut</span>
@@ -317,55 +319,58 @@
                         </button>
                     </div>
                 </div>
-                <div class="editor-actions">
-                    <button class="btn btn-secondary" id="cancelEdit">Cancel</button>
-                    <button class="btn btn-primary" id="saveCode">Save Code</button>
-                </div>
-            </div>
-            <div class="modal-body fullscreen-body">
-                <textarea id="advancedCodeEditor" class="fullscreen-editor" 
-                         placeholder="Write your code here..."></textarea>
-            </div>
-            <div class="modal-footer">
-                <div class="editor-info">
-                    <span id="lineCount">Line: 1</span>
-                    <span id="charCount">Chars: 0</span>
+                <div class="editor-header-actions">
+                    <button class="btn btn-secondary btn-small" id="cancelEdit">Cancel</button>
+                    <button class="btn btn-primary btn-small" id="saveCode">Save Code</button>
+                    <button class="modal-close">&times;</button>
                 </div>
             </div>
         </div>
+        <div class="modal-body fullscreen-body">
+            <textarea id="advancedCodeEditor" class="fullscreen-editor" 
+                     placeholder="Write your code here..."></textarea>
+        </div>
+        <div class="modal-footer">
+            <div class="editor-info">
+                <span id="lineCount">Line: 1</span>
+                <span id="charCount">Chars: 0</span>
+            </div>
+        </div>
     </div>
+</div>
 
     <!-- Templates Modal -->
-    <div id="templatesModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Code Templates</h3>
-                <button class="modal-close">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="templates-categories">
-                    <div class="category-tabs-container">
-                        <div class="category-tabs-scroll">
-                            <div class="category-tabs">
-                                <!-- Categories will be dynamically loaded -->
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="templates-content">
-                        <!-- Templates will be dynamically loaded here -->
-                        <div class="loading-state">
-                            <div class="spinner"></div>
-                            <p>Loading templates...</p>
+    <!-- Templates Modal -->
+<div id="templatesModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Code Templates</h3>
+            <button class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="templates-categories">
+                <div class="category-tabs-container">
+                    <div class="category-tabs-scroll">
+                        <div class="category-tabs-grid">
+                            <!-- Categories will be dynamically loaded in 2 rows -->
                         </div>
                     </div>
                 </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" id="closeTemplates">Close</button>
+                
+                <div class="templates-content">
+                    <!-- Templates will be dynamically loaded here -->
+                    <div class="loading-state">
+                        <div class="spinner"></div>
+                        <p>Loading templates...</p>
+                    </div>
+                </div>
             </div>
         </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" id="closeTemplates">Close</button>
+        </div>
     </div>
+</div>
 
     <script src="js/common.js"></script>
     <script src="js/command-editor.js"></script>
