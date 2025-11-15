@@ -410,6 +410,9 @@
 
 .compact-header {
     padding: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     background: var(--bg-primary);
     border-bottom: 1px solid var(--border-color);
     position: sticky;
@@ -419,24 +422,12 @@
     box-shadow: var(--shadow-sm);
 }
 
-.editor-header-content {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 1rem;
-    width: 100%;
-}
-
 .editor-toolbar {
     display: flex;
-    flex-direction: column;
     gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
     flex: 1;
-}
-
-.toolbar-row {
-    display: flex;
-    gap: 0.5rem;
 }
 
 .toolbar-group {
@@ -449,7 +440,7 @@
 .btn-icon {
     background: var(--bg-tertiary);
     border: 1px solid var(--border-color);
-    padding: 0.5rem 0.75rem;
+    padding: 0.5rem;
     border-radius: var(--radius-sm);
     cursor: pointer;
     color: var(--text-secondary);
@@ -458,9 +449,10 @@
     white-space: nowrap;
     display: flex;
     align-items: center;
-    gap: 0.25rem;
+    justify-content: center;
     flex-shrink: 0;
     min-height: 36px;
+    min-width: 36px;
 }
 
 .btn-icon:hover {
@@ -477,40 +469,6 @@
 
 .btn-icon i {
     font-size: 0.7rem;
-}
-
-.editor-header-actions {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-    flex-shrink: 0;
-}
-
-.editor-header-actions .btn {
-    min-height: 36px;
-    padding: 0.5rem 1rem;
-    font-size: 0.875rem;
-}
-
-.editor-header-actions .modal-close {
-    background: none;
-    border: none;
-    font-size: 1.25rem;
-    cursor: pointer;
-    color: var(--text-muted);
-    transition: var(--transition);
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-left: 0.5rem;
-}
-
-.editor-header-actions .modal-close:hover {
-    background: var(--bg-tertiary);
-    color: var(--error-color);
 }
 
 .fullscreen-body {
@@ -555,44 +513,36 @@
 }
 
 .category-tabs-container {
-    flex-shrink: 0;
+    padding: 1rem;
     border-bottom: 1px solid var(--border-color);
     background: var(--bg-tertiary);
-    padding: 0.5rem 0;
-}
-
-.category-tabs-scroll {
+    flex-shrink: 0;
     overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    padding: 0 1rem;
 }
 
-.category-tabs-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
+.category-tabs {
+    display: flex;
     gap: 0.5rem;
+    flex-wrap: nowrap;
     min-width: max-content;
 }
 
 .category-tab {
-    padding: 0.75rem 0.5rem;
+    padding: 0.75rem 1.25rem;
     border: 1px solid var(--border-color);
     background: var(--bg-primary);
     border-radius: var(--radius-md);
     cursor: pointer;
     transition: var(--transition);
-    font-size: 0.8rem;
+    font-size: 0.875rem;
     font-weight: 500;
     color: var(--text-primary);
-    min-height: 36px;
+    min-height: 42px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    text-align: center;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 .category-tab:hover {
@@ -627,7 +577,7 @@
 
 .templates-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
     gap: 1.5rem;
     padding: 1.5rem;
     max-height: 500px;
@@ -639,7 +589,7 @@
 .template-card {
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
-    padding: 1.25rem;
+    padding: 1.5rem;
     background: var(--bg-primary);
     cursor: pointer;
     transition: all 0.3s ease;
@@ -672,57 +622,46 @@
     transform: scaleX(1);
 }
 
-.template-card-content {
+.template-content {
     display: flex;
     gap: 1rem;
-    align-items: flex-start;
     flex: 1;
 }
 
-.template-icon-container {
-    flex-shrink: 0;
-    width: 60px;
-    height: 60px;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: 1fr 1fr;
-    gap: 2px;
-    background: var(--bg-tertiary);
-    border-radius: var(--radius-md);
-    padding: 4px;
-}
-
 .template-icon {
-    font-size: 1.2rem;
+    font-size: 2rem;
     color: var(--primary-color);
+    flex-shrink: 0;
+    transition: var(--transition);
+    width: 50px;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
-    background: var(--bg-primary);
-    border-radius: var(--radius-sm);
 }
 
-.template-info {
+.template-card:hover .template-icon {
+    transform: scale(1.1);
+    color: var(--secondary-color);
+}
+
+.template-details {
     flex: 1;
     min-width: 0;
 }
 
-.template-info h4 {
-    margin: 0 0 0.25rem 0;
+.template-card h4 {
+    margin: 0 0 0.5rem 0;
     color: var(--text-primary);
-    font-size: 1rem;
+    font-size: 1.1rem;
     font-weight: 600;
-    line-height: 1.3;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    line-height: 1.4;
 }
 
-.template-info p {
+.template-card p {
     color: var(--text-secondary);
-    font-size: 0.85rem;
-    line-height: 1.4;
-    margin: 0 0 0.75rem 0;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    margin-bottom: 1rem;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
@@ -736,7 +675,7 @@
     font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
     font-size: 0.8rem;
     color: var(--text-primary);
-    margin-bottom: 1rem;
+    margin-bottom: 1.5rem;
     border: 1px solid var(--border-light);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -793,7 +732,7 @@
 .btn-apply:hover {
     background: var(--primary-dark);
     transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
 }
 
 .btn-apply:active {
@@ -945,10 +884,6 @@
         gap: 1rem;
         padding: 1rem;
     }
-    
-    .category-tabs-grid {
-        grid-template-columns: repeat(3, 1fr);
-    }
 }
 
 @media (max-width: 768px) {
@@ -986,8 +921,20 @@
         gap: 1rem;
     }
     
-    .category-tabs-grid {
-        grid-template-columns: repeat(2, 1fr);
+    .category-tabs-container {
+        padding: 0.75rem;
+    }
+    
+    .category-tabs {
+        flex-direction: row;
+        gap: 0.5rem;
+    }
+    
+    .category-tab {
+        min-width: auto;
+        flex: none;
+        font-size: 0.8rem;
+        padding: 0.6rem 1rem;
     }
     
     .test-input-container {
@@ -995,38 +942,22 @@
         align-items: stretch;
     }
     
-    .editor-header-content {
-        flex-direction: column;
-        gap: 0.75rem;
-    }
-    
     .editor-toolbar {
-        width: 100%;
-    }
-    
-    .editor-header-actions {
-        width: 100%;
-        justify-content: flex-end;
-    }
-    
-    .btn-icon span {
-        display: none;
+        justify-content: center;
     }
     
     .template-card {
-        padding: 1rem;
+        padding: 1.25rem;
     }
     
-    .template-card-content {
+    .template-content {
         flex-direction: column;
         gap: 0.75rem;
     }
     
-    .template-icon-container {
+    .template-icon {
         width: 100%;
-        height: 40px;
-        grid-template-columns: repeat(4, 1fr);
-        grid-template-rows: 1fr;
+        justify-content: flex-start;
     }
     
     .template-footer {
@@ -1043,15 +974,15 @@
 
 @media (max-width: 480px) {
     .template-card h4 {
-        font-size: 0.95rem;
+        font-size: 1rem;
     }
     
     .template-card p {
-        font-size: 0.8rem;
+        font-size: 0.85rem;
     }
     
     .template-icon {
-        font-size: 1rem;
+        font-size: 1.5rem;
     }
     
     .empty-icon {
@@ -1060,10 +991,6 @@
     
     .empty-state h3 {
         font-size: 1.3rem;
-    }
-    
-    .category-tabs-grid {
-        grid-template-columns: 1fr;
     }
 }
 
@@ -1125,4 +1052,26 @@
 .category-tab:focus {
     outline: 2px solid var(--primary-color);
     outline-offset: 2px;
+}
+
+/* Code Editor Textarea */
+#commandCode, #answerHandler {
+    width: 100%;
+    min-height: 200px;
+    padding: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    resize: vertical;
+    transition: var(--transition);
+}
+
+#commandCode:focus, #answerHandler:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
