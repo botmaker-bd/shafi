@@ -228,28 +228,50 @@ class ApiWrapper {
         // Utility methods
         this.wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-        // Wait for answer with timeout
-        this.waitForAnswer = (question, options = {}) => {
-            const timeout = options.timeout || 30000; // 30 seconds default
-            return new Promise((resolve, reject) => {
-                const nextCommandKey = `${this.context.botToken}_${this.context.userId}`;
-                
-                const timeoutId = setTimeout(() => {
-                    this.context.nextCommandHandlers.delete(nextCommandKey);
-                    reject(new Error('Wait for answer timeout'));
-                }, timeout);
+        // Wait for answer with timeout - FIXED VERSION
+this.waitForAnswer = (question, options = {}) => {
+    return new Promise(async (resolve, reject) => {
+        const timeout = options.timeout || 30000; // 30 seconds default
+        const nextCommandKey = `${this.context.botToken}_${this.context.userId}`;
+        
+        console.log(`⏳ Setting up waitForAnswer for key: ${nextCommandKey}`);
+        
+        const timeoutId = setTimeout(() => {
+            if (this.context.nextCommandHandlers.has(nextCommandKey)) {
+                this.context.nextCommandHandlers.delete(nextCommandKey);
+                console.log(`❌ Wait for answer timeout for user ${this.context.userId}`);
+            }
+            reject(new Error('Wait for answer timeout (30 seconds)'));
+        }, timeout);
 
-                this.sendMessage(this.context.chatId, question, {
-                    parse_mode: 'HTML',
-                    ...options
-                }).then(() => {
-                    this.context.nextCommandHandlers.set(nextCommandKey, (answer) => {
-                        clearTimeout(timeoutId);
-                        resolve(answer);
-                    });
-                }).catch(reject);
+        try {
+            // Send the question first
+            await this.sendMessage(this.context.chatId, question, {
+                parse_mode: 'HTML',
+                ...options
             });
-        };
+            
+            console.log(`✅ Question sent, setting up handler for: ${nextCommandKey}`);
+            
+            // Set up the handler for the user's response
+            this.context.nextCommandHandlers.set(nextCommandKey, (answer, answerMsg) => {
+                console.log(`✅ User answered: "${answer}"`);
+                clearTimeout(timeoutId);
+                resolve({
+                    text: answer,
+                    message: answerMsg,
+                    userId: this.context.userId,
+                    chatId: this.context.chatId
+                });
+            });
+            
+        } catch (error) {
+            clearTimeout(timeoutId);
+            this.context.nextCommandHandlers.delete(nextCommandKey);
+            reject(new Error(`Failed to send question: ${error.message}`));
+        }
+    });
+};
 
         // File download helper
         this.downloadFile = async (fileId, downloadPath = null) => {
