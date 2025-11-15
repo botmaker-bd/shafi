@@ -1,4 +1,3 @@
-// client/js/command-editor.js
 class CommandEditor {
     constructor() {
         this.user = null;
@@ -17,7 +16,6 @@ class CommandEditor {
         await this.loadTemplates();
         this.setupCodeEditor();
         this.setupCommandsTags();
-        this.setupTemplateEvents();
         console.log('✅ Command editor initialized completely');
     }
 
@@ -75,7 +73,7 @@ class CommandEditor {
 
     populateTemplatesModal() {
         const templatesContent = document.querySelector('.templates-content');
-        const categoryTabsContainer = document.querySelector('.category-tabs-grid');
+        const categoryTabsContainer = document.querySelector('.category-tabs');
         
         if (!templatesContent || !categoryTabsContainer) {
             console.error('❌ Templates modal elements not found');
@@ -191,24 +189,21 @@ class CommandEditor {
 
         return `
             <div class="template-card" data-template-id="${safeTemplate.id}">
-                <div class="template-card-content">
-                    <div class="template-icon-container">
-                        <div class="template-icon"><i class="${templateIcon}"></i></div>
-                        <div class="template-icon"><i class="${templateIcon}"></i></div>
-                        <div class="template-icon"><i class="${templateIcon}"></i></div>
-                        <div class="template-icon"><i class="${templateIcon}"></i></div>
+                <div class="template-content">
+                    <div class="template-icon">
+                        <i class="${templateIcon}"></i>
                     </div>
-                    <div class="template-info">
+                    <div class="template-details">
                         <h4>${this.escapeHtml(safeTemplate.name)}</h4>
                         <p>${this.escapeHtml(safeTemplate.description)}</p>
                         <div class="template-patterns">${this.escapeHtml(safeTemplate.patterns)}</div>
-                        <div class="template-footer">
-                            <span class="template-type">${safeTemplate.waitForAnswer ? 'Interactive' : 'Simple'}</span>
-                            <button class="btn-apply" data-template='${this.escapeHtml(templateJson)}'>
-                                <i class="fas fa-check"></i> Apply
-                            </button>
-                        </div>
                     </div>
+                </div>
+                <div class="template-footer">
+                    <span class="template-type">${safeTemplate.waitForAnswer ? 'Interactive' : 'Simple'}</span>
+                    <button class="btn-apply" data-template='${this.escapeHtml(templateJson)}'>
+                        Apply Template
+                    </button>
                 </div>
             </div>
         `;
@@ -231,17 +226,6 @@ class CommandEditor {
                         console.error('❌ Template parse error from button:', error);
                         this.showError('Failed to parse template data: ' + error.message);
                     }
-                }
-            }
-        });
-
-        // Template card click event (backup)
-        document.addEventListener('click', (e) => {
-            const templateCard = e.target.closest('.template-card');
-            if (templateCard && !e.target.classList.contains('btn-apply')) {
-                const button = templateCard.querySelector('.btn-apply');
-                if (button) {
-                    button.click(); // Trigger the apply button click
                 }
             }
         });
@@ -357,6 +341,10 @@ class CommandEditor {
 
         document.getElementById('toggleCommandBtn').addEventListener('click', () => {
             this.toggleCommand();
+        });
+
+        document.getElementById('testCommandBtn').addEventListener('click', () => {
+            this.testCommand();
         });
 
         document.getElementById('runTestBtn').addEventListener('click', () => {
