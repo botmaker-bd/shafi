@@ -65,6 +65,7 @@
     </nav>
 
     <div class="container">
+        <!-- Welcome Section -->
         <div class="welcome-section">
             <div class="welcome-content">
                 <h1>Welcome back, <span id="userName">User</span>! 👋</h1>
@@ -89,6 +90,10 @@
                 <div class="stat-content">
                     <h3 id="totalBots">0</h3>
                     <p>Total Bots</p>
+                    <div class="stat-trend positive">
+                        <i class="fas fa-arrow-up"></i>
+                        <span>12% from last week</span>
+                    </div>
                 </div>
             </div>
             <div class="stat-card">
@@ -98,6 +103,10 @@
                 <div class="stat-content">
                     <h3 id="activeBots">0</h3>
                     <p>Active Bots</p>
+                    <div class="stat-trend positive">
+                        <i class="fas fa-arrow-up"></i>
+                        <span>5% from yesterday</span>
+                    </div>
                 </div>
             </div>
             <div class="stat-card">
@@ -107,6 +116,10 @@
                 <div class="stat-content">
                     <h3 id="totalCommands">0</h3>
                     <p>Total Commands</p>
+                    <div class="stat-trend positive">
+                        <i class="fas fa-arrow-up"></i>
+                        <span>8 new today</span>
+                    </div>
                 </div>
             </div>
             <div class="stat-card">
@@ -116,70 +129,112 @@
                 <div class="stat-content">
                     <h3 id="todayMessages">0</h3>
                     <p>Today's Messages</p>
+                    <div class="stat-trend positive">
+                        <i class="fas fa-arrow-up"></i>
+                        <span>15% increase</span>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Quick Actions Section -->
-        <div class="section-card">
-            <div class="section-header">
-                <h2>Quick Actions</h2>
-                <p>Manage your bots and commands quickly</p>
+        <!-- Main Content Grid -->
+        <div class="dashboard-grid">
+            <!-- Quick Actions Section -->
+            <div class="section-card quick-actions">
+                <div class="section-header">
+                    <h2>Quick Actions</h2>
+                    <p>Manage your bots and commands quickly</p>
+                </div>
+                <div class="actions-grid">
+                    <a href="bot-management.html" class="action-card">
+                        <div class="action-icon primary">
+                            <i class="fas fa-plus"></i>
+                        </div>
+                        <div class="action-content">
+                            <h3>Add New Bot</h3>
+                            <p>Connect a new Telegram bot to your account</p>
+                        </div>
+                        <div class="action-arrow">
+                            <i class="fas fa-chevron-right"></i>
+                        </div>
+                    </a>
+                    <a href="command-editor.html" class="action-card">
+                        <div class="action-icon success">
+                            <i class="fas fa-edit"></i>
+                        </div>
+                        <div class="action-content">
+                            <h3>Manage Commands</h3>
+                            <p>Create and edit bot commands</p>
+                        </div>
+                        <div class="action-arrow">
+                            <i class="fas fa-chevron-right"></i>
+                        </div>
+                    </a>
+                    <a href="admin-settings.html" class="action-card">
+                        <div class="action-icon warning">
+                            <i class="fas fa-cog"></i>
+                        </div>
+                        <div class="action-content">
+                            <h3>Admin Settings</h3>
+                            <p>Configure admin and system settings</p>
+                        </div>
+                        <div class="action-arrow">
+                            <i class="fas fa-chevron-right"></i>
+                        </div>
+                    </a>
+                    <a href="#" class="action-card" id="testAllBots">
+                        <div class="action-icon info">
+                            <i class="fas fa-bolt"></i>
+                        </div>
+                        <div class="action-content">
+                            <h3>Test All Bots</h3>
+                            <p>Check connectivity of all your bots</p>
+                        </div>
+                        <div class="action-arrow">
+                            <i class="fas fa-chevron-right"></i>
+                        </div>
+                    </a>
+                </div>
             </div>
-            <div class="actions-grid">
-                <a href="bot-management.html" class="action-card">
-                    <div class="action-icon primary">
-                        <i class="fas fa-plus"></i>
-                    </div>
-                    <h3>Add New Bot</h3>
-                    <p>Connect a new Telegram bot to your account</p>
-                </a>
-                <a href="command-editor.html" class="action-card">
-                    <div class="action-icon success">
-                        <i class="fas fa-edit"></i>
-                    </div>
-                    <h3>Manage Commands</h3>
-                    <p>Create and edit bot commands</p>
-                </a>
-                <a href="admin-settings.html" class="action-card">
-                    <div class="action-icon warning">
-                        <i class="fas fa-cog"></i>
-                    </div>
-                    <h3>Admin Settings</h3>
-                    <p>Configure admin and system settings</p>
-                </a>
-                <a href="#" class="action-card" id="testAllBots">
-                    <div class="action-icon info">
-                        <i class="fas fa-bolt"></i>
-                    </div>
-                    <h3>Test All Bots</h3>
-                    <p>Check connectivity of all your bots</p>
-                </a>
-            </div>
-        </div>
 
-        <!-- Recent Bots Section -->
-        <div class="section-card">
-            <div class="section-header">
-                <h2>Your Bots</h2>
-                <p>Recently added and active bots</p>
+            <!-- Recent Bots Section -->
+            <div class="section-card recent-bots">
+                <div class="section-header">
+                    <h2>Your Bots</h2>
+                    <p>Recently added and active bots</p>
+                </div>
+                <div id="botsList" class="bots-list">
+                    <!-- Bots will be loaded here -->
+                    <div class="empty-state">
+                        <div class="empty-icon">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                        <h3>No Bots Yet</h3>
+                        <p>Get started by adding your first bot</p>
+                        <a href="bot-management.html" class="btn btn-primary">Add Your First Bot</a>
+                    </div>
+                </div>
+                <div class="section-footer">
+                    <a href="bot-management.html" class="btn btn-secondary">View All Bots</a>
+                </div>
             </div>
-            <div id="botsList" class="bots-grid">
-                <!-- Bots will be loaded here -->
-            </div>
-            <div class="section-footer">
-                <a href="bot-management.html" class="btn btn-secondary">View All Bots</a>
-            </div>
-        </div>
 
-        <!-- Recent Activity Section -->
-        <div class="section-card">
-            <div class="section-header">
-                <h2>Recent Activity</h2>
-                <p>Latest commands and bot activities</p>
-            </div>
-            <div id="recentActivity" class="activity-list">
-                <!-- Activity will be loaded here -->
+            <!-- Recent Activity Section -->
+            <div class="section-card recent-activity">
+                <div class="section-header">
+                    <h2>Recent Activity</h2>
+                    <p>Latest commands and bot activities</p>
+                </div>
+                <div id="recentActivity" class="activity-list">
+                    <!-- Activity will be loaded here -->
+                    <div class="empty-state">
+                        <div class="empty-icon">
+                            <i class="fas fa-history"></i>
+                        </div>
+                        <h3>No Activity Yet</h3>
+                        <p>Activity will appear here as you use your bots</p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -188,7 +243,7 @@
     <div id="loadingOverlay" class="loading-overlay">
         <div class="loading-spinner">
             <div class="spinner"></div>
-            <p>Loading...</p>
+            <p>Loading Dashboard...</p>
         </div>
     </div>
 
