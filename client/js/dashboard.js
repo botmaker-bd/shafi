@@ -1,4 +1,3 @@
-// client/js/dashboard.js
 class Dashboard {
     constructor() {
         this.user = null;
@@ -11,6 +10,7 @@ class Dashboard {
         await this.checkAuth();
         this.setupEventListeners();
         await this.loadDashboardData();
+        this.updateUserInfo();
         console.log('✅ Dashboard initialized');
     }
 
@@ -35,21 +35,8 @@ class Dashboard {
             }
 
             this.user = JSON.parse(userData);
-            this.updateUserInfo();
         } catch (error) {
             this.logout();
-        }
-    }
-
-    updateUserInfo() {
-        if (this.user) {
-            const userNameEl = document.getElementById('userName');
-            const userEmailEl = document.getElementById('userEmail');
-            const userAvatarEl = document.getElementById('userAvatar');
-            
-            if (userNameEl) userNameEl.textContent = this.user.email.split('@')[0];
-            if (userEmailEl) userEmailEl.textContent = this.user.email;
-            if (userAvatarEl) userAvatarEl.textContent = this.user.email.charAt(0).toUpperCase();
         }
     }
 
@@ -66,10 +53,13 @@ class Dashboard {
         });
 
         // Logout
-        document.getElementById('logoutBtn').addEventListener('click', (e) => {
-            e.preventDefault();
-            this.logout();
-        });
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.logout();
+            });
+        }
     }
 
     async loadDashboardData() {
@@ -85,16 +75,28 @@ class Dashboard {
                 }
             });
 
-            const botsData = await botsResponse.json();
-
-            if (botsData.success) {
-                this.bots = botsData.bots || [];
-                this.updateBotsList();
-                this.updateStats();
+            if (botsResponse.ok) {
+                const botsData = await botsResponse.json();
+                if (botsData.success) {
+                    this.bots = botsData.bots || [];
+                    this.displayBots();
+                }
             }
 
-            // Load recent activity (mock data for now)
-            this.updateRecentActivity();
+            // Load dashboard stats
+            const statsResponse = await fetch('/api/admin/stats', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (statsResponse.ok) {
+                const statsData = await statsResponse.json();
+                if (statsData.success) {
+                    this.stats = statsData.stats || {};
+                    this.updateStats();
+                }
+            }
 
         } catch (error) {
             console.error('❌ Dashboard data loading error:', error);
@@ -104,9 +106,46 @@ class Dashboard {
         }
     }
 
-    updateBotsList() {
+    updateUserInfo() {
+        if (this.user) {
+            const userNameEl = document.getElementById('userName');
+            const userEmailEl = document.getElementById('userEmail');
+            const userAvatarEl = document.getElementById('userAvatar');
+            
+            if (userNameEl) userNameEl.textContent = this.user.email.split('@')[0];
+            if (userEmailEl) userEmailEl.textContent = this.user.email;
+            if (userAvatarEl) userAvatarEl.textContent = this.user.email.charAt(0).toUpperCase();
+        }
+    }
+
+    updateStats() {
+        // Update header stats
+        const totalBotsEl = document.getElementById('totalBots');
+        const activeBotsEl = document.getElementById('activeBots');
+        
+        if (totalBotsEl) totalBotsEl.textContent = this.bots.length;
+        if (activeBotsEl) {
+            const activeBots = this.bots.filter(bot => bot.is_active).length;
+            activeBotsEl.textContent = activeBots;
+        }
+
+        // Update main stats
+        const totalCommandsEl = document.getElementById('totalCommands');
+        const todayMessagesEl = document.getElementById('todayMessages');
+        const totalUsersEl = document.getElementById('totalUsers');
+        const uptimeEl = document.getElementById('uptime');
+        
+        if (totalCommandsEl) totalCommandsEl.textContent = this.stats.totalCommands || '0';
+        if (todayMessagesEl) todayMessagesEl.textContent = this.stats.todayMessages || '0';
+        if (totalUsersEl) totalUsersEl.textContent = this.formatNumber(this.stats.totalUsers || 0);
+        if (uptimeEl) uptimeEl.textContent = this.stats.uptime ? `${this.stats.uptime}%` : '99.8%';
+    }
+
+    displayBots() {
         const botsList = document.getElementById('botsList');
         
+        if (!botsList) return;
+
         if (!this.bots || this.bots.length === 0) {
             botsList.innerHTML = `
                 <div class="empty-state">
@@ -121,118 +160,64 @@ class Dashboard {
             return;
         }
 
-        // Show only first 3 bots
-        const displayBots = this.bots.slice(0, 3);
+        // Show only recent bots (limit to 6)
+        const recentBots = this.bots.slice(0, 6);
         
         let html = '';
-        displayBots.forEach(bot => {
+        recentBots.forEach(bot => {
             const isActive = bot.is_active;
             const commandsCount = bot.commands_count || 0;
+            const botInitial = bot.name ? bot.name.charAt(0).toUpperCase() : 'B';
             
             html += `
-                <div class="bot-card">
-                    <div class="bot-avatar">
-                        <i class="fas fa-robot"></i>
+                <div class="bot-card" data-bot-id="${bot.id}">
+                    <div class="bot-avatar" style="background: ${this.getBotColor(bot.id)};">
+                        ${botInitial}
                     </div>
                     <div class="bot-info">
-                        <div class="bot-name">
-                            ${bot.name}
+                        <div class="bot-name">${this.escapeHtml(bot.name)}</div>
+                        <div class="bot-username">@${this.escapeHtml(bot.username)}</div>
+                        <div class="bot-meta">
                             <span class="bot-status ${isActive ? 'active' : 'inactive'}">
                                 <i class="fas fa-circle"></i>
                                 ${isActive ? 'Active' : 'Inactive'}
                             </span>
+                            <span class="bot-commands">
+                                <i class="fas fa-code"></i>
+                                ${commandsCount} commands
+                            </span>
                         </div>
-                        <div class="bot-username">@${bot.username}</div>
-                        <div class="bot-meta">
-                            <span>${commandsCount} commands</span>
-                            <span>Added ${this.formatDate(bot.created_at)}</span>
-                        </div>
-                    </div>
-                    <div class="bot-actions">
-                        <a href="command-editor.html?bot=${bot.id}" class="btn btn-small btn-secondary">
-                            <i class="fas fa-code"></i>
-                        </a>
-                        <a href="bot-management.html" class="btn btn-small btn-primary">
-                            <i class="fas fa-cog"></i>
-                        </a>
                     </div>
                 </div>
             `;
         });
 
         botsList.innerHTML = html;
-    }
 
-    updateStats() {
-        // Update main stats
-        document.getElementById('totalBots').textContent = this.bots.length;
-        document.getElementById('activeBots').textContent = this.bots.filter(bot => bot.is_active).length;
-        
-        // Calculate total commands
-        const totalCommands = this.bots.reduce((sum, bot) => sum + (bot.commands_count || 0), 0);
-        document.getElementById('totalCommands').textContent = totalCommands;
-        
-        // Mock data for other stats
-        document.getElementById('todayMessages').textContent = '42';
-        document.getElementById('totalUsers').textContent = '1.2K';
-        document.getElementById('uptime').textContent = '99.8%';
-    }
-
-    updateRecentActivity() {
-        const activityList = document.getElementById('recentActivity');
-        
-        // Mock activity data - in real app, fetch from API
-        const activities = [
-            {
-                type: 'success',
-                icon: 'check',
-                message: 'Welcome Bot received a new message',
-                time: '2 minutes ago'
-            },
-            {
-                type: 'info',
-                icon: 'code',
-                message: 'Command /start was updated',
-                time: '1 hour ago'
-            },
-            {
-                type: 'warning',
-                icon: 'exclamation',
-                message: 'Support Bot connection test failed',
-                time: '3 hours ago'
-            }
-        ];
-
-        let html = '';
-        activities.forEach(activity => {
-            html += `
-                <div class="activity-item">
-                    <div class="activity-icon ${activity.type}">
-                        <i class="fas fa-${activity.icon}"></i>
-                    </div>
-                    <div class="activity-content">
-                        <p>${activity.message}</p>
-                        <span class="activity-time">${activity.time}</span>
-                    </div>
-                </div>
-            `;
+        // Add click events to bot cards
+        botsList.querySelectorAll('.bot-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const botId = card.dataset.botId;
+                window.location.href = `command-editor.html?bot=${botId}`;
+            });
         });
-
-        activityList.innerHTML = html;
     }
 
     async testAllBots() {
+        if (!this.bots || this.bots.length === 0) {
+            this.showInfo('No bots to test');
+            return;
+        }
+
         this.showLoading(true);
 
         try {
             const token = localStorage.getItem('token');
-            const activeBots = this.bots.filter(bot => bot.is_active);
-            
             let successCount = 0;
-            let totalCount = activeBots.length;
+            let failCount = 0;
 
             // Test each bot
-            for (const bot of activeBots) {
+            for (const bot of this.bots) {
                 try {
                     const response = await fetch(`/api/bots/${bot.id}/test`, {
                         method: 'POST',
@@ -243,13 +228,18 @@ class Dashboard {
 
                     if (response.ok) {
                         successCount++;
+                    } else {
+                        failCount++;
                     }
                 } catch (error) {
-                    console.error(`❌ Test failed for bot ${bot.name}:`, error);
+                    failCount++;
                 }
             }
 
-            this.showSuccess(`Tested ${successCount}/${totalCount} bots successfully!`);
+            this.showSuccess(`Bot testing completed: ${successCount} successful, ${failCount} failed`);
+            
+            // Reload dashboard to update status
+            await this.loadDashboardData();
 
         } catch (error) {
             console.error('❌ Test all bots error:', error);
@@ -259,18 +249,42 @@ class Dashboard {
         }
     }
 
-    formatDate(dateString) {
-        const date = new Date(dateString);
-        const now = new Date();
-        const diffTime = Math.abs(now - date);
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    getBotColor(botId) {
+        // Generate consistent color based on bot ID
+        const colors = [
+            '#3b82f6', '#ef4444', '#10b981', '#f59e0b',
+            '#8b5cf6', '#06b6d4', '#f97316', '#84cc16'
+        ];
+        const index = parseInt(botId) % colors.length;
+        return colors[index];
+    }
+
+    formatNumber(num) {
+        if (num >= 1000000) {
+            return (num / 1000000).toFixed(1) + 'M';
+        } else if (num >= 1000) {
+            return (num / 1000).toFixed(1) + 'K';
+        }
+        return num.toString();
+    }
+
+    logout() {
+        const sessionId = localStorage.getItem('sessionId');
+        const token = localStorage.getItem('token');
         
-        if (diffDays === 1) return 'today';
-        if (diffDays === 2) return 'yesterday';
-        if (diffDays <= 7) return `${diffDays - 1} days ago`;
-        if (diffDays <= 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-        
-        return date.toLocaleDateString();
+        if (sessionId && token) {
+            fetch('/api/auth/logout', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ sessionId })
+            }).catch(() => {});
+        }
+
+        localStorage.clear();
+        window.location.href = 'index.html';
     }
 
     showLoading(show) {
@@ -286,6 +300,10 @@ class Dashboard {
 
     showSuccess(message) {
         this.showNotification(message, 'success');
+    }
+
+    showInfo(message) {
+        this.showNotification(message, 'info');
     }
 
     showNotification(message, type = 'info') {
@@ -329,9 +347,17 @@ class Dashboard {
         }, 5000);
     }
 
-    logout() {
-        localStorage.clear();
-        window.location.href = 'index.html';
+    escapeHtml(unsafe) {
+        if (unsafe === null || unsafe === undefined) {
+            return '';
+        }
+        return String(unsafe)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;")
+            .replace(/\//g, "&#x2F;");
     }
 }
 
