@@ -21,36 +21,58 @@ async init() {
     console.log('✅ Command editor initialized completely');
 }
 
-    async loadTemplates() {
-        try {
-            const token = localStorage.getItem('token');
-            const response = await fetch('/api/templates', { // ✅ সঠিক endpoint
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+// File: /client/js/command-editor.js - loadTemplates method-এ error handling improve করুন
+async loadTemplates() {
+    try {
+        const token = localStorage.getItem('token');
+        console.log('🔄 Loading templates from API...');
+        
+        const response = await fetch('/api/templates', {
+            headers: {
+                'Authorization': `Bearer ${token}`
             }
+        });
 
-            const data = await response.json();
-            if (data.success) {
-                this.templates = data.templates;
-                console.log(`✅ Loaded ${Object.keys(this.templates).length} template categories`);
-                this.populateTemplatesModal();
-            } else {
-                throw new Error(data.error || 'Failed to load templates');
-            }
-        } catch (error) {
-            console.error('❌ Load templates error:', error);
-            this.showError('Failed to load templates: ' + error.message);
-            // Fallback empty templates
-            this.templates = {};
-            this.populateTemplatesModal();
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
-    }
 
+        const data = await response.json();
+        console.log('📦 Templates API response:', data);
+
+        if (data.success) {
+            this.templates = data.templates || {};
+            console.log(`✅ Loaded ${Object.keys(this.templates).length} template categories`);
+            
+            // Debug: Log template counts
+            Object.entries(this.templates).forEach(([category, templates]) => {
+                console.log(`📁 ${category}: ${templates?.length || 0} templates`);
+            });
+            
+            this.populateTemplatesModal();
+        } else {
+            throw new Error(data.error || 'Failed to load templates');
+        }
+    } catch (error) {
+        console.error('❌ Load templates error:', error);
+        this.showError('Failed to load templates: ' + error.message);
+        // Fallback with basic templates
+        this.templates = {
+            'basic': [
+                {
+                    id: 'fallback_welcome',
+                    name: 'Welcome Message',
+                    patterns: '/start, hello',
+                    description: 'Basic welcome template',
+                    code: 'const user = getUser();\nApi.sendMessage(`Hello ${user.first_name}! Welcome to our bot.`);',
+                    waitForAnswer: false,
+                    answerHandler: ''
+                }
+            ]
+        };
+        this.populateTemplatesModal();
+    }
+}
 // File: /client/js/command-editor.js - populateTemplatesModal method
 populateTemplatesModal() {
     const templatesContent = document.querySelector('.templates-content');
@@ -351,7 +373,6 @@ setupTemplateEvents() {
 
         // Modal events
         this.setupModalEvents();
-        this.setupTemplateCategories();
     }
 
     setupCommandsTags() {
@@ -610,29 +631,29 @@ setupTemplateEvents() {
         });
     }
 
-    setupTemplateCategories() {
-        const categoryTabs = document.querySelectorAll('.category-tab');
-        const templateCategories = document.querySelectorAll('.template-category');
+// File: /client/js/command-editor.js - এই method টি যোগ করুন
+setupTemplateCategories() {
+    const categoryTabs = document.querySelectorAll('.category-tab');
+    const templateCategories = document.querySelectorAll('.template-category');
 
-        categoryTabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                const category = tab.dataset.category;
-                if (!category) return;
-                
-                // Update tabs
-                categoryTabs.forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-                
-                // Update content
-                templateCategories.forEach(cat => cat.classList.remove('active'));
-                const targetCategory = document.getElementById(`${category}-templates`);
-                if (targetCategory) {
-                    targetCategory.classList.add('active');
-                }
-            });
+    categoryTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const category = tab.dataset.category;
+            if (!category) return;
+            
+            // Update tabs
+            categoryTabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            
+            // Update content
+            templateCategories.forEach(cat => cat.classList.remove('active'));
+            const targetCategory = document.getElementById(`${category}-templates`);
+            if (targetCategory) {
+                targetCategory.classList.add('active');
+            }
         });
-    }
-
+    });
+}
     toggleAnswerHandler(show) {
         const section = document.getElementById('answerHandlerSection');
         if (section) {
@@ -785,27 +806,27 @@ setupTemplateEvents() {
         });
     }
 
-    addNewCommand() {
-        this.currentCommand = {
-            id: 'new',
-            command_patterns: '/start',
-            code: '// Write your command code here\nconst user = getUser();\nBot.sendMessage(`Hello ${user.first_name}! Welcome to our bot.`);',
-            is_active: true,
-            wait_for_answer: false,
-            answer_handler: ''
-        };
+// File: /client/js/command-editor.js - addNewCommand method-এ code fix করুন
+addNewCommand() {
+    this.currentCommand = {
+        id: 'new',
+        command_patterns: '/start',
+        code: '// Write your command code here\nconst user = getUser();\nApi.sendMessage(`Hello ${user.first_name}! Welcome to our bot.`);',
+        is_active: true,
+        wait_for_answer: false,
+        answer_handler: ''
+    };
 
-        this.showCommandEditor();
-        this.populateCommandForm();
-        
-        setTimeout(() => {
-            const moreCommandsInput = document.getElementById('moreCommands');
-            if (moreCommandsInput) {
-                moreCommandsInput.focus();
-            }
-        }, 100);
-    }
-
+    this.showCommandEditor();
+    this.populateCommandForm();
+    
+    setTimeout(() => {
+        const moreCommandsInput = document.getElementById('moreCommands');
+        if (moreCommandsInput) {
+            moreCommandsInput.focus();
+        }
+    }, 100);
+}
     async selectCommand(commandId) {
         if (this.currentCommand?.id === commandId) return;
 
