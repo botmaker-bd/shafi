@@ -1,4 +1,4 @@
-// server/core/api-wrapper.js - SIMPLIFIED VERSION
+// server/core/api-wrapper.js
 class ApiWrapper {
     constructor(bot, context) {
         this.bot = bot;
@@ -73,35 +73,33 @@ class ApiWrapper {
             });
         };
 
-        // ✅ FIXED: Simplified waitForAnswer without nextCommandHandlers
+        // WaitForAnswer function
         this.waitForAnswer = (question, options = {}) => {
-            return new Promise(async (resolve, reject) => {
-                console.log(`🎯 waitForAnswer: "${question}"`);
-                
-                const timeout = options.timeout || 30000;
-                
-                try {
-                    // Send question
-                    await this.sendMessage(this.context.chatId, question, {
-                        parse_mode: 'HTML',
-                        ...options
-                    });
-                    
-                    console.log(`✅ Question sent, waiting for response...`);
-                    
-                    // Set timeout
-                    const timeoutId = setTimeout(() => {
-                        reject(new Error(`Wait for answer timeout (${timeout/1000} seconds)`));
-                    }, timeout);
-
-                    // Store the resolve function in context for bot-manager to call
-                    this.context.waitForAnswerResolve = resolve;
-                    this.context.waitForAnswerTimeout = timeoutId;
-                    
-                } catch (error) {
-                    reject(new Error(`Failed to set up wait for answer: ${error.message}`));
-                }
+            console.log(`🎯 WaitForAnswer: "${question.substring(0, 50)}..."`);
+            
+            // Send question immediately
+            this.sendMessage(this.context.chatId, question, {
+                parse_mode: 'HTML',
+                ...options
             });
+            
+            // Auto state tracking
+            const waitId = `wait_${this.context.botToken}_${this.context.userId}_${Date.now()}`;
+            
+            // Auto-save wait state
+            this.context.User.saveData(waitId, {
+                type: 'wait_for_answer',
+                question: question,
+                botToken: this.context.botToken,
+                chatId: this.context.chatId,
+                userId: this.context.userId,
+                timestamp: new Date().toISOString(),
+                timeout: options.timeout || 60000
+            });
+            
+            console.log(`✅ Auto state saved: ${waitId}`);
+            
+            return "waiting_for_response";
         };
 
         // Python integration
