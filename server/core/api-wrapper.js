@@ -229,15 +229,16 @@ class ApiWrapper {
         this.wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
         // Wait for answer with timeout - FIXED VERSION
-// server/core/api-wrapper.js - waitForAnswer মেথড (ফিক্সড)
+// server/core/api-wrapper.js - COMPLETELY FIXED waitForAnswer
 this.waitForAnswer = (question, options = {}) => {
     return new Promise(async (resolve, reject) => {
-        console.log(`🎯 waitForAnswer initiated for user ${this.context.userId}`);
+        console.log(`\n🎯 ========== waitForAnswer INITIATED ==========`);
+        console.log(`👤 User: ${this.context.userId}`);
         console.log(`📝 Question: "${question}"`);
         console.log(`🔑 Bot Token: ${this.context.botToken}`);
         console.log(`💬 Chat ID: ${this.context.chatId}`);
         
-        // Validate context CRITICALLY
+        // Validate context
         if (!this.context) {
             console.error('❌ waitForAnswer: Context is completely missing');
             reject(new Error('Context data not available'));
@@ -266,7 +267,7 @@ this.waitForAnswer = (question, options = {}) => {
         const timeout = options.timeout || 60000;
         const nextCommandKey = `${this.context.botToken}_${this.context.userId}`;
         
-        console.log(`⏳ Setting up waitForAnswer for key: ${nextCommandKey}`);
+        console.log(`🔑 Handler Key: ${nextCommandKey}`);
         console.log(`⏰ Timeout: ${timeout}ms`);
         console.log(`📊 Current handlers count: ${this.context.nextCommandHandlers.size}`);
         
@@ -293,15 +294,27 @@ this.waitForAnswer = (question, options = {}) => {
                 ...options
             });
             
-            console.log(`✅ Question sent successfully, setting handler for: ${nextCommandKey}`);
+            console.log(`✅ Question sent successfully`);
             
-            // Set up the handler
-            this.context.nextCommandHandlers.set(nextCommandKey, (answer, answerMsg) => {
-                console.log(`🎉 User response received for key: ${nextCommandKey}`);
+            // ✅ CRITICAL FIX: Create handler function
+            const answerHandler = (answer, answerMsg) => {
+                console.log(`\n🎉 ========== USER RESPONSE RECEIVED ==========`);
+                console.log(`🔑 Handler Key: ${nextCommandKey}`);
                 console.log(`📨 Response: "${answer}"`);
-                console.log(`👤 From user: ${answerMsg.from.first_name} (${answerMsg.from.id})`);
+                console.log(`👤 From: ${answerMsg.from.first_name} (${answerMsg.from.id})`);
                 
+                // Clear timeout
                 clearTimeout(timeoutId);
+                
+                // Remove handler
+                if (this.context.nextCommandHandlers.has(nextCommandKey)) {
+                    this.context.nextCommandHandlers.delete(nextCommandKey);
+                    console.log(`🗑️ Handler removed after response`);
+                }
+                
+                console.log(`✅ Resolving waitForAnswer promise`);
+                
+                // Resolve the promise
                 resolve({
                     text: answer,
                     message: answerMsg,
@@ -309,10 +322,16 @@ this.waitForAnswer = (question, options = {}) => {
                     chatId: this.context.chatId,
                     timestamp: new Date().toISOString()
                 });
-            });
+            };
             
-            console.log(`✅ Handler set successfully for key: ${nextCommandKey}`);
+            // ✅ CRITICAL FIX: Set the handler
+            console.log(`🔄 Setting handler for key: ${nextCommandKey}`);
+            this.context.nextCommandHandlers.set(nextCommandKey, answerHandler);
+            
+            console.log(`✅ Handler set successfully`);
             console.log(`📊 Total active handlers now: ${this.context.nextCommandHandlers.size}`);
+            console.log(`🔍 Handler keys:`, Array.from(this.context.nextCommandHandlers.keys()));
+            console.log(`✅ ========== waitForAnswer SETUP COMPLETE ==========\n`);
             
         } catch (error) {
             console.error(`❌ waitForAnswer setup failed:`, error);
