@@ -229,27 +229,30 @@ class ApiWrapper {
         this.wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
         // Wait for answer with timeout - FIXED VERSION
-// server/core/api-wrapper.js - waitForAnswer মেথড
+// server/core/api-wrapper.js - FIXED VERSION
 this.waitForAnswer = (question, options = {}) => {
     return new Promise(async (resolve, reject) => {
-        // Validate context
-        if (!this.context || !this.context.botToken || !this.context.chatId) {
-            console.error('❌ waitForAnswer: Missing context data');
-            reject(new Error('Context data not available'));
+        // Validate context properly
+        if (!this.context || !this.context.botToken || !this.context.chatId || !this.context.userId) {
+            console.error('❌ waitForAnswer: Missing context data', this.context);
+            reject(new Error('Context data not available for waitForAnswer'));
             return;
         }
 
-        const timeout = options.timeout || 60000;
+        const timeout = options.timeout || 60000; // 60 seconds default
         const nextCommandKey = `${this.context.botToken}_${this.context.userId}`;
         
         console.log(`⏳ Setting up waitForAnswer for key: ${nextCommandKey}`);
+        console.log(`📝 Question: "${question}"`);
         
-        // Clear existing handler
+        // Clear any existing handler first
         if (this.context.nextCommandHandlers && this.context.nextCommandHandlers.has(nextCommandKey)) {
             this.context.nextCommandHandlers.delete(nextCommandKey);
+            console.log(`🧹 Cleared existing handler for: ${nextCommandKey}`);
         }
 
         const timeoutId = setTimeout(() => {
+            console.log(`⏰ Timeout reached for: ${nextCommandKey}`);
             if (this.context.nextCommandHandlers && this.context.nextCommandHandlers.has(nextCommandKey)) {
                 this.context.nextCommandHandlers.delete(nextCommandKey);
             }
@@ -257,22 +260,23 @@ this.waitForAnswer = (question, options = {}) => {
         }, timeout);
 
         try {
-            // ✅ FIXED: Proper sendMessage call with chatId
+            // Send question to user
             console.log(`📤 Sending question to chat: ${this.context.chatId}`);
             await this.sendMessage(this.context.chatId, question, {
                 parse_mode: 'HTML',
                 ...options
             });
             
-            console.log(`✅ Question sent, setting handler for: ${nextCommandKey}`);
+            console.log(`✅ Question sent successfully, setting handler for: ${nextCommandKey}`);
             
-            // Set up handler
+            // Validate nextCommandHandlers exists
             if (!this.context.nextCommandHandlers) {
-                throw new Error('nextCommandHandlers not available');
+                throw new Error('nextCommandHandlers not available in context');
             }
             
+            // Set up the handler
             this.context.nextCommandHandlers.set(nextCommandKey, (answer, answerMsg) => {
-                console.log(`🎉 User response: "${answer}"`);
+                console.log(`🎉 User response received: "${answer}"`);
                 clearTimeout(timeoutId);
                 resolve({
                     text: answer,
@@ -282,6 +286,8 @@ this.waitForAnswer = (question, options = {}) => {
                     timestamp: new Date().toISOString()
                 });
             });
+            
+            console.log(`✅ Handler set successfully. Active handlers: ${this.context.nextCommandHandlers.size}`);
             
         } catch (error) {
             console.error(`❌ waitForAnswer setup failed:`, error);
