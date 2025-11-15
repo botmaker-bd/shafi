@@ -75,7 +75,7 @@ class CommandEditor {
 
     populateTemplatesModal() {
         const templatesContent = document.querySelector('.templates-content');
-        const categoryTabsContainer = document.querySelector('.category-tabs');
+        const categoryTabsContainer = document.querySelector('.category-tabs-grid');
         
         if (!templatesContent || !categoryTabsContainer) {
             console.error('❌ Templates modal elements not found');
@@ -191,17 +191,24 @@ class CommandEditor {
 
         return `
             <div class="template-card" data-template-id="${safeTemplate.id}">
-                <div class="template-icon">
-                    <i class="${templateIcon}"></i>
-                </div>
-                <h4>${this.escapeHtml(safeTemplate.name)}</h4>
-                <p>${this.escapeHtml(safeTemplate.description)}</p>
-                <div class="template-patterns">${this.escapeHtml(safeTemplate.patterns)}</div>
-                <div class="template-footer">
-                    <span class="template-type">${safeTemplate.waitForAnswer ? 'Interactive' : 'Simple'}</span>
-                    <button class="btn-apply" data-template='${this.escapeHtml(templateJson)}'>
-                        Apply Template
-                    </button>
+                <div class="template-card-content">
+                    <div class="template-icon-container">
+                        <div class="template-icon"><i class="${templateIcon}"></i></div>
+                        <div class="template-icon"><i class="${templateIcon}"></i></div>
+                        <div class="template-icon"><i class="${templateIcon}"></i></div>
+                        <div class="template-icon"><i class="${templateIcon}"></i></div>
+                    </div>
+                    <div class="template-info">
+                        <h4>${this.escapeHtml(safeTemplate.name)}</h4>
+                        <p>${this.escapeHtml(safeTemplate.description)}</p>
+                        <div class="template-patterns">${this.escapeHtml(safeTemplate.patterns)}</div>
+                        <div class="template-footer">
+                            <span class="template-type">${safeTemplate.waitForAnswer ? 'Interactive' : 'Simple'}</span>
+                            <button class="btn-apply" data-template='${this.escapeHtml(templateJson)}'>
+                                <i class="fas fa-check"></i> Apply
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         `;
@@ -235,6 +242,26 @@ class CommandEditor {
                 const button = templateCard.querySelector('.btn-apply');
                 if (button) {
                     button.click(); // Trigger the apply button click
+                }
+            }
+        });
+
+        // Category tab events
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('category-tab')) {
+                const category = e.target.dataset.category;
+                const categoryTabs = document.querySelectorAll('.category-tab');
+                const templateCategories = document.querySelectorAll('.template-category');
+                
+                // Update tabs
+                categoryTabs.forEach(t => t.classList.remove('active'));
+                e.target.classList.add('active');
+                
+                // Update content
+                templateCategories.forEach(cat => cat.classList.remove('active'));
+                const targetCategory = document.getElementById(`${category}-templates`);
+                if (targetCategory) {
+                    targetCategory.classList.add('active');
                 }
             }
         });
@@ -600,50 +627,10 @@ class CommandEditor {
             });
         }
 
-        // Template card click events
-        document.addEventListener('click', (e) => {
-            const templateCard = e.target.closest('.template-card');
-            if (templateCard) {
-                const templateData = templateCard.dataset.template;
-                if (templateData) {
-                    try {
-                        const template = JSON.parse(templateData);
-                        this.applyTemplate(template);
-                    } catch (error) {
-                        console.error('❌ Template data parse error:', error);
-                        this.showError('Invalid template data');
-                    }
-                }
-            }
-        });
-
         window.addEventListener('click', (e) => {
             if (e.target.classList.contains('modal')) {
                 e.target.style.display = 'none';
             }
-        });
-    }
-
-    setupTemplateCategories() {
-        const categoryTabs = document.querySelectorAll('.category-tab');
-        const templateCategories = document.querySelectorAll('.template-category');
-
-        categoryTabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                const category = tab.dataset.category;
-                if (!category) return;
-                
-                // Update tabs
-                categoryTabs.forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-                
-                // Update content
-                templateCategories.forEach(cat => cat.classList.remove('active'));
-                const targetCategory = document.getElementById(`${category}-templates`);
-                if (targetCategory) {
-                    targetCategory.classList.add('active');
-                }
-            });
         });
     }
 
@@ -1569,24 +1556,4 @@ document.addEventListener('DOMContentLoaded', () => {
             commandEditor.toggleAnswerHandler(e.target.checked);
         });
     }
-    
-    // Template category tabs event delegation
-    document.addEventListener('click', (e) => {
-        if (e.target.classList.contains('category-tab')) {
-            const category = e.target.dataset.category;
-            const categoryTabs = document.querySelectorAll('.category-tab');
-            const templateCategories = document.querySelectorAll('.template-category');
-            
-            // Update tabs
-            categoryTabs.forEach(t => t.classList.remove('active'));
-            e.target.classList.add('active');
-            
-            // Update content
-            templateCategories.forEach(cat => cat.classList.remove('active'));
-            const targetCategory = document.getElementById(`${category}-templates`);
-            if (targetCategory) {
-                targetCategory.classList.add('active');
-            }
-        }
-    });
 });
