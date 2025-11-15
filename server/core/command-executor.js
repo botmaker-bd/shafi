@@ -12,9 +12,8 @@ async function executeCommandCode(botInstance, code, context) {
             console.log(`💬 Input: "${userInput}"`);
             console.log(`📝 Code length: ${code.length} characters`);
             console.log(`📊 nextCommandHandlers available: ${!!nextCommandHandlers}`);
-            console.log(`🔑 Handler key would be: ${botToken}_${userId}`);
 
-            // ✅ CRITICAL FIX: Ensure nextCommandHandlers is properly structured
+            // ✅ FIX: Create proper execution context
             const executionContext = {
                 msg: msg,
                 chatId: chatId,
@@ -33,15 +32,15 @@ async function executeCommandCode(botInstance, code, context) {
             // Create ApiWrapper instance
             const apiWrapper = new ApiWrapper(botInstance, executionContext);
 
-            // Create enhanced execution environment with ALL required variables
+            // ✅ FIX: Create execution environment with PROPER function binding
             const executionEnv = {
-                // === CORE TELEGRAM METHODS ===
+                // Core Telegram methods
                 bot: botInstance,
                 Api: apiWrapper,
                 api: apiWrapper,
                 Bot: apiWrapper,
 
-                // === USER CONTEXT ===
+                // User context
                 getUser: () => ({
                     id: userId,
                     username: username || '',
@@ -51,7 +50,7 @@ async function executeCommandCode(botInstance, code, context) {
                     chat_id: chatId
                 }),
 
-                // === MESSAGE DATA ===
+                // Message data
                 msg: msg,
                 chatId: chatId,
                 userId: userId,
@@ -59,17 +58,17 @@ async function executeCommandCode(botInstance, code, context) {
                 params: userInput,
                 botToken: botToken,
                 
-                // === DATA STORAGE ===
+                // Data storage
                 User: context.User,
                 Bot: context.Bot,
                 
-                // === CRITICAL FIX: Direct access to nextCommandHandlers ===
+                // Next command handlers
                 nextCommandHandlers: nextCommandHandlers,
                 
-                // === UTILITY FUNCTIONS ===
+                // Utility functions
                 wait: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
                 
-                // === HTTP CLIENT ===
+                // HTTP client
                 HTTP: {
                     get: async (url, options = {}) => {
                         const axios = require('axios');
@@ -94,73 +93,6 @@ async function executeCommandCode(botInstance, code, context) {
                 }
             };
 
-            // ✅ FIXED: Enhanced execution code with PROPER variable injection
-            // server/core/command-executor.js - FIXED waitForAnswer execution
-const executionCode = `
-    // === INJECT ALL REQUIRED VARIABLES ===
-    const bot = this.context.bot;
-    const Api = this.context.Api;
-    const api = this.context.api;
-    const Bot = this.context.Bot;
-    const getUser = this.context.getUser;
-    const User = this.context.User;
-    const BotData = this.context.Bot;
-    const msg = this.context.msg;
-    const chatId = this.context.chatId;
-    const userId = this.context.userId;
-    const userInput = this.context.userInput;
-    const params = this.context.params;
-    const wait = this.context.wait;
-    const HTTP = this.context.HTTP;
-    
-    // ✅ CRITICAL: Inject nextCommandHandlers
-    const nextCommandHandlers = this.context.nextCommandHandlers;
-    
-    console.log('🚀 User code execution starting...');
-    console.log('📊 Execution environment check:', {
-        hasBot: typeof bot !== 'undefined',
-        hasApi: typeof Api !== 'undefined', 
-        hasGetUser: typeof getUser !== 'undefined',
-        hasWaitForAnswer: typeof Api.waitForAnswer === 'function',
-        hasNextCommandHandlers: typeof nextCommandHandlers !== 'undefined',
-        nextCommandHandlersCount: nextCommandHandlers ? nextCommandHandlers.size : 0
-    });
-
-    // Validate critical functions
-    if (typeof Api.waitForAnswer !== 'function') {
-        throw new Error('waitForAnswer function is not available in Api');
-    }
-    
-    if (typeof nextCommandHandlers === 'undefined') {
-        throw new Error('nextCommandHandlers is not defined in execution context');
-    }
-
-    try {
-        // ========================
-        // USER'S COMMAND CODE START
-        // ========================
-        ${code}
-        // ========================
-        // USER'S COMMAND CODE END
-        // ========================
-        
-        console.log('✅ User code executed successfully');
-        
-        // If no explicit return, return success
-        if (typeof result === 'undefined') {
-            return "Command executed successfully";
-        }
-        return result;
-    } catch (error) {
-        console.error('❌ User code execution error:', error);
-        throw error;
-    }
-`;
-
-            const executionWrapper = {
-                context: executionEnv
-            };
-
             console.log('🚀 Executing user command code...');
             console.log('🔍 Execution environment prepared:', {
                 hasApiWrapper: !!apiWrapper,
@@ -168,10 +100,92 @@ const executionCode = `
                 hasNextCommandHandlers: !!executionEnv.nextCommandHandlers
             });
 
-            const commandFunction = new Function(executionCode);
-            const boundFunction = commandFunction.bind(executionWrapper);
-            
-            const result = await boundFunction();
+            // ✅ CRITICAL FIX: Use async function wrapper for user code
+            const executeUserCode = async () => {
+                try {
+                    // Extract all variables for user code
+                    const { 
+                        bot, Api, api, Bot, getUser, User, BotData,
+                        msg, chatId, userId, userInput, params,
+                        wait, HTTP, nextCommandHandlers
+                    } = executionEnv;
+
+                    console.log('📊 User code execution starting...');
+                    console.log('🔍 Available functions:', {
+                        hasWaitForAnswer: typeof Api.waitForAnswer === 'function',
+                        hasSendMessage: typeof Api.sendMessage === 'function',
+                        chatId: chatId
+                    });
+
+                    // ========================
+                    // USER'S COMMAND CODE EXECUTION
+                    // ========================
+                    
+                    // ✅ FIX: Handle both async and sync code properly
+                    let result;
+                    
+                    // Check if code contains async operations
+                    if (code.includes('await') || code.includes('.then')) {
+                        console.log('🔄 Detected async code, executing with await...');
+                        
+                        // For async code, we need to handle it differently
+                        const asyncCode = `
+                            try {
+                                ${code}
+                                return typeof result !== 'undefined' ? result : "Command executed successfully";
+                            } catch (error) {
+                                console.error('❌ User code error:', error);
+                                throw error;
+                            }
+                        `;
+                        
+                        // Create async function
+                        const asyncFunction = new Function(`
+                            const { 
+                                bot, Api, api, Bot, getUser, User, BotData,
+                                msg, chatId, userId, userInput, params,
+                                wait, HTTP, nextCommandHandlers
+                            } = this;
+                            
+                            return (async () => {
+                                ${asyncCode}
+                            })();
+                        `);
+                        
+                        result = await asyncFunction.call(executionEnv);
+                    } else {
+                        console.log('⚡ Executing sync code...');
+                        // For sync code, use regular function
+                        const syncFunction = new Function(`
+                            const { 
+                                bot, Api, api, Bot, getUser, User, BotData,
+                                msg, chatId, userId, userInput, params,
+                                wait, HTTP, nextCommandHandlers
+                            } = this;
+                            
+                            try {
+                                ${code}
+                                return typeof result !== 'undefined' ? result : "Command executed successfully";
+                            } catch (error) {
+                                console.error('❌ User code error:', error);
+                                throw error;
+                            }
+                        `);
+                        
+                        result = syncFunction.call(executionEnv);
+                    }
+
+                    console.log('✅ User code executed successfully');
+                    return result;
+                    
+                } catch (error) {
+                    console.error('❌ User code execution error:', error);
+                    throw error;
+                }
+            };
+
+            // Execute the user code
+            const result = await executeUserCode();
             
             console.log('✅ Command execution completed successfully');
             console.log(`📦 Result:`, result);
@@ -182,10 +196,9 @@ const executionCode = `
 
         } catch (error) {
             console.error('❌ Command execution error:', error);
-            console.error('🔍 Error context details:', {
+            console.error('🔍 Error details:', {
                 message: error.message,
-                hasNextCommandHandlers: !!context.nextCommandHandlers,
-                contextKeys: Object.keys(context)
+                stack: error.stack
             });
             reject(error);
         }
