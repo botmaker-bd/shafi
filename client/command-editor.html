@@ -128,7 +128,7 @@
                 <div id="commandEditor" class="command-editor" style="display: none;">
                     <div class="editor-header">
                         <div class="command-title">
-                            <h3 id="currentCommandName">Command Name</h3>
+                            <h3 id="currentCommandName">Command Editor</h3>
                             <div class="command-status">
                                 <span class="status-badge active" id="commandStatus">Active</span>
                                 <span class="command-id" id="commandId">ID: loading...</span>
@@ -137,9 +137,6 @@
                         <div class="editor-actions">
                             <button id="toggleCommandBtn" class="btn btn-warning btn-small">
                                 <i class="fas fa-power-off"></i> Toggle
-                            </button>
-                            <button id="testCommandBtn" class="btn btn-success btn-small">
-                                <i class="fas fa-bolt"></i> Test
                             </button>
                             <button id="saveCommandBtn" class="btn btn-primary btn-small">
                                 <i class="fas fa-save"></i> Save
@@ -151,26 +148,10 @@
                     </div>
 
                     <form id="commandForm" class="command-form">
-                        <!-- Command Basic Info -->
-                        <div class="form-section">
-                            <h4>Command Information</h4>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="commandName">Command Name *</label>
-                                    <input type="text" id="commandName" required placeholder="Enter command name">
-                                </div>
-                                <div class="form-group">
-                                    <label for="commandDescription">Description</label>
-                                    <input type="text" id="commandDescription" placeholder="Brief description">
-                                </div>
-                            </div>
-                        </div>
-
                         <!-- Command Patterns -->
                         <div class="form-section">
                             <h4>Command Patterns</h4>
                             <div class="form-group">
-                                <label for="moreCommands">Command Patterns *</label>
                                 <div class="commands-input-container">
                                     <div id="commandsTags" class="commands-tags">
                                         <!-- Command tags will be added here -->
@@ -185,11 +166,32 @@
                             </div>
                         </div>
 
+                        <!-- Code Editor Section -->
+                        <div class="form-section">
+                            <div class="code-editor-header">
+                                <label for="commandCode">Command Code</label>
+                                <div class="code-actions">
+                                    <button type="button" class="btn-code" id="openEditor">
+                                        <i class="fas fa-edit"></i> Full Editor
+                                    </button>
+                                    <button type="button" class="btn-code" id="showTemplates">
+                                        <i class="fas fa-layer-group"></i> Templates
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <textarea id="commandCode" 
+                                          placeholder="Write your command code here..."></textarea>
+                                <div class="code-help">
+                                    <strong>Available Functions:</strong> bot.sendMessage(), User.saveData(), waitForAnswer(), HTTP.get(), etc.
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Test Section -->
                         <div class="form-section">
                             <h4>Test Command</h4>
                             <div class="form-group">
-                                <label for="testInput">Test Input *</label>
                                 <div class="test-input-container">
                                     <input type="text" id="testInput" 
                                            placeholder="Enter test input to simulate user message..." required>
@@ -199,29 +201,6 @@
                                 </div>
                                 <div class="form-help">
                                     Enter test input to simulate how users will trigger this command.
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Code Editor Section -->
-                        <div class="form-section">
-                            <h4>Command Code</h4>
-                            <div class="form-group">
-                                <div class="code-editor-header">
-                                    <label for="commandCode">Command Code *</label>
-                                    <div class="code-actions">
-                                        <button type="button" class="btn-code" id="openEditor">
-                                            <i class="fas fa-edit"></i> Full Editor
-                                        </button>
-                                        <button type="button" class="btn-code" id="showTemplates">
-                                            <i class="fas fa-layer-group"></i> Templates
-                                        </button>
-                                    </div>
-                                </div>
-                                <textarea id="commandCode" 
-                                          placeholder="Write your command code here..."></textarea>
-                                <div class="code-help">
-                                    <strong>Available Functions:</strong> bot.sendMessage(), User.saveData(), waitForAnswer(), HTTP.get(), etc.
                                 </div>
                             </div>
                         </div>
@@ -338,7 +317,10 @@
                         </button>
                     </div>
                 </div>
-                <button class="modal-close">&times;</button>
+                <div class="editor-actions">
+                    <button class="btn btn-secondary" id="cancelEdit">Cancel</button>
+                    <button class="btn btn-primary" id="saveCode">Save Code</button>
+                </div>
             </div>
             <div class="modal-body fullscreen-body">
                 <textarea id="advancedCodeEditor" class="fullscreen-editor" 
@@ -349,42 +331,41 @@
                     <span id="lineCount">Line: 1</span>
                     <span id="charCount">Chars: 0</span>
                 </div>
-                <div class="editor-actions">
-                    <button class="btn btn-secondary" id="cancelEdit">Cancel</button>
-                    <button class="btn btn-primary" id="saveCode">Save Code</button>
-                </div>
             </div>
         </div>
     </div>
 
     <!-- Templates Modal -->
-    <!-- Templates Modal -->
-<div id="templatesModal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3>Code Templates</h3>
-            <button class="modal-close">&times;</button>
-        </div>
-        <div class="modal-body">
-            <div class="templates-categories">
-                <div class="category-tabs">
-                    <!-- Categories will be dynamically loaded -->
-                </div>
-                
-                <div class="templates-content">
-                    <!-- Templates will be dynamically loaded here -->
-                    <div class="loading-state">
-                        <div class="spinner"></div>
-                        <p>Loading templates...</p>
+    <div id="templatesModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Code Templates</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="templates-categories">
+                    <div class="category-tabs-container">
+                        <div class="category-tabs-scroll">
+                            <div class="category-tabs">
+                                <!-- Categories will be dynamically loaded -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="templates-content">
+                        <!-- Templates will be dynamically loaded here -->
+                        <div class="loading-state">
+                            <div class="spinner"></div>
+                            <p>Loading templates...</p>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-        <div class="modal-footer">
-            <button class="btn btn-secondary" id="closeTemplates">Close</button>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="closeTemplates">Close</button>
+            </div>
         </div>
     </div>
-</div>
 
     <script src="js/common.js"></script>
     <script src="js/command-editor.js"></script>
