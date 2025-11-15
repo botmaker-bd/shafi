@@ -95,70 +95,67 @@ async function executeCommandCode(botInstance, code, context) {
             };
 
             // ✅ FIXED: Enhanced execution code with PROPER variable injection
-            const executionCode = `
-                // === INJECT ALL REQUIRED VARIABLES ===
-                const bot = this.context.bot;
-                const Api = this.context.Api;
-                const api = this.context.api;
-                const Bot = this.context.Bot;
-                const getUser = this.context.getUser;
-                const User = this.context.User;
-                const BotData = this.context.Bot;
-                const msg = this.context.msg;
-                const chatId = this.context.chatId;
-                const userId = this.context.userId;
-                const userInput = this.context.userInput;
-                const params = this.context.params;
-                const wait = this.context.wait;
-                const HTTP = this.context.HTTP;
-                
-                // ✅ CRITICAL FIX: Inject nextCommandHandlers
-                const nextCommandHandlers = this.context.nextCommandHandlers;
-                
-                // ✅ CRITICAL FIX: Inject waitForAnswer from Api
-                const waitForAnswer = Api.waitForAnswer ? Api.waitForAnswer.bind(Api) : null;
+            // server/core/command-executor.js - FIXED waitForAnswer execution
+const executionCode = `
+    // === INJECT ALL REQUIRED VARIABLES ===
+    const bot = this.context.bot;
+    const Api = this.context.Api;
+    const api = this.context.api;
+    const Bot = this.context.Bot;
+    const getUser = this.context.getUser;
+    const User = this.context.User;
+    const BotData = this.context.Bot;
+    const msg = this.context.msg;
+    const chatId = this.context.chatId;
+    const userId = this.context.userId;
+    const userInput = this.context.userInput;
+    const params = this.context.params;
+    const wait = this.context.wait;
+    const HTTP = this.context.HTTP;
+    
+    // ✅ CRITICAL: Inject nextCommandHandlers
+    const nextCommandHandlers = this.context.nextCommandHandlers;
+    
+    console.log('🚀 User code execution starting...');
+    console.log('📊 Execution environment check:', {
+        hasBot: typeof bot !== 'undefined',
+        hasApi: typeof Api !== 'undefined', 
+        hasGetUser: typeof getUser !== 'undefined',
+        hasWaitForAnswer: typeof Api.waitForAnswer === 'function',
+        hasNextCommandHandlers: typeof nextCommandHandlers !== 'undefined',
+        nextCommandHandlersCount: nextCommandHandlers ? nextCommandHandlers.size : 0
+    });
 
-                console.log('🚀 User code execution starting...');
-                console.log('📊 Execution environment check:', {
-                    hasBot: typeof bot !== 'undefined',
-                    hasApi: typeof Api !== 'undefined', 
-                    hasGetUser: typeof getUser !== 'undefined',
-                    hasWaitForAnswer: typeof waitForAnswer === 'function',
-                    hasNextCommandHandlers: typeof nextCommandHandlers !== 'undefined',
-                    nextCommandHandlersType: typeof nextCommandHandlers,
-                    nextCommandHandlersCount: nextCommandHandlers ? nextCommandHandlers.size : 0
-                });
+    // Validate critical functions
+    if (typeof Api.waitForAnswer !== 'function') {
+        throw new Error('waitForAnswer function is not available in Api');
+    }
+    
+    if (typeof nextCommandHandlers === 'undefined') {
+        throw new Error('nextCommandHandlers is not defined in execution context');
+    }
 
-                // Validate critical functions
-                if (typeof waitForAnswer !== 'function') {
-                    throw new Error('waitForAnswer function is not available in Api');
-                }
-                
-                if (typeof nextCommandHandlers === 'undefined') {
-                    throw new Error('nextCommandHandlers is not defined in execution context');
-                }
-
-                try {
-                    // ========================
-                    // USER'S COMMAND CODE START
-                    // ========================
-                    ${code}
-                    // ========================
-                    // USER'S COMMAND CODE END
-                    // ========================
-                    
-                    console.log('✅ User code executed successfully');
-                    
-                    // If no explicit return, return success
-                    if (typeof result === 'undefined') {
-                        return "Command executed successfully";
-                    }
-                    return result;
-                } catch (error) {
-                    console.error('❌ User code execution error:', error);
-                    throw error;
-                }
-            `;
+    try {
+        // ========================
+        // USER'S COMMAND CODE START
+        // ========================
+        ${code}
+        // ========================
+        // USER'S COMMAND CODE END
+        // ========================
+        
+        console.log('✅ User code executed successfully');
+        
+        // If no explicit return, return success
+        if (typeof result === 'undefined') {
+            return "Command executed successfully";
+        }
+        return result;
+    } catch (error) {
+        console.error('❌ User code execution error:', error);
+        throw error;
+    }
+`;
 
             const executionWrapper = {
                 context: executionEnv
