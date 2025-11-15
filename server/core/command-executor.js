@@ -2,64 +2,57 @@
 async function executeCommandCode(botInstance, code, context) {
     return new Promise(async (resolve, reject) => {
         try {
-            const { msg, chatId, userId, username, first_name, botToken, userInput, nextCommandHandlers } = context;
+            console.log(`🔧 Starting command execution with waitForAnswer support`);
             
-            // FIX: Handle optional fields safely
-            const lastName = context.last_name || '';
-            const languageCode = context.language_code || '';
-            
-            console.log(`🔧 Starting command execution for user ${userId}`);
-            
-            // Create COMPREHENSIVE execution environment with SAFE variables
+            // Create enhanced execution environment
             const executionEnv = {
-                // === TELEGRAM BOT METHODS ===
                 bot: botInstance,
                 
-                // === API WRAPPER INSTANCE ===
+                // FIX: Proper Api wrapper with correct context
                 Api: new (require('./api-wrapper'))(botInstance, {
-                    msg: msg,
-                    chatId: chatId,
-                    userId: userId,
-                    username: username || '',
-                    first_name: first_name || '',
-                    last_name: lastName,
-                    language_code: languageCode,
-                    botToken: botToken,
-                    userInput: userInput,
-                    nextCommandHandlers: nextCommandHandlers,
+                    msg: context.msg,
+                    chatId: context.chatId,
+                    userId: context.userId,
+                    username: context.username || '',
+                    first_name: context.first_name || '',
+                    last_name: context.last_name || '',
+                    language_code: context.language_code || '',
+                    botToken: context.botToken,
+                    userInput: context.userInput,
+                    nextCommandHandlers: context.nextCommandHandlers, // ✅ FIXED: Properly pass nextCommandHandlers
                     User: context.User,
                     Bot: context.Bot
                 }),
                 
-                // === USER INFORMATION ===
+                // User information
                 getUser: () => ({
-                    id: userId,
-                    username: username || '',
-                    first_name: first_name || '',
-                    last_name: lastName,
-                    language_code: languageCode,
-                    chat_id: chatId
+                    id: context.userId,
+                    username: context.username || '',
+                    first_name: context.first_name || '',
+                    last_name: context.last_name || '',
+                    language_code: context.language_code || '',
+                    chat_id: context.chatId
                 }),
                 
-                // === MESSAGE CONTEXT ===
-                msg: msg,
-                chatId: chatId,
-                userId: userId,
-                userInput: userInput,
-                params: userInput,
-                botToken: botToken,
+                // Message context
+                msg: context.msg,
+                chatId: context.chatId,
+                userId: context.userId,
+                userInput: context.userInput,
+                params: context.userInput,
+                botToken: context.botToken,
                 
-                // === DATA STORAGE ===
+                // Data storage
                 User: context.User,
                 Bot: context.Bot,
                 
-                // === NEXT COMMAND HANDLERS ===
-                nextCommandHandlers: nextCommandHandlers,
+                // FIX: Properly expose nextCommandHandlers
+                nextCommandHandlers: context.nextCommandHandlers,
                 
-                // === UTILITY FUNCTIONS ===
+                // Utility functions
                 wait: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
                 
-                // === HTTP CLIENT ===
+                // HTTP client
                 HTTP: {
                     get: async (url, options = {}) => {
                         const axios = require('axios');
@@ -82,69 +75,39 @@ async function executeCommandCode(botInstance, code, context) {
                 }
             };
 
-            // Create SHORTCUT functions
-            const shortcuts = {
-                sendMessage: (text, options) => executionEnv.Api.sendMessage(text, options),
-                send: (text, options) => executionEnv.Api.send(text, options),
-                reply: (text, options) => executionEnv.Api.reply(text, options),
-                sendPhoto: (photo, options) => executionEnv.Api.sendPhoto(photo, options),
-                sendDocument: (doc, options) => executionEnv.Api.sendDocument(doc, options),
-                sendVideo: (video, options) => executionEnv.Api.sendVideo(video, options),
-                sendKeyboard: (text, buttons, options) => executionEnv.Api.sendKeyboard(text, buttons, options),
-                runPython: (code) => executionEnv.Api.runPython(code),
-                waitForAnswer: (question, options) => executionEnv.Api.waitForAnswer(question, options)
-            };
-
-            // Merge everything into final execution context
-            const finalContext = {
-                ...executionEnv,
-                ...shortcuts,
-                Bot: executionEnv.Api,
-                api: executionEnv.Api
-            };
-
-            // Enhanced execution code with PROPER async handling
+            // Enhanced execution code with proper async handling
             const executionCode = `
-                // Inject ALL variables into execution context
                 const { 
-                    bot, Api, api, Bot, getUser, User, 
+                    Api, getUser, User, Bot,
                     msg, chatId, userId, userInput, params,
-                    sendMessage, send, reply, sendPhoto, sendDocument, sendVideo,
-                    sendKeyboard, runPython, waitForAnswer, wait, HTTP,
-                    nextCommandHandlers, botToken
+                    nextCommandHandlers, wait, HTTP
                 } = this.context;
 
                 console.log('🔧 User code execution starting...');
-                console.log('🤖 Bot Token available:', typeof botToken !== 'undefined');
+                console.log('⏳ WaitForAnswer available:', typeof Api.waitForAnswer === 'function');
                 console.log('📊 nextCommandHandlers available:', !!nextCommandHandlers);
 
-                // Create an async wrapper for the user's code
+                // Async wrapper for user's code
                 const executeUserCode = async () => {
                     try {
                         // User's command code
                         ${code}
                         
-                        // If no explicit return, return success
-                        if (typeof result === 'undefined') {
-                            return "Command executed successfully";
-                        }
-                        return result;
+                        return typeof result !== 'undefined' ? result : "Command executed successfully";
                     } catch (error) {
                         console.error('Command execution error:', error);
                         throw error;
                     }
                 };
 
-                // Execute and return the promise
                 return executeUserCode();
             `;
 
             const executionWrapper = {
-                context: finalContext
+                context: executionEnv
             };
 
-            // Execute the command
-            console.log('🚀 Executing user command code...');
+            console.log('🚀 Executing user command code with waitForAnswer support...');
             const commandFunction = new Function(executionCode);
             const boundFunction = commandFunction.bind(executionWrapper);
             
