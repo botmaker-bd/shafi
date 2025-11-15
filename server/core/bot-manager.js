@@ -387,76 +387,57 @@ class BotManager {
     }
 
 // server/core/bot-manager.js - IMPROVED handleMessage
+// server/core/bot-manager.js - UPDATED handleMessage
 async handleMessage(bot, token, msg) {
     try {
-        // Skip non-text messages without caption
-        if (!msg.text && !msg.caption) {
-            console.log('📨 Non-text message received, skipping command processing');
-            return;
-        }
+        if (!msg.text && !msg.caption) return;
 
         const chatId = msg.chat.id;
         const userId = msg.from.id;
         const text = msg.text || msg.caption || '';
-        const userName = msg.from.first_name || 'Unknown';
 
         console.log(`\n📨 ========== NEW MESSAGE ==========`);
-        console.log(`👤 From: ${userName} (${userId})`);
+        console.log(`👤 From: ${msg.from.first_name} (${userId})`);
         console.log(`💬 Text: "${text}"`);
-        console.log(`🤖 Bot Token: ${token.substring(0, 15)}...`);
-        console.log(`📊 Active handlers: ${this.nextCommandHandlers.size}`);
 
-        // Check for next command handler - IMPROVED VERSION
-        const nextCommandKey = `${token}_${userId}`;
-        console.log(`🔍 Checking next command handler for key: ${nextCommandKey}`);
-        
-        if (this.nextCommandHandlers.has(nextCommandKey)) {
-            console.log(`✅ NEXT COMMAND HANDLER FOUND! Executing...`);
-            const handler = this.nextCommandHandlers.get(nextCommandKey);
+        // ✅ FIXED: Check for waitForAnswer response first
+        const botInstance = this.activeBots.get(token);
+        if (botInstance && botInstance.context && botInstance.context.waitForAnswerResolve) {
+            console.log(`✅ waitForAnswer response detected`);
             
-            // Remove handler immediately to prevent multiple executions
-            this.nextCommandHandlers.delete(nextCommandKey);
-            console.log(`🗑️ Handler removed after execution for key: ${nextCommandKey}`);
-            
-            try {
-                // Execute the handler with user's response
-                console.log(`🔄 Executing handler with response: "${text}"`);
-                await handler(text, msg);
-                console.log(`✅ Next command handler executed successfully for user ${userId}`);
-                return; // Important: return after handling
-            } catch (handlerError) {
-                console.error(`❌ Next command handler error:`, handlerError);
-                await this.sendError(bot, chatId, handlerError);
-                return;
+            // Clear timeout
+            if (botInstance.context.waitForAnswerTimeout) {
+                clearTimeout(botInstance.context.waitForAnswerTimeout);
             }
-        } else {
-            console.log(`❌ No next command handler found for key: ${nextCommandKey}`);
-            console.log(`📋 Available handler keys:`, Array.from(this.nextCommandHandlers.keys()));
+            
+            // Resolve the waitForAnswer promise
+            const resolve = botInstance.context.waitForAnswerResolve;
+            botInstance.context.waitForAnswerResolve = null;
+            botInstance.context.waitForAnswerTimeout = null;
+            
+            resolve({
+                text: text,
+                message: msg,
+                userId: userId,
+                chatId: chatId,
+                timestamp: new Date().toISOString()
+            });
+            
+            console.log(`✅ waitForAnswer resolved`);
+            return;
         }
 
         // Handle Python code execution
         if (text.startsWith('/python ')) {
-            console.log('🐍 Python command detected');
             await this.executePythonCode(bot, chatId, text.replace('/python ', ''));
             return;
         }
 
-        // Handle AI code generation
-        if (text.startsWith('/ai ') || text.startsWith('/generate ')) {
-            console.log('🤖 AI command detected');
-            await this.generateAICode(bot, chatId, text);
-            return;
-        }
-
-        // Find and execute matching command (only if no next command handler)
-        console.log(`🔍 Looking for matching command for: "${text}"`);
+        // Find and execute matching command
         const command = await this.findMatchingCommand(token, text, msg);
         if (command) {
             console.log(`🎯 Executing command: ${command.command_patterns}`);
-            console.log(`📝 Command ID: ${command.id}`);
             await this.executeCommand(bot, command, msg, text);
-        } else {
-            console.log(`❌ No matching command found for: "${text}"`);
         }
 
         console.log(`✅ ========== MESSAGE PROCESSING COMPLETE ==========\n`);
