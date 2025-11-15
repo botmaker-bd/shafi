@@ -101,36 +101,36 @@ async function executeCommandCode(botInstance, code, context) {
                 api: executionEnv.Api
             };
 
-            // Enhanced execution code with async/await support
-            const executionCode = `
-                // Inject ALL variables into execution context
-                const { 
-                    bot, Api, api, Bot, getUser, User, 
-                    msg, chatId, userId, userInput, params,
-                    sendMessage, send, reply, sendPhoto, sendDocument, sendVideo,
-                    sendKeyboard, runPython, waitForAnswer, wait, HTTP
-                } = this.context;
+            // Enhanced execution code with waitForAnswer fix
+const executionCode = `
+    // Inject ALL variables into execution context
+    const { 
+        bot, Api, api, Bot, getUser, User, 
+        msg, chatId, userId, userInput, params,
+        sendMessage, send, reply, sendPhoto, sendDocument, sendVideo,
+        sendKeyboard, runPython, waitForAnswer, wait, HTTP
+    } = this.context;
 
-                // Create an async wrapper for the user's code
-                const executeUserCode = async () => {
-                    try {
-                        // User's command code
-                        ${code}
-                        
-                        // If no explicit return, return success
-                        if (typeof result === 'undefined') {
-                            return "Command executed successfully";
-                        }
-                        return result;
-                    } catch (error) {
-                        console.error('Command execution error:', error);
-                        throw error;
-                    }
-                };
+    // Create an async wrapper for the user's code
+    const executeUserCode = async () => {
+        try {
+            // User's command code
+            ${code}
+            
+            // If no explicit return, return success
+            if (typeof result === 'undefined') {
+                return "Command executed successfully";
+            }
+            return result;
+        } catch (error) {
+            console.error('Command execution error:', error);
+            throw error;
+        }
+    };
 
-                // Execute and return the promise
-                return executeUserCode();
-            `;
+    // Execute and return the promise
+    return executeUserCode();
+`;
 
             const executionWrapper = {
                 context: finalContext
