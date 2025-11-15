@@ -229,38 +229,45 @@ class ApiWrapper {
         this.wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
         // Wait for answer with timeout - FIXED VERSION
-// server/core/api-wrapper.js - FIXED VERSION
+// server/core/api-wrapper.js - waitForAnswer মেথড
 this.waitForAnswer = (question, options = {}) => {
     return new Promise(async (resolve, reject) => {
-        // Validate context properly
-        if (!this.context || !this.context.botToken || !this.context.chatId || !this.context.userId) {
-            console.error('❌ waitForAnswer: Missing context data', this.context);
-            reject(new Error('Context data not available for waitForAnswer'));
+        console.log(`🎯 waitForAnswer initiated for user ${this.context.userId}`);
+        console.log(`📝 Question: "${question}"`);
+        console.log(`🔑 Bot Token: ${this.context.botToken}`);
+        console.log(`💬 Chat ID: ${this.context.chatId}`);
+        
+        // Validate context
+        if (!this.context || !this.context.botToken || !this.context.chatId) {
+            console.error('❌ waitForAnswer: Missing context data');
+            console.error('Context:', this.context);
+            reject(new Error('Context data not available'));
             return;
         }
 
-        const timeout = options.timeout || 60000; // 60 seconds default
+        const timeout = options.timeout || 60000;
         const nextCommandKey = `${this.context.botToken}_${this.context.userId}`;
         
         console.log(`⏳ Setting up waitForAnswer for key: ${nextCommandKey}`);
-        console.log(`📝 Question: "${question}"`);
+        console.log(`⏰ Timeout: ${timeout}ms`);
         
-        // Clear any existing handler first
+        // Clear existing handler
         if (this.context.nextCommandHandlers && this.context.nextCommandHandlers.has(nextCommandKey)) {
+            console.log('🔄 Clearing existing handler for this user');
             this.context.nextCommandHandlers.delete(nextCommandKey);
-            console.log(`🧹 Cleared existing handler for: ${nextCommandKey}`);
         }
 
         const timeoutId = setTimeout(() => {
-            console.log(`⏰ Timeout reached for: ${nextCommandKey}`);
+            console.log(`⏰ Timeout reached for key: ${nextCommandKey}`);
             if (this.context.nextCommandHandlers && this.context.nextCommandHandlers.has(nextCommandKey)) {
                 this.context.nextCommandHandlers.delete(nextCommandKey);
+                console.log('🗑️ Handler removed due to timeout');
             }
             reject(new Error(`Wait for answer timeout (${timeout/1000} seconds)`));
         }, timeout);
 
         try {
-            // Send question to user
+            // ✅ FIXED: Proper sendMessage call with chatId
             console.log(`📤 Sending question to chat: ${this.context.chatId}`);
             await this.sendMessage(this.context.chatId, question, {
                 parse_mode: 'HTML',
@@ -268,15 +275,19 @@ this.waitForAnswer = (question, options = {}) => {
             });
             
             console.log(`✅ Question sent successfully, setting handler for: ${nextCommandKey}`);
+            console.log(`📊 Total active handlers: ${this.context.nextCommandHandlers?.size || 0}`);
             
-            // Validate nextCommandHandlers exists
+            // Set up handler
             if (!this.context.nextCommandHandlers) {
-                throw new Error('nextCommandHandlers not available in context');
+                console.error('❌ nextCommandHandlers not available in context');
+                throw new Error('nextCommandHandlers not available');
             }
             
-            // Set up the handler
             this.context.nextCommandHandlers.set(nextCommandKey, (answer, answerMsg) => {
-                console.log(`🎉 User response received: "${answer}"`);
+                console.log(`🎉 User response received for key: ${nextCommandKey}`);
+                console.log(`📨 Response: "${answer}"`);
+                console.log(`👤 From user: ${answerMsg.from.first_name} (${answerMsg.from.id})`);
+                
                 clearTimeout(timeoutId);
                 resolve({
                     text: answer,
@@ -287,13 +298,14 @@ this.waitForAnswer = (question, options = {}) => {
                 });
             });
             
-            console.log(`✅ Handler set successfully. Active handlers: ${this.context.nextCommandHandlers.size}`);
+            console.log(`✅ Handler set successfully for key: ${nextCommandKey}`);
             
         } catch (error) {
             console.error(`❌ waitForAnswer setup failed:`, error);
             clearTimeout(timeoutId);
             if (this.context.nextCommandHandlers) {
                 this.context.nextCommandHandlers.delete(nextCommandKey);
+                console.log(`🗑️ Handler cleaned up due to error: ${nextCommandKey}`);
             }
             reject(new Error(`Failed to set up wait for answer: ${error.message}`));
         }
