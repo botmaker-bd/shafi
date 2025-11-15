@@ -65,101 +65,137 @@
     </nav>
 
     <div class="container">
-        <!-- Welcome Section -->
-        <div class="welcome-section">
-            <div class="welcome-content">
-                <h1>Welcome back, <span id="userName">User</span>! 👋</h1>
-                <p>Here's what's happening with your bots today.</p>
+        <!-- Welcome Header -->
+        <div class="dashboard-header">
+            <div class="header-content">
+                <div class="greeting">
+                    <h1>Welcome back, <span id="userName">User</span>! 👋</h1>
+                    <p>Here's what's happening with your bots today</p>
+                </div>
+                <div class="header-stats">
+                    <div class="mini-stat">
+                        <div class="mini-stat-icon">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                        <div class="mini-stat-info">
+                            <span class="mini-stat-value" id="totalBots">0</span>
+                            <span class="mini-stat-label">Total Bots</span>
+                        </div>
+                    </div>
+                    <div class="mini-stat">
+                        <div class="mini-stat-icon">
+                            <i class="fas fa-play-circle"></i>
+                        </div>
+                        <div class="mini-stat-info">
+                            <span class="mini-stat-value" id="activeBots">0</span>
+                            <span class="mini-stat-label">Active</span>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="welcome-actions">
-                <a href="bot-management.html" class="btn btn-primary">
-                    <i class="fas fa-plus"></i> Add New Bot
-                </a>
-                <button class="btn btn-secondary" id="refreshDashboard">
+            <div class="header-actions">
+                <button class="btn btn-primary" id="refreshDashboard">
                     <i class="fas fa-sync-alt"></i> Refresh
                 </button>
-            </div>
-        </div>
-        
-        <!-- Statistics Section -->
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-icon primary">
-                    <i class="fas fa-robot"></i>
-                </div>
-                <div class="stat-content">
-                    <h3 id="totalBots">0</h3>
-                    <p>Total Bots</p>
-                    <div class="stat-trend positive">
-                        <i class="fas fa-arrow-up"></i>
-                        <span>12% from last week</span>
-                    </div>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon success">
-                    <i class="fas fa-play-circle"></i>
-                </div>
-                <div class="stat-content">
-                    <h3 id="activeBots">0</h3>
-                    <p>Active Bots</p>
-                    <div class="stat-trend positive">
-                        <i class="fas fa-arrow-up"></i>
-                        <span>5% from yesterday</span>
-                    </div>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon warning">
-                    <i class="fas fa-code"></i>
-                </div>
-                <div class="stat-content">
-                    <h3 id="totalCommands">0</h3>
-                    <p>Total Commands</p>
-                    <div class="stat-trend positive">
-                        <i class="fas fa-arrow-up"></i>
-                        <span>8 new today</span>
-                    </div>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon info">
-                    <i class="fas fa-chart-line"></i>
-                </div>
-                <div class="stat-content">
-                    <h3 id="todayMessages">0</h3>
-                    <p>Today's Messages</p>
-                    <div class="stat-trend positive">
-                        <i class="fas fa-arrow-up"></i>
-                        <span>15% increase</span>
-                    </div>
-                </div>
+                <a href="bot-management.html" class="btn btn-secondary">
+                    <i class="fas fa-plus"></i> Add Bot
+                </a>
             </div>
         </div>
 
-        <!-- Main Content Grid -->
+        <!-- Main Dashboard Grid -->
         <div class="dashboard-grid">
-            <!-- Quick Actions Section -->
-            <div class="section-card quick-actions">
+            <!-- Statistics Cards -->
+            <div class="stats-section">
+                <div class="section-header">
+                    <h2>Overview</h2>
+                    <p>Your bot performance at a glance</p>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div class="stat-icon primary">
+                                <i class="fas fa-code"></i>
+                            </div>
+                            <div class="stat-trend positive">
+                                <i class="fas fa-arrow-up"></i>
+                                <span>12%</span>
+                            </div>
+                        </div>
+                        <div class="stat-content">
+                            <h3 id="totalCommands">0</h3>
+                            <p>Total Commands</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div class="stat-icon success">
+                                <i class="fas fa-comment-alt"></i>
+                            </div>
+                            <div class="stat-trend positive">
+                                <i class="fas fa-arrow-up"></i>
+                                <span>8%</span>
+                            </div>
+                        </div>
+                        <div class="stat-content">
+                            <h3 id="todayMessages">0</h3>
+                            <p>Today's Messages</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div class="stat-icon warning">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <div class="stat-trend negative">
+                                <i class="fas fa-arrow-down"></i>
+                                <span>3%</span>
+                            </div>
+                        </div>
+                        <div class="stat-content">
+                            <h3 id="totalUsers">1.2K</h3>
+                            <p>Total Users</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div class="stat-icon info">
+                                <i class="fas fa-bolt"></i>
+                            </div>
+                            <div class="stat-trend positive">
+                                <i class="fas fa-arrow-up"></i>
+                                <span>15%</span>
+                            </div>
+                        </div>
+                        <div class="stat-content">
+                            <h3 id="uptime">99.8%</h3>
+                            <p>System Uptime</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="actions-section">
                 <div class="section-header">
                     <h2>Quick Actions</h2>
-                    <p>Manage your bots and commands quickly</p>
+                    <p>Get things done faster</p>
                 </div>
                 <div class="actions-grid">
                     <a href="bot-management.html" class="action-card">
-                        <div class="action-icon primary">
+                        <div class="action-icon">
                             <i class="fas fa-plus"></i>
                         </div>
                         <div class="action-content">
                             <h3>Add New Bot</h3>
-                            <p>Connect a new Telegram bot to your account</p>
+                            <p>Connect a new Telegram bot</p>
                         </div>
                         <div class="action-arrow">
                             <i class="fas fa-chevron-right"></i>
                         </div>
                     </a>
                     <a href="command-editor.html" class="action-card">
-                        <div class="action-icon success">
+                        <div class="action-icon">
                             <i class="fas fa-edit"></i>
                         </div>
                         <div class="action-content">
@@ -171,24 +207,24 @@
                         </div>
                     </a>
                     <a href="admin-settings.html" class="action-card">
-                        <div class="action-icon warning">
+                        <div class="action-icon">
                             <i class="fas fa-cog"></i>
                         </div>
                         <div class="action-content">
                             <h3>Admin Settings</h3>
-                            <p>Configure admin and system settings</p>
+                            <p>Configure system settings</p>
                         </div>
                         <div class="action-arrow">
                             <i class="fas fa-chevron-right"></i>
                         </div>
                     </a>
                     <a href="#" class="action-card" id="testAllBots">
-                        <div class="action-icon info">
+                        <div class="action-icon">
                             <i class="fas fa-bolt"></i>
                         </div>
                         <div class="action-content">
                             <h3>Test All Bots</h3>
-                            <p>Check connectivity of all your bots</p>
+                            <p>Check bot connectivity</p>
                         </div>
                         <div class="action-arrow">
                             <i class="fas fa-chevron-right"></i>
@@ -197,11 +233,12 @@
                 </div>
             </div>
 
-            <!-- Recent Bots Section -->
-            <div class="section-card recent-bots">
+            <!-- Recent Bots -->
+            <div class="bots-section">
                 <div class="section-header">
                     <h2>Your Bots</h2>
                     <p>Recently added and active bots</p>
+                    <a href="bot-management.html" class="view-all">View All</a>
                 </div>
                 <div id="botsList" class="bots-list">
                     <!-- Bots will be loaded here -->
@@ -214,25 +251,42 @@
                         <a href="bot-management.html" class="btn btn-primary">Add Your First Bot</a>
                     </div>
                 </div>
-                <div class="section-footer">
-                    <a href="bot-management.html" class="btn btn-secondary">View All Bots</a>
-                </div>
             </div>
 
-            <!-- Recent Activity Section -->
-            <div class="section-card recent-activity">
+            <!-- Recent Activity -->
+            <div class="activity-section">
                 <div class="section-header">
                     <h2>Recent Activity</h2>
                     <p>Latest commands and bot activities</p>
                 </div>
                 <div id="recentActivity" class="activity-list">
                     <!-- Activity will be loaded here -->
-                    <div class="empty-state">
-                        <div class="empty-icon">
-                            <i class="fas fa-history"></i>
+                    <div class="activity-item">
+                        <div class="activity-icon success">
+                            <i class="fas fa-check"></i>
                         </div>
-                        <h3>No Activity Yet</h3>
-                        <p>Activity will appear here as you use your bots</p>
+                        <div class="activity-content">
+                            <p><strong>Welcome Bot</strong> received a new message</p>
+                            <span class="activity-time">2 minutes ago</span>
+                        </div>
+                    </div>
+                    <div class="activity-item">
+                        <div class="activity-icon info">
+                            <i class="fas fa-code"></i>
+                        </div>
+                        <div class="activity-content">
+                            <p>Command <strong>/start</strong> was updated</p>
+                            <span class="activity-time">1 hour ago</span>
+                        </div>
+                    </div>
+                    <div class="activity-item">
+                        <div class="activity-icon warning">
+                            <i class="fas fa-exclamation"></i>
+                        </div>
+                        <div class="activity-content">
+                            <p><strong>Support Bot</strong> connection test failed</p>
+                            <span class="activity-time">3 hours ago</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -242,7 +296,7 @@
     <!-- Loading Overlay -->
     <div id="loadingOverlay" class="loading-overlay">
         <div class="loading-spinner">
-            <div class="spinner"></div>
+            <div class="spinner"></i></div>
             <p>Loading Dashboard...</p>
         </div>
     </div>
