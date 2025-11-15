@@ -387,24 +387,31 @@ class BotManager {
     }
 
     async handleMessage(bot, token, msg) {
-        try {
-            // Skip non-text messages without caption
-            if (!msg.text && !msg.caption) return;
+    try {
+        // Skip non-text messages without caption
+        if (!msg.text && !msg.caption) return;
 
-            const chatId = msg.chat.id;
-            const userId = msg.from.id;
-            const text = msg.text || msg.caption || '';
+        const chatId = msg.chat.id;
+        const userId = msg.from.id;
+        const text = msg.text || msg.caption || '';
 
-            console.log(`📨 Message from ${msg.from.first_name}: "${text}"`);
+        console.log(`📨 Message from ${msg.from.first_name}: "${text}"`);
 
-            // Check for next command handler
-            const nextCommandKey = `${token}_${userId}`;
-            if (this.nextCommandHandlers.has(nextCommandKey)) {
-                const handler = this.nextCommandHandlers.get(nextCommandKey);
-                this.nextCommandHandlers.delete(nextCommandKey);
-                await handler(text, msg);
-                return;
-            }
+        // Check for next command handler - FIXED VERSION
+        const nextCommandKey = `${token}_${userId}`;
+        console.log(`🔍 Checking for next command handler: ${nextCommandKey}`);
+        
+        if (this.nextCommandHandlers.has(nextCommandKey)) {
+            console.log(`✅ Next command handler found for user ${userId}`);
+            const handler = this.nextCommandHandlers.get(nextCommandKey);
+            this.nextCommandHandlers.delete(nextCommandKey);
+            
+            // Call the handler with the user's response
+            await handler(text, msg);
+            console.log(`✅ Next command handler executed successfully`);
+            return;
+        }
+
 
             // Handle Python code execution
             if (text.startsWith('/python ')) {
