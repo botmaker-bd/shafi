@@ -1,9 +1,0 @@
-{
-    "id": "test_input",
-    "name": "Test Input",
-    "patterns": "/test, /inputtest",
-    "description": "Test user input handling",
-    "code": "Api.sendMessage(`📥 Your input: \"${userInput}\"`);\nApi.sendMessage(`📥 Params: \"${params}\"`);\nUser.saveData(\"last_input\", userInput);\nApi.waitForAnswer(\"🔹 Enter something:\");",
-    "waitForAnswer": true,
-    "answerHandler": "const response = params;\nApi.sendMessage(`✅ You entered: \"${response}\"`);\nUser.saveData(\"answer\", response);"
-}
