@@ -386,9 +386,9 @@ class BotManager {
         bot.on('error', (error) => console.error(`❌ Bot error:`, error));
     }
 
+// server/core/bot-manager.js - IMPROVED handleMessage
 async handleMessage(bot, token, msg) {
     try {
-        // Skip non-text messages without caption
         if (!msg.text && !msg.caption) return;
 
         const chatId = msg.chat.id;
@@ -397,7 +397,7 @@ async handleMessage(bot, token, msg) {
 
         console.log(`📨 Message from ${msg.from.first_name} (${userId}): "${text}"`);
 
-        // Check for next command handler - IMPROVED VERSION
+        // ✅ IMPROVED: Check for next command handler first
         const nextCommandKey = `${token}_${userId}`;
         console.log(`🔍 Checking next command handler for key: ${nextCommandKey}`);
         console.log(`📊 Active handlers: ${this.nextCommandHandlers.size}`);
@@ -410,7 +410,6 @@ async handleMessage(bot, token, msg) {
             this.nextCommandHandlers.delete(nextCommandKey);
             
             try {
-                // Execute the handler with user's response
                 await handler(text, msg);
                 console.log(`✅ Next command handler executed successfully for user ${userId}`);
                 return; // Important: return after handling
@@ -419,29 +418,13 @@ async handleMessage(bot, token, msg) {
                 await this.sendError(bot, chatId, handlerError);
                 return;
             }
-        } else {
-            console.log(`❌ No next command handler found for key: ${nextCommandKey}`);
         }
 
-        // Handle Python code execution
-        if (text.startsWith('/python ')) {
-            await this.executePythonCode(bot, chatId, text.replace('/python ', ''));
-            return;
-        }
-
-        // Handle AI code generation
-        if (text.startsWith('/ai ') || text.startsWith('/generate ')) {
-            await this.generateAICode(bot, chatId, text);
-            return;
-        }
-
-        // Find and execute matching command (only if no next command handler)
+        // Rest of your existing code for command matching...
         const command = await this.findMatchingCommand(token, text, msg);
         if (command) {
             console.log(`🎯 Executing command: ${command.command_patterns}`);
             await this.executeCommand(bot, command, msg, text);
-        } else {
-            console.log(`❌ No matching command found for: "${text}"`);
         }
 
     } catch (error) {
