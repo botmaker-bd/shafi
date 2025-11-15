@@ -6,6 +6,7 @@ class CommandEditor {
         this.commands = [];
         this.templates = {};
         this.originalCode = ''; // Track original code for save button state
+        this.currentEditorType = null; // Track which editor is open
         this.init();
     }
 
@@ -15,11 +16,663 @@ class CommandEditor {
         this.setupEventListeners();
         await this.loadCommands();
         await this.loadTemplates();
-        this.setupCodeEditor();
+        this.setupEnhancedCodeEditor(); // Use enhanced editor
         this.setupCommandsTags();
         console.log('✅ Command editor initialized completely');
     }
 
+    // Enhanced code editor functionality
+    setupEnhancedCodeEditor() {
+        const advancedEditor = document.getElementById('advancedCodeEditor');
+        if (!advancedEditor) {
+            console.error('❌ Advanced code editor not found');
+            return;
+        }
+        
+        // Setup line numbers
+        this.setupLineNumbers();
+        
+        // Setup enhanced toolbar
+        this.setupEnhancedToolbar();
+        
+        // Setup editor events
+        advancedEditor.addEventListener('input', (e) => {
+            this.updateEditorStats(e.target.value);
+            this.updateLineNumbers();
+            this.updateSaveButtonState();
+            this.updateCursorPosition();
+        });
+        
+        advancedEditor.addEventListener('scroll', () => {
+            this.syncLineNumbersScroll();
+        });
+        
+        advancedEditor.addEventListener('click', () => {
+            this.updateCursorPosition();
+        });
+        
+        advancedEditor.addEventListener('keyup', () => {
+            this.updateCursorPosition();
+        });
+        
+        advancedEditor.addEventListener('keydown', (e) => {
+            this.handleEditorShortcuts(e);
+        });
+        
+        // Setup find dialog
+        this.setupFindDialog();
+        
+        // Setup modal close events
+        this.setupEnhancedModalEvents();
+        
+        // Initial updates
+        this.updateEditorStats(advancedEditor.value);
+        this.updateLineNumbers();
+        this.updateSaveButtonState();
+        this.updateCursorPosition();
+    }
+
+    setupLineNumbers() {
+        const editor = document.getElementById('advancedCodeEditor');
+        const lineNumbers = document.getElementById('lineNumbers');
+        
+        if (!editor || !lineNumbers) return;
+        
+        // Initial line numbers
+        this.updateLineNumbers();
+    }
+
+    updateLineNumbers() {
+        const editor = document.getElementById('advancedCodeEditor');
+        const lineNumbers = document.getElementById('lineNumbers');
+        
+        if (!editor || !lineNumbers) return;
+        
+        const lines = editor.value.split('\n');
+        let numbersHTML = '';
+        
+        for (let i = 1; i <= lines.length; i++) {
+            numbersHTML += `<span>${i}</span>`;
+        }
+        
+        const lineNumbersContent = lineNumbers.querySelector('.line-numbers-content');
+        if (lineNumbersContent) {
+            lineNumbersContent.innerHTML = numbersHTML;
+        }
+    }
+
+    syncLineNumbersScroll() {
+        const editor = document.getElementById('advancedCodeEditor');
+        const lineNumbers = document.getElementById('lineNumbers');
+        
+        if (editor && lineNumbers) {
+            lineNumbers.scrollTop = editor.scrollTop;
+        }
+    }
+
+    updateCursorPosition() {
+        const editor = document.getElementById('advancedCodeEditor');
+        const cursorPosition = document.getElementById('cursorPosition');
+        
+        if (!editor || !cursorPosition) return;
+        
+        const textBeforeCursor = editor.value.substring(0, editor.selectionStart);
+        const lines = textBeforeCursor.split('\n');
+        const line = lines.length;
+        const column = lines[lines.length - 1].length + 1;
+        
+        cursorPosition.textContent = `Line ${line}, Column ${column}`;
+    }
+
+    setupEnhancedToolbar() {
+        const editor = document.getElementById('advancedCodeEditor');
+        
+        if (!editor) return;
+        
+        // Enhanced undo/redo
+        const undoBtn = document.getElementById('undoBtn');
+        const redoBtn = document.getElementById('redoBtn');
+        
+        if (undoBtn) {
+            undoBtn.addEventListener('click', () => {
+                document.execCommand('undo');
+                editor.focus();
+                this.updateLineNumbers();
+                this.updateCursorPosition();
+            });
+        }
+        
+        if (redoBtn) {
+            redoBtn.addEventListener('click', () => {
+                document.execCommand('redo');
+                editor.focus();
+                this.updateLineNumbers();
+                this.updateCursorPosition();
+            });
+        }
+        
+        // Enhanced select all
+        const selectAllBtn = document.getElementById('selectAllBtn');
+        if (selectAllBtn) {
+            selectAllBtn.addEventListener('click', () => {
+                editor.select();
+                editor.focus();
+                this.updateCursorPosition();
+            });
+        }
+        
+        // Enhanced cut/copy/paste
+        const cutBtn = document.getElementById('cutBtn');
+        const copyBtn = document.getElementById('copyBtn');
+        const pasteBtn = document.getElementById('pasteBtn');
+        
+        if (cutBtn) {
+            cutBtn.addEventListener('click', () => {
+                document.execCommand('cut');
+                editor.focus();
+                this.updateLineNumbers();
+                this.updateCursorPosition();
+            });
+        }
+        
+        if (copyBtn) {
+            copyBtn.addEventListener('click', () => {
+                document.execCommand('copy');
+                editor.focus();
+            });
+        }
+        
+        if (pasteBtn) {
+            pasteBtn.addEventListener('click', async () => {
+                try {
+                    const text = await navigator.clipboard.readText();
+                    const start = editor.selectionStart;
+                    const end = editor.selectionEnd;
+                    
+                    editor.setRangeText(text, start, end, 'select');
+                    this.updateEditorStats(editor.value);
+                    this.updateLineNumbers();
+                    this.updateSaveButtonState();
+                    this.updateCursorPosition();
+                } catch (err) {
+                    document.execCommand('paste');
+                }
+                editor.focus();
+            });
+        }
+        
+        // Enhanced clear
+        const clearBtn = document.getElementById('clearBtn');
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => {
+                if (confirm('Are you sure you want to clear all code?')) {
+                    editor.value = '';
+                    this.updateEditorStats('');
+                    this.updateLineNumbers();
+                    this.updateSaveButtonState();
+                    this.updateCursorPosition();
+                    editor.focus();
+                }
+            });
+        }
+        
+        // Enhanced format
+        const formatBtn = document.getElementById('formatBtn');
+        if (formatBtn) {
+            formatBtn.addEventListener('click', () => {
+                this.formatCode();
+                editor.focus();
+            });
+        }
+        
+        // Find functionality
+        const findBtn = document.getElementById('findBtn');
+        if (findBtn) {
+            findBtn.addEventListener('click', () => {
+                this.showFindDialog();
+            });
+        }
+        
+        // Language selector
+        const languageSelect = document.getElementById('languageSelect');
+        if (languageSelect) {
+            languageSelect.addEventListener('change', (e) => {
+                this.updateSyntaxHighlighting(e.target.value);
+            });
+        }
+        
+        // Setup both cancel buttons
+        const cancelEditBtn = document.getElementById('cancelEdit');
+        const cancelEditTopBtn = document.getElementById('cancelEditTop');
+        
+        if (cancelEditBtn) {
+            cancelEditBtn.addEventListener('click', () => {
+                this.closeCodeEditor();
+            });
+        }
+        
+        if (cancelEditTopBtn) {
+            cancelEditTopBtn.addEventListener('click', () => {
+                this.closeCodeEditor();
+            });
+        }
+        
+        // Setup both save buttons
+        const saveCodeBtn = document.getElementById('saveCode');
+        const saveCodeTopBtn = document.getElementById('saveCodeTop');
+        
+        if (saveCodeBtn) {
+            saveCodeBtn.addEventListener('click', () => {
+                this.saveCodeFromEditor();
+            });
+        }
+        
+        if (saveCodeTopBtn) {
+            saveCodeTopBtn.addEventListener('click', () => {
+                this.saveCodeFromEditor();
+            });
+        }
+    }
+
+    setupFindDialog() {
+        const findDialog = document.getElementById('findDialog');
+        const closeFindDialog = document.getElementById('closeFindDialog');
+        const findInput = document.getElementById('findInput');
+        const findPrev = document.getElementById('findPrev');
+        const findNext = document.getElementById('findNext');
+        
+        if (!findDialog || !closeFindDialog) return;
+        
+        // Close find dialog
+        closeFindDialog.addEventListener('click', () => {
+            findDialog.classList.remove('show');
+        });
+        
+        // Find previous
+        if (findPrev) {
+            findPrev.addEventListener('click', () => {
+                this.findInCode(findInput.value, true, false);
+            });
+        }
+        
+        // Find next
+        if (findNext) {
+            findNext.addEventListener('click', () => {
+                this.findInCode(findInput.value, false, false);
+            });
+        }
+        
+        // Handle Enter key in find input
+        if (findInput) {
+            findInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.findInCode(findInput.value, e.shiftKey, false);
+                }
+            });
+        }
+        
+        // Close on Escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && findDialog.classList.contains('show')) {
+                findDialog.classList.remove('show');
+                const editor = document.getElementById('advancedCodeEditor');
+                if (editor) editor.focus();
+            }
+        });
+    }
+
+    showFindDialog() {
+        const findDialog = document.getElementById('findDialog');
+        const findInput = document.getElementById('findInput');
+        
+        if (findDialog && findInput) {
+            findDialog.classList.add('show');
+            findInput.focus();
+            findInput.select();
+        }
+    }
+
+    findInCode(text, backward = false, showDialog = true) {
+        const editor = document.getElementById('advancedCodeEditor');
+        if (!editor || !text) {
+            if (showDialog) this.showFindDialog();
+            return;
+        }
+        
+        const content = editor.value;
+        const caseSensitive = document.getElementById('caseSensitive')?.checked || false;
+        const wholeWord = document.getElementById('wholeWord')?.checked || false;
+        
+        let searchContent = caseSensitive ? content : content.toLowerCase();
+        let searchText = caseSensitive ? text : text.toLowerCase();
+        
+        if (wholeWord) {
+            searchText = `\\b${searchText}\\b`;
+        }
+        
+        let index;
+        if (backward) {
+            // Search backward from current cursor position
+            const textBeforeCursor = content.substring(0, editor.selectionStart);
+            let searchBefore = caseSensitive ? textBeforeCursor : textBeforeCursor.toLowerCase();
+            
+            if (wholeWord) {
+                const regex = new RegExp(searchText, 'g');
+                let match;
+                let lastMatch = -1;
+                
+                while ((match = regex.exec(searchBefore)) !== null) {
+                    lastMatch = match.index;
+                }
+                
+                index = lastMatch;
+            } else {
+                index = searchBefore.lastIndexOf(searchText);
+            }
+        } else {
+            // Search forward from current cursor position
+            const textFromCursor = content.substring(editor.selectionEnd);
+            let searchFrom = caseSensitive ? textFromCursor : textFromCursor.toLowerCase();
+            
+            if (wholeWord) {
+                const regex = new RegExp(searchText);
+                const match = regex.exec(searchFrom);
+                index = match ? editor.selectionEnd + match.index : -1;
+            } else {
+                index = searchFrom.indexOf(searchText);
+                if (index !== -1) {
+                    index += editor.selectionEnd;
+                }
+            }
+        }
+        
+        if (index !== -1) {
+            editor.focus();
+            editor.setSelectionRange(index, index + text.length);
+            this.updateCursorPosition();
+            
+            // Scroll to selection
+            const lineHeight = parseInt(getComputedStyle(editor).lineHeight);
+            const linesBefore = content.substring(0, index).split('\n').length - 1;
+            editor.scrollTop = linesBefore * lineHeight;
+        } else {
+            this.showInfo('Text not found');
+            if (backward) {
+                // Wrap around to the end
+                editor.setSelectionRange(content.length, content.length);
+            } else {
+                // Wrap around to the beginning
+                editor.setSelectionRange(0, 0);
+            }
+            this.updateCursorPosition();
+        }
+    }
+
+    handleEditorShortcuts(e) {
+        // Ctrl+S to save
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            e.preventDefault();
+            this.saveCodeFromEditor();
+        }
+        
+        // Ctrl+F to find
+        if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+            e.preventDefault();
+            this.showFindDialog();
+        }
+        
+        // Tab key handling
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            const editor = document.getElementById('advancedCodeEditor');
+            if (!editor) return;
+            
+            const start = editor.selectionStart;
+            const end = editor.selectionEnd;
+            
+            // Insert tab character
+            editor.value = editor.value.substring(0, start) + '\t' + editor.value.substring(end);
+            editor.selectionStart = editor.selectionEnd = start + 1;
+            
+            this.updateLineNumbers();
+            this.updateEditorStats(editor.value);
+        }
+    }
+
+    updateSyntaxHighlighting(language) {
+        // This is a placeholder for future syntax highlighting implementation
+        console.log(`Language changed to: ${language}`);
+        this.showInfo(`Language set to ${language}`);
+        // You can integrate with a syntax highlighting library like Prism.js or Highlight.js here
+    }
+
+    updateEditorStats(code) {
+        const lines = code.split('\n').length;
+        const chars = code.length;
+        const words = code.trim() ? code.trim().split(/\s+/).length : 0;
+        const fileSize = Math.round((new TextEncoder().encode(code).length / 1024) * 100) / 100;
+        
+        const lineCountEl = document.getElementById('lineCount');
+        const charCountEl = document.getElementById('charCount');
+        const wordCountEl = document.getElementById('wordCount');
+        const fileSizeEl = document.getElementById('fileSize');
+        
+        if (lineCountEl) lineCountEl.textContent = `Lines: ${lines}`;
+        if (charCountEl) charCountEl.textContent = `Characters: ${chars}`;
+        if (wordCountEl) wordCountEl.textContent = `Words: ${words}`;
+        if (fileSizeEl) fileSizeEl.textContent = `${fileSize} KB`;
+    }
+
+    updateSaveButtonState() {
+        const advancedEditor = document.getElementById('advancedCodeEditor');
+        const saveBtn = document.getElementById('saveCode');
+        const saveTopBtn = document.getElementById('saveCodeTop');
+        
+        if (!advancedEditor) return;
+        
+        // Check if content has changed
+        const hasChanged = advancedEditor.value !== this.originalCode;
+        const hasContent = advancedEditor.value.trim().length > 0;
+        
+        const shouldEnable = hasContent && hasChanged;
+        
+        if (saveBtn) {
+            saveBtn.disabled = !shouldEnable;
+            saveBtn.style.opacity = shouldEnable ? '1' : '0.6';
+            if (shouldEnable) {
+                saveBtn.classList.add('btn-pulse');
+            } else {
+                saveBtn.classList.remove('btn-pulse');
+            }
+        }
+        
+        if (saveTopBtn) {
+            saveTopBtn.disabled = !shouldEnable;
+            saveTopBtn.style.opacity = shouldEnable ? '1' : '0.6';
+            if (shouldEnable) {
+                saveTopBtn.classList.add('btn-pulse');
+            } else {
+                saveTopBtn.classList.remove('btn-pulse');
+            }
+        }
+    }
+
+    formatCode() {
+        const editor = document.getElementById('advancedCodeEditor');
+        if (!editor) return;
+        
+        let code = editor.value;
+        
+        // Basic formatting - add proper indentation
+        const lines = code.split('\n');
+        let formattedLines = [];
+        let indentLevel = 0;
+        
+        for (let line of lines) {
+            const trimmedLine = line.trim();
+            
+            // Decrease indent for closing braces
+            if (trimmedLine.endsWith('}') || trimmedLine.endsWith(']') || trimmedLine.endsWith(')')) {
+                indentLevel = Math.max(0, indentLevel - 1);
+            }
+            
+            // Add current line with proper indentation
+            formattedLines.push('    '.repeat(indentLevel) + trimmedLine);
+            
+            // Increase indent for opening braces
+            if (trimmedLine.endsWith('{') || trimmedLine.endsWith('[') || trimmedLine.endsWith('(')) {
+                indentLevel++;
+            }
+        }
+        
+        editor.value = formattedLines.join('\n');
+        this.updateEditorStats(editor.value);
+        this.updateSaveButtonState();
+        
+        this.showSuccess('Code formatted!');
+    }
+
+    // Enhanced openCodeEditor method
+    openCodeEditor(editorType) {
+        this.currentEditorType = editorType;
+        let code = '';
+        
+        if (editorType === 'main') {
+            const commandCodeEl = document.getElementById('commandCode');
+            code = commandCodeEl ? commandCodeEl.value : '';
+            
+            // Update UI elements
+            const editorTitle = document.getElementById('editorTitle');
+            const editorTypeEl = document.getElementById('editorType');
+            if (editorTitle) editorTitle.textContent = 'Command Code Editor';
+            if (editorTypeEl) editorTypeEl.textContent = 'Main Command Code';
+        } else if (editorType === 'answer') {
+            const answerHandlerEl = document.getElementById('answerHandler');
+            code = answerHandlerEl ? answerHandlerEl.value : '';
+            
+            // Update UI elements
+            const editorTitle = document.getElementById('editorTitle');
+            const editorTypeEl = document.getElementById('editorType');
+            if (editorTitle) editorTitle.textContent = 'Answer Handler Editor';
+            if (editorTypeEl) editorTypeEl.textContent = 'Answer Handler Code';
+        }
+        
+        const advancedEditor = document.getElementById('advancedCodeEditor');
+        if (advancedEditor) {
+            advancedEditor.value = code;
+            this.originalCode = code; // Store original code for change detection
+            this.updateEditorStats(code);
+            this.updateLineNumbers();
+            this.updateSaveButtonState();
+            this.updateCursorPosition();
+        }
+        
+        const codeEditorModal = document.getElementById('codeEditorModal');
+        if (codeEditorModal) {
+            codeEditorModal.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+        
+        setTimeout(() => {
+            const editor = document.getElementById('advancedCodeEditor');
+            if (editor) {
+                editor.focus();
+                // Move cursor to end
+                editor.setSelectionRange(editor.value.length, editor.value.length);
+            }
+        }, 100);
+    }
+
+    closeCodeEditor() {
+        const codeEditorModal = document.getElementById('codeEditorModal');
+        if (codeEditorModal) {
+            codeEditorModal.style.display = 'none';
+            // Restore body scroll
+            document.body.style.overflow = '';
+        }
+    }
+
+    saveCodeFromEditor() {
+        const advancedEditor = document.getElementById('advancedCodeEditor');
+        if (!advancedEditor) return;
+        
+        const code = advancedEditor.value;
+        
+        if (this.currentEditorType === 'main') {
+            const commandCodeEl = document.getElementById('commandCode');
+            if (commandCodeEl) commandCodeEl.value = code;
+        } else if (this.currentEditorType === 'answer') {
+            const answerHandlerEl = document.getElementById('answerHandler');
+            if (answerHandlerEl) answerHandlerEl.value = code;
+        }
+        
+        this.originalCode = code; // Update original code after save
+        this.updateSaveButtonState();
+        this.closeCodeEditor();
+        this.showSuccess('Code saved successfully!');
+    }
+
+    // Enhanced modal events setup
+    setupEnhancedModalEvents() {
+        const modals = ['testCommandModal', 'codeEditorModal', 'templatesModal'];
+        
+        modals.forEach(modalId => {
+            const modal = document.getElementById(modalId);
+            if (!modal) return;
+            
+            const closeBtn = modal.querySelector('.modal-close');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', () => {
+                    modal.style.display = 'none';
+                    if (modalId === 'codeEditorModal') {
+                        document.body.style.overflow = '';
+                    }
+                });
+            }
+            
+            // ESC key to close modal
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && modal.style.display === 'flex') {
+                    modal.style.display = 'none';
+                    if (modalId === 'codeEditorModal') {
+                        document.body.style.overflow = '';
+                    }
+                }
+            });
+        });
+
+        const closeTestCommandBtn = document.getElementById('closeTestCommand');
+        if (closeTestCommandBtn) {
+            closeTestCommandBtn.addEventListener('click', () => {
+                const testCommandModal = document.getElementById('testCommandModal');
+                if (testCommandModal) {
+                    testCommandModal.style.display = 'none';
+                }
+            });
+        }
+
+        const closeTemplatesBtn = document.getElementById('closeTemplates');
+        if (closeTemplatesBtn) {
+            closeTemplatesBtn.addEventListener('click', () => {
+                const templatesModal = document.getElementById('templatesModal');
+                if (templatesModal) {
+                    templatesModal.style.display = 'none';
+                }
+            });
+        }
+
+        window.addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal')) {
+                e.target.style.display = 'none';
+                if (e.target.id === 'codeEditorModal') {
+                    document.body.style.overflow = '';
+                }
+            }
+        });
+    }
+
+    // Rest of your existing methods remain the same...
     async loadTemplates() {
         try {
             const token = localStorage.getItem('token');
@@ -380,267 +1033,7 @@ class CommandEditor {
             }, 300);
         });
 
-        // Modal events
-        this.setupModalEvents();
-    }
-
-    setupCodeEditor() {
-        const advancedEditor = document.getElementById('advancedCodeEditor');
-        if (!advancedEditor) {
-            console.error('❌ Advanced code editor not found');
-            return;
-        }
-        
-        // Setup both cancel buttons
-        const cancelEditBtn = document.getElementById('cancelEdit');
-        const cancelEditTopBtn = document.getElementById('cancelEditTop');
-        
-        // Setup both save buttons
-        const saveCodeBtn = document.getElementById('saveCode');
-        const saveCodeTopBtn = document.getElementById('saveCodeTop');
-        
-        if (cancelEditBtn) {
-            cancelEditBtn.addEventListener('click', () => {
-                this.closeCodeEditor();
-            });
-        }
-        
-        if (cancelEditTopBtn) {
-            cancelEditTopBtn.addEventListener('click', () => {
-                this.closeCodeEditor();
-            });
-        }
-        
-        if (saveCodeBtn) {
-            saveCodeBtn.addEventListener('click', () => {
-                this.saveCodeFromEditor();
-            });
-        }
-        
-        if (saveCodeTopBtn) {
-            saveCodeTopBtn.addEventListener('click', () => {
-                this.saveCodeFromEditor();
-            });
-        }
-
-        // Setup toolbar buttons
-        this.setupToolbarButtons();
-
-        advancedEditor.addEventListener('input', (e) => {
-            this.updateEditorStats(e.target.value);
-            this.updateSaveButtonState();
-        });
-
-        // Initial stats update
-        this.updateEditorStats(advancedEditor.value);
-        this.updateSaveButtonState();
-    }
-
-    setupToolbarButtons() {
-        const editor = document.getElementById('advancedCodeEditor');
-        
-        // Undo/Redo functionality
-        document.getElementById('undoBtn').addEventListener('click', () => {
-            document.execCommand('undo');
-            editor.focus();
-        });
-        
-        document.getElementById('redoBtn').addEventListener('click', () => {
-            document.execCommand('redo');
-            editor.focus();
-        });
-        
-        // Select All
-        document.getElementById('selectAllBtn').addEventListener('click', () => {
-            editor.select();
-            editor.focus();
-        });
-        
-        // Cut
-        document.getElementById('cutBtn').addEventListener('click', () => {
-            document.execCommand('cut');
-            editor.focus();
-        });
-        
-        // Copy
-        document.getElementById('copyBtn').addEventListener('click', () => {
-            document.execCommand('copy');
-            editor.focus();
-        });
-        
-        // Paste
-        document.getElementById('pasteBtn').addEventListener('click', async () => {
-            try {
-                const text = await navigator.clipboard.readText();
-                editor.setRangeText(text, editor.selectionStart, editor.selectionEnd, 'end');
-                this.updateEditorStats(editor.value);
-                this.updateSaveButtonState();
-            } catch (err) {
-                document.execCommand('paste');
-            }
-            editor.focus();
-        });
-        
-        // Clear
-        document.getElementById('clearBtn').addEventListener('click', () => {
-            if (confirm('Are you sure you want to clear all code?')) {
-                editor.value = '';
-                this.updateEditorStats('');
-                this.updateSaveButtonState();
-                editor.focus();
-            }
-        });
-        
-        // Format (basic indentation)
-        document.getElementById('formatBtn').addEventListener('click', () => {
-            this.formatCode();
-            editor.focus();
-        });
-    }
-
-    updateEditorStats(code) {
-        const lines = code.split('\n').length;
-        const chars = code.length;
-        const words = code.trim() ? code.trim().split(/\s+/).length : 0;
-        
-        const lineCountEl = document.getElementById('lineCount');
-        const charCountEl = document.getElementById('charCount');
-        const wordCountEl = document.getElementById('wordCount');
-        
-        if (lineCountEl) lineCountEl.textContent = `Lines: ${lines}`;
-        if (charCountEl) charCountEl.textContent = `Chars: ${chars}`;
-        if (wordCountEl) wordCountEl.textContent = `Words: ${words}`;
-    }
-
-    updateSaveButtonState() {
-        const advancedEditor = document.getElementById('advancedCodeEditor');
-        const saveBtn = document.getElementById('saveCode');
-        const saveTopBtn = document.getElementById('saveCodeTop');
-        
-        // Check if content has changed
-        const hasChanged = advancedEditor.value !== this.originalCode;
-        const hasContent = advancedEditor.value.trim().length > 0;
-        
-        const shouldEnable = hasContent && hasChanged;
-        
-        if (saveBtn) {
-            saveBtn.disabled = !shouldEnable;
-            saveBtn.style.opacity = shouldEnable ? '1' : '0.6';
-            if (shouldEnable) {
-                saveBtn.classList.add('btn-pulse');
-            } else {
-                saveBtn.classList.remove('btn-pulse');
-            }
-        }
-        
-        if (saveTopBtn) {
-            saveTopBtn.disabled = !shouldEnable;
-            saveTopBtn.style.opacity = shouldEnable ? '1' : '0.6';
-            if (shouldEnable) {
-                saveTopBtn.classList.add('btn-pulse');
-            } else {
-                saveTopBtn.classList.remove('btn-pulse');
-            }
-        }
-    }
-
-    formatCode() {
-        const editor = document.getElementById('advancedCodeEditor');
-        let code = editor.value;
-        
-        // Basic formatting - add proper indentation
-        const lines = code.split('\n');
-        let formattedLines = [];
-        let indentLevel = 0;
-        
-        for (let line of lines) {
-            const trimmedLine = line.trim();
-            
-            // Decrease indent for closing braces
-            if (trimmedLine.endsWith('}') || trimmedLine.endsWith(']') || trimmedLine.endsWith(')')) {
-                indentLevel = Math.max(0, indentLevel - 1);
-            }
-            
-            // Add current line with proper indentation
-            formattedLines.push('    '.repeat(indentLevel) + trimmedLine);
-            
-            // Increase indent for opening braces
-            if (trimmedLine.endsWith('{') || trimmedLine.endsWith('[') || trimmedLine.endsWith('(')) {
-                indentLevel++;
-            }
-        }
-        
-        editor.value = formattedLines.join('\n');
-        this.updateEditorStats(editor.value);
-        this.updateSaveButtonState();
-        
-        this.showSuccess('Code formatted!');
-    }
-
-    openCodeEditor(editorType) {
-        this.currentEditorType = editorType;
-        let code = '';
-        
-        if (editorType === 'main') {
-            const commandCodeEl = document.getElementById('commandCode');
-            code = commandCodeEl ? commandCodeEl.value : '';
-        } else if (editorType === 'answer') {
-            const answerHandlerEl = document.getElementById('answerHandler');
-            code = answerHandlerEl ? answerHandlerEl.value : '';
-        }
-        
-        const advancedEditor = document.getElementById('advancedCodeEditor');
-        if (advancedEditor) {
-            advancedEditor.value = code;
-            this.originalCode = code; // Store original code for change detection
-            this.updateEditorStats(code);
-            this.updateSaveButtonState();
-        }
-        
-        const codeEditorModal = document.getElementById('codeEditorModal');
-        if (codeEditorModal) {
-            codeEditorModal.style.display = 'flex';
-            // Prevent body scroll
-            document.body.style.overflow = 'hidden';
-        }
-        
-        setTimeout(() => {
-            const editor = document.getElementById('advancedCodeEditor');
-            if (editor) {
-                editor.focus();
-                // Move cursor to end
-                editor.setSelectionRange(editor.value.length, editor.value.length);
-            }
-        }, 100);
-    }
-
-    closeCodeEditor() {
-        const codeEditorModal = document.getElementById('codeEditorModal');
-        if (codeEditorModal) {
-            codeEditorModal.style.display = 'none';
-            // Restore body scroll
-            document.body.style.overflow = '';
-        }
-    }
-
-    saveCodeFromEditor() {
-        const advancedEditor = document.getElementById('advancedCodeEditor');
-        if (!advancedEditor) return;
-        
-        const code = advancedEditor.value;
-        
-        if (this.currentEditorType === 'main') {
-            const commandCodeEl = document.getElementById('commandCode');
-            if (commandCodeEl) commandCodeEl.value = code;
-        } else if (this.currentEditorType === 'answer') {
-            const answerHandlerEl = document.getElementById('answerHandler');
-            if (answerHandlerEl) answerHandlerEl.value = code;
-        }
-        
-        this.originalCode = code; // Update original code after save
-        this.updateSaveButtonState();
-        this.closeCodeEditor();
-        this.showSuccess('Code saved successfully!');
+        // Use enhanced modal events instead of basic ones
     }
 
     setupCommandsTags() {
@@ -735,62 +1128,6 @@ class CommandEditor {
                 }
             });
         }
-    }
-
-    setupModalEvents() {
-        const modals = ['testCommandModal', 'codeEditorModal', 'templatesModal'];
-        
-        modals.forEach(modalId => {
-            const modal = document.getElementById(modalId);
-            if (!modal) return;
-            
-            const closeBtn = modal.querySelector('.modal-close');
-            if (closeBtn) {
-                closeBtn.addEventListener('click', () => {
-                    modal.style.display = 'none';
-                    if (modalId === 'codeEditorModal') {
-                        document.body.style.overflow = '';
-                    }
-                });
-            }
-            
-            // ESC key to close modal
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape' && modal.style.display === 'flex') {
-                    modal.style.display = 'none';
-                    if (modalId === 'codeEditorModal') {
-                        document.body.style.overflow = '';
-                    }
-                }
-            });
-        });
-
-        const closeTestCommandBtn = document.getElementById('closeTestCommand');
-        if (closeTestCommandBtn) {
-            closeTestCommandBtn.addEventListener('click', () => {
-                const testCommandModal = document.getElementById('testCommandModal');
-                if (testCommandModal) {
-                    testCommandModal.style.display = 'none';
-                }
-            });
-        }
-
-        const closeTemplatesBtn = document.getElementById('closeTemplates');
-        if (closeTemplatesBtn) {
-            closeTemplatesBtn.addEventListener('click', () => {
-                const templatesModal = document.getElementById('templatesModal');
-                if (templatesModal) {
-                    templatesModal.style.display = 'none';
-                }
-            });
-        }
-
-        window.addEventListener('click', (e) => {
-            if (e.target.classList.contains('modal')) {
-                e.target.style.display = 'none';
-                document.body.style.overflow = '';
-            }
-        });
     }
 
     toggleAnswerHandler(show) {
