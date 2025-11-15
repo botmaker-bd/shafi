@@ -1,3 +1,4 @@
+// server/core/api-wrapper.js - SIMPLIFIED VERSION
 class ApiWrapper {
     constructor(bot, context) {
         this.bot = bot;
@@ -6,71 +7,15 @@ class ApiWrapper {
     }
 
     setupAllMethods() {
-        // COMPLETE Telegram Bot API Methods
-        const allMethods = [
-            // === MESSAGE METHODS ===
-            'sendMessage', 'forwardMessage', 'copyMessage', 'sendPhoto', 
-            'sendAudio', 'sendDocument', 'sendVideo', 'sendAnimation',
-            'sendVoice', 'sendVideoNote', 'sendMediaGroup', 'sendLocation',
-            'sendVenue', 'sendContact', 'sendPoll', 'sendDice', 'sendChatAction',
-
-            // === MESSAGE EDITING ===
-            'editMessageText', 'editMessageCaption', 'editMessageMedia',
-            'editMessageReplyMarkup', 'editMessageLiveLocation', 'stopMessageLiveLocation',
-
-            // === MESSAGE MANAGEMENT ===
-            'deleteMessage', 'deleteMessages',
-
-            // === CHAT METHODS ===
-            'getChat', 'getChatAdministrators', 'getChatMemberCount',
-            'getChatMember', 'setChatTitle', 'setChatDescription',
-            'setChatPhoto', 'deleteChatPhoto', 'setChatPermissions',
-            'exportChatInviteLink', 'createChatInviteLink', 'editChatInviteLink',
-            'revokeChatInviteLink', 'approveChatJoinRequest', 'declineChatJoinRequest',
-            'setChatAdministratorCustomTitle', 'banChatMember', 'unbanChatMember',
-            'restrictChatMember', 'promoteChatMember', 'setChatAdministratorCustomTitle',
-            'banChatSenderChat', 'unbanChatSenderChat', 'setChatStickerSet',
-            'deleteChatStickerSet',
-
-            // === CHAT MANAGEMENT ===
-            'getChatMenuButton', 'setChatMenuButton', 'getChatMember',
-            'leaveChat', 'pinChatMessage', 'unpinChatMessage', 'unpinAllChatMessages',
-
-            // === STICKER METHODS ===
-            'sendSticker', 'getStickerSet', 'getCustomEmojiStickers',
-            'uploadStickerFile', 'createNewStickerSet', 'addStickerToSet',
-            'setStickerPositionInSet', 'deleteStickerFromSet', 'setStickerSetThumbnail',
-            'setStickerSetThumb', 'setStickerEmojiList', 'setStickerKeywords',
-            'setStickerMaskPosition', 'setStickerSetTitle',
-
-            // === FORUM & TOPIC METHODS ===
-            'createForumTopic', 'editForumTopic', 'closeForumTopic',
-            'reopenForumTopic', 'deleteForumTopic', 'unpinAllForumTopicMessages',
-            'getForumTopicIconStickers', 'editGeneralForumTopic', 'closeGeneralForumTopic',
-            'reopenGeneralForumTopic', 'hideGeneralForumTopic', 'unhideGeneralForumTopic',
-
-            // === INLINE & CALLBACK ===
-            'answerInlineQuery', 'answerWebAppQuery', 'answerCallbackQuery',
-            'answerPreCheckoutQuery', 'answerShippingQuery',
-
-            // === PAYMENT METHODS ===
-            'sendInvoice', 'createInvoiceLink', 'refundStarPayment',
-
-            // === BOT MANAGEMENT ===
-            'getMe', 'logOut', 'close', 'getMyCommands', 'setMyCommands',
-            'deleteMyCommands', 'getMyDescription', 'setMyDescription',
-            'getMyShortDescription', 'setMyShortDescription', 'getMyName',
-            'setMyName', 'getMyDefaultAdministratorRights', 'setMyDefaultAdministratorRights',
-
-            // === GAME METHODS ===
-            'sendGame', 'setGameScore', 'getGameHighScores',
-
-            // === FILE METHODS ===
-            'getFile', 'downloadFile'
+        // Basic Telegram methods
+        const methods = [
+            'sendMessage', 'sendPhoto', 'sendDocument', 'sendVideo', 
+            'sendAudio', 'sendVoice', 'sendLocation', 'sendVenue',
+            'sendContact', 'sendChatAction', 'getMe'
         ];
 
         // Bind all methods to this instance
-        allMethods.forEach(method => {
+        methods.forEach(method => {
             if (this.bot[method]) {
                 this[method] = async (...args) => {
                     try {
@@ -80,15 +25,12 @@ class ApiWrapper {
                         }
                         
                         const result = await this.bot[method](...args);
-                        console.log(`✅ API ${method} executed successfully`);
                         return result;
                     } catch (error) {
                         console.error(`❌ API ${method} failed:`, error.message);
                         throw new Error(`Telegram API Error (${method}): ${error.message}`);
                     }
                 };
-            } else {
-                console.warn(`⚠️ Method ${method} not available in bot instance`);
             }
         });
 
@@ -99,15 +41,7 @@ class ApiWrapper {
     needsChatId(method) {
         const chatIdMethods = [
             'sendMessage', 'sendPhoto', 'sendDocument', 'sendVideo', 'sendAudio',
-            'sendVoice', 'sendLocation', 'sendVenue', 'sendContact', 'sendPoll',
-            'sendDice', 'sendChatAction', 'sendMediaGroup', 'forwardMessage',
-            'copyMessage', 'deleteMessage', 'deleteMessages', 'pinChatMessage',
-            'unpinChatMessage', 'leaveChat', 'getChat', 'getChatAdministrators',
-            'getChatMemberCount', 'getChatMember', 'setChatTitle', 'setChatDescription',
-            'setChatPhoto', 'deleteChatPhoto', 'setChatPermissions', 'banChatMember',
-            'unbanChatMember', 'restrictChatMember', 'promoteChatMember', 'setChatStickerSet',
-            'deleteChatStickerSet', 'createForumTopic', 'editForumTopic', 'closeForumTopic',
-            'reopenForumTopic', 'deleteForumTopic'
+            'sendVoice', 'sendLocation', 'sendVenue', 'sendContact', 'sendChatAction'
         ];
         return chatIdMethods.includes(method);
     }
@@ -120,8 +54,7 @@ class ApiWrapper {
             first_name: this.context.first_name,
             last_name: this.context.last_name,
             language_code: this.context.language_code,
-            chat_id: this.context.chatId,
-            is_bot: false
+            chat_id: this.context.chatId
         });
 
         // Enhanced send methods
@@ -140,73 +73,35 @@ class ApiWrapper {
             });
         };
 
-        // Keyboard helpers
-        this.sendKeyboard = (text, buttons, options = {}) => {
-            return this.sendMessage(this.context.chatId, text, {
-                reply_markup: { inline_keyboard: buttons },
-                parse_mode: 'HTML',
-                ...options
-            });
-        };
-
-        this.sendReplyKeyboard = (text, buttons, options = {}) => {
-            return this.sendMessage(this.context.chatId, text, {
-                reply_markup: {
-                    keyboard: buttons,
-                    resize_keyboard: true,
-                    one_time_keyboard: options.one_time || false
-                },
-                parse_mode: 'HTML',
-                ...options
-            });
-        };
-
-        this.removeKeyboard = (text, options = {}) => {
-            return this.sendMessage(this.context.chatId, text, {
-                reply_markup: { remove_keyboard: true },
-                parse_mode: 'HTML',
-                ...options
-            });
-        };
-
-        // Media helpers
-        this.sendImage = (photo, caption = '', options = {}) => {
-            return this.sendPhoto(this.context.chatId, photo, {
-                caption: caption,
-                parse_mode: 'HTML',
-                ...options
-            });
-        };
-
-        this.sendFile = (document, caption = '', options = {}) => {
-            return this.sendDocument(this.context.chatId, document, {
-                caption: caption,
-                parse_mode: 'HTML',
-                ...options
-            });
-        };
-
-        this.sendVideo = (video, caption = '', options = {}) => {
-            return this.sendVideo(this.context.chatId, video, {
-                caption: caption,
-                parse_mode: 'HTML',
-                ...options
-            });
-        };
-
-        // Bulk operations
-        this.sendBulkMessages = async (messages, delay = 1000) => {
-            const results = [];
-            for (const message of messages) {
+        // ✅ FIXED: Simplified waitForAnswer without nextCommandHandlers
+        this.waitForAnswer = (question, options = {}) => {
+            return new Promise(async (resolve, reject) => {
+                console.log(`🎯 waitForAnswer: "${question}"`);
+                
+                const timeout = options.timeout || 30000;
+                
                 try {
-                    const result = await this.sendMessage(this.context.chatId, message);
-                    results.push({ success: true, result });
-                    await this.wait(delay);
+                    // Send question
+                    await this.sendMessage(this.context.chatId, question, {
+                        parse_mode: 'HTML',
+                        ...options
+                    });
+                    
+                    console.log(`✅ Question sent, waiting for response...`);
+                    
+                    // Set timeout
+                    const timeoutId = setTimeout(() => {
+                        reject(new Error(`Wait for answer timeout (${timeout/1000} seconds)`));
+                    }, timeout);
+
+                    // Store the resolve function in context for bot-manager to call
+                    this.context.waitForAnswerResolve = resolve;
+                    this.context.waitForAnswerTimeout = timeoutId;
+                    
                 } catch (error) {
-                    results.push({ success: false, error: error.message });
+                    reject(new Error(`Failed to set up wait for answer: ${error.message}`));
                 }
-            }
-            return results;
+            });
         };
 
         // Python integration
@@ -215,139 +110,8 @@ class ApiWrapper {
             return await pythonRunner.runPythonCode(code);
         };
 
-        this.installPython = async (library) => {
-            const pythonRunner = require('./python-runner');
-            return await pythonRunner.installPythonLibrary(library);
-        };
-
-        this.uninstallPython = async (library) => {
-            const pythonRunner = require('./python-runner');
-            return await pythonRunner.uninstallPythonLibrary(library);
-        };
-
         // Utility methods
         this.wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-        // Wait for answer with timeout - FIXED VERSION
-// server/core/api-wrapper.js - FIX sendMessage parameters
-this.waitForAnswer = (question, options = {}) => {
-    return new Promise(async (resolve, reject) => {
-        console.log(`\n🎯 ========== waitForAnswer INITIATED ==========`);
-        console.log(`👤 User: ${this.context.userId}`);
-        console.log(`📝 Question: "${question}"`);
-        console.log(`🔑 Bot Token: ${this.context.botToken}`);
-        console.log(`💬 Chat ID: ${this.context.chatId}`);
-        
-        // Validate context
-        if (!this.context) {
-            console.error('❌ waitForAnswer: Context is completely missing');
-            reject(new Error('Context data not available'));
-            return;
-        }
-
-        const timeout = options.timeout || 60000;
-        const nextCommandKey = `${this.context.botToken}_${this.context.userId}`;
-        
-        console.log(`🔑 Handler Key: ${nextCommandKey}`);
-        console.log(`⏰ Timeout: ${timeout}ms`);
-        console.log(`📊 Current handlers count: ${this.context.nextCommandHandlers?.size || 0}`);
-        
-        // Clear existing handler
-        if (this.context.nextCommandHandlers?.has(nextCommandKey)) {
-            console.log('🔄 Clearing existing handler for this user');
-            this.context.nextCommandHandlers.delete(nextCommandKey);
-        }
-
-        const timeoutId = setTimeout(() => {
-            console.log(`⏰ Timeout reached for key: ${nextCommandKey}`);
-            if (this.context.nextCommandHandlers?.has(nextCommandKey)) {
-                this.context.nextCommandHandlers.delete(nextCommandKey);
-                console.log('🗑️ Handler removed due to timeout');
-            }
-            reject(new Error(`Wait for answer timeout (${timeout/1000} seconds)`));
-        }, timeout);
-
-        try {
-            // ✅ FIX: Proper sendMessage call with explicit parameters
-            console.log(`📤 Sending question to chat: ${this.context.chatId}`);
-            
-            // Use the bot instance directly to avoid parameter issues
-            await this.bot.sendMessage(this.context.chatId, question, {
-                parse_mode: 'HTML',
-                ...options
-            });
-            
-            console.log(`✅ Question sent successfully`);
-            
-            // Create handler function
-            const answerHandler = (answer, answerMsg) => {
-                console.log(`\n🎉 ========== USER RESPONSE RECEIVED ==========`);
-                console.log(`🔑 Handler Key: ${nextCommandKey}`);
-                console.log(`📨 Response: "${answer}"`);
-                
-                clearTimeout(timeoutId);
-                
-                // Remove handler
-                if (this.context.nextCommandHandlers?.has(nextCommandKey)) {
-                    this.context.nextCommandHandlers.delete(nextCommandKey);
-                    console.log(`🗑️ Handler removed after response`);
-                }
-                
-                console.log(`✅ Resolving waitForAnswer promise`);
-                
-                // Resolve the promise
-                resolve({
-                    text: answer,
-                    message: answerMsg,
-                    userId: this.context.userId,
-                    chatId: this.context.chatId,
-                    timestamp: new Date().toISOString()
-                });
-            };
-            
-            // Set the handler
-            console.log(`🔄 Setting handler for key: ${nextCommandKey}`);
-            this.context.nextCommandHandlers.set(nextCommandKey, answerHandler);
-            
-            console.log(`✅ Handler set successfully`);
-            console.log(`📊 Total active handlers now: ${this.context.nextCommandHandlers.size}`);
-            console.log(`✅ ========== waitForAnswer SETUP COMPLETE ==========\n`);
-            
-        } catch (error) {
-            console.error(`❌ waitForAnswer setup failed:`, error);
-            clearTimeout(timeoutId);
-            if (this.context.nextCommandHandlers?.has(nextCommandKey)) {
-                this.context.nextCommandHandlers.delete(nextCommandKey);
-                console.log(`🗑️ Handler cleaned up due to error: ${nextCommandKey}`);
-            }
-            reject(new Error(`Failed to set up wait for answer: ${error.message}`));
-        }
-    });
-};
-
-        // File download helper
-        this.downloadFile = async (fileId, downloadPath = null) => {
-            const file = await this.getFile(fileId);
-            const fileUrl = `https://api.telegram.org/file/bot${this.context.botToken}/${file.file_path}`;
-            
-            if (downloadPath) {
-                const fs = require('fs');
-                const axios = require('axios');
-                const response = await axios({
-                    method: 'GET',
-                    url: fileUrl,
-                    responseType: 'stream'
-                });
-                
-                response.data.pipe(fs.createWriteStream(downloadPath));
-                return new Promise((resolve, reject) => {
-                    response.data.on('end', () => resolve(downloadPath));
-                    response.data.on('error', reject);
-                });
-            }
-            
-            return fileUrl;
-        };
     }
 }
 
