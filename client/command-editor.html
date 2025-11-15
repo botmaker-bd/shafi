@@ -10,302 +10,431 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* Full Screen Code Editor Modal - Improved Styles */
+        .fullscreen-modal {
+            align-items: stretch;
+            padding: 0;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(8px);
+        }
+
+        .fullscreen-content {
+            max-width: none;
+            width: 100%;
+            height: 100vh;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            border-radius: 0;
+            background: var(--bg-secondary);
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.3);
+        }
+
+        .compact-header {
+            padding: 1rem 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            flex-shrink: 0;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .editor-toolbar {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            flex-wrap: wrap;
+            flex: 1;
+        }
+
+        .toolbar-group {
+            display: flex;
+            gap: 0.25rem;
+            align-items: center;
+            flex-wrap: wrap;
+            padding: 0.25rem;
+            border-radius: var(--radius-md);
+            background: var(--bg-tertiary);
+        }
+
+        .btn-icon {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            padding: 0.5rem 0.75rem;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: var(--transition);
+            font-size: 0.8rem;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            min-height: 36px;
+            min-width: 36px;
+            gap: 0.5rem;
+        }
+
+        .btn-icon:hover {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .btn-icon.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .btn-icon i {
+            font-size: 0.8rem;
+        }
+
+        .btn-text {
+            font-weight: 500;
+        }
+
+        .btn-cancel {
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-cancel:hover {
+            background: var(--error-color);
+            color: white;
+            border-color: var(--error-color);
+        }
+
+        .btn-save {
+            background: var(--primary-color);
+            color: white;
+            border: 1px solid var(--primary-color);
+        }
+
+        .btn-save:hover {
+            background: var(--primary-dark);
+            border-color: var(--primary-dark);
+        }
+
+        .btn-save:disabled {
+            background: var(--text-muted);
+            border-color: var(--text-muted);
+            cursor: not-allowed;
+            transform: none;
+            opacity: 0.6;
+        }
+
+        .btn-pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(37, 99, 235, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);
+            }
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-muted);
+            transition: var(--transition);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .modal-close:hover {
+            background: var(--bg-tertiary);
+            color: var(--error-color);
+        }
+
+        .fullscreen-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 0;
+            overflow: hidden;
+            position: relative;
+            background: var(--bg-primary);
+        }
+
+        .fullscreen-editor {
+            flex: 1;
+            width: 100%;
+            border: none;
+            border-radius: 0;
+            padding: 1.5rem;
+            font-family: 'Fira Code', 'Monaco', 'Consolas', 'Courier New', monospace;
+            font-size: 15px;
+            line-height: 1.6;
+            resize: none;
+            outline: none;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            tab-size: 4;
+            white-space: pre;
+            overflow-wrap: normal;
+            overflow-x: auto;
+        }
+
+        .fullscreen-editor:focus {
+            box-shadow: none;
+        }
+
+        .modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-primary);
+            flex-shrink: 0;
+            position: sticky;
+            bottom: 0;
+            z-index: 1;
+        }
+
+        .editor-info {
+            display: flex;
+            gap: 1.5rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            flex-wrap: wrap;
+        }
+
+        .editor-info span {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.25rem 0.5rem;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-sm);
+        }
+
+        .editor-info i {
+            font-size: 0.7rem;
+        }
+
+        .editor-actions {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        /* Syntax highlighting simulation */
+        .fullscreen-editor {
+            background: #1e1e1e;
+            color: #d4d4d4;
+        }
+
+        [data-theme="light"] .fullscreen-editor {
+            background: #ffffff;
+            color: #1e1e1e;
+        }
+
+        /* Mobile Responsive Styles */
+        @media (max-width: 768px) {
+            .compact-header {
+                padding: 0.75rem 1rem;
+                flex-direction: column;
+                gap: 0.75rem;
+                align-items: stretch;
+            }
+
+            .editor-toolbar {
+                justify-content: center;
+                order: 2;
+            }
+
+            .header-actions {
+                width: 100%;
+                justify-content: space-between;
+                order: 1;
+            }
+
+            .toolbar-group {
+                justify-content: center;
+            }
+
+            .btn-icon {
+                min-height: 32px;
+                min-width: 32px;
+                padding: 0.4rem 0.6rem;
+                font-size: 0.75rem;
+            }
+
+            .btn-text {
+                display: none;
+            }
+
+            .modal-footer {
+                padding: 0.75rem 1rem;
+                flex-direction: column;
+                gap: 1rem;
+                align-items: stretch;
+            }
+
+            .editor-info {
+                justify-content: center;
+                order: 2;
+            }
+
+            .editor-actions {
+                order: 1;
+                width: 100%;
+            }
+
+            .editor-actions .btn {
+                flex: 1;
+                justify-content: center;
+            }
+
+            .fullscreen-editor {
+                padding: 1rem;
+                font-size: 14px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .toolbar-group {
+                flex: 1;
+                justify-content: space-around;
+            }
+
+            .btn-icon {
+                flex: 1;
+                min-width: 30px;
+            }
+
+            .editor-info {
+                gap: 0.75rem;
+            }
+
+            .editor-info span {
+                flex: 1;
+                justify-content: center;
+                text-align: center;
+            }
+        }
+
+        /* Tablet Optimizations */
+        @media (min-width: 769px) and (max-width: 1024px) {
+            .btn-text {
+                font-size: 0.75rem;
+            }
+
+            .toolbar-group {
+                gap: 0.2rem;
+            }
+        }
+
+        /* Dark mode optimizations */
+        [data-theme="dark"] .fullscreen-editor {
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+
+        /* Focus styles for accessibility */
+        .btn-icon:focus-visible,
+        .modal-close:focus-visible,
+        .fullscreen-editor:focus-visible {
+            outline: 2px solid var(--primary-color);
+            outline-offset: 2px;
+        }
+
+        /* Loading state for editor */
+        .editor-loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            background: var(--bg-primary);
+        }
+
+        /* Scrollbar styling */
+        .fullscreen-editor::-webkit-scrollbar {
+            width: 12px;
+        }
+
+        .fullscreen-editor::-webkit-scrollbar-track {
+            background: var(--bg-tertiary);
+        }
+
+        .fullscreen-editor::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 6px;
+        }
+
+        .fullscreen-editor::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+    </style>
 </head>
 <body>
-    <nav class="navbar">
-        <div class="container">
-            <a href="dashboard.html" class="nav-brand">
-                <span class="brand-icon">🤖</span>
-                <span class="brand-text">Bot Maker Pro</span>
-            </a>
-            
-            <button class="mobile-menu-btn" id="mobileMenuBtn">
-                <i class="fas fa-bars"></i>
-            </button>
-            
-            <div class="nav-links" id="navLinks">
-                <a href="dashboard.html" class="nav-link">
-                    <i class="fas fa-home"></i>
-                    <span>Dashboard</span>
-                </a>
-                <a href="bot-management.html" class="nav-link">
-                    <i class="fas fa-robot"></i>
-                    <span>My Bots</span>
-                </a>
-                <a href="command-editor.html" class="nav-link active">
-                    <i class="fas fa-code"></i>
-                    <span>Commands</span>
-                </a>
-                <a href="admin-settings.html" class="nav-link">
-                    <i class="fas fa-cog"></i>
-                    <span>Settings</span>
-                </a>
-                
-                <div class="user-menu">
-                    <button class="user-btn" id="userMenuBtn">
-                        <div class="user-avatar" id="userAvatar">U</div>
-                        <span id="userEmail">user@example.com</span>
-                        <i class="fas fa-chevron-down"></i>
-                    </button>
-                    <div class="user-dropdown" id="userDropdown">
-                        <a href="profile.html" class="dropdown-item">
-                            <i class="fas fa-user-edit"></i> Edit Profile
-                        </a>
-                        <a href="change-password.html" class="dropdown-item">
-                            <i class="fas fa-key"></i> Change Password
-                        </a>
-                        <div class="dropdown-divider"></div>
-                        <a href="#" id="logoutBtn" class="dropdown-item">
-                            <i class="fas fa-sign-out-alt"></i> Logout
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </nav>
-
-    <div class="container">
-        <div class="page-header">
-            <div class="header-content">
-                <h1 id="botName">Command Editor</h1>
-                <p id="botUsername">Manage commands for your bot</p>
-            </div>
-            <div class="header-actions">
-                <button class="btn btn-secondary" id="backToBots">
-                    <i class="fas fa-arrow-left"></i> Back to Bots
-                </button>
-                <button class="btn btn-primary" id="quickTest">
-                    <i class="fas fa-bolt"></i> Quick Test
-                </button>
-            </div>
-        </div>
-
-        <div class="editor-layout">
-            <!-- Sidebar -->
-            <div class="commands-sidebar">
-                <div class="sidebar-header">
-                    <h3>Commands</h3>
-                    <button id="addCommandBtn" class="btn btn-primary btn-small">
-                        <i class="fas fa-plus"></i> New
-                    </button>
-                </div>
-                
-                <div class="sidebar-search">
-                    <input type="text" id="commandSearch" placeholder="Search commands...">
-                    <i class="fas fa-search"></i>
-                </div>
-
-                <div id="commandsList" class="commands-list">
-                    <!-- Commands will be loaded here -->
-                </div>
-
-                <div id="emptyCommands" class="empty-state" style="display: none;">
-                    <div class="empty-icon">
-                        <i class="fas fa-code"></i>
-                    </div>
-                    <p>No commands yet</p>
-                    <button class="btn btn-primary btn-small" id="addFirstCommand">
-                        Create First Command
-                    </button>
-                </div>
-            </div>
-
-            <!-- Main Editor -->
-            <div class="editor-main">
-                <!-- No Command Selected -->
-                <div id="noCommandSelected" class="empty-state">
-                    <div class="empty-icon">
-                        <i class="fas fa-code"></i>
-                    </div>
-                    <h3>No Command Selected</h3>
-                    <p>Select a command from the list or create a new one to start editing</p>
-                    <button class="btn btn-primary" id="createFirstCommand">
-                        <i class="fas fa-plus"></i> Create New Command
-                    </button>
-                </div>
-
-                <!-- Command Editor -->
-                <div id="commandEditor" class="command-editor" style="display: none;">
-                    <div class="editor-header">
-                        <div class="command-title">
-                            <h3 id="currentCommandName">Command Editor</h3>
-                            <div class="command-status">
-                                <span class="status-badge active" id="commandStatus">Active</span>
-                                <span class="command-id" id="commandId">ID: loading...</span>
-                            </div>
-                        </div>
-                        <div class="editor-actions">
-                            <button id="toggleCommandBtn" class="btn btn-warning btn-small">
-                                <i class="fas fa-power-off"></i> Toggle
-                            </button>
-                            <button id="testCommandBtn" class="btn btn-success btn-small">
-                                <i class="fas fa-bolt"></i> Test
-                            </button>
-                            <button id="saveCommandBtn" class="btn btn-primary btn-small">
-                                <i class="fas fa-save"></i> Save
-                            </button>
-                            <button id="deleteCommandBtn" class="btn btn-danger btn-small">
-                                <i class="fas fa-trash"></i> Delete
-                            </button>
-                        </div>
-                    </div>
-
-                    <form id="commandForm" class="command-form">
-                        <!-- Command Patterns -->
-                        <div class="form-section">
-                            <h4>Command Patterns</h4>
-                            <div class="form-group">
-                                <label for="moreCommands">Command Patterns *</label>
-                                <div class="commands-input-container">
-                                    <div id="commandsTags" class="commands-tags">
-                                        <!-- Command tags will be added here -->
-                                    </div>
-                                    <input type="text" id="moreCommands" 
-                                           placeholder="Type command pattern and press Enter or comma...">
-                                </div>
-                                <div class="form-help">
-                                    Add multiple command patterns separated by commas. All patterns will execute the same code.
-                                    Example: /start, start, hello
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Code Editor Section -->
-                        <div class="form-section">
-                            <div class="code-editor-header">
-                                <h4>Command Code</h4>
-                                <div class="code-actions">
-                                    <button type="button" class="btn-code" id="openEditor">
-                                        <i class="fas fa-edit"></i> Full Editor
-                                    </button>
-                                    <button type="button" class="btn-code" id="showTemplates">
-                                        <i class="fas fa-layer-group"></i> Templates
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <textarea id="commandCode" 
-                                          placeholder="Write your command code here..."></textarea>
-                                <div class="code-help">
-                                    <strong>Available Functions:</strong> bot.sendMessage(), User.saveData(), waitForAnswer(), HTTP.get(), etc.
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Test Section -->
-                        <div class="form-section">
-                            <h4>Test Command</h4>
-                            <div class="form-group">
-                                <div class="test-input-container">
-                                    <input type="text" id="testInput" 
-                                           placeholder="Enter test input to simulate user message..." required>
-                                    <button type="button" id="runTestBtn" class="btn btn-warning">
-                                        <i class="fas fa-play"></i> Run Test
-                                    </button>
-                                </div>
-                                <div class="form-help">
-                                    Enter test input to simulate how users will trigger this command.
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Advanced Options -->
-                        <div class="form-section">
-                            <h4>Advanced Options</h4>
-                            <div class="toggle-group">
-                                <label class="toggle-label">
-                                    <div class="toggle-text">
-                                        <span class="toggle-title">Wait for Answer</span>
-                                        <span class="toggle-description">Enable to wait for user response after command execution</span>
-                                    </div>
-                                    <div class="toggle-switch">
-                                        <input type="checkbox" id="waitForAnswer">
-                                        <span class="toggle-slider"></span>
-                                    </div>
-                                </label>
-                            </div>
-
-                            <div id="answerHandlerSection" class="form-group" style="display: none;">
-                                <div class="code-editor-header">
-                                    <label for="answerHandler">Answer Handler Code</label>
-                                    <div class="code-actions">
-                                        <button type="button" class="btn-code" id="openAnswerEditor">
-                                            <i class="fas fa-edit"></i> Full Editor
-                                        </button>
-                                    </div>
-                                </div>
-                                <textarea id="answerHandler" 
-                                          placeholder="Code to handle user's answer..."></textarea>
-                                <div class="form-help">
-                                    This code will execute when user responds. Use waitForAnswer() to get user's response.
-                                </div>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Loading Overlay -->
-    <div id="loadingOverlay" class="loading-overlay">
-        <div class="loading-spinner">
-            <div class="spinner"></div>
-            <p>Loading...</p>
-        </div>
-    </div>
-
-    <!-- Test Command Modal -->
-    <div id="testCommandModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Test Results</h3>
-                <button class="modal-close">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div id="testCommandResult">
-                    <div class="test-loading">
-                        <div class="spinner"></div>
-                        <p>Testing command execution...</p>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" id="closeTestCommand">Close</button>
-                <button class="btn btn-primary" id="viewLogs">View Logs</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Full Screen Code Editor Modal -->
+    <!-- Your existing HTML content here -->
+    
+    <!-- Full Screen Code Editor Modal - Improved Version -->
     <div id="codeEditorModal" class="modal fullscreen-modal">
         <div class="modal-content fullscreen-content">
             <div class="modal-header compact-header">
                 <div class="editor-toolbar">
                     <div class="toolbar-group">
-                        <button class="btn-icon" id="undoBtn" title="Undo">
+                        <button class="btn-icon" id="undoBtn" title="Undo (Ctrl+Z)">
                             <i class="fas fa-undo"></i>
                             <span class="btn-text">Undo</span>
                         </button>
-                        <button class="btn-icon" id="redoBtn" title="Redo">
+                        <button class="btn-icon" id="redoBtn" title="Redo (Ctrl+Y)">
                             <i class="fas fa-redo"></i>
                             <span class="btn-text">Redo</span>
                         </button>
                     </div>
                     <div class="toolbar-group">
-                        <button class="btn-icon" id="selectAllBtn" title="Select All">
+                        <button class="btn-icon" id="selectAllBtn" title="Select All (Ctrl+A)">
                             <i class="fas fa-expand-arrows-alt"></i>
                             <span class="btn-text">Select All</span>
                         </button>
-                        <button class="btn-icon" id="cutBtn" title="Cut">
+                        <button class="btn-icon" id="cutBtn" title="Cut (Ctrl+X)">
                             <i class="fas fa-cut"></i>
                             <span class="btn-text">Cut</span>
                         </button>
-                        <button class="btn-icon" id="copyBtn" title="Copy">
+                        <button class="btn-icon" id="copyBtn" title="Copy (Ctrl+C)">
                             <i class="fas fa-copy"></i>
                             <span class="btn-text">Copy</span>
                         </button>
-                        <button class="btn-icon" id="pasteBtn" title="Paste">
+                        <button class="btn-icon" id="pasteBtn" title="Paste (Ctrl+V)">
                             <i class="fas fa-paste"></i>
                             <span class="btn-text">Paste</span>
                         </button>
@@ -315,40 +444,62 @@
                             <i class="fas fa-eraser"></i>
                             <span class="btn-text">Clear</span>
                         </button>
-                        <button class="btn-icon" id="formatBtn" title="Format Code">
+                        <button class="btn-icon" id="formatBtn" title="Format Code (Ctrl+Shift+F)">
                             <i class="fas fa-indent"></i>
                             <span class="btn-text">Format</span>
+                        </button>
+                        <button class="btn-icon" id="findBtn" title="Find (Ctrl+F)">
+                            <i class="fas fa-search"></i>
+                            <span class="btn-text">Find</span>
                         </button>
                     </div>
                 </div>
                 <div class="header-actions">
-                    <button class="btn-icon btn-cancel" id="cancelEditTop" title="Cancel">
+                    <button class="btn-icon btn-cancel" id="cancelEditTop" title="Cancel (Esc)">
                         <i class="fas fa-times"></i>
                         <span class="btn-text">Cancel</span>
                     </button>
-                    <button class="btn-icon btn-save" id="saveCodeTop" title="Save Code">
+                    <button class="btn-icon btn-save" id="saveCodeTop" title="Save (Ctrl+S)" disabled>
                         <i class="fas fa-save"></i>
                         <span class="btn-text">Save</span>
                     </button>
-                    <button class="modal-close">&times;</button>
+                    <button class="modal-close" title="Close">
+                        <i class="fas fa-times"></i>
+                    </button>
                 </div>
             </div>
             <div class="modal-body fullscreen-body">
                 <textarea id="advancedCodeEditor" class="fullscreen-editor" 
-                         placeholder="Write your code here..."></textarea>
+                         placeholder="// Write your code here...
+// Use Ctrl+S to save, Ctrl+F to find, and Esc to cancel
+                        
+// Example:
+const user = getUser();
+const message = `Hello ${user.first_name}! Welcome to our bot.`;
+Api.sendMessage(message);"
+                         spellcheck="false"></textarea>
             </div>
             <div class="modal-footer">
                 <div class="editor-info">
-                    <span id="lineCount">Lines: 1</span>
-                    <span id="charCount">Chars: 0</span>
-                    <span id="wordCount">Words: 0</span>
+                    <span id="lineCount">
+                        <i class="fas fa-bars"></i> Lines: 1
+                    </span>
+                    <span id="charCount">
+                        <i class="fas fa-font"></i> Chars: 0
+                    </span>
+                    <span id="wordCount">
+                        <i class="fas fa-file-word"></i> Words: 0
+                    </span>
+                    <span id="cursorPosition">
+                        <i class="fas fa-caret-right"></i> Line: 1, Col: 1
+                    </span>
                 </div>
                 <div class="editor-actions">
                     <button class="btn btn-secondary" id="cancelEdit">
                         <i class="fas fa-times"></i>
                         <span>Cancel</span>
                     </button>
-                    <button class="btn btn-primary" id="saveCode">
+                    <button class="btn btn-primary" id="saveCode" disabled>
                         <i class="fas fa-save"></i>
                         <span>Save Code</span>
                     </button>
@@ -357,37 +508,352 @@
         </div>
     </div>
 
-    <!-- Templates Modal -->
-    <div id="templatesModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Code Templates</h3>
-                <button class="modal-close">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="templates-categories">
-                    <div class="category-tabs-container">
-                        <div class="category-tabs">
-                            <!-- Categories will be dynamically loaded -->
-                        </div>
-                    </div>
-                    
-                    <div class="templates-content">
-                        <!-- Templates will be dynamically loaded here -->
-                        <div class="loading-state">
-                            <div class="spinner"></div>
-                            <p>Loading templates...</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" id="closeTemplates">Close</button>
-            </div>
-        </div>
-    </div>
-
     <script src="js/common.js"></script>
     <script src="js/command-editor.js"></script>
+    <script>
+        // Enhanced code editor functionality
+        class EnhancedCodeEditor {
+            constructor() {
+                this.editor = document.getElementById('advancedCodeEditor');
+                this.originalCode = '';
+                this.currentEditorType = '';
+                this.init();
+            }
+
+            init() {
+                this.setupEventListeners();
+                this.setupKeyboardShortcuts();
+            }
+
+            setupEventListeners() {
+                // Editor input tracking
+                this.editor.addEventListener('input', (e) => {
+                    this.updateEditorStats();
+                    this.updateSaveButtonState();
+                    this.updateCursorPosition();
+                });
+
+                // Editor selection tracking
+                this.editor.addEventListener('click', () => {
+                    this.updateCursorPosition();
+                });
+
+                this.editor.addEventListener('keyup', () => {
+                    this.updateCursorPosition();
+                });
+
+                // Prevent tab from losing focus
+                this.editor.addEventListener('keydown', (e) => {
+                    if (e.key === 'Tab') {
+                        e.preventDefault();
+                        this.insertTab();
+                    }
+                });
+            }
+
+            setupKeyboardShortcuts() {
+                document.addEventListener('keydown', (e) => {
+                    if (!this.isEditorOpen()) return;
+
+                    // Ctrl+S to save
+                    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                        e.preventDefault();
+                        this.saveCode();
+                    }
+
+                    // Ctrl+F to find
+                    if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                        e.preventDefault();
+                        this.showFindDialog();
+                    }
+
+                    // Ctrl+Shift+F to format
+                    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
+                        e.preventDefault();
+                        this.formatCode();
+                    }
+
+                    // Escape to close
+                    if (e.key === 'Escape') {
+                        e.preventDefault();
+                        this.closeEditor();
+                    }
+                });
+            }
+
+            isEditorOpen() {
+                const modal = document.getElementById('codeEditorModal');
+                return modal && modal.style.display === 'flex';
+            }
+
+            insertTab() {
+                const start = this.editor.selectionStart;
+                const end = this.editor.selectionEnd;
+                
+                // Insert tab character
+                this.editor.value = this.editor.value.substring(0, start) + '\t' + this.editor.value.substring(end);
+                
+                // Move cursor
+                this.editor.selectionStart = this.editor.selectionEnd = start + 1;
+                
+                this.updateEditorStats();
+                this.updateSaveButtonState();
+            }
+
+            updateEditorStats() {
+                const code = this.editor.value;
+                const lines = code.split('\n').length;
+                const chars = code.length;
+                const words = code.trim() ? code.trim().split(/\s+/).length : 0;
+                
+                document.getElementById('lineCount').innerHTML = `<i class="fas fa-bars"></i> Lines: ${lines}`;
+                document.getElementById('charCount').innerHTML = `<i class="fas fa-font"></i> Chars: ${chars}`;
+                document.getElementById('wordCount').innerHTML = `<i class="fas fa-file-word"></i> Words: ${words}`;
+            }
+
+            updateCursorPosition() {
+                const code = this.editor.value;
+                const cursorPos = this.editor.selectionStart;
+                
+                // Calculate line and column
+                const textUpToCursor = code.substring(0, cursorPos);
+                const lines = textUpToCursor.split('\n');
+                const line = lines.length;
+                const column = lines[lines.length - 1].length + 1;
+                
+                document.getElementById('cursorPosition').innerHTML = 
+                    `<i class="fas fa-caret-right"></i> Line: ${line}, Col: ${column}`;
+            }
+
+            updateSaveButtonState() {
+                const hasChanged = this.editor.value !== this.originalCode;
+                const hasContent = this.editor.value.trim().length > 0;
+                const shouldEnable = hasContent && hasChanged;
+                
+                const saveBtn = document.getElementById('saveCode');
+                const saveTopBtn = document.getElementById('saveCodeTop');
+                
+                [saveBtn, saveTopBtn].forEach(btn => {
+                    if (btn) {
+                        btn.disabled = !shouldEnable;
+                        if (shouldEnable) {
+                            btn.classList.add('btn-pulse');
+                        } else {
+                            btn.classList.remove('btn-pulse');
+                        }
+                    }
+                });
+            }
+
+            openEditor(editorType, code = '') {
+                this.currentEditorType = editorType;
+                this.editor.value = code;
+                this.originalCode = code;
+                
+                this.updateEditorStats();
+                this.updateCursorPosition();
+                this.updateSaveButtonState();
+                
+                document.getElementById('codeEditorModal').style.display = 'flex';
+                document.body.style.overflow = 'hidden';
+                
+                // Focus and set cursor to end
+                setTimeout(() => {
+                    this.editor.focus();
+                    this.editor.setSelectionRange(this.editor.value.length, this.editor.value.length);
+                }, 100);
+            }
+
+            closeEditor() {
+                document.getElementById('codeEditorModal').style.display = 'none';
+                document.body.style.overflow = '';
+            }
+
+            saveCode() {
+                const code = this.editor.value;
+                
+                if (this.currentEditorType === 'main') {
+                    const commandCodeEl = document.getElementById('commandCode');
+                    if (commandCodeEl) commandCodeEl.value = code;
+                } else if (this.currentEditorType === 'answer') {
+                    const answerHandlerEl = document.getElementById('answerHandler');
+                    if (answerHandlerEl) answerHandlerEl.value = code;
+                }
+                
+                this.originalCode = code;
+                this.updateSaveButtonState();
+                this.closeEditor();
+                
+                // Show success message
+                if (typeof commandEditor !== 'undefined') {
+                    commandEditor.showSuccess('Code saved successfully!');
+                }
+            }
+
+            formatCode() {
+                let code = this.editor.value;
+                
+                // Basic formatting - add proper indentation
+                const lines = code.split('\n');
+                let formattedLines = [];
+                let indentLevel = 0;
+                
+                for (let line of lines) {
+                    const trimmedLine = line.trim();
+                    
+                    // Decrease indent for closing braces
+                    if (trimmedLine.endsWith('}') || trimmedLine.endsWith(']') || trimmedLine.endsWith(')')) {
+                        indentLevel = Math.max(0, indentLevel - 1);
+                    }
+                    
+                    // Add current line with proper indentation
+                    formattedLines.push('    '.repeat(indentLevel) + trimmedLine);
+                    
+                    // Increase indent for opening braces
+                    if (trimmedLine.endsWith('{') || trimmedLine.endsWith('[') || trimmedLine.endsWith('(')) {
+                        indentLevel++;
+                    }
+                }
+                
+                this.editor.value = formattedLines.join('\n');
+                this.updateEditorStats();
+                this.updateSaveButtonState();
+                
+                if (typeof commandEditor !== 'undefined') {
+                    commandEditor.showSuccess('Code formatted!');
+                }
+            }
+
+            showFindDialog() {
+                // Simple find implementation
+                const searchTerm = prompt('Find in code:');
+                if (searchTerm) {
+                    const content = this.editor.value;
+                    const index = content.indexOf(searchTerm);
+                    
+                    if (index !== -1) {
+                        this.editor.focus();
+                        this.editor.setSelectionRange(index, index + searchTerm.length);
+                        this.updateCursorPosition();
+                    } else {
+                        alert('Text not found');
+                    }
+                }
+            }
+        }
+
+        // Initialize enhanced code editor
+        let enhancedEditor;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            enhancedEditor = new EnhancedCodeEditor();
+            
+            // Override the original openCodeEditor method
+            if (typeof CommandEditor !== 'undefined') {
+                const originalOpenCodeEditor = CommandEditor.prototype.openCodeEditor;
+                
+                CommandEditor.prototype.openCodeEditor = function(editorType) {
+                    let code = '';
+                    
+                    if (editorType === 'main') {
+                        const commandCodeEl = document.getElementById('commandCode');
+                        code = commandCodeEl ? commandCodeEl.value : '';
+                    } else if (editorType === 'answer') {
+                        const answerHandlerEl = document.getElementById('answerHandler');
+                        code = answerHandlerEl ? answerHandlerEl.value : '';
+                    }
+                    
+                    enhancedEditor.openEditor(editorType, code);
+                };
+            }
+
+            // Setup modal events
+            document.getElementById('cancelEdit').addEventListener('click', () => {
+                enhancedEditor.closeEditor();
+            });
+
+            document.getElementById('cancelEditTop').addEventListener('click', () => {
+                enhancedEditor.closeEditor();
+            });
+
+            document.getElementById('saveCode').addEventListener('click', () => {
+                enhancedEditor.saveCode();
+            });
+
+            document.getElementById('saveCodeTop').addEventListener('click', () => {
+                enhancedEditor.saveCode();
+            });
+
+            // Setup toolbar buttons
+            document.getElementById('undoBtn').addEventListener('click', () => {
+                document.execCommand('undo');
+                enhancedEditor.editor.focus();
+            });
+
+            document.getElementById('redoBtn').addEventListener('click', () => {
+                document.execCommand('redo');
+                enhancedEditor.editor.focus();
+            });
+
+            document.getElementById('selectAllBtn').addEventListener('click', () => {
+                enhancedEditor.editor.select();
+                enhancedEditor.editor.focus();
+            });
+
+            document.getElementById('cutBtn').addEventListener('click', () => {
+                document.execCommand('cut');
+                enhancedEditor.editor.focus();
+            });
+
+            document.getElementById('copyBtn').addEventListener('click', () => {
+                document.execCommand('copy');
+                enhancedEditor.editor.focus();
+            });
+
+            document.getElementById('pasteBtn').addEventListener('click', async () => {
+                try {
+                    const text = await navigator.clipboard.readText();
+                    const start = enhancedEditor.editor.selectionStart;
+                    const end = enhancedEditor.editor.selectionEnd;
+                    
+                    enhancedEditor.editor.value = enhancedEditor.editor.value.substring(0, start) + 
+                                                text + 
+                                                enhancedEditor.editor.value.substring(end);
+                    
+                    enhancedEditor.editor.selectionStart = enhancedEditor.editor.selectionEnd = start + text.length;
+                    enhancedEditor.updateEditorStats();
+                    enhancedEditor.updateSaveButtonState();
+                } catch (err) {
+                    document.execCommand('paste');
+                }
+                enhancedEditor.editor.focus();
+            });
+
+            document.getElementById('clearBtn').addEventListener('click', () => {
+                if (confirm('Are you sure you want to clear all code?')) {
+                    enhancedEditor.editor.value = '';
+                    enhancedEditor.updateEditorStats();
+                    enhancedEditor.updateSaveButtonState();
+                    enhancedEditor.editor.focus();
+                }
+            });
+
+            document.getElementById('formatBtn').addEventListener('click', () => {
+                enhancedEditor.formatCode();
+                enhancedEditor.editor.focus();
+            });
+
+            document.getElementById('findBtn').addEventListener('click', () => {
+                enhancedEditor.showFindDialog();
+            });
+
+            // Close modal when clicking outside
+            document.getElementById('codeEditorModal').addEventListener('click', (e) => {
+                if (e.target.id === 'codeEditorModal') {
+                    enhancedEditor.closeEditor();
+                }
+            });
+        });
+    </script>
 </body>
 </html>
