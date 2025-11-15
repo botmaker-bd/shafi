@@ -1,0 +1,20 @@
+[
+    {
+        "id": "calculator_basic",
+        "name": "Basic Calculator",
+        "patterns": "/calc, calculate, math",
+        "description": "Simple math calculator",
+        "code": "Api.sendMessage(`🧮 *Calculator*\\n\\nSend me a math expression to calculate.\\n\\nExamples:\\n• 2 + 2\\n• 10 * 5\\n• (15 - 3) / 2`);\nUser.saveData('calc_mode', 'true');",
+        "waitForAnswer": true,
+        "answerHandler": "if (User.getData('calc_mode') === 'true') {\n    const expression = params;\n    \n    try {\n        // Basic safe evaluation\n        const result = eval(expression);\n        Api.sendMessage(`✅ Calculation Result:\\n\\n\\`${expression}\\` = \\`${result}\\``);\n    } catch (error) {\n        Api.sendMessage(`❌ Invalid math expression: \\`${expression}\\`\\n\\nPlease enter a valid expression.`);\n    }\n    \n    User.saveData('calc_mode', 'false');\n}"
+    },
+    {
+        "id": "random_number",
+        "name": "Random Number Generator",
+        "patterns": "/random, rnd, randomnumber",
+        "description": "Generate random numbers between range",
+        "code": "Api.sendMessage(`🎲 *Random Number Generator*\\n\\nSend me a range like: 1-100 or 10-50`);\nUser.saveData('waiting_range', 'true');",
+        "waitForAnswer": true,
+        "answerHandler": "if (User.getData('waiting_range') === 'true') {\n    const range = params;\n    const match = range.match(/(\\d+)-(\\d+)/);\n    \n    if (match) {\n        const min = parseInt(match[1]);\n        const max = parseInt(match[2]);\n        \n        if (min >= max) {\n            Api.sendMessage(\"❌ Invalid range. First number should be smaller than second number.\");\n            return;\n        }\n        \n        const randomNum = Math.floor(Math.random() * (max - min + 1)) + min;\n        Api.sendMessage(`🎲 Random number between ${min} and ${max}:\\n\\n**${randomNum}**`);\n    } else {\n        Api.sendMessage(\"❌ Invalid format. Please use: min-max (e.g., 1-100)\");\n    }\n    \n    User.saveData('waiting_range', 'false');\n}"
+    }
+]
