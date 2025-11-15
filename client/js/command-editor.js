@@ -116,35 +116,45 @@ class CommandEditor {
         this.setupTemplateCategories();
     }
 
-    createTemplateCard(template) {
-        if (!template || typeof template !== 'object') {
-            return '<!-- Invalid template -->';
-        }
-        
-        const safeTemplate = {
-            id: template.id || 'unknown',
-            name: template.name || 'Unnamed Template',
-            patterns: template.patterns || '/unknown',
-            code: template.code || '// No code',
-            description: template.description || 'No description available',
-            waitForAnswer: Boolean(template.waitForAnswer),
-            answerHandler: template.answerHandler || ''
-        };
-
-        // Get appropriate icon based on template name/type
-        const templateIcon = this.getTemplateIcon(safeTemplate.name);
-
-        return `
-            <div class="template-card" data-template='${JSON.stringify(safeTemplate).replace(/'/g, "&#39;")}'>
-                <div class="template-icon">
-                    <i class="${templateIcon}"></i>
-                </div>
-                <h4>${this.escapeHtml(safeTemplate.name)}</h4>
-                <p>${this.escapeHtml(safeTemplate.description)}</p>
-                <div class="template-patterns">${this.escapeHtml(safeTemplate.patterns)}</div>
-            </div>
-        `;
+    // File: /client/js/command-editor.js - createTemplateCard method
+createTemplateCard(template) {
+    if (!template || typeof template !== 'object') {
+        return '<!-- Invalid template -->';
     }
+    
+    const safeTemplate = {
+        id: template.id || 'unknown',
+        name: template.name || 'Unnamed Template',
+        patterns: template.patterns || '/unknown',
+        code: template.code || '// No code',
+        description: template.description || 'No description available',
+        waitForAnswer: Boolean(template.waitForAnswer),
+        answerHandler: template.answerHandler || ''
+    };
+
+    // Get appropriate icon
+    const templateIcon = this.getTemplateIcon(safeTemplate.name);
+
+    // FIXED: Proper JSON stringification without HTML entities
+    const templateJson = JSON.stringify(safeTemplate)
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '&quot;');
+
+    return `
+        <div class="template-card" data-template='${templateJson}'>
+            <div class="template-icon">
+                <i class="${templateIcon}"></i>
+            </div>
+            <h4>${this.escapeHtml(safeTemplate.name)}</h4>
+            <p>${this.escapeHtml(safeTemplate.description)}</p>
+            <div class="template-patterns">${this.escapeHtml(safeTemplate.patterns)}</div>
+            <div class="template-footer">
+                <span class="template-type">${safeTemplate.waitForAnswer ? 'Interactive' : 'Simple'}</span>
+                <button class="btn-apply">Apply</button>
+            </div>
+        </div>
+    `;
+}
 
     getTemplateIcon(templateName) {
         const iconMap = {
@@ -1243,69 +1253,91 @@ class CommandEditor {
         }
     }
 
-// client/js/command-editor.js - applyTemplate মেথড ইম্প্রুভ করুন
 applyTemplate(template) {
     try {
         if (!template || typeof template !== 'object') {
             throw new Error('Invalid template data');
         }
 
-        // Validate required fields
-        if (!template.patterns || !template.code) {
-            throw new Error('Template missing patterns or code');
-        }
+        console.log('🔄 Applying template:', template.name);
 
-        console.log(`🔄 Applying template: ${template.name}`);
+        // Ensure we're editing a command (create new if none selected)
+        if (!this.currentCommand || this.currentCommand.id === 'new') {
+            this.addNewCommand();
+        }
 
         // Set command patterns
-        this.setCommandsToTags(template.patterns);
-        
-        // Set main code
-        const commandCodeEl = document.getElementById('commandCode');
-        if (commandCodeEl) {
-            commandCodeEl.value = template.code;
-            console.log(`✅ Code applied: ${template.code.length} characters`);
+        if (template.patterns) {
+            this.setCommandsToTags(template.patterns);
+            console.log('✅ Patterns applied:', template.patterns);
         }
-        
+
+        // Set main code - FIXED: Use proper code from template
+        const commandCodeEl = document.getElementById('commandCode');
+        if (commandCodeEl && template.code) {
+            // Clean and format the code
+            let cleanedCode = template.code;
+            
+            // Fix escaped newlines if present
+            cleanedCode = cleanedCode.replace(/\\\\n/g, '\n');
+            cleanedCode = cleanedCode.replace(/\\\\`/g, '`');
+            
+            commandCodeEl.value = cleanedCode;
+            console.log('✅ Code applied, length:', cleanedCode.length);
+        }
+
         // Handle wait for answer
-        const waitForAnswer = Boolean(template.waitForAnswer);
         const waitForAnswerEl = document.getElementById('waitForAnswer');
         if (waitForAnswerEl) {
+            const waitForAnswer = Boolean(template.waitForAnswer);
             waitForAnswerEl.checked = waitForAnswer;
             this.toggleAnswerHandler(waitForAnswer);
-            console.log(`✅ Wait for answer: ${waitForAnswer}`);
+            console.log('✅ Wait for answer:', waitForAnswer);
         }
-        
+
         // Set answer handler if available
         const answerHandlerEl = document.getElementById('answerHandler');
-        if (waitForAnswer && template.answerHandler && answerHandlerEl) {
-            answerHandlerEl.value = template.answerHandler;
-            console.log(`✅ Answer handler applied: ${template.answerHandler.length} characters`);
+        if (template.waitForAnswer && template.answerHandler && answerHandlerEl) {
+            let cleanedAnswerHandler = template.answerHandler;
+            cleanedAnswerHandler = cleanedAnswerHandler.replace(/\\\\n/g, '\n');
+            cleanedAnswerHandler = cleanedAnswerHandler.replace(/\\\\`/g, '`');
+            answerHandlerEl.value = cleanedAnswerHandler;
+            console.log('✅ Answer handler applied');
         } else if (answerHandlerEl) {
             answerHandlerEl.value = '';
         }
-        
+
+        // Update form fields with template data
+        if (template.name) {
+            const commandNameEl = document.getElementById('commandName');
+            if (commandNameEl) {
+                commandNameEl.value = template.name;
+            }
+        }
+
+        if (template.description) {
+            const commandDescEl = document.getElementById('commandDescription');
+            if (commandDescEl) {
+                commandDescEl.value = template.description;
+            }
+        }
+
         // Close template modal
         const templatesModal = document.getElementById('templatesModal');
         if (templatesModal) {
             templatesModal.style.display = 'none';
         }
-        
-        // Auto-create new command if none selected
-        if (!this.currentCommand || this.currentCommand.id === 'new') {
-            this.addNewCommand();
-        }
-        
+
         // Focus on command code editor
         setTimeout(() => {
             if (commandCodeEl) {
                 commandCodeEl.focus();
-                commandCodeEl.scrollIntoView({ behavior: 'smooth' });
+                commandCodeEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
-        }, 100);
-        
+        }, 300);
+
         this.showSuccess(`Template "${template.name}" applied successfully!`);
-        
+
     } catch (error) {
         console.error('❌ Apply template error:', error);
         this.showError('Failed to apply template: ' + error.message);
