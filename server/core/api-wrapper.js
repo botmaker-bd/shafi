@@ -229,7 +229,7 @@ class ApiWrapper {
         this.wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
         // Wait for answer with timeout - FIXED VERSION
-// server/core/api-wrapper.js - COMPLETELY FIXED waitForAnswer
+// server/core/api-wrapper.js - FIX sendMessage parameters
 this.waitForAnswer = (question, options = {}) => {
     return new Promise(async (resolve, reject) => {
         console.log(`\n🎯 ========== waitForAnswer INITIATED ==========`);
@@ -245,41 +245,22 @@ this.waitForAnswer = (question, options = {}) => {
             return;
         }
 
-        if (!this.context.botToken) {
-            console.error('❌ waitForAnswer: botToken missing in context');
-            reject(new Error('Bot token not available'));
-            return;
-        }
-
-        if (!this.context.chatId) {
-            console.error('❌ waitForAnswer: chatId missing in context');
-            reject(new Error('Chat ID not available'));
-            return;
-        }
-
-        if (!this.context.nextCommandHandlers) {
-            console.error('❌ waitForAnswer: nextCommandHandlers missing in context');
-            console.error('🔍 Context keys:', Object.keys(this.context));
-            reject(new Error('Next command handlers system not available'));
-            return;
-        }
-
         const timeout = options.timeout || 60000;
         const nextCommandKey = `${this.context.botToken}_${this.context.userId}`;
         
         console.log(`🔑 Handler Key: ${nextCommandKey}`);
         console.log(`⏰ Timeout: ${timeout}ms`);
-        console.log(`📊 Current handlers count: ${this.context.nextCommandHandlers.size}`);
+        console.log(`📊 Current handlers count: ${this.context.nextCommandHandlers?.size || 0}`);
         
         // Clear existing handler
-        if (this.context.nextCommandHandlers.has(nextCommandKey)) {
+        if (this.context.nextCommandHandlers?.has(nextCommandKey)) {
             console.log('🔄 Clearing existing handler for this user');
             this.context.nextCommandHandlers.delete(nextCommandKey);
         }
 
         const timeoutId = setTimeout(() => {
             console.log(`⏰ Timeout reached for key: ${nextCommandKey}`);
-            if (this.context.nextCommandHandlers.has(nextCommandKey)) {
+            if (this.context.nextCommandHandlers?.has(nextCommandKey)) {
                 this.context.nextCommandHandlers.delete(nextCommandKey);
                 console.log('🗑️ Handler removed due to timeout');
             }
@@ -287,27 +268,27 @@ this.waitForAnswer = (question, options = {}) => {
         }, timeout);
 
         try {
-            // Send question to user
+            // ✅ FIX: Proper sendMessage call with explicit parameters
             console.log(`📤 Sending question to chat: ${this.context.chatId}`);
-            await this.sendMessage(this.context.chatId, question, {
+            
+            // Use the bot instance directly to avoid parameter issues
+            await this.bot.sendMessage(this.context.chatId, question, {
                 parse_mode: 'HTML',
                 ...options
             });
             
             console.log(`✅ Question sent successfully`);
             
-            // ✅ CRITICAL FIX: Create handler function
+            // Create handler function
             const answerHandler = (answer, answerMsg) => {
                 console.log(`\n🎉 ========== USER RESPONSE RECEIVED ==========`);
                 console.log(`🔑 Handler Key: ${nextCommandKey}`);
                 console.log(`📨 Response: "${answer}"`);
-                console.log(`👤 From: ${answerMsg.from.first_name} (${answerMsg.from.id})`);
                 
-                // Clear timeout
                 clearTimeout(timeoutId);
                 
                 // Remove handler
-                if (this.context.nextCommandHandlers.has(nextCommandKey)) {
+                if (this.context.nextCommandHandlers?.has(nextCommandKey)) {
                     this.context.nextCommandHandlers.delete(nextCommandKey);
                     console.log(`🗑️ Handler removed after response`);
                 }
@@ -324,19 +305,18 @@ this.waitForAnswer = (question, options = {}) => {
                 });
             };
             
-            // ✅ CRITICAL FIX: Set the handler
+            // Set the handler
             console.log(`🔄 Setting handler for key: ${nextCommandKey}`);
             this.context.nextCommandHandlers.set(nextCommandKey, answerHandler);
             
             console.log(`✅ Handler set successfully`);
             console.log(`📊 Total active handlers now: ${this.context.nextCommandHandlers.size}`);
-            console.log(`🔍 Handler keys:`, Array.from(this.context.nextCommandHandlers.keys()));
             console.log(`✅ ========== waitForAnswer SETUP COMPLETE ==========\n`);
             
         } catch (error) {
             console.error(`❌ waitForAnswer setup failed:`, error);
             clearTimeout(timeoutId);
-            if (this.context.nextCommandHandlers.has(nextCommandKey)) {
+            if (this.context.nextCommandHandlers?.has(nextCommandKey)) {
                 this.context.nextCommandHandlers.delete(nextCommandKey);
                 console.log(`🗑️ Handler cleaned up due to error: ${nextCommandKey}`);
             }
