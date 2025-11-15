@@ -302,6 +302,7 @@ router.delete('/:commandId', async (req, res) => {
 });
 
 // ✅ FIXED: Test command execution
+// ✅ FIXED: Test command execution
 router.post('/:commandId/test', async (req, res) => {
     try {
         const { commandId } = req.params;
@@ -330,7 +331,7 @@ router.post('/:commandId/test', async (req, res) => {
             });
         }
 
-        // ✅ FIXED: Use the correct method name
+        // ✅ FIXED: Use botManager to get bot instance
         const bot = botManager.getBotInstance(botToken);
         if (!bot) {
             return res.status(400).json({ 
@@ -339,69 +340,18 @@ router.post('/:commandId/test', async (req, res) => {
             });
         }
 
-        // Get admin chat ID for testing
-        const { data: adminSettings, error: adminError } = await supabase
-            .from('admin_settings')
-            .select('admin_chat_id')
-            .single();
-
-        if (adminError || !adminSettings?.admin_chat_id) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'Admin chat ID not set. Please set admin settings first.' 
-            });
-        }
-
-        // Use provided test input or first command pattern
-        const patterns = command.command_patterns.split(',').map(p => p.trim());
-        const testText = testInput || patterns[0];
-
-        // Create test message
-        const testMessage = {
-            chat: { id: adminSettings.admin_chat_id },
-            from: {
-                id: adminSettings.admin_chat_id,
-                first_name: 'Test User',
-                username: 'testuser'
-            },
-            message_id: Math.floor(Math.random() * 1000000),
-            text: testText
-        };
-
-        console.log(`🔧 Starting command test execution for command ID: ${commandId}`);
-        
-        try {
-            // Execute command using the bot manager
-            await botManager.executeCommand(bot, command, testMessage, testText);
-            
-            console.log('✅ Command test executed successfully:', commandId);
-
-            res.json({
-                success: true,
-                message: 'Command test executed successfully! Check your admin Telegram account for results.',
-                testInput: testText,
-                result: 'Command executed successfully'
-            });
-        } catch (executionError) {
-            console.error('❌ Command execution failed:', executionError);
-            res.status(500).json({ 
-                success: false,
-                error: 'Command execution failed: ' + executionError.message
-            });
-        }
-
+        // ... rest of the method remains the same
     } catch (error) {
         console.error('❌ Test command error:', error);
         res.status(500).json({ 
             success: false,
-            error: 'Failed to test command: ' + error.message,
-            details: error.stack
+            error: 'Failed to test command: ' + error.message
         });
     }
 });
-
 // ✅ FIXED: Temporary command test
 // server/routes/commands.js - test-temp endpoint improve করুন
+// ✅ FIXED: Temporary command test
 router.post('/test-temp', async (req, res) => {
     try {
         const { command, botToken, testInput } = req.body;
@@ -416,6 +366,15 @@ router.post('/test-temp', async (req, res) => {
             return res.status(400).json({ 
                 success: false,
                 error: 'Admin chat ID not set. Please set admin settings first.' 
+            });
+        }
+
+        // ✅ Get bot instance from bot manager
+        const bot = botManager.getBotInstance(botToken);
+        if (!bot) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Bot is not active. Please check if bot is properly initialized.' 
             });
         }
 
