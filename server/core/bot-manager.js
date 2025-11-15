@@ -84,9 +84,7 @@ class BotManager {
         }
     }
 
-    // ✅ ADD THIS MISSING METHOD - Command execution
-    // server/core/bot-manager.js - executeCommand মেথড
-// server/core/bot-manager.js - executeCommand method
+// server/core/bot-manager.js - executeCommand মেথড
 async executeCommand(bot, command, msg, userInput = null) {
     try {
         console.log(`🔧 Executing command: ${command.command_patterns} for chat: ${msg.chat.id}`);
@@ -104,11 +102,20 @@ async executeCommand(bot, command, msg, userInput = null) {
             userInput: userInput,
             nextCommandHandlers: this.nextCommandHandlers,
             
-            // Enhanced data operations
+            // ✅ CORRECTED: Async User methods that return Promises
             User: {
-                saveData: (key, value) => this.saveData('user_data', command.bot_token, msg.from.id, key, value),
-                getData: (key) => this.getData('user_data', command.bot_token, msg.from.id, key),
-                deleteData: (key) => this.deleteData('user_data', command.bot_token, msg.from.id, key),
+                // Basic CRUD - now properly async
+                saveData: async (key, value) => {
+                    return await this.saveData('user_data', command.bot_token, msg.from.id, key, value);
+                },
+                getData: async (key) => {
+                    return await this.getData('user_data', command.bot_token, msg.from.id, key);
+                },
+                deleteData: async (key) => {
+                    return await this.deleteData('user_data', command.bot_token, msg.from.id, key);
+                },
+                
+                // Advanced operations
                 getAllData: async () => {
                     const { data, error } = await supabase
                         .from('universal_data')
@@ -131,9 +138,14 @@ async executeCommand(bot, command, msg, userInput = null) {
                 }
             },
             
+            // ✅ CORRECTED: Async Bot methods
             Bot: {
-                saveData: (key, value) => this.saveData('bot_data', command.bot_token, null, key, value),
-                getData: (key) => this.getData('bot_data', command.bot_token, null, key),
+                saveData: async (key, value) => {
+                    return await this.saveData('bot_data', command.bot_token, null, key, value);
+                },
+                getData: async (key) => {
+                    return await this.getData('bot_data', command.bot_token, null, key);
+                },
                 deleteData: async (key) => {
                     const { error } = await supabase
                         .from('universal_data')
