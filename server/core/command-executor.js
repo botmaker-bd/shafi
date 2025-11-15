@@ -1,62 +1,62 @@
-// server/core/command-executor.js - FIXED VERSION
+// server/core/command-executor.js - waitForAnswer execution context
 async function executeCommandCode(botInstance, code, context) {
     return new Promise(async (resolve, reject) => {
         try {
-            console.log(`🔧 Starting command execution with waitForAnswer support`);
+            const { msg, chatId, userId, username, first_name, botToken, userInput, nextCommandHandlers } = context;
             
+            console.log(`\n🔧 ========== COMMAND EXECUTION START ==========`);
+            console.log(`👤 User: ${first_name} (${userId})`);
+            console.log(`🤖 Bot: ${botToken.substring(0, 15)}...`);
+            console.log(`💬 Input: "${userInput}"`);
+            console.log(`📝 Code length: ${code.length} characters`);
+
             // Create enhanced execution environment
             const executionEnv = {
                 bot: botInstance,
                 
-                // FIX: Proper Api wrapper with correct context
                 Api: new (require('./api-wrapper'))(botInstance, {
-                    msg: context.msg,
-                    chatId: context.chatId,
-                    userId: context.userId,
-                    username: context.username || '',
-                    first_name: context.first_name || '',
+                    msg: msg,
+                    chatId: chatId,
+                    userId: userId,
+                    username: username || '',
+                    first_name: first_name || '',
                     last_name: context.last_name || '',
                     language_code: context.language_code || '',
-                    botToken: context.botToken,
-                    userInput: context.userInput,
-                    nextCommandHandlers: context.nextCommandHandlers, // ✅ FIXED: Properly pass nextCommandHandlers
+                    botToken: botToken,
+                    userInput: userInput,
+                    nextCommandHandlers: nextCommandHandlers,
                     User: context.User,
                     Bot: context.Bot
                 }),
-                
-                // User information
+
                 getUser: () => ({
-                    id: context.userId,
-                    username: context.username || '',
-                    first_name: context.first_name || '',
+                    id: userId,
+                    username: username || '',
+                    first_name: first_name || '',
                     last_name: context.last_name || '',
                     language_code: context.language_code || '',
-                    chat_id: context.chatId
+                    chat_id: chatId
                 }),
+
+                msg: msg,
+                chatId: chatId,
+                userId: userId,
+                userInput: userInput,
+                params: userInput,
+                botToken: botToken,
                 
-                // Message context
-                msg: context.msg,
-                chatId: context.chatId,
-                userId: context.userId,
-                userInput: context.userInput,
-                params: context.userInput,
-                botToken: context.botToken,
-                
-                // Data storage
                 User: context.User,
                 Bot: context.Bot,
                 
-                // FIX: Properly expose nextCommandHandlers
-                nextCommandHandlers: context.nextCommandHandlers,
+                nextCommandHandlers: nextCommandHandlers,
                 
-                // Utility functions
                 wait: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
                 
-                // HTTP client
                 HTTP: {
                     get: async (url, options = {}) => {
                         const axios = require('axios');
                         try {
+                            console.log(`🌐 HTTP GET: ${url}`);
                             const response = await axios.get(url, options);
                             return response.data;
                         } catch (error) {
@@ -66,6 +66,7 @@ async function executeCommandCode(botInstance, code, context) {
                     post: async (url, data = {}, options = {}) => {
                         const axios = require('axios');
                         try {
+                            console.log(`🌐 HTTP POST: ${url}`);
                             const response = await axios.post(url, data, options);
                             return response.data;
                         } catch (error) {
@@ -75,48 +76,55 @@ async function executeCommandCode(botInstance, code, context) {
                 }
             };
 
-            // Enhanced execution code with proper async handling
+            // Enhanced execution code with COMPREHENSIVE logging
             const executionCode = `
-                const { 
-                    Api, getUser, User, Bot,
-                    msg, chatId, userId, userInput, params,
-                    nextCommandHandlers, wait, HTTP
-                } = this.context;
+                console.log('🚀 User code execution starting...');
+                console.log('📊 Execution environment:', {
+                    hasBot: typeof bot !== 'undefined',
+                    hasApi: typeof Api !== 'undefined', 
+                    hasGetUser: typeof getUser !== 'undefined',
+                    hasWaitForAnswer: typeof waitForAnswer !== 'undefined',
+                    nextCommandHandlersCount: nextCommandHandlers ? nextCommandHandlers.size : 0
+                });
 
-                console.log('🔧 User code execution starting...');
-                console.log('⏳ WaitForAnswer available:', typeof Api.waitForAnswer === 'function');
-                console.log('📊 nextCommandHandlers available:', !!nextCommandHandlers);
-
-                // Async wrapper for user's code
-                const executeUserCode = async () => {
-                    try {
-                        // User's command code
-                        ${code}
-                        
-                        return typeof result !== 'undefined' ? result : "Command executed successfully";
-                    } catch (error) {
-                        console.error('Command execution error:', error);
-                        throw error;
+                try {
+                    // User's command code
+                    ${code}
+                    
+                    console.log('✅ User code executed successfully');
+                    
+                    // If no explicit return, return success
+                    if (typeof result === 'undefined') {
+                        return "Command executed successfully";
                     }
-                };
-
-                return executeUserCode();
+                    return result;
+                } catch (error) {
+                    console.error('❌ User code execution error:', error);
+                    throw error;
+                }
             `;
 
             const executionWrapper = {
                 context: executionEnv
             };
 
-            console.log('🚀 Executing user command code with waitForAnswer support...');
+            console.log('🚀 Executing user command code...');
             const commandFunction = new Function(executionCode);
             const boundFunction = commandFunction.bind(executionWrapper);
             
             const result = await boundFunction();
             console.log('✅ Command execution completed successfully');
+            console.log(`📦 Result:`, result);
+            console.log(`✅ ========== COMMAND EXECUTION COMPLETE ==========\n`);
+            
             resolve(result);
 
         } catch (error) {
             console.error('❌ Command execution error:', error);
+            console.error('🔍 Error details:', {
+                message: error.message,
+                stack: error.stack
+            });
             reject(error);
         }
     });
