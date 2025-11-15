@@ -1,0 +1,20 @@
+[
+    {
+        "id": "user_info",
+        "name": "User Information",
+        "patterns": "/info, myinfo, profile",
+        "description": "Show user information and bot stats",
+        "code": "const user = getUser();\nconst usageCount = User.getData('usage_count') || 0;\n\n// Increment usage count\nUser.saveData('usage_count', usageCount + 1);\n\nconst userInfo = `👤 *Your Information*\\n\\n` +\n`🆔 User ID: \\`${user.id}\\`\\n` +\n`👋 Name: ${user.first_name}${user.last_name ? ' ' + user.last_name : ''}\\n` +\n`📛 Username: @${user.username || 'Not set'}\\n` +\n`💬 Language: ${user.language_code || 'Unknown'}\\n\\n` +\n`📊 Usage Stats:\\n` +\n`• Commands Used: ${usageCount + 1}\\n` +\n`• First Seen: ${new Date().toLocaleDateString()}`;\n\nApi.sendMessage(userInfo, { parse_mode: 'Markdown' });",
+        "waitForAnswer": false,
+        "answerHandler": ""
+    },
+    {
+        "id": "time_date",
+        "name": "Time and Date",
+        "patterns": "/time, date, now",
+        "description": "Show current time and date information",
+        "code": "const now = new Date();\nconst timeInfo = `🕒 *Current Time*\\n\\n` +\n`📅 Date: ${now.toLocaleDateString()}\\n` +\n`⏰ Time: ${now.toLocaleTimeString()}\\n` +\n`🌐 Timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}\\n` +\n`📆 Day: ${now.toLocaleDateString('en', { weekday: 'long' })}\\n\\n` +\n`⏳ Timestamp: ${now.getTime()}`;\n\nApi.sendMessage(timeInfo, { parse_mode: 'Markdown' });",
+        "waitForAnswer": false,
+        "answerHandler": ""
+    }
+]
