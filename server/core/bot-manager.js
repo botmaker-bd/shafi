@@ -16,7 +16,6 @@ class BotManager {
         console.log(`🤖 Bot Manager initialized in ${this.USE_WEBHOOK ? 'WEBHOOK' : 'POLLING'} mode`);
     }
 
-    // ✅ ADD MISSING METHODS
     async initializeAllBots() {
         if (this.initialized) {
             console.log('🔄 Bots already initialized, skipping...');
@@ -67,12 +66,10 @@ class BotManager {
         }
     }
 
-    // ✅ ADD THIS MISSING METHOD
     getBotInstance(token) {
         return this.activeBots.get(token);
     }
 
-    // ✅ ADD THIS MISSING METHOD
     async handleBotUpdate(token, update) {
         try {
             const bot = this.activeBots.get(token);
@@ -84,105 +81,208 @@ class BotManager {
         }
     }
 
-    // ✅ ADD THIS MISSING METHOD - Command execution
-    // server/core/bot-manager.js - executeCommand মেথড
-async executeCommand(bot, command, msg, userInput = null) {
-    try {
-        console.log(`🔧 Executing command: ${command.command_patterns} for chat: ${msg.chat.id}`);
-        
-        // Create enhanced execution context with ASYNC methods
-        const context = {
-            msg: msg,
-            chatId: msg.chat.id,
-            userId: msg.from.id,
-            username: msg.from.username,
-            first_name: msg.from.first_name,
-            last_name: msg.from.last_name,
-            language_code: msg.from.language_code,
-            botToken: command.bot_token,
-            userInput: userInput,
-            nextCommandHandlers: this.nextCommandHandlers,
+    async executeCommand(bot, command, msg, userInput = null) {
+        try {
+            console.log(`🔧 Executing command: ${command.command_patterns} for chat: ${msg.chat.id}`);
             
-            // ✅ CORRECTED: ASYNC User methods
-            User: {
-                // Basic CRUD - now properly async
-                saveData: async (key, value) => {
-                    return await this.saveData('user_data', command.bot_token, msg.from.id, key, value);
-                },
-                getData: async (key) => {
-                    return await this.getData('user_data', command.bot_token, msg.from.id, key);
-                },
-                deleteData: async (key) => {
-                    return await this.deleteData('user_data', command.bot_token, msg.from.id, key);
+            // Create enhanced execution context
+            const context = {
+                msg: msg,
+                chatId: msg.chat.id,
+                userId: msg.from.id,
+                username: msg.from.username,
+                first_name: msg.from.first_name,
+                last_name: msg.from.last_name,
+                language_code: msg.from.language_code,
+                botToken: command.bot_token,
+                userInput: userInput,
+                nextCommandHandlers: this.nextCommandHandlers,
+                
+                // Enhanced data operations - FIXED: Proper async handling
+                User: {
+                    // Synchronous-style methods (returns values directly)
+                    saveData: async (key, value) => {
+                        const result = await this.saveData('user_data', command.bot_token, msg.from.id, key, value);
+                        return value; // Return the value for synchronous usage
+                    },
+                    getData: async (key) => {
+                        const result = await this.getData('user_data', command.bot_token, msg.from.id, key);
+                        return result; // Return the actual value
+                    },
+                    deleteData: async (key) => {
+                        const result = await this.deleteData('user_data', command.bot_token, msg.from.id, key);
+                        return result;
+                    },
+                    
+                    // Advanced operations
+                    getAllData: async () => {
+                        const { data, error } = await supabase
+                            .from('universal_data')
+                            .select('data_key, data_value, created_at, updated_at')
+                            .eq('data_type', 'user_data')
+                            .eq('bot_token', command.bot_token)
+                            .eq('user_id', msg.from.id.toString());
+                        
+                        if (error) throw error;
+                        
+                        const result = {};
+                        if (data) {
+                            data.forEach(item => {
+                                try {
+                                    result[item.data_key] = JSON.parse(item.data_value);
+                                } catch {
+                                    result[item.data_key] = item.data_value;
+                                }
+                            });
+                        }
+                        return result;
+                    },
+                    
+                    deleteAllData: async () => {
+                        const { error } = await supabase
+                            .from('universal_data')
+                            .delete()
+                            .eq('data_type', 'user_data')
+                            .eq('bot_token', command.bot_token)
+                            .eq('user_id', msg.from.id.toString());
+                        
+                        return !error;
+                    },
+                    
+                    saveMultiple: async (dataObject) => {
+                        for (const [key, value] of Object.entries(dataObject)) {
+                            await this.saveData('user_data', command.bot_token, msg.from.id, key, value);
+                        }
+                        return true;
+                    },
+                    
+                    findData: async (pattern) => {
+                        const { data, error } = await supabase
+                            .from('universal_data')
+                            .select('data_key, data_value')
+                            .eq('data_type', 'user_data')
+                            .eq('bot_token', command.bot_token)
+                            .eq('user_id', msg.from.id.toString())
+                            .like('data_key', `%${pattern}%`);
+                        
+                        if (error) throw error;
+                        
+                        const result = {};
+                        if (data) {
+                            data.forEach(item => {
+                                try {
+                                    result[item.data_key] = JSON.parse(item.data_value);
+                                } catch {
+                                    result[item.data_key] = item.data_value;
+                                }
+                            });
+                        }
+                        return result;
+                    },
+                    
+                    exportData: async () => {
+                        const allData = await this.getAllData();
+                        return JSON.stringify(allData, null, 2);
+                    },
+                    
+                    importData: async (jsonData) => {
+                        const dataObject = JSON.parse(jsonData);
+                        return await this.saveMultiple(dataObject);
+                    }
                 },
                 
-                // Advanced operations
-                getAllData: async () => {
-                    const { data, error } = await supabase
-                        .from('universal_data')
-                        .select('data_key, data_value')
-                        .eq('data_type', 'user_data')
-                        .eq('bot_token', command.bot_token)
-                        .eq('user_id', msg.from.id.toString());
+                Bot: {
+                    // Synchronous-style methods
+                    saveData: async (key, value) => {
+                        const result = await this.saveData('bot_data', command.bot_token, null, key, value);
+                        return value;
+                    },
+                    getData: async (key) => {
+                        const result = await this.getData('bot_data', command.bot_token, null, key);
+                        return result;
+                    },
+                    deleteData: async (key) => {
+                        const { error } = await supabase
+                            .from('universal_data')
+                            .delete()
+                            .eq('data_type', 'bot_data')
+                            .eq('bot_token', command.bot_token)
+                            .eq('data_key', key);
+                        
+                        return !error;
+                    },
                     
-                    if (error) throw error;
-                    
-                    const result = {};
-                    data.forEach(item => {
-                        try {
-                            result[item.data_key] = JSON.parse(item.data_value);
-                        } catch {
-                            result[item.data_key] = item.data_value;
+                    // Advanced operations
+                    getAllData: async () => {
+                        const { data, error } = await supabase
+                            .from('universal_data')
+                            .select('data_key, data_value, created_at, updated_at')
+                            .eq('data_type', 'bot_data')
+                            .eq('bot_token', command.bot_token);
+                        
+                        if (error) throw error;
+                        
+                        const result = {};
+                        if (data) {
+                            data.forEach(item => {
+                                try {
+                                    result[item.data_key] = JSON.parse(item.data_value);
+                                } catch {
+                                    result[item.data_key] = item.data_value;
+                                }
+                            });
                         }
-                    });
-                    return result;
+                        return result;
+                    },
+                    
+                    deleteAllData: async () => {
+                        const { error } = await supabase
+                            .from('universal_data')
+                            .delete()
+                            .eq('data_type', 'bot_data')
+                            .eq('bot_token', command.bot_token);
+                        
+                        return !error;
+                    },
+                    
+                    saveMultiple: async (dataObject) => {
+                        for (const [key, value] of Object.entries(dataObject)) {
+                            await this.saveData('bot_data', command.bot_token, null, key, value);
+                        }
+                        return true;
+                    },
+                    
+                    exportData: async () => {
+                        const allData = await this.getAllData();
+                        return JSON.stringify(allData, null, 2);
+                    }
                 }
-            },
-            
-            // ✅ CORRECTED: ASYNC Bot methods
-            Bot: {
-                saveData: async (key, value) => {
-                    return await this.saveData('bot_data', command.bot_token, null, key, value);
-                },
-                getData: async (key) => {
-                    return await this.getData('bot_data', command.bot_token, null, key);
-                },
-                deleteData: async (key) => {
-                    const { error } = await supabase
-                        .from('universal_data')
-                        .delete()
-                        .eq('data_type', 'bot_data')
-                        .eq('bot_token', command.bot_token)
-                        .eq('data_key', key);
-                    return !error;
-                }
-            }
-        };
+            };
 
-        const result = await executeCommandCode(bot, command.code, context);
-        
-        console.log(`✅ Command executed successfully: ${command.command_patterns}`);
-        return {
-            success: true,
-            message: "Command executed and message delivered",
-            chatId: msg.chat.id,
-            command: command.command_patterns,
-            result: result
-        };
-        
-    } catch (error) {
-        console.error(`❌ Command execution error for ${command.command_patterns}:`, error);
-        
-        // Send error message to user
-        try {
-            await bot.sendMessage(msg.chat.id, `❌ Command Error: ${error.message}`);
-        } catch (sendError) {
-            console.error('❌ Failed to send error message:', sendError);
+            const result = await executeCommandCode(bot, command.code, context);
+            
+            console.log(`✅ Command executed successfully: ${command.command_patterns}`);
+            return {
+                success: true,
+                message: "Command executed and message delivered",
+                chatId: msg.chat.id,
+                command: command.command_patterns,
+                result: result
+            };
+            
+        } catch (error) {
+            console.error(`❌ Command execution error for ${command.command_patterns}:`, error);
+            
+            // Send error message to user
+            try {
+                await bot.sendMessage(msg.chat.id, `❌ Command Error: ${error.message}`);
+            } catch (sendError) {
+                console.error('❌ Failed to send error message:', sendError);
+            }
+            
+            throw error;
         }
-        
-        throw error;
     }
-}
 
     async initializeBot(token) {
         try {
@@ -252,6 +352,7 @@ async executeCommand(bot, command, msg, userInput = null) {
                 console.log(`✅ Bot connected: @${botInfo.username}`);
             } catch (botError) {
                 console.error(`❌ Bot connection failed:`, botError.message);
+                throw botError;
             }
 
             // Store bot and commands
@@ -459,173 +560,6 @@ bot.sendMessage(\`Hello \${user.first_name}! You said: "${prompt}"\`);
 // Alternative: Api.sendMessage(\`Hello \${user.first_name}! You said: "${prompt}"\`);`;
     }
 
-    createExecutionContext(bot, command, msg, userInput = null) {
-        const baseContext = {
-            msg: msg,
-            chatId: msg.chat.id,
-            userId: msg.from.id,
-            username: msg.from.username,
-            first_name: msg.from.first_name,
-            botToken: command.bot_token,
-            userInput: userInput,
-            nextCommandHandlers: this.nextCommandHandlers,
-            pythonRunner: pythonRunner,
-            
-            // Data storage methods
-            // Enhanced User Data Operations
-User: {
-    // Basic CRUD
-    saveData: (key, value) => this.saveData('user_data', command.bot_token, msg.from.id, key, value),
-    getData: (key) => this.getData('user_data', command.bot_token, msg.from.id, key),
-    deleteData: (key) => this.deleteData('user_data', command.bot_token, msg.from.id, key),
-    
-    // Advanced operations
-    getAllData: async () => {
-        const { data, error } = await supabase
-            .from('universal_data')
-            .select('data_key, data_value, created_at, updated_at')
-            .eq('data_type', 'user_data')
-            .eq('bot_token', command.bot_token)
-            .eq('user_id', msg.from.id.toString());
-        
-        if (error) throw error;
-        
-        const result = {};
-        data.forEach(item => {
-            try {
-                result[item.data_key] = JSON.parse(item.data_value);
-            } catch {
-                result[item.data_key] = item.data_value;
-            }
-        });
-        return result;
-    },
-    
-    deleteAllData: async () => {
-        const { error } = await supabase
-            .from('universal_data')
-            .delete()
-            .eq('data_type', 'user_data')
-            .eq('bot_token', command.bot_token)
-            .eq('user_id', msg.from.id.toString());
-        
-        return !error;
-    },
-    
-    saveMultiple: async (dataObject) => {
-        for (const [key, value] of Object.entries(dataObject)) {
-            await this.saveData('user_data', command.bot_token, msg.from.id, key, value);
-        }
-        return true;
-    },
-    
-    findData: async (pattern) => {
-        const { data, error } = await supabase
-            .from('universal_data')
-            .select('data_key, data_value')
-            .eq('data_type', 'user_data')
-            .eq('bot_token', command.bot_token)
-            .eq('user_id', msg.from.id.toString())
-            .like('data_key', `%${pattern}%`);
-        
-        if (error) throw error;
-        
-        const result = {};
-        data.forEach(item => {
-            try {
-                result[item.data_key] = JSON.parse(item.data_value);
-            } catch {
-                result[item.data_key] = item.data_value;
-            }
-        });
-        return result;
-    },
-    
-    exportData: async () => {
-        const allData = await this.getAllData();
-        return JSON.stringify(allData, null, 2);
-    },
-    
-    importData: async (jsonData) => {
-        const dataObject = JSON.parse(jsonData);
-        return await this.saveMultiple(dataObject);
-    }
-},
-
-// Enhanced Bot Data Operations
-Bot: {
-    // Basic CRUD
-    saveData: (key, value) => this.saveData('bot_data', command.bot_token, null, key, value),
-    getData: (key) => this.getData('bot_data', command.bot_token, null, key),
-    deleteData: async (key) => {
-        const { error } = await supabase
-            .from('universal_data')
-            .delete()
-            .eq('data_type', 'bot_data')
-            .eq('bot_token', command.bot_token)
-            .eq('data_key', key);
-        
-        return !error;
-    },
-    
-    // Advanced operations
-    getAllData: async () => {
-        const { data, error } = await supabase
-            .from('universal_data')
-            .select('data_key, data_value, created_at, updated_at')
-            .eq('data_type', 'bot_data')
-            .eq('bot_token', command.bot_token);
-        
-        if (error) throw error;
-        
-        const result = {};
-        data.forEach(item => {
-            try {
-                result[item.data_key] = JSON.parse(item.data_value);
-            } catch {
-                result[item.data_key] = item.data_value;
-            }
-        });
-        return result;
-    },
-    
-    deleteAllData: async () => {
-        const { error } = await supabase
-            .from('universal_data')
-            .delete()
-            .eq('data_type', 'bot_data')
-            .eq('bot_token', command.bot_token);
-        
-        return !error;
-    },
-    
-    saveMultiple: async (dataObject) => {
-        for (const [key, value] of Object.entries(dataObject)) {
-            await this.saveData('bot_data', command.bot_token, null, key, value);
-        }
-        return true;
-    },
-    
-    exportData: async () => {
-        const allData = await this.getAllData();
-        return JSON.stringify(allData, null, 2);
-    }
-}
-        };
-
-        // Create API wrapper instance
-        const apiWrapper = new ApiWrapper(bot, baseContext);
-        
-        return {
-            ...baseContext,
-            bot: apiWrapper,      // bot.sendMessage() style
-            Api: apiWrapper,      // Api.sendMessage() style
-            // Direct methods
-            sendMessage: (text, options) => apiWrapper.sendMessage(text, options),
-            getUser: () => apiWrapper.getUser()
-        };
-    }
-
     async findMatchingCommand(token, text, msg) {
         const commands = this.botCommands.get(token) || [];
         
@@ -644,10 +578,9 @@ Bot: {
         return null;
     }
 
-    // server/core/bot-manager.js - sendError মেথডে যোগ করুন
-async sendError(bot, chatId, error) {
-    try {
-        const errorMessage = `
+    async sendError(bot, chatId, error) {
+        try {
+            const errorMessage = `
 ❌ *Error Occurred*
 
 *Message:* ${error.message}
@@ -662,7 +595,7 @@ We've logged this error and will fix it soon.
     }
 }
 
-    // Data storage methods
+    // Data storage methods - FIXED: Proper async/await
     async saveData(dataType, botToken, userId, key, value, metadata = {}) {
         try {
             const { data, error } = await supabase
@@ -748,32 +681,31 @@ We've logged this error and will fix it soon.
         }
     }
 
-    // server/core/bot-manager.js - updateCommandCache মেথডে যোগ করুন
-async updateCommandCache(token) {
-    try {
-        const { data: commands, error } = await supabase
-            .from('commands')
-            .select('*')
-            .eq('bot_token', token)
-            .eq('is_active', true);
+    async updateCommandCache(token) {
+        try {
+            const { data: commands, error } = await supabase
+                .from('commands')
+                .select('*')
+                .eq('bot_token', token)
+                .eq('is_active', true);
 
-        if (error) {
-            console.error('❌ Update command cache error:', error);
-            return;
-        }
+            if (error) {
+                console.error('❌ Update command cache error:', error);
+                return;
+            }
 
-        // Clear existing cache
-        this.botCommands.set(token, []);
-        
-        // Add new commands
-        if (commands && Array.isArray(commands)) {
-            this.botCommands.set(token, commands);
-            console.log(`✅ Updated command cache for bot ${token.substring(0,10)}...: ${commands.length} commands`);
+            // Clear existing cache
+            this.botCommands.set(token, []);
+            
+            // Add new commands
+            if (commands && Array.isArray(commands)) {
+                this.botCommands.set(token, commands);
+                console.log(`✅ Updated command cache for bot ${token.substring(0,10)}...: ${commands.length} commands`);
+            }
+        } catch (error) {
+            console.error('❌ Command cache update failed:', error);
         }
-    } catch (error) {
-        console.error('❌ Command cache update failed:', error);
     }
-}
 
     getBotStatus() {
         return {
