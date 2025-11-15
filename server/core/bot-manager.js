@@ -389,18 +389,26 @@ class BotManager {
 // server/core/bot-manager.js - IMPROVED handleMessage
 async handleMessage(bot, token, msg) {
     try {
-        if (!msg.text && !msg.caption) return;
+        // Skip non-text messages without caption
+        if (!msg.text && !msg.caption) {
+            console.log('📨 Non-text message received, skipping command processing');
+            return;
+        }
 
         const chatId = msg.chat.id;
         const userId = msg.from.id;
         const text = msg.text || msg.caption || '';
+        const userName = msg.from.first_name || 'Unknown';
 
-        console.log(`📨 Message from ${msg.from.first_name} (${userId}): "${text}"`);
+        console.log(`\n📨 ========== NEW MESSAGE ==========`);
+        console.log(`👤 From: ${userName} (${userId})`);
+        console.log(`💬 Text: "${text}"`);
+        console.log(`🤖 Bot Token: ${token.substring(0, 15)}...`);
+        console.log(`📊 Active handlers: ${this.nextCommandHandlers.size}`);
 
-        // ✅ IMPROVED: Check for next command handler first
+        // Check for next command handler - IMPROVED VERSION
         const nextCommandKey = `${token}_${userId}`;
         console.log(`🔍 Checking next command handler for key: ${nextCommandKey}`);
-        console.log(`📊 Active handlers: ${this.nextCommandHandlers.size}`);
         
         if (this.nextCommandHandlers.has(nextCommandKey)) {
             console.log(`✅ NEXT COMMAND HANDLER FOUND! Executing...`);
@@ -408,8 +416,11 @@ async handleMessage(bot, token, msg) {
             
             // Remove handler immediately to prevent multiple executions
             this.nextCommandHandlers.delete(nextCommandKey);
+            console.log(`🗑️ Handler removed after execution for key: ${nextCommandKey}`);
             
             try {
+                // Execute the handler with user's response
+                console.log(`🔄 Executing handler with response: "${text}"`);
                 await handler(text, msg);
                 console.log(`✅ Next command handler executed successfully for user ${userId}`);
                 return; // Important: return after handling
@@ -418,14 +429,37 @@ async handleMessage(bot, token, msg) {
                 await this.sendError(bot, chatId, handlerError);
                 return;
             }
+        } else {
+            console.log(`❌ No next command handler found for key: ${nextCommandKey}`);
+            console.log(`📋 Available handler keys:`, Array.from(this.nextCommandHandlers.keys()));
         }
 
-        // Rest of your existing code for command matching...
+        // Handle Python code execution
+        if (text.startsWith('/python ')) {
+            console.log('🐍 Python command detected');
+            await this.executePythonCode(bot, chatId, text.replace('/python ', ''));
+            return;
+        }
+
+        // Handle AI code generation
+        if (text.startsWith('/ai ') || text.startsWith('/generate ')) {
+            console.log('🤖 AI command detected');
+            await this.generateAICode(bot, chatId, text);
+            return;
+        }
+
+        // Find and execute matching command (only if no next command handler)
+        console.log(`🔍 Looking for matching command for: "${text}"`);
         const command = await this.findMatchingCommand(token, text, msg);
         if (command) {
             console.log(`🎯 Executing command: ${command.command_patterns}`);
+            console.log(`📝 Command ID: ${command.id}`);
             await this.executeCommand(bot, command, msg, text);
+        } else {
+            console.log(`❌ No matching command found for: "${text}"`);
         }
+
+        console.log(`✅ ========== MESSAGE PROCESSING COMPLETE ==========\n`);
 
     } catch (error) {
         console.error('❌ Handle message error:', error);
