@@ -1,0 +1,20 @@
+[
+    {
+        "id": "python_calculator",
+        "name": "Python Calculator", 
+        "patterns": "/pythoncalc, /pycalc, /calculate",
+        "description": "Advanced calculator using Python",
+        "code": "const user = getUser();\nApi.sendMessage(`🔢 *Python Calculator*\\n\\nHello ${user.first_name}! Enter a math expression:\\n\\nExamples:\\n• 2 + 2\\n• 10 * 5\\n• 25 ** 0.5`, {\n    parse_mode: 'Markdown'\n});\n\nUser.saveData('calc_mode', 'awaiting_expression');",
+        "waitForAnswer": true,
+        "answerHandler": "const userInput = params;\n\nif (User.getData('calc_mode') === 'awaiting_expression') {\n    Api.sendMessage(`🧮 Calculating: ${userInput}...`);\n    \n    try {\n        // Safe math evaluation\n        const result = Api.runPython(`\nresult = ${userInput}\nprint(result)\n        `);\n        \n        Api.sendMessage(`✅ *Calculation Result*\\n\\nExpression: \\`${userInput}\\`\\nResult: \\`${result}\\``, {\n            parse_mode: 'Markdown'\n        });\n        \n    } catch (error) {\n        Api.sendMessage(`❌ Calculation error: ${error.message}`);\n    }\n    \n    User.saveData('calc_mode', null);\n}"
+    },
+    {
+        "id": "python_runner",
+        "name": "Python Code Runner",
+        "patterns": "/python, /py, /run",
+        "description": "Execute Python code directly",
+        "code": "if (params && params.trim() !== '') {\n    // If user provided code with command\n    const pythonCode = params;\n    Api.sendMessage(`🐍 Executing Python code...\\n\\`\\`\\`python\\n${pythonCode}\\n\\`\\`\\``, {\n        parse_mode: 'Markdown'\n    });\n    \n    try {\n        const result = await Api.runPython(pythonCode);\n        Api.sendMessage(`✅ *Python Execution Result*\\n\\n\\`\\`\\`\\n${result}\\n\\`\\`\\``, {\n            parse_mode: 'Markdown'\n        });\n    } catch (error) {\n        Api.sendMessage(`❌ *Python Error*\\n\\n\\`\\`\\`\\n${error.message}\\n\\`\\`\\``, {\n            parse_mode: 'Markdown'\n        });\n    }\n} else {\n    // Ask for code\n    Api.waitForAnswer(\"🐍 Enter Python code to execute:\");\n    User.saveData('python_mode', 'awaiting_code');\n}",
+        "waitForAnswer": true,
+        "answerHandler": "if (User.getData('python_mode') === 'awaiting_code') {\n    const pythonCode = params;\n    \n    Api.sendMessage(`🐍 Executing your code...\\n\\`\\`\\`python\\n${pythonCode}\\n\\`\\`\\``, {\n        parse_mode: 'Markdown'\n    });\n    \n    try {\n        const result = await Api.runPython(pythonCode);\n        Api.sendMessage(`✅ *Execution Successful*\\n\\n\\`\\`\\`\\n${result}\\n\\`\\`\\``, {\n            parse_mode: 'Markdown'\n        });\n    } catch (error) {\n        Api.sendMessage(`❌ *Execution Failed*\\n\\n\\`\\`\\`\\n${error.message}\\n\\`\\`\\``, {\n            parse_mode: 'Markdown'\n        });\n    }\n    \n    User.saveData('python_mode', null);\n}"
+    }
+]
