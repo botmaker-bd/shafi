@@ -7,7 +7,6 @@ async function executeCommandCode(botInstance, code, context) {
             // Create COMPREHENSIVE execution environment
             const executionEnv = {
                 // === TELEGRAM BOT METHODS ===
-                // Direct bot instance (for advanced users)
                 bot: botInstance,
                 
                 // === API WRAPPER INSTANCE ===
@@ -29,7 +28,17 @@ async function executeCommandCode(botInstance, code, context) {
                 params: userInput,
                 
                 // === DATA STORAGE ===
-                User: context.User,
+                User: {
+                    // Synchronous versions for template compatibility
+                    saveData: (key, value) => context.User.saveData(key, value),
+                    getData: (key) => context.User.getData(key),
+                    deleteData: (key) => context.User.deleteData(key),
+                    
+                    // Async versions with proper handling
+                    saveDataAsync: async (key, value) => await context.User.saveData(key, value),
+                    getDataAsync: async (key) => await context.User.getData(key),
+                    deleteDataAsync: async (key) => await context.User.deleteData(key)
+                },
                 Bot: context.Bot,
                 
                 // === UTILITY FUNCTIONS ===
@@ -86,13 +95,13 @@ async function executeCommandCode(botInstance, code, context) {
                 ...shortcuts,
                 
                 // Make bot available as both 'bot' and 'Bot'
-                Bot: executionEnv.Api, // Alias for backward compatibility
+                Bot: executionEnv.Api,
                 
                 // Make Api available as both 'Api' and 'api'
                 api: executionEnv.Api
             };
 
-            // Enhanced execution code with ALL variables injected
+            // Enhanced execution code with async/await support
             const executionCode = `
                 // Inject ALL variables into execution context
                 const { 
@@ -102,19 +111,25 @@ async function executeCommandCode(botInstance, code, context) {
                     sendKeyboard, runPython, waitForAnswer, wait, HTTP
                 } = this.context;
 
-                try {
-                    // User's command code
-                    ${code}
-                    
-                    // If no explicit return, return success
-                    if (typeof result === 'undefined') {
-                        return "Command executed successfully";
+                // Create an async wrapper for the user's code
+                const executeUserCode = async () => {
+                    try {
+                        // User's command code
+                        ${code}
+                        
+                        // If no explicit return, return success
+                        if (typeof result === 'undefined') {
+                            return "Command executed successfully";
+                        }
+                        return result;
+                    } catch (error) {
+                        console.error('Command execution error:', error);
+                        throw error;
                     }
-                    return result;
-                } catch (error) {
-                    console.error('Command execution error:', error);
-                    throw error;
-                }
+                };
+
+                // Execute and return the promise
+                return executeUserCode();
             `;
 
             const executionWrapper = {
