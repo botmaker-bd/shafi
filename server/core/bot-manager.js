@@ -386,7 +386,7 @@ class BotManager {
         bot.on('error', (error) => console.error(`❌ Bot error:`, error));
     }
 
-    async handleMessage(bot, token, msg) {
+async handleMessage(bot, token, msg) {
     try {
         // Skip non-text messages without caption
         if (!msg.text && !msg.caption) return;
@@ -395,47 +395,60 @@ class BotManager {
         const userId = msg.from.id;
         const text = msg.text || msg.caption || '';
 
-        console.log(`📨 Message from ${msg.from.first_name}: "${text}"`);
+        console.log(`📨 Message from ${msg.from.first_name} (${userId}): "${text}"`);
 
-        // Check for next command handler - FIXED VERSION
+        // Check for next command handler - IMPROVED VERSION
         const nextCommandKey = `${token}_${userId}`;
-        console.log(`🔍 Checking for next command handler: ${nextCommandKey}`);
+        console.log(`🔍 Checking next command handler for key: ${nextCommandKey}`);
+        console.log(`📊 Active handlers: ${this.nextCommandHandlers.size}`);
         
         if (this.nextCommandHandlers.has(nextCommandKey)) {
-            console.log(`✅ Next command handler found for user ${userId}`);
+            console.log(`✅ NEXT COMMAND HANDLER FOUND! Executing...`);
             const handler = this.nextCommandHandlers.get(nextCommandKey);
+            
+            // Remove handler immediately to prevent multiple executions
             this.nextCommandHandlers.delete(nextCommandKey);
             
-            // Call the handler with the user's response
-            await handler(text, msg);
-            console.log(`✅ Next command handler executed successfully`);
+            try {
+                // Execute the handler with user's response
+                await handler(text, msg);
+                console.log(`✅ Next command handler executed successfully for user ${userId}`);
+                return; // Important: return after handling
+            } catch (handlerError) {
+                console.error(`❌ Next command handler error:`, handlerError);
+                await this.sendError(bot, chatId, handlerError);
+                return;
+            }
+        } else {
+            console.log(`❌ No next command handler found for key: ${nextCommandKey}`);
+        }
+
+        // Handle Python code execution
+        if (text.startsWith('/python ')) {
+            await this.executePythonCode(bot, chatId, text.replace('/python ', ''));
             return;
         }
 
-
-            // Handle Python code execution
-            if (text.startsWith('/python ')) {
-                await this.executePythonCode(bot, chatId, text.replace('/python ', ''));
-                return;
-            }
-
-            // Handle AI code generation
-            if (text.startsWith('/ai ') || text.startsWith('/generate ')) {
-                await this.generateAICode(bot, chatId, text);
-                return;
-            }
-
-            // Find and execute matching command
-            const command = await this.findMatchingCommand(token, text, msg);
-            if (command) {
-                await this.executeCommand(bot, command, msg, text);
-            }
-
-        } catch (error) {
-            console.error('❌ Handle message error:', error);
-            await this.sendError(bot, msg.chat.id, error);
+        // Handle AI code generation
+        if (text.startsWith('/ai ') || text.startsWith('/generate ')) {
+            await this.generateAICode(bot, chatId, text);
+            return;
         }
+
+        // Find and execute matching command (only if no next command handler)
+        const command = await this.findMatchingCommand(token, text, msg);
+        if (command) {
+            console.log(`🎯 Executing command: ${command.command_patterns}`);
+            await this.executeCommand(bot, command, msg, text);
+        } else {
+            console.log(`❌ No matching command found for: "${text}"`);
+        }
+
+    } catch (error) {
+        console.error('❌ Handle message error:', error);
+        await this.sendError(bot, msg.chat.id, error);
     }
+}
 
     async handleMedia(bot, token, msg, mediaType) {
         try {
