@@ -714,7 +714,7 @@ class CommandEditor {
         this.currentCommand = {
             id: 'new',
             command_patterns: '/start',
-            code: '// Write your command code here\nconst user = getUser();\nbot.sendMessage(`Hello ${user.first_name}! Welcome to our bot.`);',
+            code: '// Write your command code here\nconst user = getUser();\nBot.sendMessage(`Hello ${user.first_name}! Welcome to our bot.`);',
             is_active: true,
             wait_for_answer: false,
             answer_handler: ''
@@ -1139,16 +1139,28 @@ class CommandEditor {
             const data = await response.json();
 
             if (response.ok) {
-                this.showTestSuccess(`
-                    <h4>✅ Test Command Executed Successfully!</h4>
-                    <div class="test-details">
-                        <p><strong>Test Input:</strong> ${testInput || commands.join(', ')}</p>
-                        <p><strong>Bot:</strong> ${this.currentBot.name}</p>
-                        <p><strong>Result:</strong> ${data.result || 'Command executed successfully'}</p>
-                    </div>
-                    <p class="test-message">Command executed without errors.</p>
-                `);
-            } else {
+    let resultText = data.result || 'Command executed successfully';
+    
+    // Handle object results
+    if (typeof resultText === 'object') {
+        if (resultText.message) {
+            resultText = resultText.message;
+        } else {
+            resultText = JSON.stringify(resultText, null, 2);
+        }
+    }
+    
+    this.showTestSuccess(`
+        <h4>✅ Test Command Executed Successfully!</h4>
+        <div class="test-details">
+            <p><strong>Test Input:</strong> ${testInput || commands.join(', ')}</p>
+            <p><strong>Bot:</strong> ${this.currentBot.name}</p>
+            <p><strong>Result:</strong> ${resultText}</p>
+        </div>
+        <p class="test-message">Command executed without errors.</p>
+    `);
+}
+ else {
                 this.showTestError(`
                     <h4>❌ Test Failed</h4>
                     <div class="error-details">
@@ -1193,15 +1205,17 @@ class CommandEditor {
     }
 
     showTestSuccess(html) {
-        const testCommandResult = document.getElementById('testCommandResult');
-        if (testCommandResult) {
-            testCommandResult.innerHTML = `
-                <div class="test-success">
-                    ${html}
-                </div>
-            `;
-        }
+    const testCommandResult = document.getElementById('testCommandResult');
+    if (testCommandResult) {
+        testCommandResult.innerHTML = `
+            <div class="test-success">
+                ${html}
+            </div>
+        `;
     }
+}
+
+// Update the test response handling in runCustomTest method:
 
     showTestError(html) {
         const testCommandResult = document.getElementById('testCommandResult');
