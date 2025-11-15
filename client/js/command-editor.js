@@ -1,3 +1,4 @@
+// client/js/command-editor.js
 class CommandEditor {
     constructor() {
         this.user = null;
@@ -8,240 +9,236 @@ class CommandEditor {
         this.init();
     }
 
-    // File: /client/js/command-editor.js - init method
-async init() {
-    await this.checkAuth();
-    await this.loadBotInfo();
-    this.setupEventListeners();
-    await this.loadCommands();
-    await this.loadTemplates();
-    this.setupCodeEditor();
-    this.setupCommandsTags();
-    this.setupTemplateEvents(); // ✅ ADD THIS LINE
-    console.log('✅ Command editor initialized completely');
-}
+    async init() {
+        await this.checkAuth();
+        await this.loadBotInfo();
+        this.setupEventListeners();
+        await this.loadCommands();
+        await this.loadTemplates();
+        this.setupCodeEditor();
+        this.setupCommandsTags();
+        this.setupTemplateEvents();
+        console.log('✅ Command editor initialized completely');
+    }
 
-// File: /client/js/command-editor.js - loadTemplates method-এ error handling improve করুন
-async loadTemplates() {
-    try {
-        const token = localStorage.getItem('token');
-        console.log('🔄 Loading templates from API...');
-        
-        const response = await fetch('/api/templates', {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        console.log('📦 Templates API response:', data);
-
-        if (data.success) {
-            this.templates = data.templates || {};
-            console.log(`✅ Loaded ${Object.keys(this.templates).length} template categories`);
+    async loadTemplates() {
+        try {
+            const token = localStorage.getItem('token');
+            console.log('🔄 Loading templates from API...');
             
-            // Debug: Log template counts
-            Object.entries(this.templates).forEach(([category, templates]) => {
-                console.log(`📁 ${category}: ${templates?.length || 0} templates`);
-            });
-            
-            this.populateTemplatesModal();
-        } else {
-            throw new Error(data.error || 'Failed to load templates');
-        }
-    } catch (error) {
-        console.error('❌ Load templates error:', error);
-        this.showError('Failed to load templates: ' + error.message);
-        // Fallback with basic templates
-        this.templates = {
-            'basic': [
-                {
-                    id: 'fallback_welcome',
-                    name: 'Welcome Message',
-                    patterns: '/start, hello',
-                    description: 'Basic welcome template',
-                    code: 'const user = getUser();\nApi.sendMessage(`Hello ${user.first_name}! Welcome to our bot.`);',
-                    waitForAnswer: false,
-                    answerHandler: ''
+            const response = await fetch('/api/templates', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
                 }
-            ]
-        };
-        this.populateTemplatesModal();
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log('📦 Templates API response:', data);
+
+            if (data.success) {
+                this.templates = data.templates || {};
+                console.log(`✅ Loaded ${Object.keys(this.templates).length} template categories`);
+                
+                // Debug: Log template counts
+                Object.entries(this.templates).forEach(([category, templates]) => {
+                    console.log(`📁 ${category}: ${templates?.length || 0} templates`);
+                });
+                
+                this.populateTemplatesModal();
+            } else {
+                throw new Error(data.error || 'Failed to load templates');
+            }
+        } catch (error) {
+            console.error('❌ Load templates error:', error);
+            this.showError('Failed to load templates: ' + error.message);
+            // Fallback with basic templates
+            this.templates = {
+                'basic': [
+                    {
+                        id: 'fallback_welcome',
+                        name: 'Welcome Message',
+                        patterns: '/start, hello',
+                        description: 'Basic welcome template',
+                        code: 'const user = getUser();\nApi.sendMessage(`Hello ${user.first_name}! Welcome to our bot.`);',
+                        waitForAnswer: false,
+                        answerHandler: ''
+                    }
+                ]
+            };
+            this.populateTemplatesModal();
+        }
     }
-}
-// File: /client/js/command-editor.js - populateTemplatesModal method
-populateTemplatesModal() {
-    const templatesContent = document.querySelector('.templates-content');
-    const categoryTabsContainer = document.querySelector('.category-tabs');
-    
-    if (!templatesContent || !categoryTabsContainer) {
-        console.error('❌ Templates modal elements not found');
-        return;
-    }
 
-    // Clear existing content
-    templatesContent.innerHTML = '';
-    categoryTabsContainer.innerHTML = '';
-
-    // If no templates available
-    if (!this.templates || Object.keys(this.templates).length === 0) {
-        templatesContent.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-icon">
-                    <i class="fas fa-layer-group"></i>
-                </div>
-                <h3>No Templates Available</h3>
-                <p>Templates could not be loaded. Please check your connection.</p>
-                <button class="btn btn-primary" onclick="commandEditor.loadTemplates()">
-                    <i class="fas fa-sync"></i> Reload Templates
-                </button>
-            </div>
-        `;
-        return;
-    }
-
-    let categoriesHTML = '';
-    let templatesHTML = '';
-    let firstCategory = true;
-
-    // Generate category tabs and template content
-    Object.entries(this.templates).forEach(([category, templates]) => {
-        if (!Array.isArray(templates) || templates.length === 0) {
-            console.warn(`⚠️ No templates found for category: ${category}`);
+    populateTemplatesModal() {
+        const templatesContent = document.querySelector('.templates-content');
+        const categoryTabsContainer = document.querySelector('.category-tabs');
+        
+        if (!templatesContent || !categoryTabsContainer) {
+            console.error('❌ Templates modal elements not found');
             return;
         }
 
-        const categoryId = `${category}-templates`;
-        const isActive = firstCategory ? 'active' : '';
-        const displayName = this.formatCategoryName(category);
-        
-        // Category tab
-        categoriesHTML += `
-            <button class="category-tab ${isActive}" data-category="${category}">
-                ${displayName} (${templates.length})
-            </button>
-        `;
+        // Clear existing content
+        templatesContent.innerHTML = '';
+        categoryTabsContainer.innerHTML = '';
 
-        // Template category content
-        const categoryTemplatesHTML = templates.map(template => {
-            try {
-                return this.createTemplateCard(template);
-            } catch (error) {
-                console.error('❌ Error creating template card:', error, template);
-                return `<div class="template-card error">
-                    <div class="template-icon">
-                        <i class="fas fa-exclamation-triangle"></i>
+        // If no templates available
+        if (!this.templates || Object.keys(this.templates).length === 0) {
+            templatesContent.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <i class="fas fa-layer-group"></i>
                     </div>
-                    <h4>Invalid Template</h4>
-                    <p>Failed to load this template</p>
-                </div>`;
-            }
-        }).join('');
+                    <h3>No Templates Available</h3>
+                    <p>Templates could not be loaded. Please check your connection.</p>
+                    <button class="btn btn-primary" onclick="commandEditor.loadTemplates()">
+                        <i class="fas fa-sync"></i> Reload Templates
+                    </button>
+                </div>
+            `;
+            return;
+        }
 
-        templatesHTML += `
-            <div id="${categoryId}" class="template-category ${isActive}">
-                <div class="templates-grid">
-                    ${categoryTemplatesHTML}
+        let categoriesHTML = '';
+        let templatesHTML = '';
+        let firstCategory = true;
+
+        // Generate category tabs and template content
+        Object.entries(this.templates).forEach(([category, templates]) => {
+            if (!Array.isArray(templates) || templates.length === 0) {
+                console.warn(`⚠️ No templates found for category: ${category}`);
+                return;
+            }
+
+            const categoryId = `${category}-templates`;
+            const isActive = firstCategory ? 'active' : '';
+            const displayName = this.formatCategoryName(category);
+            
+            // Category tab
+            categoriesHTML += `
+                <button class="category-tab ${isActive}" data-category="${category}">
+                    ${displayName} (${templates.length})
+                </button>
+            `;
+
+            // Template category content
+            const categoryTemplatesHTML = templates.map(template => {
+                try {
+                    return this.createTemplateCard(template);
+                } catch (error) {
+                    console.error('❌ Error creating template card:', error, template);
+                    return `<div class="template-card error">
+                        <div class="template-icon">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <h4>Invalid Template</h4>
+                        <p>Failed to load this template</p>
+                    </div>`;
+                }
+            }).join('');
+
+            templatesHTML += `
+                <div id="${categoryId}" class="template-category ${isActive}">
+                    <div class="templates-grid">
+                        ${categoryTemplatesHTML}
+                    </div>
+                </div>
+            `;
+
+            firstCategory = false;
+        });
+
+        categoryTabsContainer.innerHTML = categoriesHTML;
+        templatesContent.innerHTML = templatesHTML;
+
+        // Setup template events
+        this.setupTemplateEvents();
+        
+        console.log('✅ Templates modal populated successfully');
+    }
+
+    createTemplateCard(template) {
+        if (!template || typeof template !== 'object') {
+            console.error('❌ Invalid template object:', template);
+            return '<div class="template-card invalid">Invalid Template</div>';
+        }
+        
+        // Validate required fields
+        if (!template.id || !template.name || !template.code) {
+            console.error('❌ Template missing required fields:', template);
+            return '<div class="template-card invalid">Invalid Template Data</div>';
+        }
+
+        const safeTemplate = {
+            id: template.id,
+            name: template.name,
+            patterns: template.patterns || '/command',
+            code: template.code,
+            description: template.description || 'No description available',
+            waitForAnswer: Boolean(template.waitForAnswer),
+            answerHandler: template.answerHandler || ''
+        };
+
+        // Get appropriate icon
+        const templateIcon = this.getTemplateIcon(safeTemplate.name);
+
+        // FIXED: Simple JSON stringification without complex escaping
+        const templateJson = JSON.stringify(safeTemplate);
+
+        return `
+            <div class="template-card" data-template-id="${safeTemplate.id}">
+                <div class="template-icon">
+                    <i class="${templateIcon}"></i>
+                </div>
+                <h4>${this.escapeHtml(safeTemplate.name)}</h4>
+                <p>${this.escapeHtml(safeTemplate.description)}</p>
+                <div class="template-patterns">${this.escapeHtml(safeTemplate.patterns)}</div>
+                <div class="template-footer">
+                    <span class="template-type">${safeTemplate.waitForAnswer ? 'Interactive' : 'Simple'}</span>
+                    <button class="btn-apply" data-template='${this.escapeHtml(templateJson)}'>
+                        Apply Template
+                    </button>
                 </div>
             </div>
         `;
-
-        firstCategory = false;
-    });
-
-    categoryTabsContainer.innerHTML = categoriesHTML;
-    templatesContent.innerHTML = templatesHTML;
-
-    // Setup template events
-    this.setupTemplateEvents();
-    
-    console.log('✅ Templates modal populated successfully');
-}
-    // File: /client/js/command-editor.js - createTemplateCard method
-// File: /client/js/command-editor.js - createTemplateCard method
-createTemplateCard(template) {
-    if (!template || typeof template !== 'object') {
-        console.error('❌ Invalid template object:', template);
-        return '<div class="template-card invalid">Invalid Template</div>';
-    }
-    
-    // Validate required fields
-    if (!template.id || !template.name || !template.code) {
-        console.error('❌ Template missing required fields:', template);
-        return '<div class="template-card invalid">Invalid Template Data</div>';
     }
 
-    const safeTemplate = {
-        id: template.id,
-        name: template.name,
-        patterns: template.patterns || '/command',
-        code: template.code,
-        description: template.description || 'No description available',
-        waitForAnswer: Boolean(template.waitForAnswer),
-        answerHandler: template.answerHandler || ''
-    };
-
-    // Get appropriate icon
-    const templateIcon = this.getTemplateIcon(safeTemplate.name);
-
-    // FIXED: Simple JSON stringification without complex escaping
-    const templateJson = JSON.stringify(safeTemplate);
-
-    return `
-        <div class="template-card" data-template-id="${safeTemplate.id}">
-            <div class="template-icon">
-                <i class="${templateIcon}"></i>
-            </div>
-            <h4>${this.escapeHtml(safeTemplate.name)}</h4>
-            <p>${this.escapeHtml(safeTemplate.description)}</p>
-            <div class="template-patterns">${this.escapeHtml(safeTemplate.patterns)}</div>
-            <div class="template-footer">
-                <span class="template-type">${safeTemplate.waitForAnswer ? 'Interactive' : 'Simple'}</span>
-                <button class="btn-apply" data-template='${this.escapeHtml(templateJson)}'>
-                    Apply Template
-                </button>
-            </div>
-        </div>
-    `;
-}
-
-// File: /client/js/command-editor.js - setupTemplateEvents method যোগ করুন
-setupTemplateEvents() {
-    // Template apply button events
-    document.addEventListener('click', (e) => {
-        if (e.target.classList.contains('btn-apply')) {
-            const button = e.target;
-            const templateData = button.getAttribute('data-template');
-            
-            if (templateData) {
-                try {
-                    // Parse the template data
-                    const template = JSON.parse(templateData);
-                    console.log('🔄 Applying template from button:', template.name);
-                    this.applyTemplate(template);
-                } catch (error) {
-                    console.error('❌ Template parse error from button:', error);
-                    this.showError('Failed to parse template data: ' + error.message);
+    setupTemplateEvents() {
+        // Template apply button events
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('btn-apply')) {
+                const button = e.target;
+                const templateData = button.getAttribute('data-template');
+                
+                if (templateData) {
+                    try {
+                        // Parse the template data
+                        const template = JSON.parse(templateData);
+                        console.log('🔄 Applying template from button:', template.name);
+                        this.applyTemplate(template);
+                    } catch (error) {
+                        console.error('❌ Template parse error from button:', error);
+                        this.showError('Failed to parse template data: ' + error.message);
+                    }
                 }
             }
-        }
-    });
+        });
 
-    // Template card click event (backup)
-    document.addEventListener('click', (e) => {
-        const templateCard = e.target.closest('.template-card');
-        if (templateCard && !e.target.classList.contains('btn-apply')) {
-            const button = templateCard.querySelector('.btn-apply');
-            if (button) {
-                button.click(); // Trigger the apply button click
+        // Template card click event (backup)
+        document.addEventListener('click', (e) => {
+            const templateCard = e.target.closest('.template-card');
+            if (templateCard && !e.target.classList.contains('btn-apply')) {
+                const button = templateCard.querySelector('.btn-apply');
+                if (button) {
+                    button.click(); // Trigger the apply button click
+                }
             }
-        }
-    });
-}
+        });
+    }
 
     getTemplateIcon(templateName) {
         const iconMap = {
@@ -333,10 +330,6 @@ setupTemplateEvents() {
 
         document.getElementById('toggleCommandBtn').addEventListener('click', () => {
             this.toggleCommand();
-        });
-
-        document.getElementById('testCommandBtn').addEventListener('click', () => {
-            this.testCommand();
         });
 
         document.getElementById('runTestBtn').addEventListener('click', () => {
@@ -631,29 +624,29 @@ setupTemplateEvents() {
         });
     }
 
-// File: /client/js/command-editor.js - এই method টি যোগ করুন
-setupTemplateCategories() {
-    const categoryTabs = document.querySelectorAll('.category-tab');
-    const templateCategories = document.querySelectorAll('.template-category');
+    setupTemplateCategories() {
+        const categoryTabs = document.querySelectorAll('.category-tab');
+        const templateCategories = document.querySelectorAll('.template-category');
 
-    categoryTabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            const category = tab.dataset.category;
-            if (!category) return;
-            
-            // Update tabs
-            categoryTabs.forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-            
-            // Update content
-            templateCategories.forEach(cat => cat.classList.remove('active'));
-            const targetCategory = document.getElementById(`${category}-templates`);
-            if (targetCategory) {
-                targetCategory.classList.add('active');
-            }
+        categoryTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const category = tab.dataset.category;
+                if (!category) return;
+                
+                // Update tabs
+                categoryTabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                // Update content
+                templateCategories.forEach(cat => cat.classList.remove('active'));
+                const targetCategory = document.getElementById(`${category}-templates`);
+                if (targetCategory) {
+                    targetCategory.classList.add('active');
+                }
+            });
         });
-    });
-}
+    }
+
     toggleAnswerHandler(show) {
         const section = document.getElementById('answerHandlerSection');
         if (section) {
@@ -806,27 +799,27 @@ setupTemplateCategories() {
         });
     }
 
-// File: /client/js/command-editor.js - addNewCommand method-এ code fix করুন
-addNewCommand() {
-    this.currentCommand = {
-        id: 'new',
-        command_patterns: '/start',
-        code: '// Write your command code here\nconst user = getUser();\nApi.sendMessage(`Hello ${user.first_name}! Welcome to our bot.`);',
-        is_active: true,
-        wait_for_answer: false,
-        answer_handler: ''
-    };
+    addNewCommand() {
+        this.currentCommand = {
+            id: 'new',
+            command_patterns: '/start',
+            code: '// Write your command code here\nconst user = getUser();\nApi.sendMessage(`Hello ${user.first_name}! Welcome to our bot.`);',
+            is_active: true,
+            wait_for_answer: false,
+            answer_handler: ''
+        };
 
-    this.showCommandEditor();
-    this.populateCommandForm();
-    
-    setTimeout(() => {
-        const moreCommandsInput = document.getElementById('moreCommands');
-        if (moreCommandsInput) {
-            moreCommandsInput.focus();
-        }
-    }, 100);
-}
+        this.showCommandEditor();
+        this.populateCommandForm();
+        
+        setTimeout(() => {
+            const moreCommandsInput = document.getElementById('moreCommands');
+            if (moreCommandsInput) {
+                moreCommandsInput.focus();
+            }
+        }, 100);
+    }
+
     async selectCommand(commandId) {
         if (this.currentCommand?.id === commandId) return;
 
@@ -1235,28 +1228,27 @@ addNewCommand() {
             const data = await response.json();
 
             if (response.ok) {
-    let resultText = data.result || 'Command executed successfully';
-    
-    // Handle object results
-    if (typeof resultText === 'object') {
-        if (resultText.message) {
-            resultText = resultText.message;
-        } else {
-            resultText = JSON.stringify(resultText, null, 2);
-        }
-    }
-    
-    this.showTestSuccess(`
-        <h4>✅ Test Command Executed Successfully!</h4>
-        <div class="test-details">
-            <p><strong>Test Input:</strong> ${testInput || commands.join(', ')}</p>
-            <p><strong>Bot:</strong> ${this.currentBot.name}</p>
-            <p><strong>Result:</strong> ${resultText}</p>
-        </div>
-        <p class="test-message">Command executed without errors.</p>
-    `);
-}
- else {
+                let resultText = data.result || 'Command executed successfully';
+                
+                // Handle object results
+                if (typeof resultText === 'object') {
+                    if (resultText.message) {
+                        resultText = resultText.message;
+                    } else {
+                        resultText = JSON.stringify(resultText, null, 2);
+                    }
+                }
+                
+                this.showTestSuccess(`
+                    <h4>✅ Test Command Executed Successfully!</h4>
+                    <div class="test-details">
+                        <p><strong>Test Input:</strong> ${testInput || commands.join(', ')}</p>
+                        <p><strong>Bot:</strong> ${this.currentBot.name}</p>
+                        <p><strong>Result:</strong> ${resultText}</p>
+                    </div>
+                    <p class="test-message">Command executed without errors.</p>
+                `);
+            } else {
                 this.showTestError(`
                     <h4>❌ Test Failed</h4>
                     <div class="error-details">
@@ -1301,17 +1293,15 @@ addNewCommand() {
     }
 
     showTestSuccess(html) {
-    const testCommandResult = document.getElementById('testCommandResult');
-    if (testCommandResult) {
-        testCommandResult.innerHTML = `
-            <div class="test-success">
-                ${html}
-            </div>
-        `;
+        const testCommandResult = document.getElementById('testCommandResult');
+        if (testCommandResult) {
+            testCommandResult.innerHTML = `
+                <div class="test-success">
+                    ${html}
+                </div>
+            `;
+        }
     }
-}
-
-// Update the test response handling in runCustomTest method:
 
     showTestError(html) {
         const testCommandResult = document.getElementById('testCommandResult');
@@ -1339,124 +1329,111 @@ addNewCommand() {
         }
     }
 
-// File: /client/js/command-editor.js - applyTemplate method
-applyTemplate(template) {
-    try {
-        console.log('🔄 Starting template application:', template);
+    applyTemplate(template) {
+        try {
+            console.log('🔄 Starting template application:', template);
 
-        // Validate template
-        if (!template || typeof template !== 'object') {
-            throw new Error('Template data is invalid or empty');
-        }
-
-        if (!template.code) {
-            throw new Error('Template code is missing');
-        }
-
-        // Create new command if none exists
-        if (!this.currentCommand || this.currentCommand.id !== 'new') {
-            console.log('📝 Creating new command for template...');
-            this.addNewCommand();
-            
-            // Wait for form to be ready
-            setTimeout(() => {
-                this.finalizeTemplateApplication(template);
-            }, 100);
-        } else {
-            this.finalizeTemplateApplication(template);
-        }
-
-    } catch (error) {
-        console.error('❌ Template application failed:', error);
-        this.showError('Template application failed: ' + error.message);
-    }
-}
-
-// New helper method for template application
-finalizeTemplateApplication(template) {
-    try {
-        console.log('🎯 Finalizing template application:', template.name);
-
-        // 1. Set command patterns
-        if (template.patterns) {
-            this.setCommandsToTags(template.patterns);
-            console.log('✅ Patterns set:', template.patterns);
-        }
-
-        // 2. Set command name and description
-        const commandNameEl = document.getElementById('commandName');
-        const commandDescEl = document.getElementById('commandDescription');
-        
-        if (commandNameEl && template.name) {
-            commandNameEl.value = template.name;
-        }
-        
-        if (commandDescEl && template.description) {
-            commandDescEl.value = template.description;
-        }
-
-        // 3. Set main code (FIXED: Properly handle code)
-        const commandCodeEl = document.getElementById('commandCode');
-        if (commandCodeEl && template.code) {
-            // Clean the code - fix escaped characters
-            let cleanCode = template.code;
-            
-            // Replace escaped characters
-            cleanCode = cleanCode.replace(/\\\\n/g, '\n');
-            cleanCode = cleanCode.replace(/\\\\t/g, '\t');
-            cleanCode = cleanCode.replace(/\\\\"/g, '"');
-            cleanCode = cleanCode.replace(/\\\\'/g, "'");
-            cleanCode = cleanCode.replace(/\\\\\\\\/g, '\\');
-            
-            commandCodeEl.value = cleanCode;
-            console.log('✅ Code applied, length:', cleanCode.length);
-        }
-
-        // 4. Handle wait for answer
-        const waitForAnswerEl = document.getElementById('waitForAnswer');
-        if (waitForAnswerEl) {
-            const shouldWait = Boolean(template.waitForAnswer);
-            waitForAnswerEl.checked = shouldWait;
-            this.toggleAnswerHandler(shouldWait);
-            console.log('✅ Wait for answer:', shouldWait);
-        }
-
-        // 5. Set answer handler if needed
-        const answerHandlerEl = document.getElementById('answerHandler');
-        if (answerHandlerEl && template.answerHandler) {
-            let cleanAnswerHandler = template.answerHandler;
-            cleanAnswerHandler = cleanAnswerHandler.replace(/\\\\n/g, '\n');
-            cleanAnswerHandler = cleanAnswerHandler.replace(/\\\\t/g, '\t');
-            answerHandlerEl.value = cleanAnswerHandler;
-            console.log('✅ Answer handler applied');
-        }
-
-        // 6. Close templates modal
-        const templatesModal = document.getElementById('templatesModal');
-        if (templatesModal) {
-            templatesModal.style.display = 'none';
-        }
-
-        // 7. Focus on code editor
-        setTimeout(() => {
-            const commandCodeEl = document.getElementById('commandCode');
-            if (commandCodeEl) {
-                commandCodeEl.focus();
-                commandCodeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Validate template
+            if (!template || typeof template !== 'object') {
+                throw new Error('Template data is invalid or empty');
             }
-        }, 200);
 
-        // 8. Show success message
-        this.showSuccess(`"${template.name}" template applied successfully! 🎉`);
+            if (!template.code) {
+                throw new Error('Template code is missing');
+            }
 
-        // 9. Debug log
-        console.log('✅ Template application completed successfully');
+            // Create new command if none exists
+            if (!this.currentCommand || this.currentCommand.id !== 'new') {
+                console.log('📝 Creating new command for template...');
+                this.addNewCommand();
+                
+                // Wait for form to be ready
+                setTimeout(() => {
+                    this.finalizeTemplateApplication(template);
+                }, 100);
+            } else {
+                this.finalizeTemplateApplication(template);
+            }
 
-    } catch (error) {
-        console.error('❌ Final template application error:', error);
-        this.showError('Failed to apply template: ' + error.message);
+        } catch (error) {
+            console.error('❌ Template application failed:', error);
+            this.showError('Template application failed: ' + error.message);
+        }
     }
-}
+
+    finalizeTemplateApplication(template) {
+        try {
+            console.log('🎯 Finalizing template application:', template.name);
+
+            // 1. Set command patterns
+            if (template.patterns) {
+                this.setCommandsToTags(template.patterns);
+                console.log('✅ Patterns set:', template.patterns);
+            }
+
+            // 2. Set main code (FIXED: Properly handle code)
+            const commandCodeEl = document.getElementById('commandCode');
+            if (commandCodeEl && template.code) {
+                // Clean the code - fix escaped characters
+                let cleanCode = template.code;
+                
+                // Replace escaped characters
+                cleanCode = cleanCode.replace(/\\\\n/g, '\n');
+                cleanCode = cleanCode.replace(/\\\\t/g, '\t');
+                cleanCode = cleanCode.replace(/\\\\"/g, '"');
+                cleanCode = cleanCode.replace(/\\\\'/g, "'");
+                cleanCode = cleanCode.replace(/\\\\\\\\/g, '\\');
+                
+                commandCodeEl.value = cleanCode;
+                console.log('✅ Code applied, length:', cleanCode.length);
+            }
+
+            // 3. Handle wait for answer
+            const waitForAnswerEl = document.getElementById('waitForAnswer');
+            if (waitForAnswerEl) {
+                const shouldWait = Boolean(template.waitForAnswer);
+                waitForAnswerEl.checked = shouldWait;
+                this.toggleAnswerHandler(shouldWait);
+                console.log('✅ Wait for answer:', shouldWait);
+            }
+
+            // 4. Set answer handler if needed
+            const answerHandlerEl = document.getElementById('answerHandler');
+            if (answerHandlerEl && template.answerHandler) {
+                let cleanAnswerHandler = template.answerHandler;
+                cleanAnswerHandler = cleanAnswerHandler.replace(/\\\\n/g, '\n');
+                cleanAnswerHandler = cleanAnswerHandler.replace(/\\\\t/g, '\t');
+                answerHandlerEl.value = cleanAnswerHandler;
+                console.log('✅ Answer handler applied');
+            }
+
+            // 5. Close templates modal
+            const templatesModal = document.getElementById('templatesModal');
+            if (templatesModal) {
+                templatesModal.style.display = 'none';
+            }
+
+            // 6. Focus on code editor
+            setTimeout(() => {
+                const commandCodeEl = document.getElementById('commandCode');
+                if (commandCodeEl) {
+                    commandCodeEl.focus();
+                    commandCodeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }, 200);
+
+            // 7. Show success message
+            this.showSuccess(`"${template.name}" template applied successfully! 🎉`);
+
+            // 8. Debug log
+            console.log('✅ Template application completed successfully');
+
+        } catch (error) {
+            console.error('❌ Final template application error:', error);
+            this.showError('Failed to apply template: ' + error.message);
+        }
+    }
+
     async checkAuth() {
         const token = localStorage.getItem('token');
         const userData = localStorage.getItem('user');
