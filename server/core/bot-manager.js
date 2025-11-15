@@ -85,21 +85,39 @@ class BotManager {
     }
 
     // ✅ ADD THIS MISSING METHOD - Command execution
-    async executeCommand(bot, command, msg, userInput = null) {
+    // server/core/bot-manager.js - executeCommand মেথড
+async executeCommand(bot, command, msg, userInput = null) {
+    try {
+        console.log(`🔧 Executing command: ${command.command_patterns} for chat: ${msg.chat.id}`);
+        
+        const context = this.createExecutionContext(bot, command, msg, userInput);
+        
+        // ✅ Actual message send নিশ্চিত করতে await ব্যবহার করুন
+        const result = await executeCommandCode(bot, command.code, context);
+        
+        // ✅ Message send হয়েছে কিনা verify করুন
+        console.log(`✅ Command executed successfully: ${command.command_patterns}`);
+        
+        return {
+            success: true,
+            message: "Command executed and message delivered",
+            chatId: msg.chat.id,
+            command: command.command_patterns
+        };
+        
+    } catch (error) {
+        console.error(`❌ Command execution error for ${command.command_patterns}:`, error);
+        
+        // ✅ Error message send করার চেষ্টা করুন
         try {
-            console.log(`🔧 Executing command: ${command.command_patterns}`);
-            
-            const context = this.createExecutionContext(bot, command, msg, userInput);
-            const result = await executeCommandCode(bot, command.code, context);
-            
-            console.log(`✅ Command executed successfully: ${command.command_patterns}`);
-            return result;
-        } catch (error) {
-            console.error(`❌ Command execution error for ${command.command_patterns}:`, error);
-            await this.sendError(bot, msg.chat.id, error);
-            throw error;
+            await bot.sendMessage(msg.chat.id, `❌ Command Error: ${error.message}`);
+        } catch (sendError) {
+            console.error('❌ Failed to send error message:', sendError);
         }
+        
+        throw error;
     }
+}
 
     async initializeBot(token) {
         try {
