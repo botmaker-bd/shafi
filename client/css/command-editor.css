@@ -511,14 +511,23 @@
     height: 100%;
 }
 
+.category-tabs-container {
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
+}
+
+.category-tabs-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 0.5rem 1rem;
+}
+
 .category-tabs {
     display: flex;
     gap: 0.5rem;
-    padding: 1rem;
-    border-bottom: 1px solid var(--border-color);
-    background: var(--bg-tertiary);
-    flex-wrap: wrap;
-    flex-shrink: 0;
+    flex-wrap: nowrap;
+    min-width: max-content;
 }
 
 .category-tab {
@@ -535,9 +544,9 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    flex: 1;
-    min-width: 120px;
+    flex-shrink: 0;
     text-align: center;
+    white-space: nowrap;
 }
 
 .category-tab:hover {
