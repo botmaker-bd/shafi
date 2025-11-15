@@ -1,19 +1,19 @@
 [
     {
-        "id": "welcome_message",
-        "name": "Welcome Message",
-        "patterns": "/start, start, hello, hi, welcome",
-        "description": "Simple welcome message with user information",
-        "code": "const user = getUser();\nconst welcomeText = `👋 Hello *${user.first_name}*!\\\\n\\\\nWelcome to our bot! 🚀\\\\n\\\\nYour User ID: \\\\`${user.id}\\\\`\\\\nUsername: @${user.username || 'Not set'}`;\n\nconst buttons = [\n    [{ text: \"📖 Help\", callback_data: \"help\" }, { text: \"ℹ️ Info\", callback_data: \"info\" }],\n    [{ text: \"⚙️ Settings\", callback_data: \"settings\" }]\n];\n\nApi.sendMessage(welcomeText, {\n    parse_mode: 'Markdown',\n    reply_markup: { inline_keyboard: buttons }\n});",
+        "id": "simple_welcome",
+        "name": "Simple Welcome",
+        "patterns": "/start, start, hello",
+        "description": "Basic welcome message with user info",
+        "code": "const user = getUser();\nApi.sendMessage(`👋 Hello ${user.first_name}! Welcome to our bot.\\n\\nYour ID: ${user.id}\\nUsername: @${user.username || 'Not set'}`);",
         "waitForAnswer": false,
         "answerHandler": ""
     },
     {
-        "id": "help_system", 
-        "name": "Help System",
-        "patterns": "/help, help, commands, menu",
-        "description": "Comprehensive help system with categorized commands",
-        "code": "const helpText = `🤖 *Bot Help Menu*\\\\n\\\\n📋 *Available Commands:*\\\\n• /start - Start the bot\\\\n• /help - Show this help\\\\n• /info - Bot information\\\\n\\\\n🎮 *Interactive Features:*\\\\n• Multi-step conversations\\\\n• Button interactions\\\\n• File sharing\\\\n\\\\n💡 *Need assistance?*\\\\nUse the buttons below!`;\n\nconst helpButtons = [\n    [{ text: \"🚀 Quick Start\", callback_data: \"quick_start\" }],\n    [{ text: \"📚 Tutorial\", callback_data: \"tutorial\" }],\n    [{ text: \"🔙 Main Menu\", callback_data: \"main_menu\" }]\n];\n\nApi.sendMessage(helpText, {\n    parse_mode: 'Markdown',\n    reply_markup: { inline_keyboard: helpButtons }\n});",
+        "id": "help_command",
+        "name": "Help Command", 
+        "patterns": "/help, help, commands",
+        "description": "Simple help menu with buttons",
+        "code": "const helpText = `🤖 *Bot Help*\\n\\nAvailable Commands:\\n• /start - Start bot\\n• /help - Show help\\n• /info - Bot info\\n\\nNeed help? Contact admin.`;\n\nconst buttons = [\n    [{ text: \"📞 Contact\", callback_data: \"contact\" }],\n    [{ text: \"ℹ️ Info\", callback_data: \"info\" }]\n];\n\nApi.sendMessage(helpText, {\n    parse_mode: 'Markdown',\n    reply_markup: { inline_keyboard: buttons }\n});",
         "waitForAnswer": false,
         "answerHandler": ""
     }
