@@ -41,14 +41,32 @@ router.get('/', async (req, res) => {
                 
                 // Validate template structure
                 if (Array.isArray(templateData)) {
-                    const validTemplates = templateData.filter(template => 
-                        template && 
-                        typeof template === 'object' &&
-                        template.id && 
-                        template.name && 
-                        template.patterns && 
-                        template.code
-                    );
+                    // server/routes/templates.js - improved validation
+const validTemplates = templateData.filter(template => {
+    if (!template || typeof template !== 'object') return false;
+    
+    // Required fields
+    const hasRequired = template.name && template.patterns && template.code;
+    if (!hasRequired) return false;
+    
+    // Auto-generate ID if missing
+    if (!template.id) {
+        template.id = `auto_${categoryName}_${Math.random().toString(36).substring(2, 9)}`;
+    }
+    
+    // Set default values for optional fields
+    if (template.waitForAnswer === undefined) {
+        template.waitForAnswer = false;
+    }
+    if (!template.answerHandler) {
+        template.answerHandler = '';
+    }
+    if (!template.description) {
+        template.description = `${template.name} template`;
+    }
+    
+    return true;
+});
                     
                     templates[categoryName] = validTemplates;
                     console.log(`✅ Loaded ${validTemplates.length} templates from ${categoryName}`);
