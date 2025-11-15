@@ -1229,59 +1229,74 @@ class CommandEditor {
         }
     }
 
-    applyTemplate(template) {
-        try {
-            if (!template || typeof template !== 'object') {
-                throw new Error('Invalid template data');
-            }
-
-            if (!template.patterns || !template.code) {
-                throw new Error('Template missing required properties');
-            }
-
-            // Set command patterns
-            this.setCommandsToTags(template.patterns);
-            
-            // Set main code
-            const commandCodeEl = document.getElementById('commandCode');
-            if (commandCodeEl) commandCodeEl.value = template.code;
-            
-            // Handle wait for answer
-            const waitForAnswer = Boolean(template.waitForAnswer);
-            const waitForAnswerEl = document.getElementById('waitForAnswer');
-            if (waitForAnswerEl) {
-                waitForAnswerEl.checked = waitForAnswer;
-                this.toggleAnswerHandler(waitForAnswer);
-            }
-            
-            // Set answer handler if available
-            const answerHandlerEl = document.getElementById('answerHandler');
-            if (waitForAnswer && template.answerHandler && answerHandlerEl) {
-                answerHandlerEl.value = template.answerHandler;
-            } else if (answerHandlerEl) {
-                answerHandlerEl.value = '';
-            }
-            
-            // Close template modal
-            const templatesModal = document.getElementById('templatesModal');
-            if (templatesModal) {
-                templatesModal.style.display = 'none';
-            }
-            
-            // Focus on command code editor after applying template
-            setTimeout(() => {
-                if (commandCodeEl) {
-                    commandCodeEl.focus();
-                }
-            }, 100);
-            
-            this.showSuccess('Template applied successfully!');
-            
-        } catch (error) {
-            console.error('❌ Apply template error:', error);
-            this.showError('Failed to apply template: ' + error.message);
+// client/js/command-editor.js - applyTemplate মেথড ইম্প্রুভ করুন
+applyTemplate(template) {
+    try {
+        if (!template || typeof template !== 'object') {
+            throw new Error('Invalid template data');
         }
+
+        // Validate required fields
+        if (!template.patterns || !template.code) {
+            throw new Error('Template missing patterns or code');
+        }
+
+        console.log(`🔄 Applying template: ${template.name}`);
+
+        // Set command patterns
+        this.setCommandsToTags(template.patterns);
+        
+        // Set main code
+        const commandCodeEl = document.getElementById('commandCode');
+        if (commandCodeEl) {
+            commandCodeEl.value = template.code;
+            console.log(`✅ Code applied: ${template.code.length} characters`);
+        }
+        
+        // Handle wait for answer
+        const waitForAnswer = Boolean(template.waitForAnswer);
+        const waitForAnswerEl = document.getElementById('waitForAnswer');
+        if (waitForAnswerEl) {
+            waitForAnswerEl.checked = waitForAnswer;
+            this.toggleAnswerHandler(waitForAnswer);
+            console.log(`✅ Wait for answer: ${waitForAnswer}`);
+        }
+        
+        // Set answer handler if available
+        const answerHandlerEl = document.getElementById('answerHandler');
+        if (waitForAnswer && template.answerHandler && answerHandlerEl) {
+            answerHandlerEl.value = template.answerHandler;
+            console.log(`✅ Answer handler applied: ${template.answerHandler.length} characters`);
+        } else if (answerHandlerEl) {
+            answerHandlerEl.value = '';
+        }
+        
+        // Close template modal
+        const templatesModal = document.getElementById('templatesModal');
+        if (templatesModal) {
+            templatesModal.style.display = 'none';
+        }
+        
+        // Auto-create new command if none selected
+        if (!this.currentCommand || this.currentCommand.id === 'new') {
+            this.addNewCommand();
+        }
+        
+        // Focus on command code editor
+        setTimeout(() => {
+            if (commandCodeEl) {
+                commandCodeEl.focus();
+                commandCodeEl.scrollIntoView({ behavior: 'smooth' });
+            }
+        }, 100);
+        
+        this.showSuccess(`Template "${template.name}" applied successfully!`);
+        
+    } catch (error) {
+        console.error('❌ Apply template error:', error);
+        this.showError('Failed to apply template: ' + error.message);
     }
+}
 
     async checkAuth() {
         const token = localStorage.getItem('token');
