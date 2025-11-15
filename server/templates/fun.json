@@ -1,0 +1,29 @@
+[
+    {
+        "id": "coin_flip",
+        "name": "Coin Flip",
+        "patterns": "/coin, flip, toss",
+        "description": "Flip a virtual coin",
+        "code": "const result = Math.random() < 0.5 ? 'Heads' : 'Tails';\nconst emoji = result === 'Heads' ? '🪙' : '🪙';\n\nApi.sendMessage(`${emoji} Coin Flip Result:\\n\\n**${result}**!`);",
+        "waitForAnswer": false,
+        "answerHandler": ""
+    },
+    {
+        "id": "dice_roller",
+        "name": "Dice Roller", 
+        "patterns": "/dice, roll, dicegame",
+        "description": "Roll virtual dice",
+        "code": "const diceCount = 1;\nlet results = [];\nlet total = 0;\n\nfor (let i = 0; i < diceCount; i++) {\n    const roll = Math.floor(Math.random() * 6) + 1;\n    results.push(roll);\n    total += roll;\n}\n\nconst diceEmojis = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];\nconst emojiResult = results.map(r => diceEmojis[r-1]).join(' ');\n\nApi.sendMessage(`🎲 Dice Roll Result:\\n\\n${emojiResult}\\n\\nTotal: **${total}**`);",
+        "waitForAnswer": false,
+        "answerHandler": ""
+    },
+    {
+        "id": "fortune_teller",
+        "name": "Fortune Teller",
+        "patterns": "/fortune, predict, future",
+        "description": "Get a random fortune prediction",
+        "code": "const fortunes = [\n    \"You will have great success today! 🌟\",\n    \"A pleasant surprise is waiting for you! 🎁\", \n    \"Good news will come to you soon! 📨\",\n    \"Today is your lucky day! 🍀\",\n    \"Someone is thinking of you! 💭\",\n    \"Your hard work will pay off! 💪\",\n    \"Adventure awaits you! 🗺️\",\n    \"You will make a new friend! 👋\"\n];\n\nconst randomFortune = fortunes[Math.floor(Math.random() * fortunes.length)];\n\nApi.sendMessage(`🔮 *Fortune Teller*\\n\\n${randomFortune}`);",
+        "waitForAnswer": false,
+        "answerHandler": ""
+    }
+]
