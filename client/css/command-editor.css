@@ -868,6 +868,28 @@
     max-width: 400px;
 }
 
+/* Code Editor Textarea */
+#commandCode, #answerHandler {
+    width: 100%;
+    min-height: 200px;
+    padding: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    resize: vertical;
+    transition: var(--transition);
+}
+
+#commandCode:focus, #answerHandler:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
 /* Responsive Design */
 @media (max-width: 1024px) {
     .editor-layout {
@@ -1052,26 +1074,4 @@
 .category-tab:focus {
     outline: 2px solid var(--primary-color);
     outline-offset: 2px;
-}
-
-/* Code Editor Textarea */
-#commandCode, #answerHandler {
-    width: 100%;
-    min-height: 200px;
-    padding: 1rem;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    font-family: 'Courier New', monospace;
-    font-size: 14px;
-    line-height: 1.5;
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    resize: vertical;
-    transition: var(--transition);
-}
-
-#commandCode:focus, #answerHandler:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
