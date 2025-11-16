@@ -167,13 +167,18 @@ body {
     backdrop-filter: blur(20px);
 }
 
+/* FIXED: Fluid Navigation Container */
 .navbar .container {
+    max-width: none; /* ← container সীমা রিমুভ */
+    margin: 0;       /* ← auto margin রিমুভ */
+    padding: 0 clamp(1rem, 3vw, 2rem); /* ← শুধু সাইড প্যাডিং */
+    width: auto;     /* ← কন্টেন্ট অনুযায়ী প্রস্থ */
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 clamp(0.5rem, 2vw, 1rem);
-    min-height: clamp(3.5rem, 8vw, 4rem);
+    flex-wrap: nowrap; /* ← আইটেম ভাঙ্গবে না */
 }
+
 
 /* Brand Styles */
 .nav-brand {
