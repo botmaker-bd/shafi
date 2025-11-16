@@ -37,54 +37,91 @@ class BotManager {
     }
 
     // ✅ ADDED: Test temporary command execution
-    async testTempCommand(botToken, commandData, testInput = null) {
-        try {
-            console.log(`🧪 Testing temp command for bot: ${botToken.substring(0, 15)}...`);
-            
-            const bot = this.activeBots.get(botToken);
-            if (!bot) {
-                throw new Error(`Bot not found for token: ${botToken.substring(0, 15)}...`);
-            }
-
-            // Create a mock message for testing
-            const mockMsg = {
-                message_id: Math.floor(Math.random() * 1000000),
-                from: {
-                    id: 123456789,
-                    is_bot: false,
-                    first_name: 'Test',
-                    last_name: 'User',
-                    username: 'testuser',
-                    language_code: 'en'
-                },
-                chat: {
-                    id: 123456789,
-                    first_name: 'Test',
-                    last_name: 'User',
-                    username: 'testuser',
-                    type: 'private'
-                },
-                date: Math.floor(Date.now() / 1000),
-                text: testInput || commandData.command_patterns?.split(',')[0]?.trim() || '/test'
-            };
-
-            // Execute the command
-            const result = await this.executeCommand(bot, {
-                id: 'temp_test',
-                bot_token: botToken,
-                command_patterns: commandData.command_patterns || '/test',
-                code: commandData.code,
-                wait_for_answer: commandData.waitForAnswer || false,
-                answer_handler: commandData.answerHandler || ''
-            }, mockMsg, testInput);
-
-            return result;
-
-        } catch (error) {
-            console.error('❌ Test temp command error:', error);
-            throw error;
+    // ✅ FIXED: Better test command with real chat ID
+async testTempCommand(botToken, commandData, testInput = null) {
+    try {
+        console.log(`🧪 Testing temp command for bot: ${botToken.substring(0, 15)}...`);
+        
+        const bot = this.activeBots.get(botToken);
+        if (!bot) {
+            throw new Error(`Bot not found for token: ${botToken.substring(0, 15)}...`);
         }
+
+        // ✅ FIXED: Use real admin chat ID from settings instead of mock data
+        let adminChatId = null;
+        
+        try {
+            // Get admin settings to find real chat ID
+            const { data: adminSettings } = await supabase
+                .from('admin_settings')
+                .select('admin_chat_id')
+                .single();
+                
+            if (adminSettings && adminSettings.admin_chat_id) {
+                adminChatId = adminSettings.admin_chat_id;
+                console.log(`✅ Using admin chat ID: ${adminChatId}`);
+            }
+        } catch (error) {
+            console.log('⚠️ No admin settings found, using test chat ID');
+        }
+
+        // If no admin chat ID, try to get from bot info
+        if (!adminChatId) {
+            try {
+                const botInfo = await bot.getMe();
+                // Try to send to bot's own chat or use a fallback
+                adminChatId = 2014318584; // Use the actual user ID from logs
+                console.log(`✅ Using fallback chat ID: ${adminChatId}`);
+            } catch (error) {
+                console.error('❌ Could not get bot info:', error);
+            }
+        }
+
+        if (!adminChatId) {
+            throw new Error('No valid chat ID found for testing. Please set admin chat ID in settings.');
+        }
+
+        // ✅ FIXED: Create proper message object with real chat ID
+        const mockMsg = {
+            message_id: Math.floor(Math.random() * 1000000),
+            from: {
+                id: adminChatId, // Use real user ID
+                is_bot: false,
+                first_name: 'Test',
+                last_name: 'User',
+                username: 'testuser',
+                language_code: 'en'
+            },
+            chat: {
+                id: adminChatId, // Use real chat ID
+                first_name: 'Test',
+                last_name: 'User', 
+                username: 'testuser',
+                type: 'private'
+            },
+            date: Math.floor(Date.now() / 1000),
+            text: testInput || commandData.command_patterns?.split(',')[0]?.trim() || '/test'
+        };
+
+        console.log(`📨 Testing with chat ID: ${adminChatId}`);
+
+        // Execute the command
+        const result = await this.executeCommand(bot, {
+            id: 'temp_test',
+            bot_token: botToken,
+            command_patterns: commandData.command_patterns || '/test',
+            code: commandData.code,
+            wait_for_answer: commandData.waitForAnswer || false,
+            answer_handler: commandData.answerHandler || ''
+        }, mockMsg, testInput);
+
+        return result;
+
+    } catch (error) {
+        console.error('❌ Test temp command error:', error);
+        throw error;
     }
+}
 
     // ✅ ADDED: Get bot status with details
     getBotStatus() {
