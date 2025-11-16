@@ -5,7 +5,7 @@ class CommandEditor {
         this.currentCommand = null;
         this.commands = [];
         this.templates = {};
-        this.originalCode = ''; // Track original code for save button state
+        this.originalCode = '';
         this.init();
     }
 
@@ -42,7 +42,6 @@ class CommandEditor {
                 this.templates = data.templates || {};
                 console.log(`✅ Loaded ${Object.keys(this.templates).length} template categories`);
                 
-                // Debug: Log template counts
                 Object.entries(this.templates).forEach(([category, templates]) => {
                     console.log(`📁 ${category}: ${templates?.length || 0} templates`);
                 });
@@ -54,7 +53,6 @@ class CommandEditor {
         } catch (error) {
             console.error('❌ Load templates error:', error);
             this.showError('Failed to load templates: ' + error.message);
-            // Fallback with basic templates
             this.templates = {
                 'basic': [
                     {
@@ -81,11 +79,9 @@ class CommandEditor {
             return;
         }
 
-        // Clear existing content
         templatesContent.innerHTML = '';
         categoryTabsContainer.innerHTML = '';
 
-        // If no templates available
         if (!this.templates || Object.keys(this.templates).length === 0) {
             templatesContent.innerHTML = `
                 <div class="empty-state">
@@ -106,7 +102,6 @@ class CommandEditor {
         let templatesHTML = '';
         let firstCategory = true;
 
-        // Generate category tabs and template content
         Object.entries(this.templates).forEach(([category, templates]) => {
             if (!Array.isArray(templates) || templates.length === 0) {
                 console.warn(`⚠️ No templates found for category: ${category}`);
@@ -117,14 +112,12 @@ class CommandEditor {
             const isActive = firstCategory ? 'active' : '';
             const displayName = this.formatCategoryName(category);
             
-            // Category tab
             categoriesHTML += `
                 <button class="category-tab ${isActive}" data-category="${category}">
                     ${displayName} (${templates.length})
                 </button>
             `;
 
-            // Template category content
             const categoryTemplatesHTML = templates.map(template => {
                 try {
                     return this.createTemplateCard(template);
@@ -153,8 +146,6 @@ class CommandEditor {
 
         categoryTabsContainer.innerHTML = categoriesHTML;
         templatesContent.innerHTML = templatesHTML;
-
-        // Setup template events
         this.setupTemplateEvents();
         
         console.log('✅ Templates modal populated successfully');
@@ -166,7 +157,6 @@ class CommandEditor {
             return '<div class="template-card invalid">Invalid Template</div>';
         }
         
-        // Validate required fields
         if (!template.id || !template.name || !template.code) {
             console.error('❌ Template missing required fields:', template);
             return '<div class="template-card invalid">Invalid Template Data</div>';
@@ -182,10 +172,7 @@ class CommandEditor {
             answerHandler: template.answerHandler || ''
         };
 
-        // Get appropriate icon
         const templateIcon = this.getTemplateIcon(safeTemplate.name);
-
-        // FIXED: Simple JSON stringification without complex escaping
         const templateJson = JSON.stringify(safeTemplate);
 
         return `
@@ -211,7 +198,6 @@ class CommandEditor {
     }
 
     setupTemplateEvents() {
-        // Template apply button events
         document.addEventListener('click', (e) => {
             if (e.target.classList.contains('btn-apply')) {
                 const button = e.target;
@@ -219,7 +205,6 @@ class CommandEditor {
                 
                 if (templateData) {
                     try {
-                        // Parse the template data
                         const template = JSON.parse(templateData);
                         console.log('🔄 Applying template from button:', template.name);
                         this.applyTemplate(template);
@@ -231,18 +216,15 @@ class CommandEditor {
             }
         });
 
-        // Category tab events
         document.addEventListener('click', (e) => {
             if (e.target.classList.contains('category-tab')) {
                 const category = e.target.dataset.category;
                 const categoryTabs = document.querySelectorAll('.category-tab');
                 const templateCategories = document.querySelectorAll('.template-category');
                 
-                // Update tabs
                 categoryTabs.forEach(t => t.classList.remove('active'));
                 e.target.classList.add('active');
                 
-                // Update content
                 templateCategories.forEach(cat => cat.classList.remove('active'));
                 const targetCategory = document.getElementById(`${category}-templates`);
                 if (targetCategory) {
@@ -289,7 +271,7 @@ class CommandEditor {
             }
         }
 
-        return 'fas fa-code'; // Default icon
+        return 'fas fa-code';
     }
 
     formatCategoryName(category) {
@@ -308,7 +290,6 @@ class CommandEditor {
     }
 
     setupEventListeners() {
-        // Navigation
         document.getElementById('backToBots').addEventListener('click', () => {
             window.location.href = 'bot-management.html';
         });
@@ -317,7 +298,6 @@ class CommandEditor {
             this.quickTest();
         });
 
-        // Command actions
         document.getElementById('addCommandBtn').addEventListener('click', () => {
             this.addNewCommand();
         });
@@ -330,7 +310,6 @@ class CommandEditor {
             this.addNewCommand();
         });
 
-        // Form actions
         document.getElementById('saveCommandBtn').addEventListener('click', (e) => {
             e.preventDefault();
             this.saveCommand();
@@ -352,12 +331,10 @@ class CommandEditor {
             this.runCustomTest();
         });
 
-        // Toggle switches
         document.getElementById('waitForAnswer').addEventListener('change', (e) => {
             this.toggleAnswerHandler(e.target.checked);
         });
 
-        // Code editor buttons
         document.getElementById('openEditor').addEventListener('click', () => {
             this.openCodeEditor('main');
         });
@@ -366,12 +343,10 @@ class CommandEditor {
             this.openCodeEditor('answer');
         });
 
-        // Templates
         document.getElementById('showTemplates').addEventListener('click', () => {
             this.showTemplates();
         });
 
-        // Search
         let searchTimeout;
         document.getElementById('commandSearch').addEventListener('input', (e) => {
             clearTimeout(searchTimeout);
@@ -380,7 +355,6 @@ class CommandEditor {
             }, 300);
         });
 
-        // Modal events
         this.setupModalEvents();
     }
 
@@ -391,11 +365,8 @@ class CommandEditor {
             return;
         }
         
-        // Setup both cancel buttons
         const cancelEditBtn = document.getElementById('cancelEdit');
         const cancelEditTopBtn = document.getElementById('cancelEditTop');
-        
-        // Setup both save buttons
         const saveCodeBtn = document.getElementById('saveCode');
         const saveCodeTopBtn = document.getElementById('saveCodeTop');
         
@@ -423,7 +394,6 @@ class CommandEditor {
             });
         }
 
-        // Setup toolbar buttons
         this.setupToolbarButtons();
 
         advancedEditor.addEventListener('input', (e) => {
@@ -431,7 +401,6 @@ class CommandEditor {
             this.updateSaveButtonState();
         });
 
-        // Initial stats update
         this.updateEditorStats(advancedEditor.value);
         this.updateSaveButtonState();
     }
@@ -439,7 +408,6 @@ class CommandEditor {
     setupToolbarButtons() {
         const editor = document.getElementById('advancedCodeEditor');
         
-        // Undo/Redo functionality
         document.getElementById('undoBtn').addEventListener('click', () => {
             document.execCommand('undo');
             editor.focus();
@@ -450,25 +418,21 @@ class CommandEditor {
             editor.focus();
         });
         
-        // Select All
         document.getElementById('selectAllBtn').addEventListener('click', () => {
             editor.select();
             editor.focus();
         });
         
-        // Cut
         document.getElementById('cutBtn').addEventListener('click', () => {
             document.execCommand('cut');
             editor.focus();
         });
         
-        // Copy
         document.getElementById('copyBtn').addEventListener('click', () => {
             document.execCommand('copy');
             editor.focus();
         });
         
-        // Paste
         document.getElementById('pasteBtn').addEventListener('click', async () => {
             try {
                 const text = await navigator.clipboard.readText();
@@ -481,7 +445,6 @@ class CommandEditor {
             editor.focus();
         });
         
-        // Clear
         document.getElementById('clearBtn').addEventListener('click', () => {
             if (confirm('Are you sure you want to clear all code?')) {
                 editor.value = '';
@@ -491,7 +454,6 @@ class CommandEditor {
             }
         });
         
-        // Format (basic indentation)
         document.getElementById('formatBtn').addEventListener('click', () => {
             this.formatCode();
             editor.focus();
@@ -517,10 +479,8 @@ class CommandEditor {
         const saveBtn = document.getElementById('saveCode');
         const saveTopBtn = document.getElementById('saveCodeTop');
         
-        // Check if content has changed
         const hasChanged = advancedEditor.value !== this.originalCode;
         const hasContent = advancedEditor.value.trim().length > 0;
-        
         const shouldEnable = hasContent && hasChanged;
         
         if (saveBtn) {
@@ -548,7 +508,6 @@ class CommandEditor {
         const editor = document.getElementById('advancedCodeEditor');
         let code = editor.value;
         
-        // Basic formatting - add proper indentation
         const lines = code.split('\n');
         let formattedLines = [];
         let indentLevel = 0;
@@ -556,15 +515,12 @@ class CommandEditor {
         for (let line of lines) {
             const trimmedLine = line.trim();
             
-            // Decrease indent for closing braces
             if (trimmedLine.endsWith('}') || trimmedLine.endsWith(']') || trimmedLine.endsWith(')')) {
                 indentLevel = Math.max(0, indentLevel - 1);
             }
             
-            // Add current line with proper indentation
             formattedLines.push('    '.repeat(indentLevel) + trimmedLine);
             
-            // Increase indent for opening braces
             if (trimmedLine.endsWith('{') || trimmedLine.endsWith('[') || trimmedLine.endsWith('(')) {
                 indentLevel++;
             }
@@ -592,7 +548,7 @@ class CommandEditor {
         const advancedEditor = document.getElementById('advancedCodeEditor');
         if (advancedEditor) {
             advancedEditor.value = code;
-            this.originalCode = code; // Store original code for change detection
+            this.originalCode = code;
             this.updateEditorStats(code);
             this.updateSaveButtonState();
         }
@@ -600,7 +556,6 @@ class CommandEditor {
         const codeEditorModal = document.getElementById('codeEditorModal');
         if (codeEditorModal) {
             codeEditorModal.style.display = 'flex';
-            // Prevent body scroll
             document.body.style.overflow = 'hidden';
         }
         
@@ -608,7 +563,6 @@ class CommandEditor {
             const editor = document.getElementById('advancedCodeEditor');
             if (editor) {
                 editor.focus();
-                // Move cursor to end
                 editor.setSelectionRange(editor.value.length, editor.value.length);
             }
         }, 100);
@@ -618,7 +572,6 @@ class CommandEditor {
         const codeEditorModal = document.getElementById('codeEditorModal');
         if (codeEditorModal) {
             codeEditorModal.style.display = 'none';
-            // Restore body scroll
             document.body.style.overflow = '';
         }
     }
@@ -637,7 +590,7 @@ class CommandEditor {
             if (answerHandlerEl) answerHandlerEl.value = code;
         }
         
-        this.originalCode = code; // Update original code after save
+        this.originalCode = code;
         this.updateSaveButtonState();
         this.closeCodeEditor();
         this.showSuccess('Code saved successfully!');
@@ -754,7 +707,6 @@ class CommandEditor {
                 });
             }
             
-            // ESC key to close modal
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape' && modal.style.display === 'flex') {
                     modal.style.display = 'none';
@@ -986,7 +938,6 @@ class CommandEditor {
                 this.showCommandEditor();
                 this.populateCommandForm();
                 
-                // Update UI selection
                 document.querySelectorAll('.command-group').forEach(group => {
                     group.classList.remove('active');
                 });
@@ -1149,7 +1100,6 @@ class CommandEditor {
                     this.currentCommand = data.command;
                     this.populateCommandForm();
                     
-                    // Auto-select the saved command
                     setTimeout(() => {
                         const commandGroup = document.querySelector(`[data-command-id="${this.currentCommand.id}"]`);
                         if (commandGroup) {
@@ -1376,7 +1326,6 @@ class CommandEditor {
             if (response.ok) {
                 let resultText = data.result || 'Command executed successfully';
                 
-                // Handle object results
                 if (typeof resultText === 'object') {
                     if (resultText.message) {
                         resultText = resultText.message;
@@ -1469,7 +1418,6 @@ class CommandEditor {
         
         modal.style.display = 'flex';
         
-        // Load templates if not already loaded
         if (Object.keys(this.templates).length === 0) {
             this.loadTemplates();
         }
@@ -1479,7 +1427,6 @@ class CommandEditor {
         try {
             console.log('🔄 Starting template application:', template);
 
-            // Validate template
             if (!template || typeof template !== 'object') {
                 throw new Error('Template data is invalid or empty');
             }
@@ -1488,12 +1435,10 @@ class CommandEditor {
                 throw new Error('Template code is missing');
             }
 
-            // Create new command if none exists
             if (!this.currentCommand || this.currentCommand.id !== 'new') {
                 console.log('📝 Creating new command for template...');
                 this.addNewCommand();
                 
-                // Wait for form to be ready
                 setTimeout(() => {
                     this.finalizeTemplateApplication(template);
                 }, 100);
@@ -1511,19 +1456,15 @@ class CommandEditor {
         try {
             console.log('🎯 Finalizing template application:', template.name);
 
-            // 1. Set command patterns
             if (template.patterns) {
                 this.setCommandsToTags(template.patterns);
                 console.log('✅ Patterns set:', template.patterns);
             }
 
-            // 2. Set main code (FIXED: Properly handle code)
             const commandCodeEl = document.getElementById('commandCode');
             if (commandCodeEl && template.code) {
-                // Clean the code - fix escaped characters
                 let cleanCode = template.code;
                 
-                // Replace escaped characters
                 cleanCode = cleanCode.replace(/\\\\n/g, '\n');
                 cleanCode = cleanCode.replace(/\\\\t/g, '\t');
                 cleanCode = cleanCode.replace(/\\\\"/g, '"');
@@ -1534,7 +1475,6 @@ class CommandEditor {
                 console.log('✅ Code applied, length:', cleanCode.length);
             }
 
-            // 3. Handle wait for answer
             const waitForAnswerEl = document.getElementById('waitForAnswer');
             if (waitForAnswerEl) {
                 const shouldWait = Boolean(template.waitForAnswer);
@@ -1543,7 +1483,6 @@ class CommandEditor {
                 console.log('✅ Wait for answer:', shouldWait);
             }
 
-            // 4. Set answer handler if needed
             const answerHandlerEl = document.getElementById('answerHandler');
             if (answerHandlerEl && template.answerHandler) {
                 let cleanAnswerHandler = template.answerHandler;
@@ -1553,13 +1492,11 @@ class CommandEditor {
                 console.log('✅ Answer handler applied');
             }
 
-            // 5. Close templates modal
             const templatesModal = document.getElementById('templatesModal');
             if (templatesModal) {
                 templatesModal.style.display = 'none';
             }
 
-            // 6. Focus on code editor
             setTimeout(() => {
                 const commandCodeEl = document.getElementById('commandCode');
                 if (commandCodeEl) {
@@ -1568,10 +1505,8 @@ class CommandEditor {
                 }
             }, 200);
 
-            // 7. Show success message
             this.showSuccess(`"${template.name}" template applied successfully! 🎉`);
 
-            // 8. Debug log
             console.log('✅ Template application completed successfully');
 
         } catch (error) {
@@ -1685,19 +1620,16 @@ class CommandEditor {
     }
 }
 
-// Initialize command editor
 let commandEditor;
 
 document.addEventListener('DOMContentLoaded', () => {
     commandEditor = new CommandEditor();
     
-    // Add click event for command groups
     document.addEventListener('click', (e) => {
         const commandGroup = e.target.closest('.command-group');
         if (commandGroup && commandGroup.dataset.commandId) {
             const commandId = commandGroup.dataset.commandId;
             
-            // Prevent multiple rapid clicks
             if (commandEditor.currentCommand?.id === commandId) {
                 return;
             }
@@ -1708,7 +1640,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
-    // Add event listener for waitForAnswer toggle
     const waitForAnswerToggle = document.getElementById('waitForAnswer');
     if (waitForAnswerToggle && commandEditor) {
         waitForAnswerToggle.addEventListener('change', (e) => {
