@@ -1,5 +1,5 @@
 const ApiWrapper = require('./api-wrapper');
-const vm = require('vm'); // ✅ Use VM for safer execution
+const vm = require('vm');
 
 async function executeCommandCode(botInstance, code, context) {
     return new Promise(async (resolve, reject) => {
@@ -9,7 +9,7 @@ async function executeCommandCode(botInstance, code, context) {
             console.log(`\n🔧 ========== COMMAND EXECUTION START ==========`);
             console.log(`👤 User: ${first_name} (${userId})`);
             console.log(`🤖 Bot: ${botToken.substring(0, 15)}...`);
-            console.log(`💬 Input: "${userInput}"`);
+            console.log(`💬 Input: "${userInput || msg.text || 'No input'}"`);
 
             // Create execution context
             const executionContext = {
@@ -21,7 +21,7 @@ async function executeCommandCode(botInstance, code, context) {
                 last_name: context.last_name || '',
                 language_code: context.language_code || '',
                 botToken: botToken,
-                userInput: userInput,
+                userInput: userInput || msg.text || '',
                 User: context.User,
                 Bot: context.Bot
             };
@@ -29,7 +29,7 @@ async function executeCommandCode(botInstance, code, context) {
             // Create ApiWrapper instance
             const apiWrapper = new ApiWrapper(botInstance, executionContext);
 
-            // ✅ SAFER execution environment
+            // ✅ FIXED: Safer execution environment without return statement issue
             const executionEnv = {
                 // Core methods
                 bot: botInstance,
@@ -50,9 +50,9 @@ async function executeCommandCode(botInstance, code, context) {
                 msg: msg,
                 chatId: chatId,
                 userId: userId,
-                userInput: userInput,
-                params: userInput,
-                text: userInput,
+                userInput: userInput || msg.text || '',
+                params: userInput || msg.text || '',
+                text: userInput || msg.text || '',
                 
                 // Data storage
                 User: context.User,
@@ -105,8 +105,8 @@ async function executeCommandCode(botInstance, code, context) {
             console.log('🚀 Executing user command code...');
 
             try {
-                // ✅ Use VM for safer execution
-                const script = new vm.Script(`
+                // ✅ FIXED: Remove the problematic return statement
+                const wrappedCode = `
                     try {
                         const { 
                             bot, Api, Bot, getUser, User,
@@ -115,18 +115,24 @@ async function executeCommandCode(botInstance, code, context) {
                             Math, Date, JSON, console, String, Number, Boolean, Array, Object, RegExp
                         } = this;
 
+                        // User's code execution
                         ${code}
 
-                        return typeof result !== 'undefined' ? result : "Command executed successfully";
+                        // Auto-return if user doesn't return anything
+                        if (typeof result !== 'undefined') {
+                            return result;
+                        }
+                        return "Command executed successfully";
                     } catch (error) {
                         console.error('User code execution error:', error);
                         throw error;
                     }
-                `);
+                `;
 
+                const script = new vm.Script(wrappedCode);
                 const sandbox = vm.createContext(executionEnv);
                 const result = script.runInContext(sandbox, {
-                    timeout: 30000, // 30 second timeout
+                    timeout: 30000,
                     displayErrors: true
                 });
 
@@ -138,7 +144,16 @@ async function executeCommandCode(botInstance, code, context) {
 
             } catch (vmError) {
                 console.error('❌ VM execution error:', vmError);
-                throw new Error(`Code execution error: ${vmError.message}`);
+                
+                // ✅ Better error message for common issues
+                let userFriendlyError = vmError.message;
+                if (vmError.message.includes('Illegal return statement')) {
+                    userFriendlyError = 'Syntax error: Remove return statements from your code. Use Api.sendMessage() instead.';
+                } else if (vmError.message.includes('Unexpected token')) {
+                    userFriendlyError = 'Syntax error: Check your JavaScript code for typos.';
+                }
+                
+                throw new Error(`Code execution error: ${userFriendlyError}`);
             }
 
         } catch (error) {
