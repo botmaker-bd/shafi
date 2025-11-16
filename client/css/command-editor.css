@@ -1075,28 +1075,3 @@
     border-color: var(--primary-color);
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
-
-/* client/css/command-editor.css - এ যোগ করুন */
-.required-field {
-    border-left: 4px solid #ef4444;
-    padding-left: 12px;
-    background-color: #fef2f2;
-}
-
-.required-field label {
-    color: #dc2626;
-    font-weight: 600;
-}
-
-.answer-handler-error {
-    color: #dc2626;
-    font-size: 0.875rem;
-    margin-top: 0.5rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.answer-handler-error::before {
-    content: "⚠️";
-}
