@@ -7,10 +7,8 @@
     "start": "node server/index.js",
     "dev": "nodemon server/index.js",
     "build": "echo 'No build needed'",
-    "test": "echo 'No tests specified'",
-    "render-start": "node server/index.js",
-    "setup-python": "python3 --version && pip3 --version",
-    "install-deps": "npm install"
+    "setup-python": "chmod +x scripts/setup-python-env.sh && ./scripts/setup-python-env.sh",
+    "install-deps": "npm install && pip3 install -r requirements.txt"
   },
   "dependencies": {
     "express": "^4.18.2",
@@ -29,7 +27,6 @@
     "nodemon": "^3.0.1"
   },
   "engines": {
-    "node": ">=18.0.0",
-    "npm": ">=8.0.0"
+    "node": ">=18.0.0"
   }
 }
