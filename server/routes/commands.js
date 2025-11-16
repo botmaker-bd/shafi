@@ -74,30 +74,19 @@ router.get('/:commandId', async (req, res) => {
 });
 
 // Add new command
-// Add new command
 router.post('/', async (req, res) => {
     try {
         const { botToken, commandPatterns, code, waitForAnswer, answerHandler } = req.body;
 
         console.log('🔄 Adding new command:', { 
             commandPatterns: commandPatterns?.substring(0, 50) + '...',
-            botToken: botToken?.substring(0, 10) + '...',
-            waitForAnswer: waitForAnswer,
-            hasAnswerHandler: !!answerHandler
+            botToken: botToken?.substring(0, 10) + '...' 
         });
 
         if (!botToken || !commandPatterns || !code) {
             return res.status(400).json({ 
                 success: false,
                 error: 'Bot token, command patterns and code are required' 
-            });
-        }
-
-        // ✅ NEW: Validate Wait For Answer
-        if (waitForAnswer && (!answerHandler || answerHandler.trim().length === 0)) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'Answer handler code is required when Wait For Answer is enabled' 
             });
         }
 
@@ -140,7 +129,7 @@ router.post('/', async (req, res) => {
                 command_patterns: commandPatterns.trim(),
                 code: code.trim(),
                 wait_for_answer: waitForAnswer || false,
-                answer_handler: waitForAnswer ? answerHandler.trim() : null, // ✅ Only save if waitForAnswer is true
+                answer_handler: answerHandler?.trim() || null,
                 is_active: true
             }])
             .select('*')
@@ -172,31 +161,17 @@ router.post('/', async (req, res) => {
 });
 
 // Update command
-// Update command
 router.put('/:commandId', async (req, res) => {
     try {
         const { commandId } = req.params;
         const { commandPatterns, code, waitForAnswer, answerHandler, botToken } = req.body;
 
-        console.log('🔄 Updating command:', { 
-            commandId, 
-            commandPatterns: commandPatterns?.substring(0, 50) + '...',
-            waitForAnswer: waitForAnswer,
-            hasAnswerHandler: !!answerHandler
-        });
+        console.log('🔄 Updating command:', { commandId, commandPatterns: commandPatterns?.substring(0, 50) + '...' });
 
         if (!commandPatterns || !code) {
             return res.status(400).json({ 
                 success: false,
                 error: 'Command patterns and code are required' 
-            });
-        }
-
-        // ✅ NEW: Validate Wait For Answer
-        if (waitForAnswer && (!answerHandler || answerHandler.trim().length === 0)) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'Answer handler code is required when Wait For Answer is enabled' 
             });
         }
 
@@ -239,7 +214,7 @@ router.put('/:commandId', async (req, res) => {
                 command_patterns: commandPatterns.trim(),
                 code: code.trim(),
                 wait_for_answer: waitForAnswer || false,
-                answer_handler: waitForAnswer ? answerHandler.trim() : null, // ✅ Only save if waitForAnswer is true
+                answer_handler: answerHandler?.trim() || null,
                 updated_at: new Date().toISOString()
             })
             .eq('id', commandId)
@@ -375,30 +350,39 @@ router.post('/:commandId/test', async (req, res) => {
     }
 });
 // ✅ FIXED: Temporary command test
-// server/routes/commands.js - test-temp endpoint এ improvement
+// server/routes/commands.js - test-temp endpoint improve করুন
+// ✅ FIXED: Temporary command test
 router.post('/test-temp', async (req, res) => {
     try {
         const { command, botToken, testInput } = req.body;
 
-        // ✅ IMPROVED: Use the actual user's chat ID instead of admin ID
-        const token = req.headers.authorization?.replace('Bearer ', '');
-        if (!token) {
-            return res.status(401).json({ 
+        // ✅ Get ACTUAL admin chat ID (not test ID)
+        const { data: adminSettings, error: adminError } = await supabase
+            .from('admin_settings')
+            .select('admin_chat_id')
+            .single();
+
+        if (adminError || !adminSettings?.admin_chat_id) {
+            return res.status(400).json({ 
                 success: false,
-                error: 'Authentication required' 
+                error: 'Admin chat ID not set. Please set admin settings first.' 
             });
         }
 
-        // Decode token to get user ID (you'll need to implement this)
-        const jwt = require('jsonwebtoken');
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const userChatId = decoded.userId; // Or get from users table
+        // ✅ Get bot instance from bot manager
+        const bot = botManager.getBotInstance(botToken);
+        if (!bot) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Bot is not active. Please check if bot is properly initialized.' 
+            });
+        }
 
-        // ✅ Use actual user's chat ID for more realistic testing
+        // ✅ Use REAL admin chat ID for testing
         const testMessage = {
-            chat: { id: userChatId },
+            chat: { id: adminSettings.admin_chat_id },
             from: {
-                id: userChatId,
+                id: adminSettings.admin_chat_id, // ✅ Actual user ID
                 first_name: 'Test User',
                 username: 'testuser'
             },
@@ -406,22 +390,16 @@ router.post('/test-temp', async (req, res) => {
             text: testInput || command.command_patterns.split(',')[0]
         };
 
-        // Rest of the code remains same...
-        const bot = botManager.getBotInstance(botToken);
-        if (!bot) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'Bot is not active' 
-            });
-        }
+        console.log(`🧪 Testing command with REAL chat ID: ${adminSettings.admin_chat_id}`);
 
+        // ✅ Execute command and verify delivery
         const result = await botManager.executeCommand(bot, command, testMessage, testInput);
 
         res.json({
             success: true,
-            message: 'Command executed successfully!',
+            message: 'Command executed successfully! Check your Telegram bot for the message.',
             testInput: testInput,
-            chatId: userChatId,
+            chatId: adminSettings.admin_chat_id,
             result: result
         });
 
@@ -433,7 +411,6 @@ router.post('/test-temp', async (req, res) => {
         });
     }
 });
-
 
 // Toggle command status
 router.patch('/:commandId/toggle', async (req, res) => {
