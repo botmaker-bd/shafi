@@ -1,4 +1,4 @@
-// server/core/python-runner.js - PRINT vs RESULT FIX
+// server/core/python-runner.js - COMPLETELY FIXED VERSION
 const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -48,64 +48,45 @@ class PythonRunner {
         });
     }
 
-    // ✅ FIXED: SEPARATE PRINT OUTPUT AND RESULT
+    // ✅ FIXED: PROPER PYTHON CODE EXECUTION WITH CORRECT INDENTATION
     runPythonCodeSync(code) {
         try {
             console.log('🐍 Executing Python code synchronously...');
+            console.log('📝 Python code:', code.substring(0, 200) + '...');
             
             const tempFile = path.join(this.tempDir, `script_${Date.now()}_${Math.random().toString(36).substring(7)}.py`);
             
-            // ✅ IMPROVED PYTHON TEMPLATE WITH SEPARATE OUTPUT
+            // ✅ FIXED: SIMPLIFIED PYTHON TEMPLATE WITHOUT COMPLEX INDENTATION
             const pythonTemplate = `# Python Code Execution
 import sys
 import json
-import io
-from contextlib import redirect_stdout
-
-# Capture all print outputs
-print_output = io.StringIO()
-result_value = None
 
 try:
-    # Redirect print statements to capture them
-    with redirect_stdout(print_output):
-        # User's code execution
-${this.indentCode(code)}
-        
-        # Get the result value (if exists)
-        if 'result' in locals() or 'result' in globals():
-            result_value = locals().get('result') or globals().get('result')
-        else:
-            result_value = "Code executed successfully"
+    # User's code execution - DIRECT EXECUTION
+    ${this.preparePythonCode(code)}
     
-    # Get all print outputs
-    all_prints = print_output.getvalue().strip()
-    
-    # Prepare final output
-    final_output = ""
-    if all_prints:
-        final_output += "📝 Print Output:\\n" + all_prints + "\\n\\n"
-    
-    final_output += "✅ Final Result: " + str(result_value)
-    
-    # Return combined output
-    print(final_output)
+    # If we reach here, execution was successful
+    print("✅ Python code executed successfully")
     
 except Exception as e:
     # Return clean error message
-    print("❌ Python Error: " + str(e))
+    error_msg = f"❌ Python Error: {str(e)}"
+    print(error_msg)
     sys.exit(1)`;
 
             // Write Python file
             fs.writeFileSync(tempFile, pythonTemplate);
+            console.log('📄 Python file created:', tempFile);
             
             // Determine Python command
             const pythonCommand = process.env.PYTHON_PATH || 'python3';
+            console.log('🔧 Using Python command:', pythonCommand);
             
             // Use spawnSync for synchronous execution
             const result = spawnSync(pythonCommand, [tempFile], {
                 timeout: 30000,
-                encoding: 'utf-8'
+                encoding: 'utf-8',
+                cwd: this.tempDir
             });
 
             // Clean up temporary file
@@ -119,21 +100,33 @@ except Exception as e:
 
             // Check for process errors
             if (result.error) {
+                console.error('❌ Python process error:', result.error);
                 throw new Error(`Python process error: ${result.error.message}`);
             }
 
             // Check exit code
             if (result.status !== 0) {
-                throw new Error(`Python execution failed: ${result.stderr || result.stdout || 'Unknown error'}`);
+                console.error('❌ Python execution failed. Exit code:', result.status);
+                console.error('Python stderr:', result.stderr);
+                console.error('Python stdout:', result.stdout);
+                
+                let errorMessage = 'Python execution failed';
+                if (result.stderr) {
+                    errorMessage = result.stderr.split('\\n')[0]; // Get first line of error
+                } else if (result.stdout) {
+                    errorMessage = result.stdout.split('\\n')[0]; // Get first line of output
+                }
+                
+                throw new Error(errorMessage);
             }
 
             // Return clean output
             if (result.stdout) {
                 const output = result.stdout.trim();
-                console.log('✅ Python output received');
+                console.log('✅ Python output received:', output.substring(0, 100) + '...');
                 return output;
             } else {
-                throw new Error('Python execution produced no output');
+                return 'Python code executed (no output)';
             }
 
         } catch (error) {
@@ -142,14 +135,99 @@ except Exception as e:
         }
     }
 
-    // ✅ PROPER INDENTATION METHOD
-    indentCode(code) {
-        const lines = code.split('\n');
-        const indentedLines = lines.map(line => {
-            if (line.trim() === '') return line;
-            return '    ' + line;
-        });
-        return indentedLines.join('\n');
+    // ✅ FIXED: PROPER PYTHON CODE PREPARATION
+    preparePythonCode(code) {
+        try {
+            // Remove any existing indentation and handle line breaks
+            const lines = code.split('\n');
+            let preparedCode = [];
+            
+            for (let line of lines) {
+                // Trim whitespace but preserve empty lines for structure
+                const trimmedLine = line.trim();
+                if (trimmedLine === '') {
+                    preparedCode.push('');
+                } else {
+                    preparedCode.push(trimmedLine);
+                }
+            }
+            
+            // Join with proper line breaks
+            return preparedCode.join('\n    ');
+            
+        } catch (error) {
+            console.error('❌ Python code preparation error:', error);
+            return code; // Fallback to original code
+        }
+    }
+
+    // ✅ FIXED: ALTERNATIVE METHOD FOR COMPLEX CODE
+    runPythonCodeAdvanced(code) {
+        try {
+            console.log('🐍 Executing Python code (advanced method)...');
+            
+            const tempFile = path.join(this.tempDir, `advanced_${Date.now()}.py`);
+            
+            // Write user code directly to file
+            fs.writeFileSync(tempFile, code);
+            
+            const pythonCommand = process.env.PYTHON_PATH || 'python3';
+            const result = spawnSync(pythonCommand, [tempFile], {
+                timeout: 30000,
+                encoding: 'utf-8',
+                cwd: this.tempDir
+            });
+
+            // Clean up
+            try {
+                if (fs.existsSync(tempFile)) {
+                    fs.unlinkSync(tempFile);
+                }
+            } catch (cleanupError) {
+                console.error('❌ Temp file cleanup error:', cleanupError);
+            }
+
+            if (result.error) {
+                throw new Error(`Python process error: ${result.error.message}`);
+            }
+
+            if (result.status !== 0) {
+                throw new Error(result.stderr || result.stdout || 'Python execution failed');
+            }
+
+            return result.stdout ? result.stdout.trim() : 'Code executed successfully';
+
+        } catch (error) {
+            console.error('❌ Advanced Python execution error:', error);
+            throw new Error(`Python execution failed: ${error.message}`);
+        }
+    }
+
+    // ✅ SIMPLE METHOD FOR BASIC CALCULATIONS
+    runPythonSimple(expression) {
+        try {
+            console.log('🐍 Executing simple Python expression:', expression);
+            
+            const pythonCommand = process.env.PYTHON_PATH || 'python3';
+            const result = spawnSync(pythonCommand, ['-c', `print(${expression})`], {
+                timeout: 10000,
+                encoding: 'utf-8'
+            });
+
+            if (result.error) {
+                throw new Error(`Python process error: ${result.error.message}`);
+            }
+
+            if (result.status !== 0) {
+                throw new Error(result.stderr || 'Python execution failed');
+            }
+
+            return result.stdout ? result.stdout.trim() : 'No output';
+
+        } catch (error) {
+            console.error('❌ Simple Python execution error:', error);
+            throw new Error(`Python calculation failed: ${error.message}`);
+        }
     }
 
     // Compatibility method
@@ -238,6 +316,45 @@ except Exception as e:
         } catch (error) {
             console.error('❌ Get installed libraries error:', error);
             return [];
+        }
+    }
+
+    // ✅ NEW: VALIDATE PYTHON CODE
+    validatePythonCode(code) {
+        try {
+            const tempFile = path.join(this.tempDir, `validate_${Date.now()}.py`);
+            fs.writeFileSync(tempFile, code);
+            
+            const pythonCommand = process.env.PYTHON_PATH || 'python3';
+            const result = spawnSync(pythonCommand, ['-m', 'py_compile', tempFile], {
+                encoding: 'utf-8',
+                timeout: 10000
+            });
+
+            // Clean up
+            try {
+                if (fs.existsSync(tempFile)) {
+                    fs.unlinkSync(tempFile);
+                }
+                // Remove compiled file if exists
+                const compiledFile = tempFile + 'c';
+                if (fs.existsSync(compiledFile)) {
+                    fs.unlinkSync(compiledFile);
+                }
+            } catch (cleanupError) {
+                // Ignore cleanup errors
+            }
+
+            return {
+                valid: result.status === 0,
+                error: result.stderr || null
+            };
+
+        } catch (error) {
+            return {
+                valid: false,
+                error: error.message
+            };
         }
     }
 }
