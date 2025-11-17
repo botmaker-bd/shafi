@@ -1,0 +1,50 @@
+# render.yaml
+services:
+  - type: web
+    name: telegram-bot-platform
+    env: node
+    plan: free
+    buildCommand: |
+      # Node.js dependencies
+      npm install
+      
+      # Python environment with auto version resolution
+      python3 -m venv /opt/venv
+      source /opt/venv/bin/activate
+      pip3 install --upgrade pip
+      
+      # ✅ Core packages (latest compatible versions)
+      pip3 install telethon
+      pip3 install pandas
+      pip3 install numpy
+      pip3 install requests
+      pip3 install beautifulsoup4
+      pip3 install Pillow
+      pip3 install python-dotenv
+      pip3 install aiohttp
+      
+      # ✅ QR Code packages (latest stable)
+      pip3 install "qrcode[pil]"
+      pip3 install opencv-python-headless
+      
+      # Show installed versions
+      echo "📦 Installed Python packages:"
+      pip3 list | grep -E "(telethon|pandas|numpy|requests|beautifulsoup4|Pillow|qrcode|opencv)"
+      
+      echo "✅ All packages installed successfully"
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: USE_WEBHOOK
+        value: true
+      - key: BASE_URL
+        value: https://bot-maker-bd.onrender.com
+      - key: SUPABASE_URL
+        value: https://tyoaazgsoqvubgfychmd.supabase.co
+      - key: SUPABASE_KEY
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR5b2Fhemdzb3F2dWJnZnljaG1kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI3NTE0NDQsImV4cCI6MjA3ODMyNzQ0NH0.czWc-rOitmnn31iAvgTEvZj7bW-aJ2ysFymoWJ8UZCc
+      - key: PYTHON_PATH
+        value: /opt/venv/bin/python3
+    healthCheckPath: /api/health
+    autoDeploy: true
