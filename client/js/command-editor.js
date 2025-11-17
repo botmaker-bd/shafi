@@ -1,4 +1,3 @@
-// command-editor.js - Complete Mobile & Desktop Optimized
 class CommandEditor {
     constructor() {
         this.user = null;
@@ -6,10 +5,7 @@ class CommandEditor {
         this.currentCommand = null;
         this.commands = [];
         this.templates = {};
-        this.originalCode = '';
-        this.currentEditorType = null;
-        this.isMobile = window.innerWidth <= 768;
-        
+        this.originalCode = ''; // Track original code for save button state
         this.init();
     }
 
@@ -17,110 +13,11 @@ class CommandEditor {
         await this.checkAuth();
         await this.loadBotInfo();
         this.setupEventListeners();
-        this.setupMobileFeatures();
         await this.loadCommands();
         await this.loadTemplates();
         this.setupCodeEditor();
         this.setupCommandsTags();
         console.log('✅ Command editor initialized completely');
-    }
-
-    setupMobileFeatures() {
-        // Mobile FAB
-        const mobileFab = document.getElementById('mobileFab');
-        if (mobileFab) {
-            mobileFab.addEventListener('click', () => {
-                this.addNewCommand();
-            });
-        }
-
-        // Mobile back button
-        const mobileBackBtn = document.getElementById('mobileBackToList');
-        if (mobileBackBtn) {
-            mobileBackBtn.addEventListener('click', () => {
-                this.showCommandList();
-            });
-        }
-
-        // Mobile action bar buttons
-        const mobileSaveBtn = document.getElementById('mobileSaveBtn');
-        const mobileTestBtn = document.getElementById('mobileTestBtn');
-        const mobileToggleBtn = document.getElementById('mobileToggleBtn');
-
-        if (mobileSaveBtn) {
-            mobileSaveBtn.addEventListener('click', () => this.saveCommand());
-        }
-        if (mobileTestBtn) {
-            mobileTestBtn.addEventListener('click', () => this.testCommand());
-        }
-        if (mobileToggleBtn) {
-            mobileToggleBtn.addEventListener('click', () => this.toggleCommand());
-        }
-
-        // Handle resize
-        window.addEventListener('resize', () => {
-            this.isMobile = window.innerWidth <= 768;
-            this.handleResize();
-        });
-
-        // Touch events for better mobile UX
-        this.setupTouchEvents();
-    }
-
-    setupTouchEvents() {
-        // Better touch handling for command groups
-        document.addEventListener('touchstart', (e) => {
-            const commandGroup = e.target.closest('.command-group');
-            if (commandGroup) {
-                commandGroup.classList.add('touch-active');
-            }
-        }, { passive: true });
-
-        document.addEventListener('touchend', () => {
-            document.querySelectorAll('.command-group.touch-active').forEach(group => {
-                group.classList.remove('touch-active');
-            });
-        }, { passive: true });
-    }
-
-    handleResize() {
-        if (this.isMobile && this.currentCommand) {
-            this.showMobileEditorView();
-        } else if (!this.isMobile && this.currentCommand) {
-            this.showDesktopView();
-        }
-    }
-
-    showMobileEditorView() {
-        const sidebar = document.querySelector('.commands-sidebar');
-        const backHeader = document.querySelector('.mobile-back-header');
-        const actionBar = document.querySelector('.mobile-action-bar');
-
-        if (sidebar) sidebar.style.display = 'none';
-        if (backHeader) backHeader.style.display = 'block';
-        if (actionBar) actionBar.style.display = 'flex';
-    }
-
-    showCommandList() {
-        const sidebar = document.querySelector('.commands-sidebar');
-        const backHeader = document.querySelector('.mobile-back-header');
-        const actionBar = document.querySelector('.mobile-action-bar');
-
-        if (sidebar) sidebar.style.display = 'flex';
-        if (backHeader) backHeader.style.display = 'none';
-        if (actionBar) actionBar.style.display = 'none';
-        
-        this.hideCommandEditor();
-    }
-
-    showDesktopView() {
-        const sidebar = document.querySelector('.commands-sidebar');
-        const backHeader = document.querySelector('.mobile-back-header');
-        const actionBar = document.querySelector('.mobile-action-bar');
-
-        if (sidebar) sidebar.style.display = 'flex';
-        if (backHeader) backHeader.style.display = 'none';
-        if (actionBar) actionBar.style.display = 'none';
     }
 
     async loadTemplates() {
@@ -145,6 +42,7 @@ class CommandEditor {
                 this.templates = data.templates || {};
                 console.log(`✅ Loaded ${Object.keys(this.templates).length} template categories`);
                 
+                // Debug: Log template counts
                 Object.entries(this.templates).forEach(([category, templates]) => {
                     console.log(`📁 ${category}: ${templates?.length || 0} templates`);
                 });
@@ -183,9 +81,11 @@ class CommandEditor {
             return;
         }
 
+        // Clear existing content
         templatesContent.innerHTML = '';
         categoryTabsContainer.innerHTML = '';
 
+        // If no templates available
         if (!this.templates || Object.keys(this.templates).length === 0) {
             templatesContent.innerHTML = `
                 <div class="empty-state">
@@ -206,6 +106,7 @@ class CommandEditor {
         let templatesHTML = '';
         let firstCategory = true;
 
+        // Generate category tabs and template content
         Object.entries(this.templates).forEach(([category, templates]) => {
             if (!Array.isArray(templates) || templates.length === 0) {
                 console.warn(`⚠️ No templates found for category: ${category}`);
@@ -216,13 +117,14 @@ class CommandEditor {
             const isActive = firstCategory ? 'active' : '';
             const displayName = this.formatCategoryName(category);
             
+            // Category tab
             categoriesHTML += `
                 <button class="category-tab ${isActive}" data-category="${category}">
-                    <span class="btn-text-desktop">${displayName} (${templates.length})</span>
-                    <span class="btn-text-mobile">${displayName}</span>
+                    ${displayName} (${templates.length})
                 </button>
             `;
 
+            // Template category content
             const categoryTemplatesHTML = templates.map(template => {
                 try {
                     return this.createTemplateCard(template);
@@ -252,7 +154,9 @@ class CommandEditor {
         categoryTabsContainer.innerHTML = categoriesHTML;
         templatesContent.innerHTML = templatesHTML;
 
+        // Setup template events
         this.setupTemplateEvents();
+        
         console.log('✅ Templates modal populated successfully');
     }
 
@@ -262,6 +166,7 @@ class CommandEditor {
             return '<div class="template-card invalid">Invalid Template</div>';
         }
         
+        // Validate required fields
         if (!template.id || !template.name || !template.code) {
             console.error('❌ Template missing required fields:', template);
             return '<div class="template-card invalid">Invalid Template Data</div>';
@@ -277,7 +182,10 @@ class CommandEditor {
             answerHandler: template.answerHandler || ''
         };
 
+        // Get appropriate icon
         const templateIcon = this.getTemplateIcon(safeTemplate.name);
+
+        // FIXED: Simple JSON stringification without complex escaping
         const templateJson = JSON.stringify(safeTemplate);
 
         return `
@@ -288,16 +196,14 @@ class CommandEditor {
                     </div>
                     <div class="template-details">
                         <h4>${this.escapeHtml(safeTemplate.name)}</h4>
-                        <p class="mobile-hidden">${this.escapeHtml(safeTemplate.description)}</p>
+                        <p>${this.escapeHtml(safeTemplate.description)}</p>
                         <div class="template-patterns">${this.escapeHtml(safeTemplate.patterns)}</div>
                     </div>
                 </div>
                 <div class="template-footer">
                     <span class="template-type">${safeTemplate.waitForAnswer ? 'Interactive' : 'Simple'}</span>
                     <button class="btn-apply" data-template='${this.escapeHtml(templateJson)}'>
-                        <i class="fas fa-plus"></i>
-                        <span class="btn-text-desktop">Apply Template</span>
-                        <span class="btn-text-mobile">Apply</span>
+                        Apply Template
                     </button>
                 </div>
             </div>
@@ -305,13 +211,15 @@ class CommandEditor {
     }
 
     setupTemplateEvents() {
+        // Template apply button events
         document.addEventListener('click', (e) => {
-            if (e.target.classList.contains('btn-apply') || e.target.closest('.btn-apply')) {
-                const button = e.target.classList.contains('btn-apply') ? e.target : e.target.closest('.btn-apply');
+            if (e.target.classList.contains('btn-apply')) {
+                const button = e.target;
                 const templateData = button.getAttribute('data-template');
                 
                 if (templateData) {
                     try {
+                        // Parse the template data
                         const template = JSON.parse(templateData);
                         console.log('🔄 Applying template from button:', template.name);
                         this.applyTemplate(template);
@@ -321,39 +229,24 @@ class CommandEditor {
                     }
                 }
             }
+        });
 
+        // Category tab events
+        document.addEventListener('click', (e) => {
             if (e.target.classList.contains('category-tab')) {
                 const category = e.target.dataset.category;
                 const categoryTabs = document.querySelectorAll('.category-tab');
                 const templateCategories = document.querySelectorAll('.template-category');
                 
+                // Update tabs
                 categoryTabs.forEach(t => t.classList.remove('active'));
                 e.target.classList.add('active');
                 
+                // Update content
                 templateCategories.forEach(cat => cat.classList.remove('active'));
                 const targetCategory = document.getElementById(`${category}-templates`);
                 if (targetCategory) {
                     targetCategory.classList.add('active');
-                }
-            }
-        });
-
-        // Template card click
-        document.addEventListener('click', (e) => {
-            const templateCard = e.target.closest('.template-card');
-            if (templateCard && !e.target.closest('.btn-apply')) {
-                const applyBtn = templateCard.querySelector('.btn-apply');
-                if (applyBtn) {
-                    const templateData = applyBtn.getAttribute('data-template');
-                    if (templateData) {
-                        try {
-                            const template = JSON.parse(templateData);
-                            this.applyTemplate(template);
-                        } catch (error) {
-                            console.error('❌ Template parse error from card:', error);
-                            this.showError('Failed to parse template data: ' + error.message);
-                        }
-                    }
                 }
             }
         });
@@ -396,7 +289,7 @@ class CommandEditor {
             }
         }
 
-        return 'fas fa-code';
+        return 'fas fa-code'; // Default icon
     }
 
     formatCategoryName(category) {
@@ -489,15 +382,6 @@ class CommandEditor {
 
         // Modal events
         this.setupModalEvents();
-
-        // Mobile: handle search focus
-        document.getElementById('commandSearch').addEventListener('focus', () => {
-            if (this.isMobile) {
-                setTimeout(() => {
-                    document.getElementById('commandSearch').scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }, 300);
-            }
-        });
     }
 
     setupCodeEditor() {
@@ -633,8 +517,10 @@ class CommandEditor {
         const saveBtn = document.getElementById('saveCode');
         const saveTopBtn = document.getElementById('saveCodeTop');
         
+        // Check if content has changed
         const hasChanged = advancedEditor.value !== this.originalCode;
         const hasContent = advancedEditor.value.trim().length > 0;
+        
         const shouldEnable = hasContent && hasChanged;
         
         if (saveBtn) {
@@ -662,6 +548,7 @@ class CommandEditor {
         const editor = document.getElementById('advancedCodeEditor');
         let code = editor.value;
         
+        // Basic formatting - add proper indentation
         const lines = code.split('\n');
         let formattedLines = [];
         let indentLevel = 0;
@@ -669,12 +556,15 @@ class CommandEditor {
         for (let line of lines) {
             const trimmedLine = line.trim();
             
+            // Decrease indent for closing braces
             if (trimmedLine.endsWith('}') || trimmedLine.endsWith(']') || trimmedLine.endsWith(')')) {
                 indentLevel = Math.max(0, indentLevel - 1);
             }
             
+            // Add current line with proper indentation
             formattedLines.push('    '.repeat(indentLevel) + trimmedLine);
             
+            // Increase indent for opening braces
             if (trimmedLine.endsWith('{') || trimmedLine.endsWith('[') || trimmedLine.endsWith('(')) {
                 indentLevel++;
             }
@@ -702,14 +592,15 @@ class CommandEditor {
         const advancedEditor = document.getElementById('advancedCodeEditor');
         if (advancedEditor) {
             advancedEditor.value = code;
-            this.originalCode = code;
+            this.originalCode = code; // Store original code for change detection
             this.updateEditorStats(code);
             this.updateSaveButtonState();
         }
         
         const codeEditorModal = document.getElementById('codeEditorModal');
         if (codeEditorModal) {
-            codeEditorModal.classList.add('active');
+            codeEditorModal.style.display = 'flex';
+            // Prevent body scroll
             document.body.style.overflow = 'hidden';
         }
         
@@ -717,12 +608,8 @@ class CommandEditor {
             const editor = document.getElementById('advancedCodeEditor');
             if (editor) {
                 editor.focus();
+                // Move cursor to end
                 editor.setSelectionRange(editor.value.length, editor.value.length);
-                
-                // Mobile: scroll to editor
-                if (this.isMobile) {
-                    editor.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }
             }
         }, 100);
     }
@@ -730,7 +617,8 @@ class CommandEditor {
     closeCodeEditor() {
         const codeEditorModal = document.getElementById('codeEditorModal');
         if (codeEditorModal) {
-            codeEditorModal.classList.remove('active');
+            codeEditorModal.style.display = 'none';
+            // Restore body scroll
             document.body.style.overflow = '';
         }
     }
@@ -749,7 +637,7 @@ class CommandEditor {
             if (answerHandlerEl) answerHandlerEl.value = code;
         }
         
-        this.originalCode = code;
+        this.originalCode = code; // Update original code after save
         this.updateSaveButtonState();
         this.closeCodeEditor();
         this.showSuccess('Code saved successfully!');
@@ -796,15 +684,6 @@ class CommandEditor {
             
             moreCommandsInput.value = '';
         });
-
-        // Mobile: handle input with virtual keyboard
-        if (this.isMobile) {
-            moreCommandsInput.addEventListener('focus', () => {
-                setTimeout(() => {
-                    moreCommandsInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }, 300);
-            });
-        }
     }
 
     addCommandTag(command) {
@@ -875,6 +754,7 @@ class CommandEditor {
                 });
             }
             
+            // ESC key to close modal
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape' && modal.style.display === 'flex') {
                     modal.style.display = 'none';
@@ -913,34 +793,38 @@ class CommandEditor {
         });
     }
 
-    toggleAnswerHandler(show) {
-        const section = document.getElementById('answerHandlerSection');
-        const waitForAnswerEl = document.getElementById('waitForAnswer');
-        const answerHandlerEl = document.getElementById('answerHandler');
+// client/js/command-editor.js - toggleAnswerHandler() method এ improvement
+toggleAnswerHandler(show) {
+    const section = document.getElementById('answerHandlerSection');
+    const waitForAnswerEl = document.getElementById('waitForAnswer');
+    const answerHandlerEl = document.getElementById('answerHandler');
+    
+    if (section) {
+        section.style.display = show ? 'block' : 'none';
         
-        if (section) {
-            section.style.display = show ? 'block' : 'none';
-            
-            if (show) {
-                section.classList.add('required-field');
-                if (answerHandlerEl) {
-                    answerHandlerEl.placeholder = '⚠️ Required: Code to handle user\'s answer...';
-                    answerHandlerEl.required = true;
-                }
-            } else {
-                section.classList.remove('required-field');
-                if (answerHandlerEl) {
-                    answerHandlerEl.placeholder = 'Code to handle user\'s answer...';
-                    answerHandlerEl.required = false;
-                }
+        // ✅ NEW: Add visual indication for required field
+        if (show) {
+            section.classList.add('required-field');
+            if (answerHandlerEl) {
+                answerHandlerEl.placeholder = '⚠️ Required: Code to handle user\'s answer...';
+                answerHandlerEl.required = true;
+            }
+        } else {
+            section.classList.remove('required-field');
+            if (answerHandlerEl) {
+                answerHandlerEl.placeholder = 'Code to handle user\'s answer...';
+                answerHandlerEl.required = false;
             }
         }
-        
-        if (!show) {
-            const errorElements = document.querySelectorAll('.answer-handler-error');
-            errorElements.forEach(el => el.remove());
-        }
     }
+    
+    // ✅ NEW: Also validate immediately when toggled
+    if (!show) {
+        // If turning off waitForAnswer, clear any previous errors
+        const errorElements = document.querySelectorAll('.answer-handler-error');
+        errorElements.forEach(el => el.remove());
+    }
+}
 
     async loadBotInfo() {
         const urlParams = new URLSearchParams(window.location.search);
@@ -1056,8 +940,7 @@ class CommandEditor {
                                 <i class="fas fa-circle"></i>
                                 ${isActive ? 'Active' : 'Inactive'}
                             </span>
-                            ${command.wait_for_answer ? '<span class="command-feature mobile-hidden">⏳ Waits</span>' : ''}
-                            <span class="command-id mobile-hidden">CMD-${command.id}</span>
+                            ${command.wait_for_answer ? '<span class="command-feature">⏳ Waits</span>' : ''}
                         </div>
                     </div>
                 </div>
@@ -1101,11 +984,6 @@ class CommandEditor {
         this.showCommandEditor();
         this.populateCommandForm();
         
-        // Mobile: switch to editor view
-        if (this.isMobile) {
-            this.showMobileEditorView();
-        }
-        
         setTimeout(() => {
             const moreCommandsInput = document.getElementById('moreCommands');
             if (moreCommandsInput) {
@@ -1133,11 +1011,6 @@ class CommandEditor {
                 this.currentCommand = data.command;
                 this.showCommandEditor();
                 this.populateCommandForm();
-                
-                // Mobile: switch to editor view
-                if (this.isMobile) {
-                    this.showMobileEditorView();
-                }
                 
                 // Update UI selection
                 document.querySelectorAll('.command-group').forEach(group => {
@@ -1215,127 +1088,122 @@ class CommandEditor {
         
         if (deleteBtn) {
             deleteBtn.disabled = isNew;
-            if (this.isMobile) {
-                deleteBtn.innerHTML = `<i class="fas fa-trash"></i>`;
-            } else {
-                deleteBtn.innerHTML = `<i class="fas fa-trash"></i> Delete`;
-            }
         }
         
         if (toggleBtn) {
             const text = this.currentCommand?.is_active ? 'Deactivate' : 'Activate';
-            if (this.isMobile) {
-                toggleBtn.innerHTML = `<i class="fas fa-power-off"></i>`;
-            } else {
-                toggleBtn.innerHTML = `<i class="fas fa-power-off"></i> ${text}`;
-            }
+            toggleBtn.innerHTML = `<i class="fas fa-power-off"></i> ${text}`;
         }
     }
 
-    async saveCommand() {
-        if (!this.currentCommand || !this.currentBot) {
-            this.showError('No command selected or bot not loaded');
-            return false;
-        }
-
-        const commands = this.getCommandsFromTags();
-        
-        if (commands.length === 0) {
-            this.showError('Please add at least one command pattern');
-            const moreCommandsInput = document.getElementById('moreCommands');
-            if (moreCommandsInput) moreCommandsInput.focus();
-            return false;
-        }
-
-        const commandCodeEl = document.getElementById('commandCode');
-        const commandCode = commandCodeEl ? commandCodeEl.value.trim() : '';
-
-        if (!commandCode) {
-            this.showError('Command code is required');
-            if (commandCodeEl) commandCodeEl.focus();
-            return false;
-        }
-
-        const waitForAnswerEl = document.getElementById('waitForAnswer');
-        const answerHandlerEl = document.getElementById('answerHandler');
-        
-        const waitForAnswer = waitForAnswerEl ? waitForAnswerEl.checked : false;
-        const answerHandler = waitForAnswer && answerHandlerEl ? answerHandlerEl.value.trim() : '';
-
-        if (waitForAnswer && !answerHandler) {
-            this.showError('Answer handler code is required when "Wait for Answer" is enabled');
-            if (answerHandlerEl) {
-                answerHandlerEl.focus();
-                const answerSection = document.getElementById('answerHandlerSection');
-                if (answerSection) answerSection.style.display = 'block';
-            }
-            return false;
-        }
-
-        const formData = {
-            commandPatterns: commands.join(','),
-            code: commandCode,
-            waitForAnswer: waitForAnswer,
-            answerHandler: answerHandler,
-            botToken: this.currentBot.token
-        };
-
-        this.showLoading(true);
-
-        try {
-            const token = localStorage.getItem('token');
-            let response;
-            let url;
-            let method;
-
-            if (this.currentCommand.id === 'new') {
-                url = '/api/commands';
-                method = 'POST';
-            } else {
-                url = `/api/commands/${this.currentCommand.id}`;
-                method = 'PUT';
-            }
-
-            response = await fetch(url, {
-                method: method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(formData)
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                this.showSuccess('Command saved successfully!');
-                
-                await this.loadCommands();
-                
-                if (data.command) {
-                    this.currentCommand = data.command;
-                    this.populateCommandForm();
-                    
-                    setTimeout(() => {
-                        const commandGroup = document.querySelector(`[data-command-id="${this.currentCommand.id}"]`);
-                        if (commandGroup) {
-                            commandGroup.click();
-                        }
-                    }, 500);
-                }
-                
-                return true;
-            } else {
-                this.showError(data.error || 'Failed to save command');
-                return false;
-            }
-        } catch (error) {
-            this.showError('Network error while saving command');
-            return false;
-        } finally {
-            this.showLoading(false);
-        }
+// client/js/command-editor.js - saveCommand() method এ যোগ করুন
+async saveCommand() {
+    if (!this.currentCommand || !this.currentBot) {
+        this.showError('No command selected or bot not loaded');
+        return false;
     }
+
+    const commands = this.getCommandsFromTags();
+    
+    if (commands.length === 0) {
+        this.showError('Please add at least one command pattern');
+        const moreCommandsInput = document.getElementById('moreCommands');
+        if (moreCommandsInput) moreCommandsInput.focus();
+        return false;
+    }
+
+    const commandCodeEl = document.getElementById('commandCode');
+    const commandCode = commandCodeEl ? commandCodeEl.value.trim() : '';
+
+    if (!commandCode) {
+        this.showError('Command code is required');
+        if (commandCodeEl) commandCodeEl.focus();
+        return false;
+    }
+
+    const waitForAnswerEl = document.getElementById('waitForAnswer');
+    const answerHandlerEl = document.getElementById('answerHandler');
+    
+    const waitForAnswer = waitForAnswerEl ? waitForAnswerEl.checked : false;
+    const answerHandler = waitForAnswer && answerHandlerEl ? answerHandlerEl.value.trim() : '';
+
+    // ✅ NEW: Client-side validation
+    if (waitForAnswer && !answerHandler) {
+        this.showError('Answer handler code is required when "Wait for Answer" is enabled');
+        if (answerHandlerEl) {
+            answerHandlerEl.focus();
+            // Show the answer handler section if hidden
+            const answerSection = document.getElementById('answerHandlerSection');
+            if (answerSection) answerSection.style.display = 'block';
+        }
+        return false;
+    }
+
+    const formData = {
+        commandPatterns: commands.join(','),
+        code: commandCode,
+        waitForAnswer: waitForAnswer,
+        answerHandler: answerHandler,
+        botToken: this.currentBot.token
+    };
+
+    this.showLoading(true);
+
+    try {
+        const token = localStorage.getItem('token');
+        let response;
+        let url;
+        let method;
+
+        if (this.currentCommand.id === 'new') {
+            url = '/api/commands';
+            method = 'POST';
+        } else {
+            url = `/api/commands/${this.currentCommand.id}`;
+            method = 'PUT';
+        }
+
+        response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(formData)
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            this.showSuccess('Command saved successfully!');
+            
+            await this.loadCommands();
+            
+            if (data.command) {
+                this.currentCommand = data.command;
+                this.populateCommandForm();
+                
+                // Auto-select the saved command
+                setTimeout(() => {
+                    const commandGroup = document.querySelector(`[data-command-id="${this.currentCommand.id}"]`);
+                    if (commandGroup) {
+                        commandGroup.click();
+                    }
+                }, 500);
+            }
+            
+            return true;
+        } else {
+            this.showError(data.error || 'Failed to save command');
+            return false;
+        }
+    } catch (error) {
+        this.showError('Network error while saving command');
+        return false;
+    } finally {
+        this.showLoading(false);
+    }
+}
 
     async deleteCommand() {
         if (!this.currentCommand || this.currentCommand.id === 'new') {
@@ -1542,6 +1410,7 @@ class CommandEditor {
             if (response.ok) {
                 let resultText = data.result || 'Command executed successfully';
                 
+                // Handle object results
                 if (typeof resultText === 'object') {
                     if (resultText.message) {
                         resultText = resultText.message;
@@ -1634,6 +1503,7 @@ class CommandEditor {
         
         modal.style.display = 'flex';
         
+        // Load templates if not already loaded
         if (Object.keys(this.templates).length === 0) {
             this.loadTemplates();
         }
@@ -1643,6 +1513,7 @@ class CommandEditor {
         try {
             console.log('🔄 Starting template application:', template);
 
+            // Validate template
             if (!template || typeof template !== 'object') {
                 throw new Error('Template data is invalid or empty');
             }
@@ -1651,10 +1522,12 @@ class CommandEditor {
                 throw new Error('Template code is missing');
             }
 
+            // Create new command if none exists
             if (!this.currentCommand || this.currentCommand.id !== 'new') {
                 console.log('📝 Creating new command for template...');
                 this.addNewCommand();
                 
+                // Wait for form to be ready
                 setTimeout(() => {
                     this.finalizeTemplateApplication(template);
                 }, 100);
@@ -1672,15 +1545,19 @@ class CommandEditor {
         try {
             console.log('🎯 Finalizing template application:', template.name);
 
+            // 1. Set command patterns
             if (template.patterns) {
                 this.setCommandsToTags(template.patterns);
                 console.log('✅ Patterns set:', template.patterns);
             }
 
+            // 2. Set main code (FIXED: Properly handle code)
             const commandCodeEl = document.getElementById('commandCode');
             if (commandCodeEl && template.code) {
+                // Clean the code - fix escaped characters
                 let cleanCode = template.code;
                 
+                // Replace escaped characters
                 cleanCode = cleanCode.replace(/\\\\n/g, '\n');
                 cleanCode = cleanCode.replace(/\\\\t/g, '\t');
                 cleanCode = cleanCode.replace(/\\\\"/g, '"');
@@ -1691,6 +1568,7 @@ class CommandEditor {
                 console.log('✅ Code applied, length:', cleanCode.length);
             }
 
+            // 3. Handle wait for answer
             const waitForAnswerEl = document.getElementById('waitForAnswer');
             if (waitForAnswerEl) {
                 const shouldWait = Boolean(template.waitForAnswer);
@@ -1699,6 +1577,7 @@ class CommandEditor {
                 console.log('✅ Wait for answer:', shouldWait);
             }
 
+            // 4. Set answer handler if needed
             const answerHandlerEl = document.getElementById('answerHandler');
             if (answerHandlerEl && template.answerHandler) {
                 let cleanAnswerHandler = template.answerHandler;
@@ -1708,11 +1587,13 @@ class CommandEditor {
                 console.log('✅ Answer handler applied');
             }
 
+            // 5. Close templates modal
             const templatesModal = document.getElementById('templatesModal');
             if (templatesModal) {
                 templatesModal.style.display = 'none';
             }
 
+            // 6. Focus on code editor
             setTimeout(() => {
                 const commandCodeEl = document.getElementById('commandCode');
                 if (commandCodeEl) {
@@ -1721,7 +1602,10 @@ class CommandEditor {
                 }
             }, 200);
 
+            // 7. Show success message
             this.showSuccess(`"${template.name}" template applied successfully! 🎉`);
+
+            // 8. Debug log
             console.log('✅ Template application completed successfully');
 
         } catch (error) {
@@ -1841,11 +1725,13 @@ let commandEditor;
 document.addEventListener('DOMContentLoaded', () => {
     commandEditor = new CommandEditor();
     
+    // Add click event for command groups
     document.addEventListener('click', (e) => {
         const commandGroup = e.target.closest('.command-group');
         if (commandGroup && commandGroup.dataset.commandId) {
             const commandId = commandGroup.dataset.commandId;
             
+            // Prevent multiple rapid clicks
             if (commandEditor.currentCommand?.id === commandId) {
                 return;
             }
@@ -1856,6 +1742,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
+    // Add event listener for waitForAnswer toggle
     const waitForAnswerToggle = document.getElementById('waitForAnswer');
     if (waitForAnswerToggle && commandEditor) {
         waitForAnswerToggle.addEventListener('change', (e) => {
