@@ -54,58 +54,30 @@ class PythonRunner {
             try {
                 const tempFile = path.join(this.tempDir, `script_${Date.now()}_${Math.random().toString(36).substring(7)}.py`);
                 
-                // Enhanced Python template with common libraries and better error handling
-                const pythonTemplate = `
-import sys
+                // ✅ COMPLETELY NEW SIMPLE PYTHON TEMPLATE
+                const pythonTemplate = `import sys
 import json
-import math
-import random
-import datetime
-import os
 import traceback
 
-# Try to import common libraries
+# User code execution - SIMPLE VERSION
 try:
-    import requests
-except ImportError:
-    requests = None
-
-# Input data handling
-input_data = None
-if len(sys.argv) > 1 and sys.argv[1].strip():
-    try:
-        input_data = json.loads(sys.argv[1])
-    except json.JSONDecodeError:
-        input_data = sys.argv[1]
-
-# User code execution
-try:
-    # User's code will be inserted here
-    ${code}
-    
-    # If no result variable, check for output
+${this.indentCode(code)}
+    # If no result variable
     if 'result' not in locals() and 'result' not in globals():
         result = "Code executed successfully"
-        
+    
+    # Return success
+    print(json.dumps({"success": True, "result": result}))
+
 except Exception as e:
-    error_info = {
+    # Return error
+    print(json.dumps({
+        "success": False,
         "error": str(e),
         "type": type(e).__name__,
         "traceback": traceback.format_exc()
-    }
-    print(json.dumps({"success": False, **error_info}))
-    sys.exit(1)
-else:
-    # Convert result to JSON-serializable format
-    import json
-    try:
-        json.dumps(result)
-        output_result = result
-    except:
-        output_result = str(result)
-    
-    print(json.dumps({"success": True, "result": output_result}))
-`;
+    }))
+    sys.exit(1)`;
 
                 fs.writeFileSync(tempFile, pythonTemplate);
                 
@@ -175,6 +147,19 @@ else:
                 reject(new Error(`Python runner setup error: ${error.message}`));
             }
         });
+    }
+
+    // ✅ NEW METHOD: Properly indent user code
+    indentCode(code) {
+        // Split code into lines and indent each line
+        const lines = code.split('\n');
+        const indentedLines = lines.map(line => {
+            // Skip empty lines
+            if (line.trim() === '') return '';
+            // Indent with 4 spaces
+            return '    ' + line;
+        });
+        return indentedLines.join('\n');
     }
 
     async installPythonLibrary(libraryName) {
