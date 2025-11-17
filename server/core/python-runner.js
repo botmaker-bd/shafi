@@ -54,7 +54,7 @@ class PythonRunner {
             try {
                 const tempFile = path.join(this.tempDir, `script_${Date.now()}_${Math.random().toString(36).substring(7)}.py`);
                 
-                // Enhanced Python template with common libraries and better error handling
+                // FIXED: Python template with proper indentation
                 const pythonTemplate = `
 import sys
 import json
@@ -97,7 +97,6 @@ except Exception as e:
     sys.exit(1)
 else:
     # Convert result to JSON-serializable format
-    import json
     try:
         json.dumps(result)
         output_result = result
