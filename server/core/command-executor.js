@@ -1,8 +1,8 @@
-// server/core/command-executor.js - COMPLETE FIXED VERSION
+// server/core/command-executor.js - COMPLETELY FIXED WAIT FOR ANSWER
 async function executeCommandCode(botInstance, code, context) {
     return new Promise(async (resolve, reject) => {
         try {
-            const { msg, chatId, userId, username, first_name, botToken, userInput, nextCommandHandlers, waitingAnswers } = context;
+            const { msg, chatId, userId, username, first_name, botToken, userInput, nextCommandHandlers } = context;
             
             // Handle optional fields
             const lastName = context.last_name || '';
@@ -25,7 +25,6 @@ async function executeCommandCode(botInstance, code, context) {
                 botToken: botToken,
                 userInput: userInput,
                 nextCommandHandlers: nextCommandHandlers || new Map(),
-                waitingAnswers: waitingAnswers || new Map(),
                 User: context.User || {},
                 Bot: context.Bot || {}
             };
@@ -59,14 +58,58 @@ async function executeCommandCode(botInstance, code, context) {
                 }
             };
 
-            // ✅ FIXED: PROPER BOT OBJECT WITH ALL METHODS
-            const botObject = {
-                // Copy all methods from apiWrapperInstance
-                ...apiWrapperInstance,
-                // ✅ EXPLICITLY ADD runPython method
-                runPython: (pythonCode) => runPythonSync(pythonCode),
-                // ✅ ADD ask method as alias for waitForAnswer
-                ask: apiWrapperInstance.waitForAnswer ? apiWrapperInstance.waitForAnswer.bind(apiWrapperInstance) : null
+            // ✅ FIXED: PROPER WAIT FOR ANSWER IMPLEMENTATION
+            const waitForAnswer = (question, options = {}) => {
+                return new Promise((resolve, reject) => {
+                    try {
+                        console.log(`⏳ Setting up waitForAnswer for user ${userId}`);
+                        
+                        // First send the question
+                        botInstance.sendMessage(chatId, question, options)
+                            .then(() => {
+                                // Create unique key for this waiting answer
+                                const waitKey = `${botToken}_${userId}`;
+                                
+                                console.log(`🔑 Wait key created: ${waitKey}`);
+                                
+                                // Store the resolver in nextCommandHandlers
+                                if (nextCommandHandlers) {
+                                    // Store both resolve and reject functions
+                                    nextCommandHandlers.set(waitKey, {
+                                        resolve: resolve,
+                                        reject: reject,
+                                        timestamp: Date.now()
+                                    });
+                                    
+                                    console.log(`✅ WaitForAnswer handler stored for ${waitKey}`);
+                                } else {
+                                    reject(new Error('nextCommandHandlers not available'));
+                                    return;
+                                }
+                                
+                                // Set timeout to clean up (5 minutes)
+                                setTimeout(() => {
+                                    if (nextCommandHandlers && nextCommandHandlers.has(waitKey)) {
+                                        const handler = nextCommandHandlers.get(waitKey);
+                                        if (handler && handler.reject) {
+                                            handler.reject(new Error('Wait for answer timeout (5 minutes)'));
+                                        }
+                                        nextCommandHandlers.delete(waitKey);
+                                        console.log(`⏰ WaitForAnswer timeout for ${waitKey}`);
+                                    }
+                                }, 5 * 60 * 1000);
+                                
+                            })
+                            .catch(sendError => {
+                                console.error('❌ Failed to send waitForAnswer question:', sendError);
+                                reject(new Error('Failed to send question: ' + sendError.message));
+                            });
+                            
+                    } catch (error) {
+                        console.error('❌ WaitForAnswer setup error:', error);
+                        reject(new Error('WaitForAnswer setup failed: ' + error.message));
+                    }
+                });
             };
 
             // Create execution environment
@@ -75,8 +118,16 @@ async function executeCommandCode(botInstance, code, context) {
                 bot: apiWrapperInstance,      // bot.sendMessage()
                 Api: apiWrapperInstance,      // Api.sendMessage()  
                 
-                // ✅ FIXED: Proper Bot object with all methods
-                Bot: botObject,
+                // ✅ FIX: Bot object with runPython method
+                Bot: {
+                    // Copy all methods from apiWrapperInstance
+                    ...apiWrapperInstance,
+                    // ✅ ADD runPython method specifically
+                    runPython: (pythonCode) => runPythonSync(pythonCode),
+                    // ✅ ADD waitForAnswer method to Bot
+                    waitForAnswer: waitForAnswer,
+                    ask: waitForAnswer
+                },
                 
                 // === USER INFORMATION ===
                 getUser: () => ({
@@ -194,14 +245,17 @@ async function executeCommandCode(botInstance, code, context) {
                 },
                 
                 // === HANDLERS ===
-                nextCommandHandlers: nextCommandHandlers || new Map(),
-                waitingAnswers: waitingAnswers || new Map(),
+                nextCommandHandlers: nextCommandHandlers,
                 
                 // === UTILITY FUNCTIONS ===
                 wait: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
                 
                 // ✅ SYNCHRONOUS PYTHON EXECUTION
-                runPython: (pythonCode) => runPythonSync(pythonCode)
+                runPython: (pythonCode) => runPythonSync(pythonCode),
+                
+                // ✅ WAIT FOR ANSWER FUNCTIONS
+                waitForAnswer: waitForAnswer,
+                ask: waitForAnswer
             };
 
             // Direct function shortcuts
@@ -227,62 +281,50 @@ async function executeCommandCode(botInstance, code, context) {
                 getUser: () => executionEnv.getUser(),
                 wait: (ms) => executionEnv.wait(ms),
                 // ✅ SYNCHRONOUS PYTHON
-                runPython: (code) => executionEnv.runPython(code)
+                runPython: (code) => executionEnv.runPython(code),
+                // ✅ WAIT FOR ANSWER
+                waitForAnswer: waitForAnswer,
+                ask: waitForAnswer
             };
-
-            // ✅ FIXED: PROPER WAIT FOR ANSWER IMPLEMENTATION
-            const waitForAnswer = async (question, options = {}) => {
-                return new Promise(async (resolve) => {
-                    try {
-                        console.log('⏳ WaitForAnswer started for question:', question);
-                        
-                        // First send the question
-                        await directFunctions.sendMessage(question, options);
-                        
-                        // Create unique key for this waiting answer
-                        const waitKey = `wait_${botToken}_${userId}_${Date.now()}`;
-                        console.log('🔑 Wait key created:', waitKey);
-                        
-                        // ✅ FIXED: Use nextCommandHandlers instead of waitingAnswers
-                        if (nextCommandHandlers) {
-                            nextCommandHandlers.set(waitKey, (answer) => {
-                                console.log('✅ Answer received:', answer);
-                                resolve(answer);
-                            });
-                            
-                            // Set timeout to clean up (5 minutes)
-                            setTimeout(() => {
-                                if (nextCommandHandlers && nextCommandHandlers.has(waitKey)) {
-                                    nextCommandHandlers.delete(waitKey);
-                                    console.log('⏰ WaitForAnswer timeout');
-                                    resolve("Timeout - no answer received");
-                                }
-                            }, 5 * 60 * 1000);
-                        } else {
-                            resolve("Error: nextCommandHandlers not available");
-                        }
-                        
-                    } catch (error) {
-                        console.error('WaitForAnswer error:', error);
-                        resolve("Error asking question: " + error.message);
-                    }
-                });
-            };
-
-            // ✅ FIXED: Add ask as alias
-            const ask = waitForAnswer;
 
             // Merge all functions
             const finalContext = {
                 ...executionEnv,
-                ...directFunctions,
-                waitForAnswer: waitForAnswer,
-                ask: ask
+                ...directFunctions
+            };
+
+            // ✅ FIXED: SIMPLE EXECUTION FUNCTION
+            const executeUserCode = function(
+                getUser, sendMessage, bot, Api, Bot, 
+                params, message, User, BotData, wait, runPython, waitForAnswer, ask
+            ) {
+                try {
+                    var user = getUser();
+                    console.log('✅ Execution started for user:', user.first_name);
+                    console.log('📝 User input:', message);
+                    console.log('📋 Parameters:', params);
+                    console.log('⏳ WaitForAnswer available:', typeof waitForAnswer);
+                    console.log('❓ Ask available:', typeof ask);
+                    
+                    // ✅ USER'S CODE EXECUTES HERE - SYNCHRONOUSLY
+                    // The 'code' variable content is inserted here
+                    
+                    return "Command completed successfully";
+                } catch (error) {
+                    console.error('❌ Execution error:', error);
+                    try {
+                        sendMessage("❌ Error: " + error.message);
+                    } catch (e) {
+                        console.error('Failed to send error message:', e);
+                    }
+                    throw error;
+                }
             };
 
             // ✅ FIXED: Create the execution function with user code properly injected
-            const executionCode = `
-                try {
+            const executionFunction = new Function(
+                'getUser', 'sendMessage', 'bot', 'Api', 'Bot', 'params', 'message', 'User', 'BotData', 'wait', 'runPython', 'waitForAnswer', 'ask',
+                `try {
                     var user = getUser();
                     console.log('✅ Execution started for user:', user.first_name);
                     console.log('📝 User input:', message);
@@ -305,13 +347,7 @@ async function executeCommandCode(botInstance, code, context) {
                         console.error('Failed to send error message:', e);
                     }
                     throw error;
-                }
-            `;
-
-            // Create execution function
-            const executionFunction = new Function(
-                'getUser', 'sendMessage', 'bot', 'Api', 'Bot', 'params', 'message', 'User', 'BotData', 'waitForAnswer', 'ask', 'wait', 'runPython',
-                executionCode
+                }`
             );
 
             // Execute the command
@@ -326,10 +362,10 @@ async function executeCommandCode(botInstance, code, context) {
                 finalContext.message,
                 finalContext.User,
                 finalContext.BotData,
-                finalContext.waitForAnswer,
-                finalContext.ask,
                 finalContext.wait,
-                finalContext.runPython
+                finalContext.runPython,
+                finalContext.waitForAnswer,
+                finalContext.ask
             );
             
             console.log('✅ Command execution completed');
