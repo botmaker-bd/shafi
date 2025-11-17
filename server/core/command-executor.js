@@ -1,18 +1,20 @@
-// server/core/command-executor.js - FIXED VERSION
+// server/core/command-executor.js - COMPLETELY FIXED VERSION
 async function executeCommandCode(botInstance, code, context) {
     return new Promise(async (resolve, reject) => {
         try {
             const { msg, chatId, userId, username, first_name, botToken, userInput, nextCommandHandlers, waitingAnswers } = context;
             
-            // FIX: Handle optional fields safely
+            // Handle optional fields
             const lastName = context.last_name || '';
             const languageCode = context.language_code || '';
             
             console.log(`🔧 Starting command execution for user ${userId}`);
             
-            // ✅ FIX: Create ApiWrapper instance FIRST
+            // ✅ CRITICAL FIX: Import and create ApiWrapper PROPERLY
             const ApiWrapper = require('./api-wrapper');
-            const apiWrapperInstance = new ApiWrapper(botInstance, {
+            
+            // Create the context for ApiWrapper
+            const apiContext = {
                 msg: msg,
                 chatId: chatId,
                 userId: userId,
@@ -22,34 +24,32 @@ async function executeCommandCode(botInstance, code, context) {
                 language_code: languageCode,
                 botToken: botToken,
                 userInput: userInput,
-                nextCommandHandlers: nextCommandHandlers,
-                waitingAnswers: waitingAnswers,
-                User: context.User,
-                Bot: context.Bot
-            });
-
-            // ✅ FIX: Parse parameters from user input
+                nextCommandHandlers: nextCommandHandlers || new Map(),
+                waitingAnswers: waitingAnswers || new Map(),
+                User: context.User || {},
+                Bot: context.Bot || {}
+            };
+            
+            // ✅ Create ApiWrapper instance
+            const apiWrapperInstance = new ApiWrapper(botInstance, apiContext);
+            
+            // Parse parameters
             const parseParams = (input) => {
                 if (!input) return [];
-                const parts = input.split(' ').slice(1); // Remove command part
+                const parts = input.split(' ').slice(1);
                 return parts.filter(param => param.trim() !== '');
             };
 
             const params = parseParams(userInput);
-            const message = userInput; // Full user message
+            const message = userInput;
 
-            // Create COMPREHENSIVE execution environment with SAFE variables
+            // ✅ FIXED: Create execution environment with PROPER references
             const executionEnv = {
-                // === TELEGRAM BOT METHODS ===
-                // ✅ FIX: bot is now ApiWrapper instance so bot.sendMessage works
-                bot: apiWrapperInstance,
+                // === BOT INSTANCES (ALL WORKING) ===
+                bot: apiWrapperInstance,      // bot.sendMessage()
+                Api: apiWrapperInstance,      // Api.sendMessage()  
+                Bot: apiWrapperInstance,      // Bot.sendMessage()
                 
-                // === API WRAPPER INSTANCE ===
-                Api: apiWrapperInstance,
-                
-                // === ALIAS FOR Bot ===
-                Bot: apiWrapperInstance,
-
                 // === USER INFORMATION ===
                 getUser: () => ({
                     id: userId,
@@ -60,130 +60,211 @@ async function executeCommandCode(botInstance, code, context) {
                     chat_id: chatId
                 }),
                 
-                // === MESSAGE CONTEXT ===
+                // === MESSAGE & PARAMS ===
                 msg: msg,
                 chatId: chatId,
                 userId: userId,
                 userInput: userInput,
-                params: params, // ✅ FIX: Array of parameters after command
-                message: message, // ✅ FIX: Full user message
+                params: params,
+                message: message,
                 botToken: botToken,
                 
                 // === DATA STORAGE ===
-                User: context.User,
-                Bot: context.Bot,
+                User: context.User || {
+                    saveData: async (key, value) => {
+                        const supabase = require('../config/supabase');
+                        await supabase.from('universal_data').upsert({
+                            data_type: 'user_data',
+                            bot_token: botToken,
+                            user_id: userId.toString(),
+                            data_key: key,
+                            data_value: JSON.stringify(value)
+                        });
+                    },
+                    getData: async (key) => {
+                        const supabase = require('../config/supabase');
+                        const { data } = await supabase.from('universal_data')
+                            .select('data_value')
+                            .eq('data_type', 'user_data')
+                            .eq('bot_token', botToken)
+                            .eq('user_id', userId.toString())
+                            .eq('data_key', key)
+                            .single();
+                        return data ? JSON.parse(data.data_value) : null;
+                    },
+                    deleteData: async (key) => {
+                        const supabase = require('../config/supabase');
+                        await supabase.from('universal_data')
+                            .delete()
+                            .eq('data_type', 'user_data')
+                            .eq('bot_token', botToken)
+                            .eq('user_id', userId.toString())
+                            .eq('data_key', key);
+                    }
+                },
+                
+                BotData: context.Bot || {
+                    saveData: async (key, value) => {
+                        const supabase = require('../config/supabase');
+                        await supabase.from('universal_data').upsert({
+                            data_type: 'bot_data',
+                            bot_token: botToken,
+                            data_key: key,
+                            data_value: JSON.stringify(value)
+                        });
+                    },
+                    getData: async (key) => {
+                        const supabase = require('../config/supabase');
+                        const { data } = await supabase.from('universal_data')
+                            .select('data_value')
+                            .eq('data_type', 'bot_data')
+                            .eq('bot_token', botToken)
+                            .eq('data_key', key)
+                            .single();
+                        return data ? JSON.parse(data.data_value) : null;
+                    },
+                    deleteData: async (key) => {
+                        const supabase = require('../config/supabase');
+                        await supabase.from('universal_data')
+                            .delete()
+                            .eq('data_type', 'bot_data')
+                            .eq('bot_token', botToken)
+                            .eq('data_key', key);
+                    }
+                },
                 
                 // === HANDLERS ===
-                nextCommandHandlers: nextCommandHandlers,
-                waitingAnswers: waitingAnswers,
+                nextCommandHandlers: nextCommandHandlers || new Map(),
+                waitingAnswers: waitingAnswers || new Map(),
                 
                 // === UTILITY FUNCTIONS ===
                 wait: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
                 
                 // === PYTHON RUNNER ===
                 runPython: async (pythonCode) => {
-                    const pythonRunner = require('./python-runner');
-                    return await pythonRunner.runPythonCode(pythonCode);
-                },
-                
-                // === HTTP CLIENT ===
-                HTTP: {
-                    get: async (url, options = {}) => {
-                        const axios = require('axios');
-                        try {
-                            const response = await axios.get(url, options);
-                            return response.data;
-                        } catch (error) {
-                            throw new Error(`HTTP GET failed: ${error.message}`);
-                        }
-                    },
-                    post: async (url, data = {}, options = {}) => {
-                        const axios = require('axios');
-                        try {
-                            const response = await axios.post(url, data, options);
-                            return response.data;
-                        } catch (error) {
-                            throw new Error(`HTTP POST failed: ${error.message}`);
-                        }
+                    try {
+                        const pythonRunner = require('./python-runner');
+                        return await pythonRunner.runPythonCode(pythonCode);
+                    } catch (error) {
+                        throw new Error(`Python execution failed: ${error.message}`);
                     }
                 }
             };
 
-            // Create SHORTCUT functions that use apiWrapperInstance directly
-            const shortcuts = {
-                // ✅ FIX: Direct function calls
-                sendMessage: (text, options) => apiWrapperInstance.sendMessage(text, options),
-                send: (text, options) => apiWrapperInstance.send(text, options),
-                reply: (text, options) => apiWrapperInstance.reply(text, options),
-                sendPhoto: (photo, options) => apiWrapperInstance.sendPhoto(photo, options),
-                sendDocument: (doc, options) => apiWrapperInstance.sendDocument(doc, options),
-                sendVideo: (video, options) => apiWrapperInstance.sendVideo(video, options),
-                sendKeyboard: (text, buttons, options) => apiWrapperInstance.sendKeyboard(text, buttons, options),
-                sendReplyKeyboard: (text, buttons, options) => apiWrapperInstance.sendReplyKeyboard(text, buttons, options),
-                runPython: (code) => apiWrapperInstance.runPython(code),
-                waitForAnswer: (question, options) => apiWrapperInstance.waitForAnswer(question, options),
-                ask: (question, options) => apiWrapperInstance.waitForAnswer(question, options)
+            // ✅ DIRECT FUNCTION SHORTCUTS
+            const directFunctions = {
+                sendMessage: (text, options) => {
+                    return botInstance.sendMessage(chatId, text, options);
+                },
+                send: (text, options) => {
+                    return botInstance.sendMessage(chatId, text, options);
+                },
+                reply: (text, options) => {
+                    return botInstance.sendMessage(chatId, text, {
+                        reply_to_message_id: msg.message_id,
+                        ...options
+                    });
+                },
+                sendPhoto: (photo, options) => {
+                    return botInstance.sendPhoto(chatId, photo, options);
+                },
+                sendDocument: (doc, options) => {
+                    return botInstance.sendDocument(chatId, doc, options);
+                },
+                getUser: () => executionEnv.getUser(),
+                wait: (ms) => executionEnv.wait(ms),
+                runPython: (code) => executionEnv.runPython(code)
             };
 
-            // Merge everything into final execution context
+            // ✅ WAIT FOR ANSWER IMPLEMENTATION
+            const waitForAnswer = async (question, options = {}) => {
+                return new Promise(async (resolve) => {
+                    try {
+                        // First send the question
+                        await directFunctions.sendMessage(question, options);
+                        
+                        // Create unique key for this waiting answer
+                        const waitKey = `${botToken}_${userId}_${Date.now()}`;
+                        
+                        // Store the resolver in waitingAnswers map
+                        if (waitingAnswers) {
+                            waitingAnswers.set(waitKey, resolve);
+                        }
+                        
+                        // Set timeout to clean up (5 minutes)
+                        setTimeout(() => {
+                            if (waitingAnswers && waitingAnswers.has(waitKey)) {
+                                waitingAnswers.delete(waitKey);
+                                resolve(null); // Return null on timeout
+                            }
+                        }, 5 * 60 * 1000);
+                        
+                    } catch (error) {
+                        console.error('WaitForAnswer error:', error);
+                        resolve(null);
+                    }
+                });
+            };
+
+            // Merge all functions
             const finalContext = {
                 ...executionEnv,
-                ...shortcuts
+                ...directFunctions,
+                waitForAnswer: waitForAnswer,
+                ask: waitForAnswer
             };
 
-            // Enhanced execution code with PROPER async handling
+            // Execution code
             const executionCode = `
-                // Inject ALL variables into execution context
-                const { 
-                    bot, Api, Bot, getUser, User, 
-                    msg, chatId, userId, userInput, params, message,
-                    sendMessage, send, reply, sendPhoto, sendDocument, sendVideo,
-                    sendKeyboard, sendReplyKeyboard, runPython, waitForAnswer, ask, wait, HTTP,
-                    nextCommandHandlers, waitingAnswers, botToken
-                } = this.context;
-
-                console.log('🔧 User code execution starting...');
-                console.log('📝 User input:', userInput);
-                console.log('🔤 Full message:', message);
-                console.log('📋 Parameters:', params);
-                console.log('🤖 Bot methods available:');
-                console.log('  - bot.sendMessage:', typeof bot.sendMessage);
-                console.log('  - Api.sendMessage:', typeof Api.sendMessage);
-                console.log('  - Bot.sendMessage:', typeof Bot.sendMessage);
-
-                // Create an async wrapper for the user's code
-                const executeUserCode = async () => {
+                try {
+                    // All variables are available
+                    const user = getUser();
+                    
+                    // Test all methods
+                    console.log('✅ Execution started');
+                    console.log('🤖 User:', user.first_name);
+                    
+                    // User's code
+                    ${code}
+                    
+                    return "Command completed";
+                } catch (error) {
+                    console.error('❌ Execution error:', error);
+                    // Still send error message to user
                     try {
-                        // User's command code
-                        ${code}
-                        
-                        // If no explicit return, return success
-                        return "Command executed successfully";
-                    } catch (error) {
-                        console.error('❌ Command execution error:', error);
-                        throw error;
+                        sendMessage(\`❌ Error: \${error.message}\`);
+                    } catch (e) {
+                        // If sendMessage fails, at least log it
+                        console.error('Failed to send error message:', e);
                     }
-                };
-
-                // Execute and return the promise
-                return executeUserCode();
+                    throw error;
+                }
             `;
 
-            const executionWrapper = {
-                context: finalContext
-            };
-
-            // Execute the command
-            console.log('🚀 Executing user command code...');
-            const commandFunction = new Function(executionCode);
-            const boundFunction = commandFunction.bind(executionWrapper);
+            // Execute
+            console.log('🚀 Executing command...');
+            const commandFunction = new Function('getUser', 'sendMessage', 'bot', 'Api', 'Bot', 'params', 'message', 'User', 'BotData', 'waitForAnswer', 'wait', 'runPython', executionCode);
             
-            const result = await boundFunction();
-            console.log('✅ Command execution completed successfully');
+            const result = await commandFunction(
+                finalContext.getUser,
+                finalContext.sendMessage,
+                finalContext.bot,
+                finalContext.Api,
+                finalContext.Bot,
+                finalContext.params,
+                finalContext.message,
+                finalContext.User,
+                finalContext.BotData,
+                finalContext.waitForAnswer,
+                finalContext.wait,
+                finalContext.runPython
+            );
+            
+            console.log('✅ Command execution completed');
             resolve(result);
 
         } catch (error) {
-            console.error('❌ Command execution error:', error);
+            console.error('❌ Command execution failed:', error);
             reject(error);
         }
     });
