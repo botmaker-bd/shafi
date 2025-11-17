@@ -1,0 +1,47 @@
+[
+    {
+        "id": "inline_buttons",
+        "name": "Inline Buttons",
+        "patterns": "/buttons, menu, options",
+        "description": "Message with inline keyboard",
+        "code": "// Inline buttons template\nconst buttons = [\n    [\n        { text: 'Option 1', callback_data: 'option_1' },\n        { text: 'Option 2', callback_data: 'option_2' }\n    ],\n    [\n        { text: 'Option 3', callback_data: 'option_3' },\n        { text: 'Cancel', callback_data: 'cancel' }\n    ]\n];\n\nApi.sendMessage('Please choose an option:', {\n    reply_markup: {\n        inline_keyboard: buttons\n    }\n});",
+        "waitForAnswer": false,
+        "answerHandler": ""
+    },
+    {
+        "id": "reply_keyboard",
+        "name": "Reply Keyboard",
+        "patterns": "/keyboard, keys, reply",
+        "description": "Custom reply keyboard",
+        "code": "// Reply keyboard template\nconst keyboard = [\n    ['Option 1', 'Option 2'],\n    ['Option 3', 'Option 4'],\n    ['Help', 'Cancel']\n];\n\nApi.sendMessage('Choose an option from the keyboard:', {\n    reply_markup: {\n        keyboard: keyboard,\n        resize_keyboard: true,\n        one_time_keyboard: true\n    }\n});",
+        "waitForAnswer": false,
+        "answerHandler": ""
+    },
+    {
+        "id": "url_buttons",
+        "name": "URL Buttons",
+        "patterns": "/links, urls, web",
+        "description": "Buttons that open URLs",
+        "code": "// URL buttons template\nconst urlButtons = [\n    [\n        { text: 'Visit Google', url: 'https://google.com' },\n        { text: 'Visit GitHub', url: 'https://github.com' }\n    ],\n    [\n        { text: 'Our Website', url: 'https://yourapp.com' }\n    ]\n];\n\nApi.sendMessage('Useful links:', {\n    reply_markup: {\n        inline_keyboard: urlButtons\n    }\n});",
+        "waitForAnswer": false,
+        "answerHandler": ""
+    },
+    {
+        "id": "webapp_buttons",
+        "name": "Web App Buttons",
+        "patterns": "/webapp, app, web",
+        "description": "Buttons that open web apps",
+        "code": "// Web App buttons template\nconst webAppButtons = [\n    [\n        { \n            text: 'Open Web App', \n            web_app: { url: 'https://yourapp.com' }\n        }\n    ]\n];\n\nApi.sendMessage('Try our web application:', {\n    reply_markup: {\n        inline_keyboard: webAppButtons\n    }\n});",
+        "waitForAnswer": false,
+        "answerHandler": ""
+    },
+    {
+        "id": "dynamic_buttons",
+        "name": "Dynamic Buttons",
+        "patterns": "/dynamic, menu, custom",
+        "description": "Dynamic buttons with user info",
+        "code": "// Dynamic buttons template\nconst user = getUser();\nconst buttons = [\n    [\n        { text: `Hello ${user.first_name}`, callback_data: 'greet' },\n        { text: 'Settings', callback_data: 'settings' }\n    ],\n    [\n        { text: 'Help', callback_data: 'help' },\n        { text: 'About', callback_data: 'about' }\n    ]\n];\n\nApi.sendMessage('Main Menu:', {\n    reply_markup: {\n        inline_keyboard: buttons\n    }\n});",
+        "waitForAnswer": false,
+        "answerHandler": ""
+    }
+]
