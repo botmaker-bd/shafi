@@ -10,7 +10,7 @@ async function executeCommandCode(botInstance, code, context) {
             
             console.log(`🔧 Starting command execution for user ${userId}`);
             
-            // Create ApiWrapper instance FIRST - এটাই মূল ফিক্স
+            // ✅ FIX: Create ApiWrapper instance FIRST
             const ApiWrapper = require('./api-wrapper');
             const apiWrapperInstance = new ApiWrapper(botInstance, {
                 msg: msg,
@@ -28,25 +28,26 @@ async function executeCommandCode(botInstance, code, context) {
                 Bot: context.Bot
             });
 
-            // ✅ FIXED: Parse parameters from user input
+            // ✅ FIX: Parse parameters from user input
             const parseParams = (input) => {
                 if (!input) return [];
-                const parts = input.split(' ').slice(1); // First part is command, rest are params
-                return parts.filter(param => param.length > 0);
+                const parts = input.split(' ').slice(1); // Remove command part
+                return parts.filter(param => param.trim() !== '');
             };
 
             const params = parseParams(userInput);
-            const message = userInput; // পুরো মেসেজ
+            const message = userInput; // Full user message
 
-            // Create COMPREHENSIVE execution environment
+            // Create COMPREHENSIVE execution environment with SAFE variables
             const executionEnv = {
-                // === TELEGRAM BOT INSTANCE (bot.) ===
-                bot: apiWrapperInstance, // ✅ FIXED: This makes bot.sendMessage work
+                // === TELEGRAM BOT METHODS ===
+                // ✅ FIX: bot is now ApiWrapper instance so bot.sendMessage works
+                bot: apiWrapperInstance,
                 
-                // === API WRAPPER INSTANCE (Api.) ===
+                // === API WRAPPER INSTANCE ===
                 Api: apiWrapperInstance,
                 
-                // === ALIAS FOR Bot. ===
+                // === ALIAS FOR Bot ===
                 Bot: apiWrapperInstance,
 
                 // === USER INFORMATION ===
@@ -64,12 +65,13 @@ async function executeCommandCode(botInstance, code, context) {
                 chatId: chatId,
                 userId: userId,
                 userInput: userInput,
-                message: message, // ✅ ADDED: পুরো মেসেজ
-                params: params,   // ✅ ADDED: প্যারামস অ্যারে
+                params: params, // ✅ FIX: Array of parameters after command
+                message: message, // ✅ FIX: Full user message
                 botToken: botToken,
                 
                 // === DATA STORAGE ===
                 User: context.User,
+                Bot: context.Bot,
                 
                 // === HANDLERS ===
                 nextCommandHandlers: nextCommandHandlers,
@@ -107,9 +109,9 @@ async function executeCommandCode(botInstance, code, context) {
                 }
             };
 
-            // Create SHORTCUT functions that DIRECTLY use apiWrapperInstance
+            // Create SHORTCUT functions that use apiWrapperInstance directly
             const shortcuts = {
-                // ✅ FIXED: Direct shortcuts
+                // ✅ FIX: Direct function calls
                 sendMessage: (text, options) => apiWrapperInstance.sendMessage(text, options),
                 send: (text, options) => apiWrapperInstance.send(text, options),
                 reply: (text, options) => apiWrapperInstance.reply(text, options),
@@ -118,6 +120,7 @@ async function executeCommandCode(botInstance, code, context) {
                 sendVideo: (video, options) => apiWrapperInstance.sendVideo(video, options),
                 sendKeyboard: (text, buttons, options) => apiWrapperInstance.sendKeyboard(text, buttons, options),
                 sendReplyKeyboard: (text, buttons, options) => apiWrapperInstance.sendReplyKeyboard(text, buttons, options),
+                runPython: (code) => apiWrapperInstance.runPython(code),
                 waitForAnswer: (question, options) => apiWrapperInstance.waitForAnswer(question, options),
                 ask: (question, options) => apiWrapperInstance.waitForAnswer(question, options)
             };
@@ -133,7 +136,7 @@ async function executeCommandCode(botInstance, code, context) {
                 // Inject ALL variables into execution context
                 const { 
                     bot, Api, Bot, getUser, User, 
-                    msg, chatId, userId, userInput, message, params,
+                    msg, chatId, userId, userInput, params, message,
                     sendMessage, send, reply, sendPhoto, sendDocument, sendVideo,
                     sendKeyboard, sendReplyKeyboard, runPython, waitForAnswer, ask, wait, HTTP,
                     nextCommandHandlers, waitingAnswers, botToken
@@ -141,11 +144,12 @@ async function executeCommandCode(botInstance, code, context) {
 
                 console.log('🔧 User code execution starting...');
                 console.log('📝 User input:', userInput);
-                console.log('📦 Parameters:', params);
-                console.log('💬 Full message:', message);
+                console.log('🔤 Full message:', message);
+                console.log('📋 Parameters:', params);
                 console.log('🤖 Bot methods available:');
                 console.log('  - bot.sendMessage:', typeof bot.sendMessage);
                 console.log('  - Api.sendMessage:', typeof Api.sendMessage);
+                console.log('  - Bot.sendMessage:', typeof Bot.sendMessage);
 
                 // Create an async wrapper for the user's code
                 const executeUserCode = async () => {
