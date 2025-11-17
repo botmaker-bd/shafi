@@ -1,4 +1,4 @@
-// server/core/python-runner.js - COMPLETELY FIXED VERSION
+// server/core/python-runner.js - COMPLETELY FIXED
 const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -48,129 +48,88 @@ class PythonRunner {
         });
     }
 
-    // ✅ FIXED: PROPER PYTHON CODE EXECUTION WITH CORRECT INDENTATION
+    // ✅ FIXED: PROPER PYTHON CODE EXECUTION
     runPythonCodeSync(code) {
         try {
             console.log('🐍 Executing Python code synchronously...');
-            console.log('📝 Python code:', code.substring(0, 200) + '...');
+            console.log('📝 Python code:', code);
             
-            const tempFile = path.join(this.tempDir, `script_${Date.now()}_${Math.random().toString(36).substring(7)}.py`);
+            // Check if it's a simple expression
+            if (this.isSimpleExpression(code)) {
+                console.log('🔧 Using simple expression mode');
+                return this.runSimpleExpression(code);
+            }
             
-            // ✅ FIXED: SIMPLIFIED PYTHON TEMPLATE WITHOUT COMPLEX INDENTATION
+            // For multi-line code, use file execution
+            return this.runPythonFile(code);
+            
+        } catch (error) {
+            console.error('❌ Python execution error:', error);
+            throw new Error(`Python Error: ${error.message}`);
+        }
+    }
+
+    // ✅ CHECK IF SIMPLE EXPRESSION
+    isSimpleExpression(code) {
+        const simplePattern = /^[0-9+\-*/().\s]+$/;
+        return simplePattern.test(code.trim()) && !code.includes('\n');
+    }
+
+    // ✅ RUN SIMPLE EXPRESSION
+    runSimpleExpression(expression) {
+        try {
+            console.log('🔧 Running simple expression:', expression);
+            
+            const pythonCommand = process.env.PYTHON_PATH || 'python3';
+            const result = spawnSync(pythonCommand, ['-c', `print(${expression})`], {
+                timeout: 10000,
+                encoding: 'utf-8'
+            });
+
+            if (result.error) {
+                throw new Error(`Python process error: ${result.error.message}`);
+            }
+
+            if (result.status !== 0) {
+                throw new Error(result.stderr || 'Python execution failed');
+            }
+
+            const output = result.stdout ? result.stdout.trim() : 'No output';
+            console.log('✅ Simple expression result:', output);
+            return output;
+
+        } catch (error) {
+            console.error('❌ Simple expression error:', error);
+            throw error;
+        }
+    }
+
+    // ✅ RUN PYTHON FILE FOR MULTI-LINE CODE
+    runPythonFile(code) {
+        try {
+            const tempFile = path.join(this.tempDir, `script_${Date.now()}.py`);
+            
+            // ✅ FIXED: CLEAN PYTHON TEMPLATE
             const pythonTemplate = `# Python Code Execution
 import sys
-import json
 
 try:
-    # User's code execution - DIRECT EXECUTION
-    ${this.preparePythonCode(code)}
+    # User's code
+${this.indentCode(code)}
     
-    # If we reach here, execution was successful
-    print("✅ Python code executed successfully")
+    # If no result variable, indicate success
+    if 'result' not in locals() and 'result' not in globals():
+        print("✅ Python code executed successfully")
     
 except Exception as e:
-    # Return clean error message
-    error_msg = f"❌ Python Error: {str(e)}"
-    print(error_msg)
+    print(f"❌ Python Error: {str(e)}")
     sys.exit(1)`;
 
             // Write Python file
             fs.writeFileSync(tempFile, pythonTemplate);
-            console.log('📄 Python file created:', tempFile);
+            console.log('📄 Python file created');
             
-            // Determine Python command
-            const pythonCommand = process.env.PYTHON_PATH || 'python3';
-            console.log('🔧 Using Python command:', pythonCommand);
-            
-            // Use spawnSync for synchronous execution
-            const result = spawnSync(pythonCommand, [tempFile], {
-                timeout: 30000,
-                encoding: 'utf-8',
-                cwd: this.tempDir
-            });
-
-            // Clean up temporary file
-            try {
-                if (fs.existsSync(tempFile)) {
-                    fs.unlinkSync(tempFile);
-                }
-            } catch (cleanupError) {
-                console.error('❌ Temp file cleanup error:', cleanupError);
-            }
-
-            // Check for process errors
-            if (result.error) {
-                console.error('❌ Python process error:', result.error);
-                throw new Error(`Python process error: ${result.error.message}`);
-            }
-
-            // Check exit code
-            if (result.status !== 0) {
-                console.error('❌ Python execution failed. Exit code:', result.status);
-                console.error('Python stderr:', result.stderr);
-                console.error('Python stdout:', result.stdout);
-                
-                let errorMessage = 'Python execution failed';
-                if (result.stderr) {
-                    errorMessage = result.stderr.split('\\n')[0]; // Get first line of error
-                } else if (result.stdout) {
-                    errorMessage = result.stdout.split('\\n')[0]; // Get first line of output
-                }
-                
-                throw new Error(errorMessage);
-            }
-
-            // Return clean output
-            if (result.stdout) {
-                const output = result.stdout.trim();
-                console.log('✅ Python output received:', output.substring(0, 100) + '...');
-                return output;
-            } else {
-                return 'Python code executed (no output)';
-            }
-
-        } catch (error) {
-            console.error('❌ Python execution error:', error);
-            throw new Error(`Python execution failed: ${error.message}`);
-        }
-    }
-
-    // ✅ FIXED: PROPER PYTHON CODE PREPARATION
-    preparePythonCode(code) {
-        try {
-            // Remove any existing indentation and handle line breaks
-            const lines = code.split('\n');
-            let preparedCode = [];
-            
-            for (let line of lines) {
-                // Trim whitespace but preserve empty lines for structure
-                const trimmedLine = line.trim();
-                if (trimmedLine === '') {
-                    preparedCode.push('');
-                } else {
-                    preparedCode.push(trimmedLine);
-                }
-            }
-            
-            // Join with proper line breaks
-            return preparedCode.join('\n    ');
-            
-        } catch (error) {
-            console.error('❌ Python code preparation error:', error);
-            return code; // Fallback to original code
-        }
-    }
-
-    // ✅ FIXED: ALTERNATIVE METHOD FOR COMPLEX CODE
-    runPythonCodeAdvanced(code) {
-        try {
-            console.log('🐍 Executing Python code (advanced method)...');
-            
-            const tempFile = path.join(this.tempDir, `advanced_${Date.now()}.py`);
-            
-            // Write user code directly to file
-            fs.writeFileSync(tempFile, code);
-            
+            // Execute Python
             const pythonCommand = process.env.PYTHON_PATH || 'python3';
             const result = spawnSync(pythonCommand, [tempFile], {
                 timeout: 30000,
@@ -187,47 +146,34 @@ except Exception as e:
                 console.error('❌ Temp file cleanup error:', cleanupError);
             }
 
+            // Check for errors
             if (result.error) {
                 throw new Error(`Python process error: ${result.error.message}`);
             }
 
             if (result.status !== 0) {
-                throw new Error(result.stderr || result.stdout || 'Python execution failed');
+                const errorMsg = result.stderr || result.stdout || 'Python execution failed';
+                throw new Error(errorMsg.split('\n')[0]); // Get first error line
             }
 
-            return result.stdout ? result.stdout.trim() : 'Code executed successfully';
+            const output = result.stdout ? result.stdout.trim() : 'Code executed (no output)';
+            console.log('✅ Python output:', output);
+            return output;
 
         } catch (error) {
-            console.error('❌ Advanced Python execution error:', error);
-            throw new Error(`Python execution failed: ${error.message}`);
+            console.error('❌ Python file execution error:', error);
+            throw error;
         }
     }
 
-    // ✅ SIMPLE METHOD FOR BASIC CALCULATIONS
-    runPythonSimple(expression) {
-        try {
-            console.log('🐍 Executing simple Python expression:', expression);
-            
-            const pythonCommand = process.env.PYTHON_PATH || 'python3';
-            const result = spawnSync(pythonCommand, ['-c', `print(${expression})`], {
-                timeout: 10000,
-                encoding: 'utf-8'
-            });
-
-            if (result.error) {
-                throw new Error(`Python process error: ${result.error.message}`);
-            }
-
-            if (result.status !== 0) {
-                throw new Error(result.stderr || 'Python execution failed');
-            }
-
-            return result.stdout ? result.stdout.trim() : 'No output';
-
-        } catch (error) {
-            console.error('❌ Simple Python execution error:', error);
-            throw new Error(`Python calculation failed: ${error.message}`);
-        }
+    // ✅ FIXED: PROPER INDENTATION
+    indentCode(code) {
+        const lines = code.split('\n');
+        const indentedLines = lines.map(line => {
+            if (line.trim() === '') return '';
+            return '    ' + line;
+        });
+        return indentedLines.join('\n');
     }
 
     // Compatibility method
@@ -316,45 +262,6 @@ except Exception as e:
         } catch (error) {
             console.error('❌ Get installed libraries error:', error);
             return [];
-        }
-    }
-
-    // ✅ NEW: VALIDATE PYTHON CODE
-    validatePythonCode(code) {
-        try {
-            const tempFile = path.join(this.tempDir, `validate_${Date.now()}.py`);
-            fs.writeFileSync(tempFile, code);
-            
-            const pythonCommand = process.env.PYTHON_PATH || 'python3';
-            const result = spawnSync(pythonCommand, ['-m', 'py_compile', tempFile], {
-                encoding: 'utf-8',
-                timeout: 10000
-            });
-
-            // Clean up
-            try {
-                if (fs.existsSync(tempFile)) {
-                    fs.unlinkSync(tempFile);
-                }
-                // Remove compiled file if exists
-                const compiledFile = tempFile + 'c';
-                if (fs.existsSync(compiledFile)) {
-                    fs.unlinkSync(compiledFile);
-                }
-            } catch (cleanupError) {
-                // Ignore cleanup errors
-            }
-
-            return {
-                valid: result.status === 0,
-                error: result.stderr || null
-            };
-
-        } catch (error) {
-            return {
-                valid: false,
-                error: error.message
-            };
         }
     }
 }
