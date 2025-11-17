@@ -741,4 +741,38 @@ try {
     }
 });
 
+
+// ✅ NEW: TEST PYTHON EXECUTION ENDPOINT
+router.post('/test/python', async (req, res) => {
+    try {
+        const { code, botToken } = req.body;
+
+        console.log('🧪 Testing Python code execution');
+
+        if (!code) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Python code is required' 
+            });
+        }
+
+        // Test Python execution directly
+        const result = pythonRunner.runPythonCodeSync(code);
+
+        res.json({
+            success: true,
+            message: 'Python code executed successfully',
+            output: result,
+            code: code
+        });
+
+    } catch (error) {
+        console.error('❌ Python test error:', error);
+        res.status(500).json({ 
+            success: false,
+            error: 'Python execution failed: ' + error.message
+        });
+    }
+});
+
 module.exports = router;
