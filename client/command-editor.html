@@ -13,7 +13,7 @@
 </head>
 <body>
     <nav class="navbar">
-        <div class="container">
+        <div class="nav-container">
             <a href="dashboard.html" class="nav-brand">
                 <span class="brand-icon">🤖</span>
                 <span class="brand-text">Bot Maker Pro</span>
@@ -64,7 +64,7 @@
         </div>
     </nav>
 
-    <div class="container">
+    <div class="main-container">
         <div class="page-header">
             <div class="header-content">
                 <h1 id="botName">Command Editor</h1>
@@ -320,6 +320,17 @@
                             <span class="btn-text">Format</span>
                         </button>
                     </div>
+                </div>
+                <div class="header-actions">
+                    <button class="btn-icon btn-cancel" id="cancelEditTop" title="Cancel">
+                        <i class="fas fa-times"></i>
+                        <span class="btn-text">Cancel</span>
+                    </button>
+                    <button class="btn-icon btn-save" id="saveCodeTop" title="Save Code">
+                        <i class="fas fa-save"></i>
+                        <span class="btn-text">Save</span>
+                    </button>
+                    <button class="modal-close">&times;</button>
                 </div>
             </div>
             <div class="modal-body fullscreen-body">
