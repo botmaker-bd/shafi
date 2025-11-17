@@ -387,27 +387,6 @@ class BotManager {
         }
     }
 
-    cleanupStaleHandlers() {
-        const now = Date.now();
-        const STALE_TIMEOUT = 10 * 60 * 1000;
-        
-        for (const [userKey, handlerData] of this.commandAnswerHandlers.entries()) {
-            if (now - handlerData.timestamp > STALE_TIMEOUT) {
-                console.log(`🧹 Removing stale command handler for ${userKey}`);
-                this.commandAnswerHandlers.delete(userKey);
-            }
-        }
-        
-        for (const [userKey, waitingData] of this.waitingAnswers.entries()) {
-            if (now - waitingData.timestamp > STALE_TIMEOUT) {
-                console.log(`🧹 Removing stale waitForAnswer for ${userKey}`);
-                if (waitingData.reject) {
-                    waitingData.reject(new Error('Wait for answer timeout (system cleanup)'));
-                }
-                this.waitingAnswers.delete(userKey);
-            }
-        }
-    }
 
     async preloadUserData(botToken, userId) {
         try {
@@ -544,76 +523,114 @@ class BotManager {
         bot.on('webhook_error', (error) => console.error(`❌ Webhook error:`, error));
         bot.on('error', (error) => console.error(`❌ Bot error:`, error));
     }
+    
+    
+    // server/core/bot-manager.js - WAIT FOR ANSWER PROCESSING FIX
 
-    async handleMessage(bot, token, msg) {
-        try {
-            if (!msg.text && !msg.caption) return;
+async handleMessage(bot, token, msg) {
+    try {
+        if (!msg.text && !msg.caption) return;
 
-            const chatId = msg.chat.id;
-            const userId = msg.from.id;
-            const text = msg.text || msg.caption || '';
+        const chatId = msg.chat.id;
+        const userId = msg.from.id;
+        const text = msg.text || msg.caption || '';
 
-            console.log(`📨 Message from ${msg.from.first_name} (${userId}): "${text}"`);
+        console.log(`📨 Message from ${msg.from.first_name} (${userId}): "${text}"`);
 
-            const userKey = `${token}_${userId}`;
+        const userKey = `${token}_${userId}`;
 
-            // 1. Check for waitForAnswer() promises
-            if (this.waitingAnswers.has(userKey)) {
-                console.log(`✅ USER HAS waitForAnswer() PENDING! Processing...`);
-                await this.processWaitForAnswer(userKey, text, msg);
+        // ✅ FIXED: 1. FIRST - Check for waitForAnswer() promises
+        if (this.nextCommandHandlers.has(userKey)) {
+            console.log(`✅ WAIT FOR ANSWER HANDLER FOUND! Processing...`);
+            const handlerData = this.nextCommandHandlers.get(userKey);
+            
+            if (handlerData && handlerData.resolve) {
+                console.log(`🎯 Resolving waitForAnswer with: "${text}"`);
+                handlerData.resolve(text);
+                this.nextCommandHandlers.delete(userKey);
+                console.log(`✅ waitForAnswer resolved successfully`);
                 return;
             }
+        }
 
-            // 2. Check for command-based answer handlers
-            if (this.commandAnswerHandlers.has(userKey)) {
-                console.log(`✅ USER HAS COMMAND ANSWER HANDLER! Processing...`);
-                await this.processCommandAnswer(userKey, text, msg);
+        // 2. Check for command-based answer handlers
+        if (this.commandAnswerHandlers.has(userKey)) {
+            console.log(`✅ COMMAND ANSWER HANDLER FOUND! Processing...`);
+            await this.processCommandAnswer(userKey, text, msg);
+            return;
+        }
+
+        // 3. Check for next command handler (other types)
+        const nextCommandKey = `${token}_${userId}_next`;
+        if (this.nextCommandHandlers.has(nextCommandKey)) {
+            console.log(`✅ NEXT COMMAND HANDLER FOUND! Executing...`);
+            const handler = this.nextCommandHandlers.get(nextCommandKey);
+            this.nextCommandHandlers.delete(nextCommandKey);
+            
+            try {
+                await handler(text, msg);
+                console.log(`✅ Next command handler executed successfully`);
+                return;
+            } catch (handlerError) {
+                console.error(`❌ Next command handler error:`, handlerError);
+                await this.sendError(bot, chatId, handlerError);
                 return;
             }
+        }
 
-            // 3. Check for next command handler
-            const nextCommandKey = `${token}_${userId}`;
-            if (this.nextCommandHandlers.has(nextCommandKey)) {
-                console.log(`✅ NEXT COMMAND HANDLER FOUND! Executing...`);
-                const handler = this.nextCommandHandlers.get(nextCommandKey);
-                this.nextCommandHandlers.delete(nextCommandKey);
-                
-                try {
-                    await handler(text, msg);
-                    console.log(`✅ Next command handler executed successfully`);
-                    return;
-                } catch (handlerError) {
-                    console.error(`❌ Next command handler error:`, handlerError);
-                    await this.sendError(bot, chatId, handlerError);
-                    return;
-                }
+        // Handle special commands
+        if (text.startsWith('/python ')) {
+            await this.executePythonCode(bot, chatId, text.replace('/python ', ''));
+            return;
+        }
+
+        if (text.startsWith('/ai ') || text.startsWith('/generate ')) {
+            await this.generateAICode(bot, chatId, text);
+            return;
+        }
+
+        // Find and execute matching command
+        const command = await this.findMatchingCommand(token, text, msg);
+        if (command) {
+            console.log(`🎯 Executing command: ${command.command_patterns}`);
+            await this.executeCommand(bot, command, msg, text);
+        } else {
+            console.log(`❌ No matching command found for: "${text}"`);
+        }
+
+    } catch (error) {
+        console.error('❌ Handle message error:', error);
+        await this.sendError(bot, msg.chat.id, error);
+    }
+}
+
+// ✅ FIXED: Cleanup stale handlers
+cleanupStaleHandlers() {
+    const now = Date.now();
+    const STALE_TIMEOUT = 10 * 60 * 1000; // 10 minutes
+    
+    // Cleanup waitForAnswer handlers
+    for (const [userKey, handlerData] of this.nextCommandHandlers.entries()) {
+        if (now - handlerData.timestamp > STALE_TIMEOUT) {
+            console.log(`🧹 Removing stale waitForAnswer handler for ${userKey}`);
+            if (handlerData.reject) {
+                handlerData.reject(new Error('Wait for answer timeout (system cleanup)'));
             }
-
-            // Handle special commands
-            if (text.startsWith('/python ')) {
-                await this.executePythonCode(bot, chatId, text.replace('/python ', ''));
-                return;
-            }
-
-            if (text.startsWith('/ai ') || text.startsWith('/generate ')) {
-                await this.generateAICode(bot, chatId, text);
-                return;
-            }
-
-            // Find and execute matching command
-            const command = await this.findMatchingCommand(token, text, msg);
-            if (command) {
-                console.log(`🎯 Executing command: ${command.command_patterns}`);
-                await this.executeCommand(bot, command, msg, text);
-            } else {
-                console.log(`❌ No matching command found for: "${text}"`);
-            }
-
-        } catch (error) {
-            console.error('❌ Handle message error:', error);
-            await this.sendError(bot, msg.chat.id, error);
+            this.nextCommandHandlers.delete(userKey);
         }
     }
+    
+    // Cleanup command answer handlers
+    for (const [userKey, handlerData] of this.commandAnswerHandlers.entries()) {
+        if (now - handlerData.timestamp > STALE_TIMEOUT) {
+            console.log(`🧹 Removing stale command handler for ${userKey}`);
+            this.commandAnswerHandlers.delete(userKey);
+        }
+    }
+}
+
+
+
 
     // ✅ FIXED: Callback Query Handler - NOW PROCESSES AS COMMANDS
     async handleCallbackQuery(bot, token, callbackQuery) {
