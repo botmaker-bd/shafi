@@ -134,7 +134,7 @@ class ApiWrapper {
 
         this.reply = (text, options = {}) => {
             return this.sendMessage(this.context.chatId, text, {
-                reply_to_message_id: this.context.msg.message_id,
+                reply_to_message_id: this.context.msg?.message_id,
                 parse_mode: 'HTML',
                 ...options
             });
@@ -228,71 +228,100 @@ class ApiWrapper {
         // Utility methods
         this.wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-        // Wait for answer with timeout - FIXED VERSION
-// server/core/api-wrapper.js - waitForAnswer মেথড
-this.waitForAnswer = (question, options = {}) => {
-    return new Promise(async (resolve, reject) => {
-        // Validate context
-        if (!this.context || !this.context.botToken || !this.context.chatId) {
-            console.error('❌ waitForAnswer: Missing context data');
-            reject(new Error('Context data not available'));
-            return;
-        }
+        // ✅ FIXED: Wait for answer with timeout - SIMPLIFIED VERSION
+        this.waitForAnswer = (question, options = {}) => {
+            return new Promise(async (resolve, reject) => {
+                // Validate context
+                if (!this.context || !this.context.botToken || !this.context.chatId || !this.context.userId) {
+                    console.error('❌ waitForAnswer: Missing context data');
+                    reject(new Error('Context data not available for waitForAnswer'));
+                    return;
+                }
 
-        const timeout = options.timeout || 60000;
-        const nextCommandKey = `${this.context.botToken}_${this.context.userId}`;
-        
-        console.log(`⏳ Setting up waitForAnswer for key: ${nextCommandKey}`);
-        
-        // Clear existing handler
-        if (this.context.nextCommandHandlers && this.context.nextCommandHandlers.has(nextCommandKey)) {
-            this.context.nextCommandHandlers.delete(nextCommandKey);
-        }
+                const timeout = options.timeout || 60000; // 60 seconds
+                const nextCommandKey = `${this.context.botToken}_${this.context.userId}`;
+                
+                console.log(`⏳ Setting up waitForAnswer for user: ${this.context.userId}`);
+                
+                // Get botManager instance
+                let botManager;
+                try {
+                    botManager = require('./bot-manager');
+                } catch (error) {
+                    console.error('❌ Bot manager not available:', error);
+                    reject(new Error('Bot manager not available'));
+                    return;
+                }
 
-        const timeoutId = setTimeout(() => {
-            if (this.context.nextCommandHandlers && this.context.nextCommandHandlers.has(nextCommandKey)) {
-                this.context.nextCommandHandlers.delete(nextCommandKey);
-            }
-            reject(new Error(`Wait for answer timeout (${timeout/1000} seconds)`));
-        }, timeout);
+                // Clear existing handler
+                if (botManager.waitingAnswers && botManager.waitingAnswers.has(nextCommandKey)) {
+                    botManager.waitingAnswers.delete(nextCommandKey);
+                }
 
-        try {
-            // ✅ FIXED: Proper sendMessage call with chatId
-            console.log(`📤 Sending question to chat: ${this.context.chatId}`);
-            await this.sendMessage(this.context.chatId, question, {
+                const timeoutId = setTimeout(() => {
+                    if (botManager.waitingAnswers && botManager.waitingAnswers.has(nextCommandKey)) {
+                        botManager.waitingAnswers.delete(nextCommandKey);
+                    }
+                    reject(new Error(`Wait for answer timeout (${timeout/1000} seconds)`));
+                }, timeout);
+
+                try {
+                    // Send question to user
+                    console.log(`📤 Sending question to user ${this.context.userId}: "${question}"`);
+                    await this.sendMessage(this.context.chatId, question, {
+                        parse_mode: 'HTML',
+                        ...options
+                    });
+                    
+                    console.log(`✅ Question sent, waiting for answer from user: ${this.context.userId}`);
+                    
+                    // Set up the waiting state
+                    const waitingPromise = new Promise((innerResolve, innerReject) => {
+                        // Store the resolve function in botManager
+                        if (!botManager.waitingAnswers) {
+                            botManager.waitingAnswers = new Map();
+                        }
+                        
+                        botManager.waitingAnswers.set(nextCommandKey, {
+                            resolve: innerResolve,
+                            reject: innerReject,
+                            timeoutId: timeoutId,
+                            timestamp: Date.now()
+                        });
+                    });
+
+                    // Wait for user's response
+                    const userResponse = await waitingPromise;
+                    
+                    console.log(`🎉 Received answer from user: "${userResponse}"`);
+                    resolve({
+                        text: userResponse,
+                        userId: this.context.userId,
+                        chatId: this.context.chatId,
+                        timestamp: new Date().toISOString()
+                    });
+                    
+                } catch (error) {
+                    console.error(`❌ waitForAnswer failed:`, error);
+                    clearTimeout(timeoutId);
+                    
+                    // Cleanup
+                    if (botManager.waitingAnswers && botManager.waitingAnswers.has(nextCommandKey)) {
+                        botManager.waitingAnswers.delete(nextCommandKey);
+                    }
+                    
+                    reject(new Error(`Failed to wait for answer: ${error.message}`));
+                }
+            });
+        };
+
+        // ✅ NEW: Simple ask method without waiting
+        this.ask = (question, options = {}) => {
+            return this.sendMessage(this.context.chatId, question, {
                 parse_mode: 'HTML',
                 ...options
             });
-            
-            console.log(`✅ Question sent, setting handler for: ${nextCommandKey}`);
-            
-            // Set up handler
-            if (!this.context.nextCommandHandlers) {
-                throw new Error('nextCommandHandlers not available');
-            }
-            
-            this.context.nextCommandHandlers.set(nextCommandKey, (answer, answerMsg) => {
-                console.log(`🎉 User response: "${answer}"`);
-                clearTimeout(timeoutId);
-                resolve({
-                    text: answer,
-                    message: answerMsg,
-                    userId: this.context.userId,
-                    chatId: this.context.chatId,
-                    timestamp: new Date().toISOString()
-                });
-            });
-            
-        } catch (error) {
-            console.error(`❌ waitForAnswer setup failed:`, error);
-            clearTimeout(timeoutId);
-            if (this.context.nextCommandHandlers) {
-                this.context.nextCommandHandlers.delete(nextCommandKey);
-            }
-            reject(new Error(`Failed to set up wait for answer: ${error.message}`));
-        }
-    });
-};
+        };
 
         // File download helper
         this.downloadFile = async (fileId, downloadPath = null) => {
