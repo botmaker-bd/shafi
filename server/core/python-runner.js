@@ -54,9 +54,8 @@ class PythonRunner {
             try {
                 const tempFile = path.join(this.tempDir, `script_${Date.now()}_${Math.random().toString(36).substring(7)}.py`);
                 
-                // FIXED: Python template with proper indentation
-                const pythonTemplate = `
-import sys
+                // ✅ FIXED: Python template with proper indentation
+                const pythonTemplate = `import sys
 import json
 import math
 import random
@@ -86,7 +85,7 @@ try:
     # If no result variable, check for output
     if 'result' not in locals() and 'result' not in globals():
         result = "Code executed successfully"
-        
+
 except Exception as e:
     error_info = {
         "error": str(e),
@@ -95,16 +94,15 @@ except Exception as e:
     }
     print(json.dumps({"success": False, **error_info}))
     sys.exit(1)
-else:
-    # Convert result to JSON-serializable format
-    try:
-        json.dumps(result)
-        output_result = result
-    except:
-        output_result = str(result)
-    
-    print(json.dumps({"success": True, "result": output_result}))
-`;
+
+# Convert result to JSON-serializable format
+try:
+    json.dumps(result)
+    output_result = result
+except:
+    output_result = str(result)
+
+print(json.dumps({"success": True, "result": output_result}))`;
 
                 fs.writeFileSync(tempFile, pythonTemplate);
                 
