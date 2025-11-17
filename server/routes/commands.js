@@ -1,6 +1,8 @@
+// server/routes/commands.js - COMPLETE FIXED VERSION
 const express = require('express');
 const supabase = require('../config/supabase');
 const botManager = require('../core/bot-manager');
+const pythonRunner = require('../core/python-runner');
 
 const router = express.Router();
 
@@ -301,7 +303,7 @@ router.delete('/:commandId', async (req, res) => {
     }
 });
 
-// ✅ FIXED: Test command execution
+// Test command execution
 router.post('/:commandId/test', async (req, res) => {
     try {
         const { commandId } = req.params;
@@ -330,7 +332,7 @@ router.post('/:commandId/test', async (req, res) => {
             });
         }
 
-        // ✅ FIXED: Use botManager to get bot instance
+        // Get bot instance
         const bot = botManager.getBotInstance(botToken);
         if (!bot) {
             return res.status(400).json({ 
@@ -339,7 +341,7 @@ router.post('/:commandId/test', async (req, res) => {
             });
         }
 
-        // ✅ Get ACTUAL admin chat ID (not test ID)
+        // Get admin chat ID
         const { data: adminSettings, error: adminError } = await supabase
             .from('admin_settings')
             .select('admin_chat_id')
@@ -389,7 +391,7 @@ router.post('/:commandId/test', async (req, res) => {
 });
 
 // ✅ FIXED: Temporary command test
-router.post('/test-temp/command', async (req, res) => {
+router.post('/test/temp', async (req, res) => {
     try {
         const { code, botToken, testInput } = req.body;
 
@@ -402,7 +404,7 @@ router.post('/test-temp/command', async (req, res) => {
             });
         }
 
-        // ✅ Get ACTUAL admin chat ID
+        // Get admin chat ID
         const { data: adminSettings, error: adminError } = await supabase
             .from('admin_settings')
             .select('admin_chat_id')
@@ -415,7 +417,7 @@ router.post('/test-temp/command', async (req, res) => {
             });
         }
 
-        // ✅ Get bot instance from bot manager
+        // Get bot instance
         const bot = botManager.getBotInstance(botToken);
         if (!bot) {
             return res.status(400).json({ 
@@ -424,7 +426,7 @@ router.post('/test-temp/command', async (req, res) => {
             });
         }
 
-        // ✅ Create temporary command object
+        // Create temporary command
         const tempCommand = {
             id: 'temp_test_command_' + Date.now(),
             command_patterns: '/test',
@@ -434,7 +436,7 @@ router.post('/test-temp/command', async (req, res) => {
             wait_for_answer: false
         };
 
-        // ✅ Use REAL admin chat ID for testing
+        // Create test message
         const testMessage = {
             chat: { id: adminSettings.admin_chat_id },
             from: {
@@ -448,9 +450,9 @@ router.post('/test-temp/command', async (req, res) => {
             date: Math.floor(Date.now() / 1000)
         };
 
-        console.log(`🧪 Testing temporary command with REAL chat ID: ${adminSettings.admin_chat_id}`);
+        console.log(`🧪 Testing temporary command with chat ID: ${adminSettings.admin_chat_id}`);
 
-        // ✅ Execute command and verify delivery
+        // Execute command
         const result = await botManager.executeCommand(bot, tempCommand, testMessage, testInput);
 
         res.json({
@@ -466,6 +468,39 @@ router.post('/test-temp/command', async (req, res) => {
         res.status(500).json({ 
             success: false,
             error: 'Failed to test command: ' + error.message
+        });
+    }
+});
+
+// ✅ NEW: Test Python execution directly
+router.post('/test/python', async (req, res) => {
+    try {
+        const { code } = req.body;
+
+        console.log('🧪 Testing Python code execution');
+
+        if (!code) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Python code is required' 
+            });
+        }
+
+        // Test Python execution directly
+        const result = pythonRunner.runPythonCodeSync(code);
+
+        res.json({
+            success: true,
+            message: 'Python code executed successfully',
+            output: result,
+            code: code
+        });
+
+    } catch (error) {
+        console.error('❌ Python test error:', error);
+        res.status(500).json({ 
+            success: false,
+            error: 'Python execution failed: ' + error.message
         });
     }
 });
@@ -515,50 +550,66 @@ router.patch('/:commandId/toggle', async (req, res) => {
 router.get('/templates/categories', async (req, res) => {
     try {
         const templates = {
-            basic: [
+            python: [
                 {
-                    id: 'welcome',
-                    name: 'Welcome Message',
-                    patterns: '/start,start,hello,hi',
-                    code: `// Welcome message template
-const user = getUser();
-const welcomeMessage = \`Hello \${user.first_name}! 👋
-
-Welcome to our bot! Here's what you can do:
-• Use /help to see all commands
-• Use /info to get bot information
-
-Your User ID: \${user.id}
-Username: @\${user.username || 'Not set'}\`;
-
-bot.sendMessage(welcomeMessage, {
-    parse_mode: 'Markdown'
-});`
+                    id: 'python_simple_calc',
+                    name: 'Simple Calculator',
+                    patterns: '/calc,calculate',
+                    code: `// Simple Python calculation
+try {
+    const result = runPython("(20 + 30) * 2");
+    Bot.sendMessage("🔢 Result: " + result);
+} catch (error) {
+    Bot.sendMessage("❌ Error: " + error.message);
+}`
                 },
                 {
-                    id: 'help',
-                    name: 'Help Command',
-                    patterns: '/help,help,commands,menu',
-                    code: `// Help command template
-const helpText = \`🤖 *Bot Help Menu*
+                    id: 'python_math',
+                    name: 'Math Operations',
+                    patterns: '/math',
+                    code: `// Python math operations
+try {
+    const output = runPython(\`
+x = 15
+y = 10
+addition = x + y
+subtraction = x - y
+multiplication = x * y
+division = x / y
 
-*Available Commands:*
-• /start - Start the bot
-• /help - Show this help message
-• /info - Bot information
+result = f"""📊 Math Results:
+➕ Addition: {x} + {y} = {addition}
+➖ Subtraction: {x} - {y} = {subtraction}
+✖️ Multiplication: {x} * {y} = {multiplication}
+➗ Division: {x} / {y} = {division}"""
 
-*Features:*
-• Multiple command patterns
-• Interactive conversations
-• Media support
-• Python code execution
+print(result)
+\`);
 
-*Need Help?*
-Contact support if you need assistance.\`;
+    Bot.sendMessage("🐍 Python Math:\\n\\\\n" + output);
+} catch (error) {
+    Bot.sendMessage("❌ Python Error: " + error.message);
+}`
+                },
+                {
+                    id: 'python_list',
+                    name: 'List Operations',
+                    patterns: '/list',
+                    code: `// Python list operations
+try {
+    const result = runPython(\`
+numbers = [1, 2, 3, 4, 5]
+squares = [x**2 for x in numbers]
+total = sum(numbers)
 
-bot.sendMessage(helpText, {
-    parse_mode: 'Markdown'
-});`
+output = f"Numbers: {numbers}\\\\nSquares: {squares}\\\\nTotal: {total}"
+print(output)
+\`);
+
+    Bot.sendMessage("📋 List Results:\\n\\\\n" + result);
+} catch (error) {
+    Bot.sendMessage("❌ Error: " + error.message);
+}`
                 }
             ],
             interactive: [
@@ -569,57 +620,10 @@ bot.sendMessage(helpText, {
                     code: `// Ask user name with waitForAnswer
 try {
     const name = await waitForAnswer("What's your name?");
-    bot.sendMessage(\`Hello \${name}! Nice to meet you! 😊\`);
-    
-    const age = await ask("How old are you?");
-    bot.sendMessage(\`Great! \${age} years old is a wonderful age! 🎉\`);
-    
+    Bot.sendMessage(\`Hello \${name}! Nice to meet you! 😊\`);
 } catch (error) {
-    bot.sendMessage("Sorry, there was an error: " + error.message);
+    Bot.sendMessage("Sorry, there was an error: " + error.message);
 }`
-                }
-            ],
-            python: [
-                {
-                    id: 'python_calc',
-                    name: 'Python Calculator',
-                    patterns: '/calc,calculate,math',
-                    code: `// Python calculator
-try {
-    const result = runPython(\`
-num1 = 25
-num2 = 15
-result = num1 + num2
-print(f"Calculation: {num1} + {num2} = {result}")
-\`);
-
-    bot.sendMessage(\`🐍 Python Result:\\n\\n\${result}\`);
-} catch (error) {
-    bot.sendMessage(\`❌ Python Error: \${error.message}\`);
-}`
-                }
-            ],
-            data: [
-                {
-                    id: 'save_data',
-                    name: 'Save User Data',
-                    patterns: '/save,mydata',
-                    code: `// Save user data example
-const user = getUser();
-
-// Save user data
-User.saveData('last_activity', new Date().toISOString());
-User.saveData('usage_count', (User.getData('usage_count') || 0) + 1);
-
-// Save bot data
-Bot.saveData('total_users', (Bot.getData('total_users') || 0) + 1);
-
-const message = \`✅ Data saved successfully!
-
-📊 Your Usage: \${User.getData('usage_count')} times
-👥 Total Users: \${Bot.getData('total_users')}\`;
-
-bot.sendMessage(message);`
                 }
             ]
         };
@@ -634,143 +638,6 @@ bot.sendMessage(message);`
         res.status(500).json({ 
             success: false,
             error: 'Failed to fetch templates' 
-        });
-    }
-});
-
-// ✅ NEW: Test waitForAnswer functionality
-router.post('/test/wait-for-answer', async (req, res) => {
-    try {
-        const { botToken, testInput } = req.body;
-
-        console.log('🧪 Testing waitForAnswer functionality');
-
-        if (!botToken) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'Bot token is required' 
-            });
-        }
-
-        // ✅ Get ACTUAL admin chat ID
-        const { data: adminSettings, error: adminError } = await supabase
-            .from('admin_settings')
-            .select('admin_chat_id')
-            .single();
-
-        if (adminError || !adminSettings?.admin_chat_id) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'Admin chat ID not set. Please set admin settings first.' 
-            });
-        }
-
-        // ✅ Get bot instance
-        const bot = botManager.getBotInstance(botToken);
-        if (!bot) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'Bot is not active' 
-            });
-        }
-
-        // ✅ Create test command with waitForAnswer
-        const testCommand = {
-            id: 'wait_test_' + Date.now(),
-            command_patterns: '/wait_test',
-            code: `
-// Test waitForAnswer functionality
-try {
-    // Method 1: Using waitForAnswer
-    const name = await waitForAnswer("👋 What's your name?");
-    
-    // Method 2: Using ask
-    const age = await ask("🎂 How old are you?");
-    
-    // Method 3: Using Bot.waitForAnswer
-    const city = await Bot.waitForAnswer("🏙️ Which city do you live in?");
-    
-    const summary = \`✅ Summary:
-👤 Name: \${name}
-🎂 Age: \${age}
-🏙️ City: \${city}\`;
-    
-    Bot.sendMessage(summary);
-    
-} catch (error) {
-    Bot.sendMessage("❌ Error: " + error.message);
-}
-            `,
-            bot_token: botToken,
-            is_active: true,
-            wait_for_answer: false
-        };
-
-        // Create test message
-        const testMessage = {
-            chat: { id: adminSettings.admin_chat_id },
-            from: {
-                id: adminSettings.admin_chat_id,
-                first_name: 'Test User',
-                username: 'testuser',
-                language_code: 'en'
-            },
-            message_id: Math.floor(Math.random() * 1000000),
-            text: '/wait_test',
-            date: Math.floor(Date.now() / 1000)
-        };
-
-        console.log(`🧪 Testing waitForAnswer with chat ID: ${adminSettings.admin_chat_id}`);
-
-        // Execute command
-        const result = await botManager.executeCommand(bot, testCommand, testMessage, '/wait_test');
-
-        res.json({
-            success: true,
-            message: 'WaitForAnswer test started! Check your Telegram bot and respond to the questions.',
-            chatId: adminSettings.admin_chat_id,
-            result: result
-        });
-
-    } catch (error) {
-        console.error('❌ WaitForAnswer test error:', error);
-        res.status(500).json({ 
-            success: false,
-            error: 'Failed to test waitForAnswer: ' + error.message
-        });
-    }
-});
-
-
-// ✅ NEW: TEST PYTHON EXECUTION ENDPOINT
-router.post('/test/python', async (req, res) => {
-    try {
-        const { code, botToken } = req.body;
-
-        console.log('🧪 Testing Python code execution');
-
-        if (!code) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'Python code is required' 
-            });
-        }
-
-        // Test Python execution directly
-        const result = pythonRunner.runPythonCodeSync(code);
-
-        res.json({
-            success: true,
-            message: 'Python code executed successfully',
-            output: result,
-            code: code
-        });
-
-    } catch (error) {
-        console.error('❌ Python test error:', error);
-        res.status(500).json({ 
-            success: false,
-            error: 'Python execution failed: ' + error.message
         });
     }
 });
