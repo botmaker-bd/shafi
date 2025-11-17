@@ -486,7 +486,7 @@
     border: none;
     border-radius: 0;
     padding: 1rem;
-    font-family: 'Courier New', monospace;
+    font-family: "Trebuchet MS", Helvetica, sans-serif;
     font-size: 14px;
     line-height: 1.5;
     resize: none;
@@ -1057,11 +1057,11 @@
 /* Code Editor Textarea */
 #commandCode, #answerHandler {
     width: 100%;
-    min-height: 200px;
+    min-height: 250px;
     padding: 1rem;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
-    font-family: 'Courier New', monospace;
+    font-family: "Trebuchet MS", Helvetica, sans-serif;
     font-size: 14px;
     line-height: 1.5;
     background: var(--bg-primary);
