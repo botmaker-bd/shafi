@@ -1,4 +1,4 @@
-// server/core/command-executor.js - COMPLETELY FIXED VERSION
+// server/core/command-executor.js - COMPLETE FIXED VERSION
 async function executeCommandCode(botInstance, code, context) {
     return new Promise(async (resolve, reject) => {
         try {
@@ -10,7 +10,7 @@ async function executeCommandCode(botInstance, code, context) {
             
             console.log(`🔧 Starting command execution for user ${userId}`);
             
-            // ✅ CRITICAL FIX: Import and create ApiWrapper PROPERLY
+            // Import ApiWrapper
             const ApiWrapper = require('./api-wrapper');
             
             // Create the context for ApiWrapper
@@ -30,7 +30,7 @@ async function executeCommandCode(botInstance, code, context) {
                 Bot: context.Bot || {}
             };
             
-            // ✅ Create ApiWrapper instance
+            // Create ApiWrapper instance
             const apiWrapperInstance = new ApiWrapper(botInstance, apiContext);
             
             // Parse parameters
@@ -43,21 +43,25 @@ async function executeCommandCode(botInstance, code, context) {
             const params = parseParams(userInput);
             const message = userInput;
 
-            // ✅ FIXED: SYNCHRONOUS PYTHON RUNNER
+            // ✅ SYNCHRONOUS PYTHON RUNNER
             const pythonRunner = require('./python-runner');
             
-            // ✅ SYNCHRONOUS-STYLE PYTHON EXECUTION FUNCTION
+            // ✅ COMPLETELY SYNCHRONOUS PYTHON FUNCTION
             const runPythonSync = (pythonCode) => {
-                return new Promise((resolve, reject) => {
-                    pythonRunner.runPythonCode(pythonCode)
-                        .then(resolve)
-                        .catch(reject);
-                });
+                try {
+                    console.log('🐍 Running Python code synchronously...');
+                    const result = pythonRunner.runPythonCodeSync(pythonCode);
+                    console.log('✅ Python execution completed');
+                    return result;
+                } catch (error) {
+                    console.error('❌ Python execution failed:', error);
+                    throw new Error(`Python Error: ${error.message}`);
+                }
             };
 
-            // ✅ FIXED: Create execution environment with PROPER references
+            // Create execution environment
             const executionEnv = {
-                // === BOT INSTANCES (ALL WORKING) ===
+                // === BOT INSTANCES ===
                 bot: apiWrapperInstance,      // bot.sendMessage()
                 Api: apiWrapperInstance,      // Api.sendMessage()  
                 Bot: apiWrapperInstance,      // Bot.sendMessage()
@@ -84,64 +88,96 @@ async function executeCommandCode(botInstance, code, context) {
                 // === DATA STORAGE ===
                 User: context.User || {
                     saveData: async (key, value) => {
-                        const supabase = require('../config/supabase');
-                        await supabase.from('universal_data').upsert({
-                            data_type: 'user_data',
-                            bot_token: botToken,
-                            user_id: userId.toString(),
-                            data_key: key,
-                            data_value: JSON.stringify(value)
-                        });
+                        try {
+                            const supabase = require('../config/supabase');
+                            await supabase.from('universal_data').upsert({
+                                data_type: 'user_data',
+                                bot_token: botToken,
+                                user_id: userId.toString(),
+                                data_key: key,
+                                data_value: JSON.stringify(value),
+                                updated_at: new Date().toISOString()
+                            });
+                        } catch (error) {
+                            console.error('❌ Save data error:', error);
+                            throw error;
+                        }
                     },
                     getData: async (key) => {
-                        const supabase = require('../config/supabase');
-                        const { data } = await supabase.from('universal_data')
-                            .select('data_value')
-                            .eq('data_type', 'user_data')
-                            .eq('bot_token', botToken)
-                            .eq('user_id', userId.toString())
-                            .eq('data_key', key)
-                            .single();
-                        return data ? JSON.parse(data.data_value) : null;
+                        try {
+                            const supabase = require('../config/supabase');
+                            const { data } = await supabase.from('universal_data')
+                                .select('data_value')
+                                .eq('data_type', 'user_data')
+                                .eq('bot_token', botToken)
+                                .eq('user_id', userId.toString())
+                                .eq('data_key', key)
+                                .single();
+                            return data ? JSON.parse(data.data_value) : null;
+                        } catch (error) {
+                            console.error('❌ Get data error:', error);
+                            return null;
+                        }
                     },
                     deleteData: async (key) => {
-                        const supabase = require('../config/supabase');
-                        await supabase.from('universal_data')
-                            .delete()
-                            .eq('data_type', 'user_data')
-                            .eq('bot_token', botToken)
-                            .eq('user_id', userId.toString())
-                            .eq('data_key', key);
+                        try {
+                            const supabase = require('../config/supabase');
+                            await supabase.from('universal_data')
+                                .delete()
+                                .eq('data_type', 'user_data')
+                                .eq('bot_token', botToken)
+                                .eq('user_id', userId.toString())
+                                .eq('data_key', key);
+                        } catch (error) {
+                            console.error('❌ Delete data error:', error);
+                            throw error;
+                        }
                     }
                 },
                 
                 BotData: context.Bot || {
                     saveData: async (key, value) => {
-                        const supabase = require('../config/supabase');
-                        await supabase.from('universal_data').upsert({
-                            data_type: 'bot_data',
-                            bot_token: botToken,
-                            data_key: key,
-                            data_value: JSON.stringify(value)
-                        });
+                        try {
+                            const supabase = require('../config/supabase');
+                            await supabase.from('universal_data').upsert({
+                                data_type: 'bot_data',
+                                bot_token: botToken,
+                                data_key: key,
+                                data_value: JSON.stringify(value),
+                                updated_at: new Date().toISOString()
+                            });
+                        } catch (error) {
+                            console.error('❌ Save bot data error:', error);
+                            throw error;
+                        }
                     },
                     getData: async (key) => {
-                        const supabase = require('../config/supabase');
-                        const { data } = await supabase.from('universal_data')
-                            .select('data_value')
-                            .eq('data_type', 'bot_data')
-                            .eq('bot_token', botToken)
-                            .eq('data_key', key)
-                            .single();
-                        return data ? JSON.parse(data.data_value) : null;
+                        try {
+                            const supabase = require('../config/supabase');
+                            const { data } = await supabase.from('universal_data')
+                                .select('data_value')
+                                .eq('data_type', 'bot_data')
+                                .eq('bot_token', botToken)
+                                .eq('data_key', key)
+                                .single();
+                            return data ? JSON.parse(data.data_value) : null;
+                        } catch (error) {
+                            console.error('❌ Get bot data error:', error);
+                            return null;
+                        }
                     },
                     deleteData: async (key) => {
-                        const supabase = require('../config/supabase');
-                        await supabase.from('universal_data')
-                            .delete()
-                            .eq('data_type', 'bot_data')
-                            .eq('bot_token', botToken)
-                            .eq('data_key', key);
+                        try {
+                            const supabase = require('../config/supabase');
+                            await supabase.from('universal_data')
+                                .delete()
+                                .eq('data_type', 'bot_data')
+                                .eq('bot_token', botToken)
+                                .eq('data_key', key);
+                        } catch (error) {
+                            console.error('❌ Delete bot data error:', error);
+                            throw error;
+                        }
                     }
                 },
                 
@@ -152,11 +188,11 @@ async function executeCommandCode(botInstance, code, context) {
                 // === UTILITY FUNCTIONS ===
                 wait: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
                 
-                // === PYTHON RUNNER - SYNCHRONOUS STYLE ===
+                // ✅ SYNCHRONOUS PYTHON EXECUTION
                 runPython: (pythonCode) => runPythonSync(pythonCode)
             };
 
-            // ✅ DIRECT FUNCTION SHORTCUTS
+            // Direct function shortcuts
             const directFunctions = {
                 sendMessage: (text, options) => {
                     return botInstance.sendMessage(chatId, text, options);
@@ -178,6 +214,7 @@ async function executeCommandCode(botInstance, code, context) {
                 },
                 getUser: () => executionEnv.getUser(),
                 wait: (ms) => executionEnv.wait(ms),
+                // ✅ SYNCHRONOUS PYTHON
                 runPython: (code) => executionEnv.runPython(code)
             };
 
@@ -200,66 +237,37 @@ async function executeCommandCode(botInstance, code, context) {
                         setTimeout(() => {
                             if (waitingAnswers && waitingAnswers.has(waitKey)) {
                                 waitingAnswers.delete(waitKey);
-                                resolve(null); // Return null on timeout
+                                resolve("Timeout - no answer received");
                             }
                         }, 5 * 60 * 1000);
                         
                     } catch (error) {
                         console.error('WaitForAnswer error:', error);
-                        resolve(null);
+                        resolve("Error asking question");
                     }
                 });
             };
 
-            // ✅ FIXED: Add runPythonSync to context
+            // Merge all functions
             const finalContext = {
                 ...executionEnv,
                 ...directFunctions,
                 waitForAnswer: waitForAnswer,
-                ask: waitForAnswer,
-                runPythonSync: runPythonSync  // ✅ ADDED: Synchronous version
+                ask: waitForAnswer
             };
 
-            // ✅ FIXED: Execution code with PROPER function parameters
-            const executionCode = `
-                try {
-                    // All variables are available
-                    var user = getUser();
-                    
-                    // Test all methods
-                    console.log('✅ Execution started');
-                    console.log('🤖 User:', user.first_name);
-                    
-                    // User's code execution
-                    ${code}
-                    
-                    return "Command completed successfully";
-                } catch (error) {
-                    console.error('❌ Execution error:', error);
-                    // Send error message to user
-                    try {
-                        sendMessage("❌ Error: " + error.message);
-                    } catch (e) {
-                        console.error('Failed to send error message:', e);
-                    }
-                    throw error;
-                }
-            `;
-
-            // ✅ FIXED: Execute with ALL necessary functions
-            console.log('🚀 Executing command...');
-            
-            // Create execution function with ALL parameters
+            // ✅ SIMPLE EXECUTION FUNCTION
             const executeUserCode = function(
                 getUser, sendMessage, bot, Api, Bot, 
-                params, message, User, BotData, 
-                waitForAnswer, wait, runPython, runPythonSync
+                params, message, User, BotData, waitForAnswer, wait, runPython
             ) {
                 try {
                     var user = getUser();
                     console.log('✅ Execution started for user:', user.first_name);
+                    console.log('📝 User input:', message);
+                    console.log('📋 Parameters:', params);
                     
-                    // User's code execution
+                    // ✅ USER'S CODE EXECUTES HERE - SYNCHRONOUSLY
                     ${code}
                     
                     return "Command completed successfully";
@@ -275,6 +283,7 @@ async function executeCommandCode(botInstance, code, context) {
             };
 
             // Execute the command
+            console.log('🚀 Executing command...');
             const result = await executeUserCode(
                 finalContext.getUser,
                 finalContext.sendMessage,
@@ -287,8 +296,7 @@ async function executeCommandCode(botInstance, code, context) {
                 finalContext.BotData,
                 finalContext.waitForAnswer,
                 finalContext.wait,
-                finalContext.runPython,
-                finalContext.runPythonSync
+                finalContext.runPython  // ✅ This is now synchronous
             );
             
             console.log('✅ Command execution completed');
