@@ -43,6 +43,18 @@ async function executeCommandCode(botInstance, code, context) {
             const params = parseParams(userInput);
             const message = userInput;
 
+            // ✅ FIXED: SYNCHRONOUS PYTHON RUNNER
+            const pythonRunner = require('./python-runner');
+            
+            // ✅ SYNCHRONOUS-STYLE PYTHON EXECUTION FUNCTION
+            const runPythonSync = (pythonCode) => {
+                return new Promise((resolve, reject) => {
+                    pythonRunner.runPythonCode(pythonCode)
+                        .then(resolve)
+                        .catch(reject);
+                });
+            };
+
             // ✅ FIXED: Create execution environment with PROPER references
             const executionEnv = {
                 // === BOT INSTANCES (ALL WORKING) ===
@@ -140,11 +152,8 @@ async function executeCommandCode(botInstance, code, context) {
                 // === UTILITY FUNCTIONS ===
                 wait: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
                 
-                // === PYTHON RUNNER ===
-                runPython: function(code) {
-        const pythonRunner = require('./python-runner');
-        return pythonRunner.runPythonCodeSync(code);
-    },
+                // === PYTHON RUNNER - SYNCHRONOUS STYLE ===
+                runPython: (pythonCode) => runPythonSync(pythonCode)
             };
 
             // ✅ DIRECT FUNCTION SHORTCUTS
@@ -202,46 +211,71 @@ async function executeCommandCode(botInstance, code, context) {
                 });
             };
 
-            // Merge all functions
+            // ✅ FIXED: Add runPythonSync to context
             const finalContext = {
                 ...executionEnv,
                 ...directFunctions,
                 waitForAnswer: waitForAnswer,
-                ask: waitForAnswer
+                ask: waitForAnswer,
+                runPythonSync: runPythonSync  // ✅ ADDED: Synchronous version
             };
 
-            // Execution code
+            // ✅ FIXED: Execution code with PROPER function parameters
             const executionCode = `
                 try {
                     // All variables are available
-                    const user = getUser();
+                    var user = getUser();
                     
                     // Test all methods
                     console.log('✅ Execution started');
                     console.log('🤖 User:', user.first_name);
                     
-                    // User's code
+                    // User's code execution
                     ${code}
                     
-                    return "Command completed";
+                    return "Command completed successfully";
                 } catch (error) {
                     console.error('❌ Execution error:', error);
-                    // Still send error message to user
+                    // Send error message to user
                     try {
-                        sendMessage(\`❌ Error: \${error.message}\`);
+                        sendMessage("❌ Error: " + error.message);
                     } catch (e) {
-                        // If sendMessage fails, at least log it
                         console.error('Failed to send error message:', e);
                     }
                     throw error;
                 }
             `;
 
-            // Execute
+            // ✅ FIXED: Execute with ALL necessary functions
             console.log('🚀 Executing command...');
-            const commandFunction = new Function('getUser', 'sendMessage', 'bot', 'Api', 'Bot', 'params', 'message', 'User', 'BotData', 'waitForAnswer', 'wait', 'runPython', executionCode);
             
-            const result = await commandFunction(
+            // Create execution function with ALL parameters
+            const executeUserCode = function(
+                getUser, sendMessage, bot, Api, Bot, 
+                params, message, User, BotData, 
+                waitForAnswer, wait, runPython, runPythonSync
+            ) {
+                try {
+                    var user = getUser();
+                    console.log('✅ Execution started for user:', user.first_name);
+                    
+                    // User's code execution
+                    ${code}
+                    
+                    return "Command completed successfully";
+                } catch (error) {
+                    console.error('❌ Execution error:', error);
+                    try {
+                        sendMessage("❌ Error: " + error.message);
+                    } catch (e) {
+                        console.error('Failed to send error message:', e);
+                    }
+                    throw error;
+                }
+            };
+
+            // Execute the command
+            const result = await executeUserCode(
                 finalContext.getUser,
                 finalContext.sendMessage,
                 finalContext.bot,
@@ -253,7 +287,8 @@ async function executeCommandCode(botInstance, code, context) {
                 finalContext.BotData,
                 finalContext.waitForAnswer,
                 finalContext.wait,
-                finalContext.runPython
+                finalContext.runPython,
+                finalContext.runPythonSync
             );
             
             console.log('✅ Command execution completed');
