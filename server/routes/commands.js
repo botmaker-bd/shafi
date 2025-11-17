@@ -106,7 +106,7 @@ router.post('/', async (req, res) => {
                 .from('commands')
                 .select('id, command_patterns')
                 .eq('bot_token', botToken)
-                .eq('command_patterns', pattern)
+                .ilike('command_patterns', `%${pattern}%`)
                 .single();
 
             if (checkError && checkError.code !== 'PGRST116') {
@@ -191,7 +191,7 @@ router.put('/:commandId', async (req, res) => {
                 .from('commands')
                 .select('id, command_patterns')
                 .eq('bot_token', botToken)
-                .eq('command_patterns', pattern)
+                .ilike('command_patterns', `%${pattern}%`)
                 .neq('id', commandId)
                 .single();
 
@@ -302,7 +302,6 @@ router.delete('/:commandId', async (req, res) => {
 });
 
 // ✅ FIXED: Test command execution
-// ✅ FIXED: Test command execution
 router.post('/:commandId/test', async (req, res) => {
     try {
         const { commandId } = req.params;
@@ -340,7 +339,46 @@ router.post('/:commandId/test', async (req, res) => {
             });
         }
 
-        // ... rest of the method remains the same
+        // ✅ Get ACTUAL admin chat ID (not test ID)
+        const { data: adminSettings, error: adminError } = await supabase
+            .from('admin_settings')
+            .select('admin_chat_id')
+            .single();
+
+        if (adminError || !adminSettings?.admin_chat_id) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Admin chat ID not set. Please set admin settings first.' 
+            });
+        }
+
+        // Create test message
+        const testMessage = {
+            chat: { id: adminSettings.admin_chat_id },
+            from: {
+                id: adminSettings.admin_chat_id,
+                first_name: 'Test User',
+                username: 'testuser',
+                language_code: 'en'
+            },
+            message_id: Math.floor(Math.random() * 1000000),
+            text: testInput || command.command_patterns.split(',')[0].trim(),
+            date: Math.floor(Date.now() / 1000)
+        };
+
+        console.log(`🧪 Testing command with REAL chat ID: ${adminSettings.admin_chat_id}`);
+
+        // Execute command
+        const result = await botManager.executeCommand(bot, command, testMessage, testInput);
+
+        res.json({
+            success: true,
+            message: 'Command executed successfully! Check your Telegram bot for the message.',
+            testInput: testInput,
+            chatId: adminSettings.admin_chat_id,
+            result: result
+        });
+
     } catch (error) {
         console.error('❌ Test command error:', error);
         res.status(500).json({ 
@@ -349,14 +387,22 @@ router.post('/:commandId/test', async (req, res) => {
         });
     }
 });
-// ✅ FIXED: Temporary command test
-// server/routes/commands.js - test-temp endpoint improve করুন
-// ✅ FIXED: Temporary command test
-router.post('/test-temp', async (req, res) => {
-    try {
-        const { command, botToken, testInput } = req.body;
 
-        // ✅ Get ACTUAL admin chat ID (not test ID)
+// ✅ FIXED: Temporary command test
+router.post('/test-temp/command', async (req, res) => {
+    try {
+        const { code, botToken, testInput } = req.body;
+
+        console.log('🧪 Testing temporary command');
+
+        if (!botToken || !code) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Bot token and code are required' 
+            });
+        }
+
+        // ✅ Get ACTUAL admin chat ID
         const { data: adminSettings, error: adminError } = await supabase
             .from('admin_settings')
             .select('admin_chat_id')
@@ -378,22 +424,34 @@ router.post('/test-temp', async (req, res) => {
             });
         }
 
+        // ✅ Create temporary command object
+        const tempCommand = {
+            id: 'temp_test_command_' + Date.now(),
+            command_patterns: '/test',
+            code: code,
+            bot_token: botToken,
+            is_active: true,
+            wait_for_answer: false
+        };
+
         // ✅ Use REAL admin chat ID for testing
         const testMessage = {
             chat: { id: adminSettings.admin_chat_id },
             from: {
-                id: adminSettings.admin_chat_id, // ✅ Actual user ID
+                id: adminSettings.admin_chat_id,
                 first_name: 'Test User',
-                username: 'testuser'
+                username: 'testuser',
+                language_code: 'en'
             },
             message_id: Math.floor(Math.random() * 1000000),
-            text: testInput || command.command_patterns.split(',')[0]
+            text: testInput || '/test',
+            date: Math.floor(Date.now() / 1000)
         };
 
-        console.log(`🧪 Testing command with REAL chat ID: ${adminSettings.admin_chat_id}`);
+        console.log(`🧪 Testing temporary command with REAL chat ID: ${adminSettings.admin_chat_id}`);
 
         // ✅ Execute command and verify delivery
-        const result = await botManager.executeCommand(bot, command, testMessage, testInput);
+        const result = await botManager.executeCommand(bot, tempCommand, testMessage, testInput);
 
         res.json({
             success: true,
@@ -503,20 +561,65 @@ bot.sendMessage(helpText, {
 });`
                 }
             ],
+            interactive: [
+                {
+                    id: 'ask_name',
+                    name: 'Ask User Name',
+                    patterns: '/ask,name',
+                    code: `// Ask user name with waitForAnswer
+try {
+    const name = await waitForAnswer("What's your name?");
+    bot.sendMessage(\`Hello \${name}! Nice to meet you! 😊\`);
+    
+    const age = await ask("How old are you?");
+    bot.sendMessage(\`Great! \${age} years old is a wonderful age! 🎉\`);
+    
+} catch (error) {
+    bot.sendMessage("Sorry, there was an error: " + error.message);
+}`
+                }
+            ],
             python: [
                 {
                     id: 'python_calc',
                     name: 'Python Calculator',
                     patterns: '/calc,calculate,math',
                     code: `// Python calculator
-const result = await bot.runPython(\`
-num1 = 10
-num2 = 5
+try {
+    const result = runPython(\`
+num1 = 25
+num2 = 15
 result = num1 + num2
 print(f"Calculation: {num1} + {num2} = {result}")
 \`);
 
-bot.sendMessage(\`🐍 Python Result:\\n\\n\${result}\`);`
+    bot.sendMessage(\`🐍 Python Result:\\n\\n\${result}\`);
+} catch (error) {
+    bot.sendMessage(\`❌ Python Error: \${error.message}\`);
+}`
+                }
+            ],
+            data: [
+                {
+                    id: 'save_data',
+                    name: 'Save User Data',
+                    patterns: '/save,mydata',
+                    code: `// Save user data example
+const user = getUser();
+
+// Save user data
+User.saveData('last_activity', new Date().toISOString());
+User.saveData('usage_count', (User.getData('usage_count') || 0) + 1);
+
+// Save bot data
+Bot.saveData('total_users', (Bot.getData('total_users') || 0) + 1);
+
+const message = \`✅ Data saved successfully!
+
+📊 Your Usage: \${User.getData('usage_count')} times
+👥 Total Users: \${Bot.getData('total_users')}\`;
+
+bot.sendMessage(message);`
                 }
             ]
         };
@@ -531,6 +634,109 @@ bot.sendMessage(\`🐍 Python Result:\\n\\n\${result}\`);`
         res.status(500).json({ 
             success: false,
             error: 'Failed to fetch templates' 
+        });
+    }
+});
+
+// ✅ NEW: Test waitForAnswer functionality
+router.post('/test/wait-for-answer', async (req, res) => {
+    try {
+        const { botToken, testInput } = req.body;
+
+        console.log('🧪 Testing waitForAnswer functionality');
+
+        if (!botToken) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Bot token is required' 
+            });
+        }
+
+        // ✅ Get ACTUAL admin chat ID
+        const { data: adminSettings, error: adminError } = await supabase
+            .from('admin_settings')
+            .select('admin_chat_id')
+            .single();
+
+        if (adminError || !adminSettings?.admin_chat_id) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Admin chat ID not set. Please set admin settings first.' 
+            });
+        }
+
+        // ✅ Get bot instance
+        const bot = botManager.getBotInstance(botToken);
+        if (!bot) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Bot is not active' 
+            });
+        }
+
+        // ✅ Create test command with waitForAnswer
+        const testCommand = {
+            id: 'wait_test_' + Date.now(),
+            command_patterns: '/wait_test',
+            code: `
+// Test waitForAnswer functionality
+try {
+    // Method 1: Using waitForAnswer
+    const name = await waitForAnswer("👋 What's your name?");
+    
+    // Method 2: Using ask
+    const age = await ask("🎂 How old are you?");
+    
+    // Method 3: Using Bot.waitForAnswer
+    const city = await Bot.waitForAnswer("🏙️ Which city do you live in?");
+    
+    const summary = \`✅ Summary:
+👤 Name: \${name}
+🎂 Age: \${age}
+🏙️ City: \${city}\`;
+    
+    Bot.sendMessage(summary);
+    
+} catch (error) {
+    Bot.sendMessage("❌ Error: " + error.message);
+}
+            `,
+            bot_token: botToken,
+            is_active: true,
+            wait_for_answer: false
+        };
+
+        // Create test message
+        const testMessage = {
+            chat: { id: adminSettings.admin_chat_id },
+            from: {
+                id: adminSettings.admin_chat_id,
+                first_name: 'Test User',
+                username: 'testuser',
+                language_code: 'en'
+            },
+            message_id: Math.floor(Math.random() * 1000000),
+            text: '/wait_test',
+            date: Math.floor(Date.now() / 1000)
+        };
+
+        console.log(`🧪 Testing waitForAnswer with chat ID: ${adminSettings.admin_chat_id}`);
+
+        // Execute command
+        const result = await botManager.executeCommand(bot, testCommand, testMessage, '/wait_test');
+
+        res.json({
+            success: true,
+            message: 'WaitForAnswer test started! Check your Telegram bot and respond to the questions.',
+            chatId: adminSettings.admin_chat_id,
+            result: result
+        });
+
+    } catch (error) {
+        console.error('❌ WaitForAnswer test error:', error);
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to test waitForAnswer: ' + error.message
         });
     }
 });
