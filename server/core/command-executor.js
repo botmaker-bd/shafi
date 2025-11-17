@@ -1,4 +1,4 @@
-// server/core/command-executor.js - COMPLETE FIXED VERSION
+// server/core/command-executor.js - BOT.RUNPYTHON FIX
 async function executeCommandCode(botInstance, code, context) {
     return new Promise(async (resolve, reject) => {
         try {
@@ -64,7 +64,14 @@ async function executeCommandCode(botInstance, code, context) {
                 // === BOT INSTANCES ===
                 bot: apiWrapperInstance,      // bot.sendMessage()
                 Api: apiWrapperInstance,      // Api.sendMessage()  
-                Bot: apiWrapperInstance,      // Bot.sendMessage()
+                
+                // ✅ FIX: Bot object with runPython method
+                Bot: {
+                    // Copy all methods from apiWrapperInstance
+                    ...apiWrapperInstance,
+                    // ✅ ADD runPython method specifically
+                    runPython: (pythonCode) => runPythonSync(pythonCode)
+                },
                 
                 // === USER INFORMATION ===
                 getUser: () => ({
@@ -256,7 +263,7 @@ async function executeCommandCode(botInstance, code, context) {
                 ask: waitForAnswer
             };
 
-            // ✅ FIXED: SIMPLE EXECUTION FUNCTION WITHOUT TEMPLATE STRING ISSUES
+            // ✅ FIXED: SIMPLE EXECUTION FUNCTION
             const executeUserCode = function(
                 getUser, sendMessage, bot, Api, Bot, 
                 params, message, User, BotData, waitForAnswer, wait, runPython
@@ -268,8 +275,7 @@ async function executeCommandCode(botInstance, code, context) {
                     console.log('📋 Parameters:', params);
                     
                     // ✅ USER'S CODE EXECUTES HERE - SYNCHRONOUSLY
-                    // This is where the user's code gets injected
-                    // The 'code' variable content is inserted here by the Function constructor
+                    // The 'code' variable content is inserted here
                     
                     return "Command completed successfully";
                 } catch (error) {
@@ -291,6 +297,8 @@ async function executeCommandCode(botInstance, code, context) {
                     console.log('✅ Execution started for user:', user.first_name);
                     console.log('📝 User input:', message);
                     console.log('📋 Parameters:', params);
+                    console.log('🤖 Bot.runPython available:', typeof Bot.runPython);
+                    console.log('🐍 runPython available:', typeof runPython);
                     
                     // User's code starts here
                     ${code}
@@ -315,7 +323,7 @@ async function executeCommandCode(botInstance, code, context) {
                 finalContext.sendMessage,
                 finalContext.bot,
                 finalContext.Api,
-                finalContext.Bot,
+                finalContext.Bot,  // ✅ This now has runPython method
                 finalContext.params,
                 finalContext.message,
                 finalContext.User,
