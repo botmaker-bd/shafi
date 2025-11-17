@@ -1,9 +1,28 @@
 /* ===== COMMAND EDITOR SPECIFIC STYLES ===== */
+.main-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 clamp(1rem, 3vw, 2rem);
+    padding-bottom: var(--safe-area-inset-bottom);
+}
+
+.nav-container {
+    max-width: none;
+    margin: 0;
+    padding: 0 clamp(1rem, 3vw, 2rem);
+    width: auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: nowrap;
+}
+
 .editor-layout {
     display: grid;
     grid-template-columns: 320px 1fr;
     gap: 1.5rem;
     min-height: calc(100vh - 200px);
+    margin-top: 1rem;
 }
 
 .commands-sidebar {
@@ -744,23 +763,6 @@
     transform: translateY(0);
 }
 
-/* Template States */
-.template-card.invalid,
-.template-card.error {
-    border-color: var(--error-color);
-    background: rgba(239, 68, 68, 0.05);
-}
-
-.template-card.invalid .template-icon,
-.template-card.error .template-icon {
-    color: var(--error-color);
-}
-
-.template-card.loading {
-    opacity: 0.7;
-    pointer-events: none;
-}
-
 /* Test Results Styles */
 .test-success, .test-error {
     padding: 1.5rem;
@@ -892,6 +894,10 @@
 }
 
 @media (max-width: 768px) {
+    .main-container {
+        padding: 0 1rem;
+    }
+    
     .editor-header {
         flex-direction: column;
         gap: 1rem;
@@ -978,6 +984,10 @@
 }
 
 @media (max-width: 480px) {
+    .main-container {
+        padding: 0 0.5rem;
+    }
+    
     .template-card h4 {
         font-size: 1rem;
     }
@@ -1079,4 +1089,32 @@
     outline: none;
     border-color: var(--primary-color);
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+/* Required field styling */
+.required-field {
+    border-left: 4px solid var(--warning-color);
+    padding-left: 1rem;
+}
+
+.required-field label {
+    color: var(--warning-color);
+    font-weight: 600;
+}
+
+/* Button pulse animation */
+.btn-pulse {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(37, 99, 235, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);
+    }
 }
