@@ -72,22 +72,13 @@
             </div>
             <div class="header-actions">
                 <button class="btn btn-secondary" id="backToBots">
-                    <i class="fas fa-arrow-left"></i> 
-                    <span class="btn-text-mobile">Back</span>
-                    <span class="btn-text-desktop">Back to Bots</span>
+                    <i class="fas fa-arrow-left"></i> Back to Bots
                 </button>
                 <button class="btn btn-primary" id="quickTest">
-                    <i class="fas fa-bolt"></i> 
-                    <span class="btn-text-mobile">Test</span>
-                    <span class="btn-text-desktop">Quick Test</span>
+                    <i class="fas fa-bolt"></i> Quick Test
                 </button>
             </div>
         </div>
-
-        <!-- Mobile Floating Action Button -->
-        <button class="fab mobile-only" id="mobileFab">
-            <i class="fas fa-plus"></i>
-        </button>
 
         <div class="editor-layout">
             <!-- Sidebar -->
@@ -95,8 +86,7 @@
                 <div class="sidebar-header">
                     <h3>Commands</h3>
                     <button id="addCommandBtn" class="btn btn-primary btn-small">
-                        <i class="fas fa-plus"></i> 
-                        <span class="btn-text-desktop">New</span>
+                        <i class="fas fa-plus"></i> New
                     </button>
                 </div>
                 
@@ -106,10 +96,10 @@
                 </div>
 
                 <div id="commandsList" class="commands-list">
-                    <!-- Commands will be loaded dynamically -->
+                    <!-- Commands will be loaded here -->
                 </div>
 
-                <div id="emptyCommands" class="empty-state">
+                <div id="emptyCommands" class="empty-state" style="display: none;">
                     <div class="empty-icon">
                         <i class="fas fa-code"></i>
                     </div>
@@ -122,13 +112,6 @@
 
             <!-- Main Editor -->
             <div class="editor-main">
-                <!-- Mobile Back Button -->
-                <div class="mobile-back-header mobile-only">
-                    <button class="btn btn-secondary btn-small" id="mobileBackToList">
-                        <i class="fas fa-arrow-left"></i> Back to List
-                    </button>
-                </div>
-
                 <!-- No Command Selected -->
                 <div id="noCommandSelected" class="empty-state">
                     <div class="empty-icon">
@@ -142,31 +125,27 @@
                 </div>
 
                 <!-- Command Editor -->
-                <div id="commandEditor" class="command-editor">
+                <div id="commandEditor" class="command-editor" style="display: none;">
                     <div class="editor-header">
                         <div class="command-title">
                             <h3 id="currentCommandName">Command Editor</h3>
                             <div class="command-status">
                                 <span class="status-badge active" id="commandStatus">Active</span>
-                                <span class="command-id mobile-hidden" id="commandId">ID: loading...</span>
+                                <span class="command-id" id="commandId">ID: loading...</span>
                             </div>
                         </div>
                         <div class="editor-actions">
-                            <button id="toggleCommandBtn" class="btn btn-warning btn-small btn-icon-mobile" title="Toggle Command">
-                                <i class="fas fa-power-off"></i>
-                                <span class="btn-text-desktop">Toggle</span>
+                            <button id="toggleCommandBtn" class="btn btn-warning btn-small">
+                                <i class="fas fa-power-off"></i> Toggle
                             </button>
-                            <button id="testCommandBtn" class="btn btn-success btn-small btn-icon-mobile" title="Test Command">
-                                <i class="fas fa-bolt"></i>
-                                <span class="btn-text-desktop">Test</span>
+                            <button id="testCommandBtn" class="btn btn-success btn-small">
+                                <i class="fas fa-bolt"></i> Test
                             </button>
-                            <button id="saveCommandBtn" class="btn btn-primary btn-small btn-icon-mobile" title="Save Command">
-                                <i class="fas fa-save"></i>
-                                <span class="btn-text-desktop">Save</span>
+                            <button id="saveCommandBtn" class="btn btn-primary btn-small">
+                                <i class="fas fa-save"></i> Save
                             </button>
-                            <button id="deleteCommandBtn" class="btn btn-danger btn-small btn-icon-mobile" title="Delete Command">
-                                <i class="fas fa-trash"></i>
-                                <span class="btn-text-desktop">Delete</span>
+                            <button id="deleteCommandBtn" class="btn btn-danger btn-small">
+                                <i class="fas fa-trash"></i> Delete
                             </button>
                         </div>
                     </div>
@@ -182,7 +161,7 @@
                                         <!-- Command tags will be added here -->
                                     </div>
                                     <input type="text" id="moreCommands" 
-                                           placeholder="Type command pattern and press Enter...">
+                                           placeholder="Type command pattern and press Enter or comma...">
                                 </div>
                                 <div class="form-help">
                                     Add multiple command patterns separated by commas. All patterns will execute the same code.
@@ -197,14 +176,10 @@
                                 <h4>Command Code</h4>
                                 <div class="code-actions">
                                     <button type="button" class="btn-code" id="openEditor">
-                                        <i class="fas fa-edit"></i> 
-                                        <span class="btn-text-desktop">Full Editor</span>
-                                        <span class="btn-text-mobile">Editor</span>
+                                        <i class="fas fa-edit"></i> Full Editor
                                     </button>
                                     <button type="button" class="btn-code" id="showTemplates">
-                                        <i class="fas fa-layer-group"></i> 
-                                        <span class="btn-text-desktop">Templates</span>
-                                        <span class="btn-text-mobile">Templates</span>
+                                        <i class="fas fa-layer-group"></i> Templates
                                     </button>
                                 </div>
                             </div>
@@ -223,12 +198,9 @@
                             <div class="form-group">
                                 <div class="test-input-container">
                                     <input type="text" id="testInput" 
-                                           placeholder="Enter test input..." 
-                                           value="/start">
+                                           placeholder="Enter test input to simulate user message..." required>
                                     <button type="button" id="runTestBtn" class="btn btn-warning">
-                                        <i class="fas fa-play"></i> 
-                                        <span class="btn-text-desktop">Run Test</span>
-                                        <span class="btn-text-mobile">Test</span>
+                                        <i class="fas fa-play"></i> Run Test
                                     </button>
                                 </div>
                                 <div class="form-help">
@@ -244,7 +216,7 @@
                                 <label class="toggle-label">
                                     <div class="toggle-text">
                                         <span class="toggle-title">Wait for Answer</span>
-                                        <span class="toggle-description mobile-hidden">Enable to wait for user response after command execution</span>
+                                        <span class="toggle-description">Enable to wait for user response after command execution</span>
                                     </div>
                                     <div class="toggle-switch">
                                         <input type="checkbox" id="waitForAnswer">
@@ -253,14 +225,12 @@
                                 </label>
                             </div>
 
-                            <div id="answerHandlerSection" class="form-group">
+                            <div id="answerHandlerSection" class="form-group" style="display: none;">
                                 <div class="code-editor-header">
                                     <label for="answerHandler">Answer Handler Code</label>
                                     <div class="code-actions">
                                         <button type="button" class="btn-code" id="openAnswerEditor">
-                                            <i class="fas fa-edit"></i> 
-                                            <span class="btn-text-desktop">Full Editor</span>
-                                            <span class="btn-text-mobile">Editor</span>
+                                            <i class="fas fa-edit"></i> Full Editor
                                         </button>
                                     </div>
                                 </div>
@@ -313,61 +283,59 @@
             <div class="modal-header compact-header">
                 <div class="editor-toolbar">
                     <div class="toolbar-group">
-                        <button class="btn-icon" id="undoBtn" title="Undo (Ctrl+Z)">
+                        <button class="btn-icon" id="undoBtn" title="Undo">
                             <i class="fas fa-undo"></i>
-                            <span class="btn-text-desktop">Undo</span>
+                            <span class="btn-text">Undo</span>
                         </button>
-                        <button class="btn-icon" id="redoBtn" title="Redo (Ctrl+Y)">
+                        <button class="btn-icon" id="redoBtn" title="Redo">
                             <i class="fas fa-redo"></i>
-                            <span class="btn-text-desktop">Redo</span>
+                            <span class="btn-text">Redo</span>
                         </button>
                     </div>
                     <div class="toolbar-group">
-                        <button class="btn-icon" id="selectAllBtn" title="Select All (Ctrl+A)">
+                        <button class="btn-icon" id="selectAllBtn" title="Select All">
                             <i class="fas fa-expand-arrows-alt"></i>
-                            <span class="btn-text-desktop">Select All</span>
+                            <span class="btn-text">Select All</span>
                         </button>
-                        <button class="btn-icon" id="cutBtn" title="Cut (Ctrl+X)">
+                        <button class="btn-icon" id="cutBtn" title="Cut">
                             <i class="fas fa-cut"></i>
-                            <span class="btn-text-desktop">Cut</span>
+                            <span class="btn-text">Cut</span>
                         </button>
-                        <button class="btn-icon" id="copyBtn" title="Copy (Ctrl+C)">
+                        <button class="btn-icon" id="copyBtn" title="Copy">
                             <i class="fas fa-copy"></i>
-                            <span class="btn-text-desktop">Copy</span>
+                            <span class="btn-text">Copy</span>
                         </button>
-                        <button class="btn-icon" id="pasteBtn" title="Paste (Ctrl+V)">
+                        <button class="btn-icon" id="pasteBtn" title="Paste">
                             <i class="fas fa-paste"></i>
-                            <span class="btn-text-desktop">Paste</span>
+                            <span class="btn-text">Paste</span>
                         </button>
                     </div>
                     <div class="toolbar-group">
                         <button class="btn-icon" id="clearBtn" title="Clear All">
                             <i class="fas fa-eraser"></i>
-                            <span class="btn-text-desktop">Clear</span>
+                            <span class="btn-text">Clear</span>
                         </button>
                         <button class="btn-icon" id="formatBtn" title="Format Code">
                             <i class="fas fa-indent"></i>
-                            <span class="btn-text-desktop">Format</span>
+                            <span class="btn-text">Format</span>
                         </button>
                     </div>
                 </div>
                 <div class="header-actions">
-                    <button class="btn-icon btn-cancel" id="cancelEditTop">
+                    <button class="btn-icon btn-cancel" id="cancelEditTop" title="Cancel">
                         <i class="fas fa-times"></i>
-                        <span class="btn-text-desktop">Cancel</span>
+                        <span class="btn-text">Cancel</span>
                     </button>
-                    <button class="btn-icon btn-save" id="saveCodeTop">
+                    <button class="btn-icon btn-save" id="saveCodeTop" title="Save Code">
                         <i class="fas fa-save"></i>
-                        <span class="btn-text-desktop">Save</span>
+                        <span class="btn-text">Save</span>
                     </button>
                     <button class="modal-close">&times;</button>
                 </div>
             </div>
             <div class="modal-body fullscreen-body">
-                <div class="code-editor-wrapper">
-                    <textarea id="advancedCodeEditor" class="fullscreen-editor" 
-                             placeholder="Write your code here..."></textarea>
-                </div>
+                <textarea id="advancedCodeEditor" class="fullscreen-editor" 
+                         placeholder="Write your code here..."></textarea>
             </div>
             <div class="modal-footer">
                 <div class="editor-info">
@@ -400,12 +368,16 @@
                 <div class="templates-categories">
                     <div class="category-tabs-container">
                         <div class="category-tabs">
-                            <!-- Categories will be loaded dynamically -->
+                            <!-- Categories will be dynamically loaded -->
                         </div>
                     </div>
                     
                     <div class="templates-content">
-                        <!-- Templates will be loaded dynamically -->
+                        <!-- Templates will be dynamically loaded here -->
+                        <div class="loading-state">
+                            <div class="spinner"></div>
+                            <p>Loading templates...</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -413,22 +385,6 @@
                 <button class="btn btn-secondary" id="closeTemplates">Close</button>
             </div>
         </div>
-    </div>
-
-    <!-- Mobile Bottom Action Bar -->
-    <div class="mobile-action-bar mobile-only">
-        <button class="mobile-action-btn" id="mobileSaveBtn">
-            <i class="fas fa-save"></i>
-            <span>Save</span>
-        </button>
-        <button class="mobile-action-btn" id="mobileTestBtn">
-            <i class="fas fa-bolt"></i>
-            <span>Test</span>
-        </button>
-        <button class="mobile-action-btn" id="mobileToggleBtn">
-            <i class="fas fa-power-off"></i>
-            <span>Toggle</span>
-        </button>
     </div>
 
     <script src="js/common.js"></script>
