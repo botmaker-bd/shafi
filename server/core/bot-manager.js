@@ -15,7 +15,7 @@ class BotManager {
         this.dataCache = new Map();
         this.waitingAnswers = new Map();
         this.commandAnswerHandlers = new Map();
-        this.callbackHandlers = new Map(); // ✅ NEW: For callback data handlers
+        this.callbackHandlers = new Map();
         
         console.log(`🤖 Bot Manager initialized in ${this.USE_WEBHOOK ? 'WEBHOOK' : 'POLLING'} mode`);
     }
@@ -124,113 +124,114 @@ class BotManager {
         }
     }
 
-
-// server/core/bot-manager.js - CONTEXT FIX
-createExecutionContext(bot, command, msg, userInput) {
-    // ✅ FIX: Ensure botToken is properly passed
-    const botToken = command.bot_token;
-    
-    if (!botToken) {
-        console.error('❌ CRITICAL: command.bot_token is undefined!');
-        console.log('Command structure:', {
-            id: command.id,
-            patterns: command.command_patterns,
-            has_token: !!command.bot_token
-        });
-    }
-    
-    console.log(`🔧 Creating context for bot: ${botToken?.substring(0, 10)}...`);
-    
-    return {
-        msg: msg,
-        chatId: msg.chat.id,
-        userId: msg.from.id,
-        username: msg.from.username,
-        first_name: msg.from.first_name,
-        last_name: msg.from.last_name,
-        language_code: msg.from.language_code,
-        botToken: botToken, // ✅ THIS WAS MISSING!
-        userInput: userInput,
-        nextCommandHandlers: this.nextCommandHandlers,
-        waitingAnswers: this.waitingAnswers,
-        commandAnswerHandlers: this.commandAnswerHandlers,
-        callbackHandlers: this.callbackHandlers,
+    // ✅ FIXED: CONTEXT CREATION
+    createExecutionContext(bot, command, msg, userInput) {
+        // ✅ FIX: Ensure botToken is properly passed
+        const botToken = command.bot_token;
         
-        User: {
-            saveData: (key, value) => {
-                const cacheKey = `${botToken}_${msg.from.id}_${key}`;
-                this.dataCache.set(cacheKey, value);
-                
-                this.saveData('user_data', botToken, msg.from.id, key, value)
-                    .catch(err => console.error('❌ Background save error:', err));
-                
-                return value;
-            },
-            
-            getData: (key) => {
-                const cacheKey = `${botToken}_${msg.from.id}_${key}`;
-                if (this.dataCache.has(cacheKey)) {
-                    return this.dataCache.get(cacheKey);
-                }
-                
-                const defaults = {
-                    'total_usage': 0,
-                    'user_count': 1,
-                    'usage_count': 0
-                };
-                
-                return defaults[key] || null;
-            },
-            
-            deleteData: (key) => {
-                const cacheKey = `${botToken}_${msg.from.id}_${key}`;
-                this.dataCache.delete(cacheKey);
-                
-                this.deleteData('user_data', botToken, msg.from.id, key)
-                    .catch(err => console.error('❌ Background delete error:', err));
-                
-                return true;
-            },
-            
-            increment: (key, amount = 1) => {
-                const current = this.User.getData(key) || 0;
-                const newValue = parseInt(current) + amount;
-                this.User.saveData(key, newValue);
-                return newValue;
-            }
-        },
-        
-        Bot: {
-            saveData: (key, value) => {
-                const cacheKey = `${botToken}_bot_${key}`;
-                this.dataCache.set(cacheKey, value);
-                
-                this.saveData('bot_data', botToken, null, key, value)
-                    .catch(err => console.error('❌ Background bot save error:', err));
-                
-                return value;
-            },
-            
-            getData: (key) => {
-                const cacheKey = `${botToken}_bot_${key}`;
-                if (this.dataCache.has(cacheKey)) {
-                    return this.dataCache.get(cacheKey);
-                }
-                return null;
-            },
-            
-            deleteData: (key) => {
-                const cacheKey = `${botToken}_bot_${key}`;
-                this.dataCache.delete(cacheKey);
-                
-                this.deleteData('bot_data', botToken, null, key)
-                    .catch(err => console.error('❌ Background bot delete error:', err));
-                
-                return true;
-            }
+        if (!botToken) {
+            console.error('❌ CRITICAL: command.bot_token is undefined!');
+            console.log('Command structure:', {
+                id: command.id,
+                patterns: command.command_patterns,
+                has_token: !!command.bot_token
+            });
         }
-    };
-}
+        
+        console.log(`🔧 Creating context for bot: ${botToken?.substring(0, 10)}...`);
+        
+        const self = this; // Store reference for callbacks
+        
+        return {
+            msg: msg,
+            chatId: msg.chat.id,
+            userId: msg.from.id,
+            username: msg.from.username,
+            first_name: msg.from.first_name,
+            last_name: msg.from.last_name,
+            language_code: msg.from.language_code,
+            botToken: botToken,
+            userInput: userInput,
+            nextCommandHandlers: this.nextCommandHandlers,
+            waitingAnswers: this.waitingAnswers,
+            commandAnswerHandlers: this.commandAnswerHandlers,
+            callbackHandlers: this.callbackHandlers,
+            
+            User: {
+                saveData: (key, value) => {
+                    const cacheKey = `${botToken}_${msg.from.id}_${key}`;
+                    self.dataCache.set(cacheKey, value);
+                    
+                    self.saveData('user_data', botToken, msg.from.id, key, value)
+                        .catch(err => console.error('❌ Background save error:', err));
+                    
+                    return value;
+                },
+                
+                getData: (key) => {
+                    const cacheKey = `${botToken}_${msg.from.id}_${key}`;
+                    if (self.dataCache.has(cacheKey)) {
+                        return self.dataCache.get(cacheKey);
+                    }
+                    
+                    const defaults = {
+                        'total_usage': 0,
+                        'user_count': 1,
+                        'usage_count': 0
+                    };
+                    
+                    return defaults[key] || null;
+                },
+                
+                deleteData: (key) => {
+                    const cacheKey = `${botToken}_${msg.from.id}_${key}`;
+                    self.dataCache.delete(cacheKey);
+                    
+                    self.deleteData('user_data', botToken, msg.from.id, key)
+                        .catch(err => console.error('❌ Background delete error:', err));
+                    
+                    return true;
+                },
+                
+                increment: (key, amount = 1) => {
+                    const current = this.User.getData(key) || 0;
+                    const newValue = parseInt(current) + amount;
+                    this.User.saveData(key, newValue);
+                    return newValue;
+                }
+            },
+            
+            Bot: {
+                saveData: (key, value) => {
+                    const cacheKey = `${botToken}_bot_${key}`;
+                    self.dataCache.set(cacheKey, value);
+                    
+                    self.saveData('bot_data', botToken, null, key, value)
+                        .catch(err => console.error('❌ Background bot save error:', err));
+                    
+                    return value;
+                },
+                
+                getData: (key) => {
+                    const cacheKey = `${botToken}_bot_${key}`;
+                    if (self.dataCache.has(cacheKey)) {
+                        return self.dataCache.get(cacheKey);
+                    }
+                    return null;
+                },
+                
+                deleteData: (key) => {
+                    const cacheKey = `${botToken}_bot_${key}`;
+                    self.dataCache.delete(cacheKey);
+                    
+                    self.deleteData('bot_data', botToken, null, key)
+                        .catch(err => console.error('❌ Background bot delete error:', err));
+                    
+                    return true;
+                }
+            }
+        };
+    }
 
     // ✅ FIXED: Setup Command Answer Handler with ERROR HANDLING
     async setupCommandAnswerHandler(bot, command, msg, context) {
@@ -403,7 +404,6 @@ createExecutionContext(bot, command, msg, userInput) {
         }
     }
 
-
     async preloadUserData(botToken, userId) {
         try {
             const { data, error } = await supabase
@@ -539,120 +539,114 @@ createExecutionContext(bot, command, msg, userInput) {
         bot.on('webhook_error', (error) => console.error(`❌ Webhook error:`, error));
         bot.on('error', (error) => console.error(`❌ Bot error:`, error));
     }
-    
-    
-    // server/core/bot-manager.js - WAIT FOR ANSWER PROCESSING FIX
 
-// server/core/bot-manager.js - MESSAGE HANDLER FIX
-async handleMessage(bot, token, msg) {
-    try {
-        if (!msg.text && !msg.caption) return;
+    // ✅ FIXED: MESSAGE HANDLER
+    async handleMessage(bot, token, msg) {
+        try {
+            if (!msg.text && !msg.caption) return;
 
-        const chatId = msg.chat.id;
-        const userId = msg.from.id;
-        const text = msg.text || msg.caption || '';
+            const chatId = msg.chat.id;
+            const userId = msg.from.id;
+            const text = msg.text || msg.caption || '';
 
-        console.log(`📨 Message from ${msg.from.first_name} (${userId}): "${text}"`);
-        console.log(`🔑 Bot token: ${token.substring(0, 10)}...`);
+            console.log(`📨 Message from ${msg.from.first_name} (${userId}): "${text}"`);
+            console.log(`🔑 Bot token: ${token.substring(0, 10)}...`);
 
-        const userKey = `${token}_${userId}`;
+            const userKey = `${token}_${userId}`;
 
-        // ✅ FIXED: 1. FIRST - Check for waitForAnswer() promises
-        if (this.nextCommandHandlers.has(userKey)) {
-            console.log(`✅ WAIT FOR ANSWER HANDLER FOUND! Processing...`);
-            const handlerData = this.nextCommandHandlers.get(userKey);
-            
-            if (handlerData && handlerData.resolve) {
-                console.log(`🎯 Resolving waitForAnswer with: "${text}"`);
-                handlerData.resolve(text);
-                this.nextCommandHandlers.delete(userKey);
-                console.log(`✅ waitForAnswer resolved successfully`);
+            // ✅ FIXED: 1. FIRST - Check for waitForAnswer() promises
+            if (this.nextCommandHandlers.has(userKey)) {
+                console.log(`✅ WAIT FOR ANSWER HANDLER FOUND! Processing...`);
+                const handlerData = this.nextCommandHandlers.get(userKey);
+                
+                if (handlerData && handlerData.resolve) {
+                    console.log(`🎯 Resolving waitForAnswer with: "${text}"`);
+                    handlerData.resolve(text);
+                    this.nextCommandHandlers.delete(userKey);
+                    console.log(`✅ waitForAnswer resolved successfully`);
+                    return;
+                } else {
+                    console.log(`❌ Handler data exists but resolve function missing`);
+                    this.nextCommandHandlers.delete(userKey);
+                }
+            }
+
+            // 2. Check for command-based answer handlers
+            if (this.commandAnswerHandlers.has(userKey)) {
+                console.log(`✅ COMMAND ANSWER HANDLER FOUND! Processing...`);
+                await this.processCommandAnswer(userKey, text, msg);
                 return;
+            }
+
+            // 3. Check for next command handler (other types)
+            const nextCommandKey = `${token}_${userId}_next`;
+            if (this.nextCommandHandlers.has(nextCommandKey)) {
+                console.log(`✅ NEXT COMMAND HANDLER FOUND! Executing...`);
+                const handler = this.nextCommandHandlers.get(nextCommandKey);
+                this.nextCommandHandlers.delete(nextCommandKey);
+                
+                try {
+                    await handler(text, msg);
+                    console.log(`✅ Next command handler executed successfully`);
+                    return;
+                } catch (handlerError) {
+                    console.error(`❌ Next command handler error:`, handlerError);
+                    await this.sendError(bot, chatId, handlerError);
+                    return;
+                }
+            }
+
+            // Handle special commands
+            if (text.startsWith('/python ')) {
+                await this.executePythonCode(bot, chatId, text.replace('/python ', ''));
+                return;
+            }
+
+            if (text.startsWith('/ai ') || text.startsWith('/generate ')) {
+                await this.generateAICode(bot, chatId, text);
+                return;
+            }
+
+            // Find and execute matching command
+            const command = await this.findMatchingCommand(token, text, msg);
+            if (command) {
+                console.log(`🎯 Executing command: ${command.command_patterns}`);
+                console.log(`🔑 Command bot token: ${command.bot_token?.substring(0, 10)}...`);
+                await this.executeCommand(bot, command, msg, text);
             } else {
-                console.log(`❌ Handler data exists but resolve function missing`);
+                console.log(`❌ No matching command found for: "${text}"`);
+            }
+
+        } catch (error) {
+            console.error('❌ Handle message error:', error);
+            await this.sendError(bot, msg.chat.id, error);
+        }
+    }
+
+    // ✅ FIXED: Cleanup stale handlers
+    cleanupStaleHandlers() {
+        const now = Date.now();
+        const STALE_TIMEOUT = 10 * 60 * 1000; // 10 minutes
+        
+        // Cleanup waitForAnswer handlers
+        for (const [userKey, handlerData] of this.nextCommandHandlers.entries()) {
+            if (now - handlerData.timestamp > STALE_TIMEOUT) {
+                console.log(`🧹 Removing stale waitForAnswer handler for ${userKey}`);
+                if (handlerData.reject) {
+                    handlerData.reject(new Error('Wait for answer timeout (system cleanup)'));
+                }
                 this.nextCommandHandlers.delete(userKey);
             }
         }
-
-        // 2. Check for command-based answer handlers
-        if (this.commandAnswerHandlers.has(userKey)) {
-            console.log(`✅ COMMAND ANSWER HANDLER FOUND! Processing...`);
-            await this.processCommandAnswer(userKey, text, msg);
-            return;
-        }
-
-        // 3. Check for next command handler (other types)
-        const nextCommandKey = `${token}_${userId}_next`;
-        if (this.nextCommandHandlers.has(nextCommandKey)) {
-            console.log(`✅ NEXT COMMAND HANDLER FOUND! Executing...`);
-            const handler = this.nextCommandHandlers.get(nextCommandKey);
-            this.nextCommandHandlers.delete(nextCommandKey);
-            
-            try {
-                await handler(text, msg);
-                console.log(`✅ Next command handler executed successfully`);
-                return;
-            } catch (handlerError) {
-                console.error(`❌ Next command handler error:`, handlerError);
-                await this.sendError(bot, chatId, handlerError);
-                return;
+        
+        // Cleanup command answer handlers
+        for (const [userKey, handlerData] of this.commandAnswerHandlers.entries()) {
+            if (now - handlerData.timestamp > STALE_TIMEOUT) {
+                console.log(`🧹 Removing stale command handler for ${userKey}`);
+                this.commandAnswerHandlers.delete(userKey);
             }
         }
-
-        // Handle special commands
-        if (text.startsWith('/python ')) {
-            await this.executePythonCode(bot, chatId, text.replace('/python ', ''));
-            return;
-        }
-
-        if (text.startsWith('/ai ') || text.startsWith('/generate ')) {
-            await this.generateAICode(bot, chatId, text);
-            return;
-        }
-
-        // Find and execute matching command
-        const command = await this.findMatchingCommand(token, text, msg);
-        if (command) {
-            console.log(`🎯 Executing command: ${command.command_patterns}`);
-            console.log(`🔑 Command bot token: ${command.bot_token?.substring(0, 10)}...`);
-            await this.executeCommand(bot, command, msg, text);
-        } else {
-            console.log(`❌ No matching command found for: "${text}"`);
-        }
-
-    } catch (error) {
-        console.error('❌ Handle message error:', error);
-        await this.sendError(bot, msg.chat.id, error);
     }
-}
-
-// ✅ FIXED: Cleanup stale handlers
-cleanupStaleHandlers() {
-    const now = Date.now();
-    const STALE_TIMEOUT = 10 * 60 * 1000; // 10 minutes
-    
-    // Cleanup waitForAnswer handlers
-    for (const [userKey, handlerData] of this.nextCommandHandlers.entries()) {
-        if (now - handlerData.timestamp > STALE_TIMEOUT) {
-            console.log(`🧹 Removing stale waitForAnswer handler for ${userKey}`);
-            if (handlerData.reject) {
-                handlerData.reject(new Error('Wait for answer timeout (system cleanup)'));
-            }
-            this.nextCommandHandlers.delete(userKey);
-        }
-    }
-    
-    // Cleanup command answer handlers
-    for (const [userKey, handlerData] of this.commandAnswerHandlers.entries()) {
-        if (now - handlerData.timestamp > STALE_TIMEOUT) {
-            console.log(`🧹 Removing stale command handler for ${userKey}`);
-            this.commandAnswerHandlers.delete(userKey);
-        }
-    }
-}
-
-
-
 
     // ✅ FIXED: Callback Query Handler - NOW PROCESSES AS COMMANDS
     async handleCallbackQuery(bot, token, callbackQuery) {
