@@ -256,7 +256,7 @@ async function executeCommandCode(botInstance, code, context) {
                 ask: waitForAnswer
             };
 
-            // ✅ SIMPLE EXECUTION FUNCTION
+            // ✅ FIXED: SIMPLE EXECUTION FUNCTION WITHOUT TEMPLATE STRING ISSUES
             const executeUserCode = function(
                 getUser, sendMessage, bot, Api, Bot, 
                 params, message, User, BotData, waitForAnswer, wait, runPython
@@ -268,7 +268,8 @@ async function executeCommandCode(botInstance, code, context) {
                     console.log('📋 Parameters:', params);
                     
                     // ✅ USER'S CODE EXECUTES HERE - SYNCHRONOUSLY
-                    ${code}
+                    // This is where the user's code gets injected
+                    // The 'code' variable content is inserted here by the Function constructor
                     
                     return "Command completed successfully";
                 } catch (error) {
@@ -282,9 +283,34 @@ async function executeCommandCode(botInstance, code, context) {
                 }
             };
 
+            // ✅ FIXED: Create the execution function with user code properly injected
+            const executionFunction = new Function(
+                'getUser', 'sendMessage', 'bot', 'Api', 'Bot', 'params', 'message', 'User', 'BotData', 'waitForAnswer', 'wait', 'runPython',
+                `try {
+                    var user = getUser();
+                    console.log('✅ Execution started for user:', user.first_name);
+                    console.log('📝 User input:', message);
+                    console.log('📋 Parameters:', params);
+                    
+                    // User's code starts here
+                    ${code}
+                    // User's code ends here
+                    
+                    return "Command completed successfully";
+                } catch (error) {
+                    console.error('❌ Execution error:', error);
+                    try {
+                        sendMessage("❌ Error: " + error.message);
+                    } catch (e) {
+                        console.error('Failed to send error message:', e);
+                    }
+                    throw error;
+                }`
+            );
+
             // Execute the command
             console.log('🚀 Executing command...');
-            const result = await executeUserCode(
+            const result = await executionFunction(
                 finalContext.getUser,
                 finalContext.sendMessage,
                 finalContext.bot,
@@ -296,7 +322,7 @@ async function executeCommandCode(botInstance, code, context) {
                 finalContext.BotData,
                 finalContext.waitForAnswer,
                 finalContext.wait,
-                finalContext.runPython  // ✅ This is now synchronous
+                finalContext.runPython
             );
             
             console.log('✅ Command execution completed');
