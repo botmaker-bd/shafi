@@ -1,14 +1,18 @@
-// server/core/command-executor.js - COMPLETELY FIXED WAIT FOR ANSWER
+// server/core/command-executor.js - COMPLETELY FIXED
 async function executeCommandCode(botInstance, code, context) {
     return new Promise(async (resolve, reject) => {
         try {
             const { msg, chatId, userId, username, first_name, botToken, userInput, nextCommandHandlers } = context;
             
-            // Handle optional fields
-            const lastName = context.last_name || '';
-            const languageCode = context.language_code || '';
+            // ✅ FIX: Validate botToken
+            if (!botToken) {
+                console.error('❌ CRITICAL: botToken is undefined!');
+                console.log('Context keys:', Object.keys(context));
+                reject(new Error('botToken is required but was undefined'));
+                return;
+            }
             
-            console.log(`🔧 Starting command execution for user ${userId}`);
+            console.log(`🔧 Starting command execution for user ${userId}, bot: ${botToken.substring(0, 10)}...`);
             
             // Import ApiWrapper
             const ApiWrapper = require('./api-wrapper');
@@ -20,9 +24,9 @@ async function executeCommandCode(botInstance, code, context) {
                 userId: userId,
                 username: username || '',
                 first_name: first_name || '',
-                last_name: lastName,
-                language_code: languageCode,
-                botToken: botToken,
+                last_name: context.last_name || '',
+                language_code: context.language_code || '',
+                botToken: botToken, // ✅ NOW DEFINED
                 userInput: userInput,
                 nextCommandHandlers: nextCommandHandlers || new Map(),
                 User: context.User || {},
@@ -45,7 +49,6 @@ async function executeCommandCode(botInstance, code, context) {
             // ✅ SYNCHRONOUS PYTHON RUNNER
             const pythonRunner = require('./python-runner');
             
-            // ✅ COMPLETELY SYNCHRONOUS PYTHON FUNCTION
             const runPythonSync = (pythonCode) => {
                 try {
                     console.log('🐍 Running Python code synchronously...');
@@ -58,12 +61,18 @@ async function executeCommandCode(botInstance, code, context) {
                 }
             };
 
-            // ✅ FIXED: PROPER WAIT FOR ANSWER IMPLEMENTATION
+            // ✅ FIXED: PROPER WAIT FOR ANSWER WITH BOTTOKEN VALIDATION
             const waitForAnswer = (question, options = {}) => {
                 return new Promise((resolve, reject) => {
                     try {
-                        console.log(`⏳ Setting up waitForAnswer for user ${userId}`);
+                        console.log(`⏳ Setting up waitForAnswer for user ${userId}, bot: ${botToken.substring(0, 10)}...`);
                         
+                        // ✅ VALIDATE botToken again
+                        if (!botToken) {
+                            reject(new Error('botToken is undefined in waitForAnswer'));
+                            return;
+                        }
+
                         // First send the question
                         botInstance.sendMessage(chatId, question, options)
                             .then(() => {
@@ -71,6 +80,7 @@ async function executeCommandCode(botInstance, code, context) {
                                 const waitKey = `${botToken}_${userId}`;
                                 
                                 console.log(`🔑 Wait key created: ${waitKey}`);
+                                console.log(`📊 nextCommandHandlers available: ${!!nextCommandHandlers}`);
                                 
                                 // Store the resolver in nextCommandHandlers
                                 if (nextCommandHandlers) {
@@ -78,10 +88,13 @@ async function executeCommandCode(botInstance, code, context) {
                                     nextCommandHandlers.set(waitKey, {
                                         resolve: resolve,
                                         reject: reject,
-                                        timestamp: Date.now()
+                                        timestamp: Date.now(),
+                                        botToken: botToken, // ✅ Store for verification
+                                        userId: userId
                                     });
                                     
                                     console.log(`✅ WaitForAnswer handler stored for ${waitKey}`);
+                                    console.log(`📋 Total handlers: ${nextCommandHandlers.size}`);
                                 } else {
                                     reject(new Error('nextCommandHandlers not available'));
                                     return;
@@ -115,16 +128,13 @@ async function executeCommandCode(botInstance, code, context) {
             // Create execution environment
             const executionEnv = {
                 // === BOT INSTANCES ===
-                bot: apiWrapperInstance,      // bot.sendMessage()
-                Api: apiWrapperInstance,      // Api.sendMessage()  
+                bot: apiWrapperInstance,
+                Api: apiWrapperInstance,
                 
-                // ✅ FIX: Bot object with runPython method
+                // ✅ FIXED: Bot object with all methods
                 Bot: {
-                    // Copy all methods from apiWrapperInstance
                     ...apiWrapperInstance,
-                    // ✅ ADD runPython method specifically
                     runPython: (pythonCode) => runPythonSync(pythonCode),
-                    // ✅ ADD waitForAnswer method to Bot
                     waitForAnswer: waitForAnswer,
                     ask: waitForAnswer
                 },
@@ -134,8 +144,8 @@ async function executeCommandCode(botInstance, code, context) {
                     id: userId,
                     username: username || '',
                     first_name: first_name || '',
-                    last_name: lastName,
-                    language_code: languageCode,
+                    last_name: context.last_name || '',
+                    language_code: context.language_code || '',
                     chat_id: chatId
                 }),
                 
@@ -146,7 +156,7 @@ async function executeCommandCode(botInstance, code, context) {
                 userInput: userInput,
                 params: params,
                 message: message,
-                botToken: botToken,
+                botToken: botToken, // ✅ DEFINED
                 
                 // === DATA STORAGE ===
                 User: context.User || {
@@ -249,11 +259,7 @@ async function executeCommandCode(botInstance, code, context) {
                 
                 // === UTILITY FUNCTIONS ===
                 wait: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
-                
-                // ✅ SYNCHRONOUS PYTHON EXECUTION
                 runPython: (pythonCode) => runPythonSync(pythonCode),
-                
-                // ✅ WAIT FOR ANSWER FUNCTIONS
                 waitForAnswer: waitForAnswer,
                 ask: waitForAnswer
             };
@@ -280,9 +286,7 @@ async function executeCommandCode(botInstance, code, context) {
                 },
                 getUser: () => executionEnv.getUser(),
                 wait: (ms) => executionEnv.wait(ms),
-                // ✅ SYNCHRONOUS PYTHON
                 runPython: (code) => executionEnv.runPython(code),
-                // ✅ WAIT FOR ANSWER
                 waitForAnswer: waitForAnswer,
                 ask: waitForAnswer
             };
@@ -293,35 +297,7 @@ async function executeCommandCode(botInstance, code, context) {
                 ...directFunctions
             };
 
-            // ✅ FIXED: SIMPLE EXECUTION FUNCTION
-            const executeUserCode = function(
-                getUser, sendMessage, bot, Api, Bot, 
-                params, message, User, BotData, wait, runPython, waitForAnswer, ask
-            ) {
-                try {
-                    var user = getUser();
-                    console.log('✅ Execution started for user:', user.first_name);
-                    console.log('📝 User input:', message);
-                    console.log('📋 Parameters:', params);
-                    console.log('⏳ WaitForAnswer available:', typeof waitForAnswer);
-                    console.log('❓ Ask available:', typeof ask);
-                    
-                    // ✅ USER'S CODE EXECUTES HERE - SYNCHRONOUSLY
-                    // The 'code' variable content is inserted here
-                    
-                    return "Command completed successfully";
-                } catch (error) {
-                    console.error('❌ Execution error:', error);
-                    try {
-                        sendMessage("❌ Error: " + error.message);
-                    } catch (e) {
-                        console.error('Failed to send error message:', e);
-                    }
-                    throw error;
-                }
-            };
-
-            // ✅ FIXED: Create the execution function with user code properly injected
+            // ✅ FIXED: Create the execution function with user code
             const executionFunction = new Function(
                 'getUser', 'sendMessage', 'bot', 'Api', 'Bot', 'params', 'message', 'User', 'BotData', 'wait', 'runPython', 'waitForAnswer', 'ask',
                 `try {
@@ -333,6 +309,7 @@ async function executeCommandCode(botInstance, code, context) {
                     console.log('🐍 runPython available:', typeof runPython);
                     console.log('⏳ waitForAnswer available:', typeof waitForAnswer);
                     console.log('❓ ask available:', typeof ask);
+                    console.log('🔑 botToken available:', typeof botToken);
                     
                     // User's code starts here
                     ${code}
