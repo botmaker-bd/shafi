@@ -1,3 +1,4 @@
+// server/core/bot-manager.js - COMPLETELY FIXED VERSION
 const TelegramBot = require('node-telegram-bot-api');
 const supabase = require('../config/supabase');
 const pythonRunner = require('./python-runner');
@@ -12,8 +13,9 @@ class BotManager {
         this.USE_WEBHOOK = process.env.USE_WEBHOOK === 'true';
         this.initialized = false;
         this.dataCache = new Map();
-        this.waitingAnswers = new Map(); // For waitForAnswer() function
-        this.commandAnswerHandlers = new Map(); // For wait_for_answer: true templates
+        this.waitingAnswers = new Map();
+        this.commandAnswerHandlers = new Map();
+        this.callbackHandlers = new Map(); // ✅ NEW: For callback data handlers
         
         console.log(`🤖 Bot Manager initialized in ${this.USE_WEBHOOK ? 'WEBHOOK' : 'POLLING'} mode`);
     }
@@ -87,15 +89,13 @@ class BotManager {
         try {
             console.log(`🔧 Executing command: ${command.command_patterns} for chat: ${msg.chat.id}`);
             
-            // Pre-load data for this user to enable synchronous access
             await this.preloadUserData(command.bot_token, msg.from.id);
             
-            // Create enhanced execution context
             const context = this.createExecutionContext(bot, command, msg, userInput);
 
             const result = await executeCommandCode(bot, command.code, context);
             
-            // 🔥 NEW: Setup Wait For Answer system if enabled - NO USER STATE NEEDED
+            // ✅ FIXED: Setup Wait For Answer system with ERROR HANDLING
             if (command.wait_for_answer && command.answer_handler) {
                 await this.setupCommandAnswerHandler(bot, command, msg, context);
             }
@@ -112,9 +112,10 @@ class BotManager {
         } catch (error) {
             console.error(`❌ Command execution error for ${command.command_patterns}:`, error);
             
-            // Send error message to user
+            // ✅ IMPROVED: Better error message
             try {
-                await bot.sendMessage(msg.chat.id, `❌ Command Error: ${error.message}`);
+                const errorMsg = `❌ Command Error: ${error.message}\n\nIf this continues, please contact support.`;
+                await bot.sendMessage(msg.chat.id, errorMsg);
             } catch (sendError) {
                 console.error('❌ Failed to send error message:', sendError);
             }
@@ -123,7 +124,6 @@ class BotManager {
         }
     }
 
-    // 🔥 IMPROVED: Create execution context
     createExecutionContext(bot, command, msg, userInput) {
         return {
             msg: msg,
@@ -137,9 +137,9 @@ class BotManager {
             userInput: userInput,
             nextCommandHandlers: this.nextCommandHandlers,
             waitingAnswers: this.waitingAnswers,
-            commandAnswerHandlers: this.commandAnswerHandlers, // Add this for API wrapper
+            commandAnswerHandlers: this.commandAnswerHandlers,
+            callbackHandlers: this.callbackHandlers, // ✅ ADDED: For callback support
             
-            // Enhanced data operations - SYNCHRONOUS STYLE
             User: {
                 saveData: (key, value) => {
                     const cacheKey = `${command.bot_token}_${msg.from.id}_${key}`;
@@ -216,25 +216,33 @@ class BotManager {
         };
     }
 
-    // 🔥 IMPROVED: Setup Command-based Answer Handler - NO USER STATE
+    // ✅ FIXED: Setup Command Answer Handler with ERROR HANDLING
     async setupCommandAnswerHandler(bot, command, msg, context) {
         const userKey = `${command.bot_token}_${msg.from.id}`;
         
         console.log(`⏳ Setting up Command Answer Handler for user: ${userKey}`);
         
-        // 🔥 NO User.saveData() needed - system automatically tracks in memory
-        this.commandAnswerHandlers.set(userKey, {
-            bot: bot,
-            command: command,
-            context: context,
-            timestamp: Date.now(),
-            originalMessage: msg
-        });
-        
-        console.log(`✅ Now waiting for answer from user ${msg.from.first_name}`);
+        try {
+            this.commandAnswerHandlers.set(userKey, {
+                bot: bot,
+                command: command,
+                context: context,
+                timestamp: Date.now(),
+                originalMessage: msg
+            });
+            
+            console.log(`✅ Now waiting for answer from user ${msg.from.first_name}`);
+            
+            // Send confirmation message
+            await bot.sendMessage(msg.chat.id, "💬 I'm listening for your response...");
+            
+        } catch (error) {
+            console.error('❌ Failed to setup command answer handler:', error);
+            await bot.sendMessage(msg.chat.id, "❌ Failed to setup response listener. Please try again.");
+        }
     }
 
-    // 🔥 IMPROVED: Process user's answer for command-based handlers
+    // ✅ FIXED: Process user's answer with BETTER ERROR HANDLING
     async processCommandAnswer(userKey, answerText, answerMsg) {
         let handlerData;
         
@@ -249,7 +257,9 @@ class BotManager {
             
             console.log(`🎯 Processing command answer: "${answerText}" for command: ${command.command_patterns}`);
             
-            // Create enhanced context for answer handler
+            // Send processing message
+            await bot.sendMessage(answerMsg.chat.id, "⏳ Processing your response...");
+            
             const answerContext = {
                 ...context,
                 params: answerText,
@@ -266,23 +276,21 @@ class BotManager {
         } catch (error) {
             console.error('❌ Command answer handler execution error:', error);
             
-            // Send error to user but DON'T keep handler active
+            // ✅ IMPROVED: Send detailed error message
             try {
-                await handlerData?.bot.sendMessage(answerMsg.chat.id, `❌ Error: ${error.message}`);
+                const errorMsg = `❌ Answer Handler Error: ${error.message}\n\nPlease try the command again.`;
+                await handlerData?.bot.sendMessage(answerMsg.chat.id, errorMsg);
             } catch (sendError) {
                 console.error('❌ Failed to send error message:', sendError);
             }
             
-            // 🔥 IMPORTANT: Even on error, remove handler to prevent stuck state
-            throw error;
         } finally {
-            // 🔥 ALWAYS remove handler - no manual state management needed
             this.commandAnswerHandlers.delete(userKey);
             console.log(`🧹 Auto-cleaned command answer handler for ${userKey}`);
         }
     }
 
-    // 🔥 IMPROVED: Process waitForAnswer() promises
+    // ✅ FIXED: Process waitForAnswer() with BETTER ERROR HANDLING
     async processWaitForAnswer(userKey, answerText, answerMsg) {
         let waitingData;
         
@@ -295,7 +303,6 @@ class BotManager {
 
             console.log(`🎯 Processing waitForAnswer: "${answerText}"`);
             
-            // Resolve the promise with user's answer
             if (waitingData.resolve) {
                 waitingData.resolve(answerText);
             }
@@ -305,23 +312,85 @@ class BotManager {
         } catch (error) {
             console.error('❌ waitForAnswer processing error:', error);
             
-            // Reject the promise if there's an error
             if (waitingData && waitingData.reject) {
                 waitingData.reject(error);
             }
+            
+            // Send error message
+            try {
+                await waitingData?.bot.sendMessage(answerMsg.chat.id, `❌ Error processing your answer: ${error.message}`);
+            } catch (sendError) {
+                console.error('❌ Failed to send error message:', sendError);
+            }
         } finally {
-            // 🔥 ALWAYS remove from waiting answers
             this.waitingAnswers.delete(userKey);
             console.log(`🧹 Auto-cleaned waitForAnswer for ${userKey}`);
         }
     }
 
-    // 🔥 NEW: Auto-cleanup system for stale handlers
+    // ✅ NEW: Process Callback Data as Commands
+    async processCallbackAsCommand(bot, token, callbackQuery) {
+        try {
+            const { data, message, from } = callbackQuery;
+            const callbackData = data;
+            
+            console.log(`🔘 Processing callback as command: ${callbackData} from ${from.first_name}`);
+            
+            // Find command that matches this callback data
+            const commands = this.botCommands.get(token) || [];
+            const matchingCommand = commands.find(cmd => {
+                if (!cmd.command_patterns) return false;
+                const patterns = cmd.command_patterns.split(',').map(p => p.trim());
+                return patterns.includes(callbackData);
+            });
+            
+            if (matchingCommand) {
+                console.log(`🎯 Found command for callback: ${matchingCommand.command_patterns}`);
+                
+                // Create a message-like object for the callback
+                const callbackMessage = {
+                    chat: message.chat,
+                    from: from,
+                    message_id: message.message_id,
+                    text: callbackData,
+                    date: new Date().getTime() / 1000
+                };
+                
+                // Execute the command
+                await this.executeCommand(bot, matchingCommand, callbackMessage, callbackData);
+                
+                // Answer the callback query
+                await bot.answerCallbackQuery(callbackQuery.id, { 
+                    text: `Executed: ${callbackData}`,
+                    show_alert: false 
+                });
+                
+            } else {
+                console.log(`❌ No command found for callback: ${callbackData}`);
+                await bot.answerCallbackQuery(callbackQuery.id, { 
+                    text: `Unknown command: ${callbackData}`,
+                    show_alert: true 
+                });
+            }
+            
+        } catch (error) {
+            console.error('❌ Callback command processing error:', error);
+            
+            try {
+                await bot.answerCallbackQuery(callbackQuery.id, { 
+                    text: `Error: ${error.message}`,
+                    show_alert: true 
+                });
+            } catch (answerError) {
+                console.error('❌ Failed to answer callback query:', answerError);
+            }
+        }
+    }
+
     cleanupStaleHandlers() {
         const now = Date.now();
-        const STALE_TIMEOUT = 10 * 60 * 1000; // 10 minutes
+        const STALE_TIMEOUT = 10 * 60 * 1000;
         
-        // Cleanup command answer handlers
         for (const [userKey, handlerData] of this.commandAnswerHandlers.entries()) {
             if (now - handlerData.timestamp > STALE_TIMEOUT) {
                 console.log(`🧹 Removing stale command handler for ${userKey}`);
@@ -329,7 +398,6 @@ class BotManager {
             }
         }
         
-        // Cleanup waiting answers
         for (const [userKey, waitingData] of this.waitingAnswers.entries()) {
             if (now - waitingData.timestamp > STALE_TIMEOUT) {
                 console.log(`🧹 Removing stale waitForAnswer for ${userKey}`);
@@ -431,7 +499,6 @@ class BotManager {
 
             this.setupEventHandlers(bot, token);
 
-            // Test connection
             try {
                 const botInfo = await bot.getMe();
                 console.log(`✅ Bot connected: @${botInfo.username}`);
@@ -440,12 +507,10 @@ class BotManager {
                 throw botError;
             }
 
-            // Store bot and commands
             this.activeBots.set(token, bot);
             this.botCommands.set(token, commands || []);
 
-            // 🔥 Start auto-cleanup interval
-            setInterval(() => this.cleanupStaleHandlers(), 5 * 60 * 1000); // 5 minutes
+            setInterval(() => this.cleanupStaleHandlers(), 5 * 60 * 1000);
 
             return true;
         } catch (error) {
@@ -467,7 +532,10 @@ class BotManager {
         bot.on('contact', (msg) => this.handleContact(bot, token, msg));
         bot.on('poll', (poll) => this.handlePoll(bot, token, poll));
         bot.on('poll_answer', (pollAnswer) => this.handlePollAnswer(bot, token, pollAnswer));
+        
+        // ✅ FIXED: Callback query handler - NOW PROCESSES AS COMMANDS
         bot.on('callback_query', (callbackQuery) => this.handleCallbackQuery(bot, token, callbackQuery));
+        
         bot.on('inline_query', (inlineQuery) => this.handleInlineQuery(bot, token, inlineQuery));
         bot.on('new_chat_members', (msg) => this.handleChatMember(bot, token, msg, 'new'));
         bot.on('left_chat_member', (msg) => this.handleChatMember(bot, token, msg, 'left'));
@@ -489,21 +557,21 @@ class BotManager {
 
             const userKey = `${token}_${userId}`;
 
-            // 1. FIRST: Check for waitForAnswer() promises
+            // 1. Check for waitForAnswer() promises
             if (this.waitingAnswers.has(userKey)) {
                 console.log(`✅ USER HAS waitForAnswer() PENDING! Processing...`);
                 await this.processWaitForAnswer(userKey, text, msg);
                 return;
             }
 
-            // 2. SECOND: Check for command-based answer handlers
+            // 2. Check for command-based answer handlers
             if (this.commandAnswerHandlers.has(userKey)) {
                 console.log(`✅ USER HAS COMMAND ANSWER HANDLER! Processing...`);
                 await this.processCommandAnswer(userKey, text, msg);
                 return;
             }
 
-            // 3. THIRD: Check for next command handler
+            // 3. Check for next command handler
             const nextCommandKey = `${token}_${userId}`;
             if (this.nextCommandHandlers.has(nextCommandKey)) {
                 console.log(`✅ NEXT COMMAND HANDLER FOUND! Executing...`);
@@ -547,6 +615,40 @@ class BotManager {
         }
     }
 
+    // ✅ FIXED: Callback Query Handler - NOW PROCESSES AS COMMANDS
+    async handleCallbackQuery(bot, token, callbackQuery) {
+        try {
+            const { data, message, from } = callbackQuery;
+            console.log(`🔘 Callback received: ${data} from ${from.first_name}`);
+
+            // 1. FIRST: Try to process as a command
+            await this.processCallbackAsCommand(bot, token, callbackQuery);
+            
+            // 2. SECOND: If not processed as command, try nextCommandHandlers
+            const callbackKey = `${token}_${data}`;
+            if (this.nextCommandHandlers.has(callbackKey)) {
+                console.log(`✅ NEXT COMMAND HANDLER FOUND FOR CALLBACK!`);
+                const handler = this.nextCommandHandlers.get(callbackKey);
+                await handler(data, callbackQuery);
+                this.nextCommandHandlers.delete(callbackKey);
+            }
+
+            // Always answer the callback query
+            await bot.answerCallbackQuery(callbackQuery.id);
+            
+        } catch (error) {
+            console.error('❌ Callback query error:', error);
+            try {
+                await bot.answerCallbackQuery(callbackQuery.id, { 
+                    text: `Error: ${error.message}`,
+                    show_alert: true 
+                });
+            } catch (answerError) {
+                console.error('❌ Failed to answer callback query:', answerError);
+            }
+        }
+    }
+
     async handleMedia(bot, token, msg, mediaType) {
         try {
             const caption = msg.caption || '';
@@ -556,24 +658,6 @@ class BotManager {
             }
         } catch (error) {
             console.error(`❌ Handle ${mediaType} error:`, error);
-        }
-    }
-
-    async handleCallbackQuery(bot, token, callbackQuery) {
-        try {
-            const { data, message, from } = callbackQuery;
-            console.log(`🔘 Callback: ${data} from ${from.first_name}`);
-
-            const callbackKey = `${token}_${data}`;
-            if (this.nextCommandHandlers.has(callbackKey)) {
-                const handler = this.nextCommandHandlers.get(callbackKey);
-                await handler(data, callbackQuery);
-                this.nextCommandHandlers.delete(callbackKey);
-            }
-
-            await bot.answerCallbackQuery(callbackQuery.id);
-        } catch (error) {
-            console.error('❌ Callback query error:', error);
         }
     }
 
@@ -597,7 +681,6 @@ class BotManager {
         }
     }
 
-    // Other event handlers...
     async handleEditedMessage(bot, token, msg) {
         console.log(`✏️ Edited message from ${msg.from.first_name}`);
     }
@@ -681,15 +764,14 @@ bot.sendMessage(\`Hello \${user.first_name}! You said: "${prompt}"\`);`;
 *Type:* ${error.name}
 
 We've logged this error and will fix it soon.
-        `.trim();
+            `.trim();
         
-        await bot.sendMessage(chatId, errorMessage, { parse_mode: 'Markdown' });
+            await bot.sendMessage(chatId, errorMessage, { parse_mode: 'Markdown' });
         } catch (sendError) {
             console.error('❌ Failed to send error message:', sendError);
         }
     }
 
-    // Data storage methods...
     async saveData(dataType, botToken, userId, key, value, metadata = {}) {
         try {
             const { data, error } = await supabase
