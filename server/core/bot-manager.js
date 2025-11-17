@@ -124,97 +124,113 @@ class BotManager {
         }
     }
 
-    createExecutionContext(bot, command, msg, userInput) {
-        return {
-            msg: msg,
-            chatId: msg.chat.id,
-            userId: msg.from.id,
-            username: msg.from.username,
-            first_name: msg.from.first_name,
-            last_name: msg.from.last_name,
-            language_code: msg.from.language_code,
-            botToken: command.bot_token,
-            userInput: userInput,
-            nextCommandHandlers: this.nextCommandHandlers,
-            waitingAnswers: this.waitingAnswers,
-            commandAnswerHandlers: this.commandAnswerHandlers,
-            callbackHandlers: this.callbackHandlers, // ✅ ADDED: For callback support
-            
-            User: {
-                saveData: (key, value) => {
-                    const cacheKey = `${command.bot_token}_${msg.from.id}_${key}`;
-                    this.dataCache.set(cacheKey, value);
-                    
-                    this.saveData('user_data', command.bot_token, msg.from.id, key, value)
-                        .catch(err => console.error('❌ Background save error:', err));
-                    
-                    return value;
-                },
+
+// server/core/bot-manager.js - CONTEXT FIX
+createExecutionContext(bot, command, msg, userInput) {
+    // ✅ FIX: Ensure botToken is properly passed
+    const botToken = command.bot_token;
+    
+    if (!botToken) {
+        console.error('❌ CRITICAL: command.bot_token is undefined!');
+        console.log('Command structure:', {
+            id: command.id,
+            patterns: command.command_patterns,
+            has_token: !!command.bot_token
+        });
+    }
+    
+    console.log(`🔧 Creating context for bot: ${botToken?.substring(0, 10)}...`);
+    
+    return {
+        msg: msg,
+        chatId: msg.chat.id,
+        userId: msg.from.id,
+        username: msg.from.username,
+        first_name: msg.from.first_name,
+        last_name: msg.from.last_name,
+        language_code: msg.from.language_code,
+        botToken: botToken, // ✅ THIS WAS MISSING!
+        userInput: userInput,
+        nextCommandHandlers: this.nextCommandHandlers,
+        waitingAnswers: this.waitingAnswers,
+        commandAnswerHandlers: this.commandAnswerHandlers,
+        callbackHandlers: this.callbackHandlers,
+        
+        User: {
+            saveData: (key, value) => {
+                const cacheKey = `${botToken}_${msg.from.id}_${key}`;
+                this.dataCache.set(cacheKey, value);
                 
-                getData: (key) => {
-                    const cacheKey = `${command.bot_token}_${msg.from.id}_${key}`;
-                    if (this.dataCache.has(cacheKey)) {
-                        return this.dataCache.get(cacheKey);
-                    }
-                    
-                    const defaults = {
-                        'total_usage': 0,
-                        'user_count': 1,
-                        'usage_count': 0
-                    };
-                    
-                    return defaults[key] || null;
-                },
+                this.saveData('user_data', botToken, msg.from.id, key, value)
+                    .catch(err => console.error('❌ Background save error:', err));
                 
-                deleteData: (key) => {
-                    const cacheKey = `${command.bot_token}_${msg.from.id}_${key}`;
-                    this.dataCache.delete(cacheKey);
-                    
-                    this.deleteData('user_data', command.bot_token, msg.from.id, key)
-                        .catch(err => console.error('❌ Background delete error:', err));
-                    
-                    return true;
-                },
-                
-                increment: (key, amount = 1) => {
-                    const current = this.User.getData(key) || 0;
-                    const newValue = parseInt(current) + amount;
-                    this.User.saveData(key, newValue);
-                    return newValue;
-                }
+                return value;
             },
             
-            Bot: {
-                saveData: (key, value) => {
-                    const cacheKey = `${command.bot_token}_bot_${key}`;
-                    this.dataCache.set(cacheKey, value);
-                    
-                    this.saveData('bot_data', command.bot_token, null, key, value)
-                        .catch(err => console.error('❌ Background bot save error:', err));
-                    
-                    return value;
-                },
-                
-                getData: (key) => {
-                    const cacheKey = `${command.bot_token}_bot_${key}`;
-                    if (this.dataCache.has(cacheKey)) {
-                        return this.dataCache.get(cacheKey);
-                    }
-                    return null;
-                },
-                
-                deleteData: (key) => {
-                    const cacheKey = `${command.bot_token}_bot_${key}`;
-                    this.dataCache.delete(cacheKey);
-                    
-                    this.deleteData('bot_data', command.bot_token, null, key)
-                        .catch(err => console.error('❌ Background bot delete error:', err));
-                    
-                    return true;
+            getData: (key) => {
+                const cacheKey = `${botToken}_${msg.from.id}_${key}`;
+                if (this.dataCache.has(cacheKey)) {
+                    return this.dataCache.get(cacheKey);
                 }
+                
+                const defaults = {
+                    'total_usage': 0,
+                    'user_count': 1,
+                    'usage_count': 0
+                };
+                
+                return defaults[key] || null;
+            },
+            
+            deleteData: (key) => {
+                const cacheKey = `${botToken}_${msg.from.id}_${key}`;
+                this.dataCache.delete(cacheKey);
+                
+                this.deleteData('user_data', botToken, msg.from.id, key)
+                    .catch(err => console.error('❌ Background delete error:', err));
+                
+                return true;
+            },
+            
+            increment: (key, amount = 1) => {
+                const current = this.User.getData(key) || 0;
+                const newValue = parseInt(current) + amount;
+                this.User.saveData(key, newValue);
+                return newValue;
             }
-        };
-    }
+        },
+        
+        Bot: {
+            saveData: (key, value) => {
+                const cacheKey = `${botToken}_bot_${key}`;
+                this.dataCache.set(cacheKey, value);
+                
+                this.saveData('bot_data', botToken, null, key, value)
+                    .catch(err => console.error('❌ Background bot save error:', err));
+                
+                return value;
+            },
+            
+            getData: (key) => {
+                const cacheKey = `${botToken}_bot_${key}`;
+                if (this.dataCache.has(cacheKey)) {
+                    return this.dataCache.get(cacheKey);
+                }
+                return null;
+            },
+            
+            deleteData: (key) => {
+                const cacheKey = `${botToken}_bot_${key}`;
+                this.dataCache.delete(cacheKey);
+                
+                this.deleteData('bot_data', botToken, null, key)
+                    .catch(err => console.error('❌ Background bot delete error:', err));
+                
+                return true;
+            }
+        }
+    };
+}
 
     // ✅ FIXED: Setup Command Answer Handler with ERROR HANDLING
     async setupCommandAnswerHandler(bot, command, msg, context) {
@@ -527,6 +543,7 @@ class BotManager {
     
     // server/core/bot-manager.js - WAIT FOR ANSWER PROCESSING FIX
 
+// server/core/bot-manager.js - MESSAGE HANDLER FIX
 async handleMessage(bot, token, msg) {
     try {
         if (!msg.text && !msg.caption) return;
@@ -536,6 +553,7 @@ async handleMessage(bot, token, msg) {
         const text = msg.text || msg.caption || '';
 
         console.log(`📨 Message from ${msg.from.first_name} (${userId}): "${text}"`);
+        console.log(`🔑 Bot token: ${token.substring(0, 10)}...`);
 
         const userKey = `${token}_${userId}`;
 
@@ -550,6 +568,9 @@ async handleMessage(bot, token, msg) {
                 this.nextCommandHandlers.delete(userKey);
                 console.log(`✅ waitForAnswer resolved successfully`);
                 return;
+            } else {
+                console.log(`❌ Handler data exists but resolve function missing`);
+                this.nextCommandHandlers.delete(userKey);
             }
         }
 
@@ -593,6 +614,7 @@ async handleMessage(bot, token, msg) {
         const command = await this.findMatchingCommand(token, text, msg);
         if (command) {
             console.log(`🎯 Executing command: ${command.command_patterns}`);
+            console.log(`🔑 Command bot token: ${command.bot_token?.substring(0, 10)}...`);
             await this.executeCommand(bot, command, msg, text);
         } else {
             console.log(`❌ No matching command found for: "${text}"`);
