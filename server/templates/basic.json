@@ -1,47 +1,20 @@
 [
-  {
-    "id": "welcome_interactive",
-    "name": "Interactive Welcome",
-    "patterns": "/start, start, hello",
-    "description": "Interactive welcome with buttons and user engagement",
-    "code": "const user = getUser();\nconst welcomeMsg = `🎉 *Welcome ${user.first_name}!* \n\nI'm your assistant bot with amazing features:\n\n✨ *What I can do:*\n• Process text and files\n• Convert between formats\n• Provide information\n• Much more!\n\n🔧 *Get started by choosing an option below:*`;\n\nawait bot.sendMessage(chatId, welcomeMsg, {\n    parse_mode: 'Markdown',\n    reply_markup: {\n        inline_keyboard: [\n            [\n                { text: '🚀 Quick Start', callback_data: 'quick_start' },\n                { text: '📚 Tutorial', callback_data: 'tutorial' }\n            ],\n            [\n                { text: '🔧 Tools', callback_data: 'tools_menu' },\n                { text: '⚙️ Settings', callback_data: 'settings_menu' }\n            ],\n            [\n                { text: '📞 Support', url: 'https://t.me/support' },\n                { text: '⭐ Rate Bot', url: 'https://t.me/store' }\n            ]\n        ]\n    }\n});\n\n// Save user first interaction\nUser.saveData('first_visit', new Date().toISOString());\nUser.saveData('usage_count', 1);",
-    "waitForAnswer": false,
-    "answerHandler": ""
-  },
-  {
-    "id": "text_utility",
-    "name": "Text Utilities",
-    "patterns": "/text, text, format",
-    "description": "Multiple text manipulation utilities in one command",
-    "code": "const fullText = msg.text || '';\nconst args = fullText.split(' ');\nconst action = args[1] ? args[1].toLowerCase() : '';\nconst inputText = args.slice(2).join(' ');\n\nif (!action) {\n    const helpText = `📝 *Text Utilities*\n\n*Available Actions:*\n• uppercase - Convert to UPPERCASE\n• lowercase - convert to lowercase\n• titlecase - Convert To Title Case\n• reverse - esrever txet\n• length - Count characters\n• words - Count words\n\n*Usage:*\n/text uppercase hello world\n/text length count this text\n/text reverse mirror`;\n\n    return bot.sendMessage(chatId, helpText, { parse_mode: 'Markdown' });\n}\n\nif (!inputText) {\n    return bot.sendMessage(chatId, '❌ Please provide text to process.\\nExample: /text uppercase hello world');\n}\n\nlet result = '';\nswitch (action) {\n    case 'uppercase':\n    case 'upper':\n        result = inputText.toUpperCase();\n        break;\n    case 'lowercase':\n    case 'lower':\n        result = inputText.toLowerCase();\n        break;\n    case 'titlecase':\n    case 'title':\n        result = inputText.replace(/\\w\\S*/g, txt => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());\n        break;\n    case 'reverse':\n        result = inputText.split('').reverse().join('');\n        break;\n    case 'length':\n    case 'count':\n        result = `Characters: ${inputText.length}\\nWords: ${inputText.split(/\\s+/).filter(word => word.length > 0).length}`;\n        break;\n    case 'words':\n        const words = inputText.split(/\\s+/).filter(word => word.length > 0);\n        result = `Word count: ${words.length}\\nWords: ${words.join(', ')}`;\n        break;\n    default:\n        return bot.sendMessage(chatId, `❌ Unknown action: ${action}\\nUse /text to see available actions.`);\n}\n\nawait bot.sendMessage(chatId, `✅ *Text Processing Result*\n\n*Action:* ${action}\\n*Input:* ${inputText}\\n*Result:* \\`${result}\\``, {\n    parse_mode: 'Markdown',\n    reply_to_message_id: msg.message_id\n});",
-    "waitForAnswer": false,
-    "answerHandler": ""
-  },
-  {
-    "id": "file_info",
-    "name": "File Information",
-    "patterns": "/fileinfo, fileinfo, file",
-    "description": "Get detailed information about any file or document",
-    "code": "// File Information Template\nif (!msg.document && !msg.photo && !msg.video && !msg.audio && !msg.voice) {\n    return bot.sendMessage(chatId, `📁 *File Information Tool*\\n\\nPlease send me a file, photo, video, audio, or voice message to analyze.\\n\\n*Supported formats:*\\n• Documents (PDF, TXT, DOC)\\n• Images (JPG, PNG, GIF)\\n• Videos (MP4, AVI)\\n• Audio files (MP3, WAV)\\n• Voice messages`,\n    { parse_mode: 'Markdown' });\n}\n\nlet fileInfo = '';\nlet fileType = '';\nlet fileSize = 0;\n\nif (msg.document) {\n    fileType = msg.document.mime_type || 'Document';\n    fileSize = msg.document.file_size;\n    fileInfo = `📄 *Document Analysis*\\n\\n`;\n} else if (msg.photo) {\n    fileType = 'Image/Photo';\n    const photo = msg.photo[msg.photo.length - 1]; // Highest resolution\n    fileSize = photo.file_size;\n    fileInfo = `🖼️ *Image Analysis*\\n\\n`;\n} else if (msg.video) {\n    fileType = msg.video.mime_type || 'Video';\n    fileSize = msg.video.file_size;\n    fileInfo = `🎥 *Video Analysis*\\n\\n`;\n} else if (msg.audio) {\n    fileType = msg.audio.mime_type || 'Audio';\n    fileSize = msg.audio.file_size;\n    fileInfo = `🎵 *Audio Analysis*\\n\\n`;\n} else if (msg.voice) {\n    fileType = 'Voice Message';\n    fileSize = msg.voice.file_size;\n    fileInfo = `🎤 *Voice Message Analysis*\\n\\n`;\n}\n\nfileInfo += `📊 *File Details:*\\n`;\nfileInfo += `• Type: ${fileType}\\n`;\nfileInfo += `• Size: ${(fileSize / 1024).toFixed(2)} KB\\n`;\n\nif (msg.document) {\n    fileInfo += `• Filename: ${msg.document.file_name || 'Unknown'}\\n`;\n}\n\nif (msg.video) {\n    fileInfo += `• Duration: ${msg.video.duration || 0} seconds\\n`;\n    fileInfo += `• Dimensions: ${msg.video.width || 0}x${msg.video.height || 0}\\n`;\n}\n\nif (msg.audio) {\n    fileInfo += `• Duration: ${msg.audio.duration || 0} seconds\\n`;\n    fileInfo += `• Title: ${msg.audio.title || 'Unknown'}\\n`;\n    fileInfo += `• Performer: ${msg.audio.performer || 'Unknown'}\\n`;\n}\n\nfileInfo += `\\n🆔 *Message ID:* ${msg.message_id}\\n`;\nfileInfo += `👤 *Sent by:* ${msg.from.first_name}\\n`;\nfileInfo += `⏰ *Time:* ${new Date(msg.date * 1000).toLocaleString()}`;\n\nawait bot.sendMessage(chatId, fileInfo, {\n    parse_mode: 'Markdown',\n    reply_to_message_id: msg.message_id\n});\n\n// Log file analysis\nUser.saveData('last_file_analysis', new Date().toISOString());\nUser.increment('files_analyzed', 1);",
-    "waitForAnswer": false,
-    "answerHandler": ""
-  },
-  {
-    "id": "conversation_starter",
-    "name": "Conversation Starter",
-    "patterns": "/chat, chat, talk, conversation",
-    "description": "Interactive conversation with multiple questions",
-    "code": "// Conversation Starter Template\nconst user = getUser();\n\nconst welcomeMsg = `💬 *Let's Have a Conversation!* \\n\\nI'll ask you a few questions to get to know you better. Ready to begin?`;\n\nawait bot.sendMessage(chatId, welcomeMsg, { \n    parse_mode: 'Markdown',\n    reply_markup: {\n        inline_keyboard: [[\n            { text: '✅ Yes, Start!', callback_data: 'start_chat' },\n            { text: '❌ Maybe Later', callback_data: 'cancel_chat' }\n        ]]\n    }\n});",
-    "waitForAnswer": true,
-    "answerHandler": "// Handle conversation responses\nif (params.toLowerCase().includes('yes') || params.toLowerCase().includes('start')) {\n    await bot.sendMessage(chatId, `Great! Let's begin...\\n\\nWhat's your favorite hobby? 🎨⚽🎮`);\n    \n    // Set next question handler\n    const hobby = await waitForAnswer(\"I'm curious about your hobbies! What do you enjoy doing in your free time?\");\n    \n    await bot.sendMessage(chatId, `Nice! \\\"${hobby}\\\" sounds interesting! 🎯\\n\\nNow, what's your favorite type of music? 🎵`);\n    \n    const music = await waitForAnswer(\"What kind of music gets you moving? 🎶\");\n    \n    const summary = `🎉 *Nice Chatting With You!*\\n\\nHere's what I learned:\\n\\n👤 *Name:* ${user.first_name}\\n🎨 *Hobby:* ${hobby}\\n🎵 *Music:* ${music}\\n\\nThanks for sharing! It was great getting to know you better! 😊`;\n    \n    await bot.sendMessage(chatId, summary, { parse_mode: 'Markdown' });\n    \n    // Save conversation data\n    User.saveData('last_chat', new Date().toISOString());\n    User.saveData('user_hobby', hobby);\n    User.saveData('user_music', music);\n    User.increment('chats_completed', 1);\n    \n} else {\n    await bot.sendMessage(chatId, \"No problem! Feel free to start a conversation anytime by typing /chat 😊\");\n}"
-  },
-  {
-    "id": "weather_basic",
-    "name": "Weather Information",
-    "patterns": "/weather, weather, forecast",
-    "description": "Get weather information for any city",
-    "code": "const fullText = msg.text || '';\nconst city = fullText.replace(/^\\/\\w+\\s*/, '').trim();\n\nif (!city) {\n    return bot.sendMessage(chatId, `🌤️ *Weather Information*\\n\\n*Usage:*\\n/weather London\\n/weather New York\\n/weather Tokyo\\n\\n*Example:*\\n\\`/weather Dhaka\\`\\n\\`/weather New York\\``, \n    { parse_mode: 'Markdown' });\n}\n\n// Show loading message\nconst loadingMsg = await bot.sendMessage(chatId, `🔍 Searching weather for *${city}*...`, \n{ parse_mode: 'Markdown' });\n\ntry {\n    // Simulate API call - in real implementation, use actual weather API\n    await bot.wait(2000); // Simulate API delay\n    \n    // Mock weather data (replace with real API)\n    const mockWeather = {\n        temperature: Math.floor(Math.random() * 35) + 5,\n        condition: ['Sunny', 'Cloudy', 'Rainy', 'Partly Cloudy'][Math.floor(Math.random() * 4)],\n        humidity: Math.floor(Math.random() * 60) + 30,\n        wind: (Math.random() * 20 + 5).toFixed(1)\n    };\n    \n    const weatherEmoji = {\n        'Sunny': '☀️',\n        'Cloudy': '☁️',\n        'Rainy': '🌧️',\n        'Partly Cloudy': '⛅'\n    };\n    \n    const weatherReport = `${weatherEmoji[mockWeather.condition]} *Weather in ${city}*\\n\\n` +\n                         `🌡️ Temperature: *${mockWeather.temperature}°C*\\n` +\n                         `📊 Condition: *${mockWeather.condition}*\\n` +\n                         `💧 Humidity: *${mockWeather.humidity}%*\\n` +\n                         `💨 Wind: *${mockWeather.wind} km/h*\\n\\n` +\n                         `_Note: This is demo data. Connect to a real weather API for accurate information._`;\n    \n    // Edit the loading message with results\n    await bot.editMessageText(weatherReport, {\n        chat_id: chatId,\n        message_id: loadingMsg.message_id,\n        parse_mode: 'Markdown'\n    });\n    \n    // Log weather search\n    User.saveData('last_weather_search', city);\n    User.increment('weather_searches', 1);\n    \n} catch (error) {\n    await bot.editMessageText(`❌ *Weather Service Unavailable*\\n\\nCould not fetch weather for *${city}*. Please try again later.`,\n    {\n        chat_id: chatId,\n        message_id: loadingMsg.message_id,\n        parse_mode: 'Markdown'\n    });\n}",
-    "waitForAnswer": false,
-    "answerHandler": ""
-  }
+    {
+        "id": "simple_welcome",
+        "name": "Simple Welcome",
+        "patterns": "/start, start, hello",
+        "description": "Basic welcome message with user info",
+        "code": "const user = getUser();\nApi.sendMessage(`👋 Hello ${user.first_name}! Welcome to our bot.\\n\\nYour ID: ${user.id}\\nUsername: @${user.username || 'Not set'}`);",
+        "waitForAnswer": false,
+        "answerHandler": ""
+    },
+    {
+        "id": "help_command",
+        "name": "Help Command", 
+        "patterns": "/help, help, commands",
+        "description": "Simple help menu with buttons",
+        "code": "const helpText = `🤖 *Bot Help*\\n\\nAvailable Commands:\\n• /start - Start bot\\n• /help - Show help\\n• /info - Bot info\\n\\nNeed help? Contact admin.`;\n\nconst buttons = [\n    [{ text: \"📞 Contact\", callback_data: \"contact\" }],\n    [{ text: \"ℹ️ Info\", callback_data: \"info\" }]\n];\n\nApi.sendMessage(helpText, {\n    parse_mode: 'Markdown',\n    reply_markup: { inline_keyboard: buttons }\n});",
+        "waitForAnswer": false,
+        "answerHandler": ""
+    }
 ]
