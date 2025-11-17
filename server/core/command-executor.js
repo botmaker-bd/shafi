@@ -141,14 +141,10 @@ async function executeCommandCode(botInstance, code, context) {
                 wait: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
                 
                 // === PYTHON RUNNER ===
-                runPython: async (pythonCode) => {
-                    try {
-                        const pythonRunner = require('./python-runner');
-                        return await pythonRunner.runPythonCode(pythonCode);
-                    } catch (error) {
-                        throw new Error(`Python execution failed: ${error.message}`);
-                    }
-                }
+                runPython: function(code) {
+        const pythonRunner = require('./python-runner');
+        return pythonRunner.runPythonCodeSync(code);
+    },
             };
 
             // ✅ DIRECT FUNCTION SHORTCUTS
