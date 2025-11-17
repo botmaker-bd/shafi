@@ -55,20 +55,38 @@ async function executeCommandCode(botInstance, code, context) {
             const params = parseParams(userInput);
             const message = userInput;
 
-            // ✅ SYNCHRONOUS PYTHON RUNNER
-            const pythonRunner = require('./python-runner');
-            
-            const runPythonSync = (pythonCode) => {
-                try {
-                    console.log('🐍 Running Python code synchronously...');
-                    const result = pythonRunner.runPythonCodeSync(pythonCode);
-                    console.log('✅ Python execution completed');
-                    return result;
-                } catch (error) {
-                    console.error('❌ Python execution failed:', error);
-                    throw new Error(`Python Error: ${error.message}`);
-                }
-            };
+// ✅ FIXED: PYTHON RUNNER
+const pythonRunner = require('./python-runner');
+
+// ✅ FIXED: BETTER PYTHON FUNCTION
+const runPythonSync = (pythonCode) => {
+    try {
+        console.log('🐍 Running Python code...');
+        
+        if (!pythonCode || pythonCode.trim() === '') {
+            throw new Error('Python code is empty');
+        }
+        
+        const result = pythonRunner.runPythonCodeSync(pythonCode);
+        console.log('✅ Python execution completed');
+        return result;
+        
+    } catch (error) {
+        console.error('❌ Python execution failed:', error);
+        
+        // Return clean error message
+        let errorMessage = error.message;
+        if (errorMessage.includes('IndentationError')) {
+            errorMessage = 'Python indentation error';
+        } else if (errorMessage.includes('SyntaxError')) {
+            errorMessage = 'Python syntax error';
+        } else if (errorMessage.includes('NameError')) {
+            errorMessage = 'Python variable error';
+        }
+        
+        throw new Error(`Python Error: ${errorMessage}`);
+    }
+};
 
             // ✅ FIXED: PROPER ASYNC WAIT FOR ANSWER
             const waitForAnswer = async (question, options = {}) => {
