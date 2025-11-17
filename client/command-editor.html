@@ -106,36 +106,10 @@
                 </div>
 
                 <div id="commandsList" class="commands-list">
-                    <div class="command-group active" data-command-id="1">
-                        <div class="command-icon">
-                            <i class="fas fa-code"></i>
-                        </div>
-                        <div class="command-content">
-                            <div class="command-patterns">/start, start, hello</div>
-                            <div class="command-meta">
-                                <span class="command-status active">Active</span>
-                                <span class="command-feature mobile-hidden">Basic</span>
-                                <span class="command-id mobile-hidden">CMD-001</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="command-group" data-command-id="2">
-                        <div class="command-icon">
-                            <i class="fas fa-info"></i>
-                        </div>
-                        <div class="command-content">
-                            <div class="command-patterns">/help, help, support</div>
-                            <div class="command-meta">
-                                <span class="command-status active">Active</span>
-                                <span class="command-feature mobile-hidden">Info</span>
-                                <span class="command-id mobile-hidden">CMD-002</span>
-                            </div>
-                        </div>
-                    </div>
+                    <!-- Commands will be loaded dynamically -->
                 </div>
 
-                <div id="emptyCommands" class="empty-state" style="display: none;">
+                <div id="emptyCommands" class="empty-state">
                     <div class="empty-icon">
                         <i class="fas fa-code"></i>
                     </div>
@@ -149,7 +123,7 @@
             <!-- Main Editor -->
             <div class="editor-main">
                 <!-- Mobile Back Button -->
-                <div class="mobile-back-header mobile-only" style="display: none;">
+                <div class="mobile-back-header mobile-only">
                     <button class="btn btn-secondary btn-small" id="mobileBackToList">
                         <i class="fas fa-arrow-left"></i> Back to List
                     </button>
@@ -168,13 +142,13 @@
                 </div>
 
                 <!-- Command Editor -->
-                <div id="commandEditor" class="command-editor" style="display: none;">
+                <div id="commandEditor" class="command-editor">
                     <div class="editor-header">
                         <div class="command-title">
-                            <h3 id="currentCommandName">Welcome Command</h3>
+                            <h3 id="currentCommandName">Command Editor</h3>
                             <div class="command-status">
                                 <span class="status-badge active" id="commandStatus">Active</span>
-                                <span class="command-id mobile-hidden" id="commandId">ID: CMD-001</span>
+                                <span class="command-id mobile-hidden" id="commandId">ID: loading...</span>
                             </div>
                         </div>
                         <div class="editor-actions">
@@ -205,24 +179,7 @@
                                 <label for="moreCommands">Command Patterns *</label>
                                 <div class="commands-input-container">
                                     <div id="commandsTags" class="commands-tags">
-                                        <span class="command-tag">
-                                            <span class="tag-text">/start</span>
-                                            <button type="button" class="remove-tag">
-                                                <i class="fas fa-times"></i>
-                                            </button>
-                                        </span>
-                                        <span class="command-tag">
-                                            <span class="tag-text">start</span>
-                                            <button type="button" class="remove-tag">
-                                                <i class="fas fa-times"></i>
-                                            </button>
-                                        </span>
-                                        <span class="command-tag">
-                                            <span class="tag-text">hello</span>
-                                            <button type="button" class="remove-tag">
-                                                <i class="fas fa-times"></i>
-                                            </button>
-                                        </span>
+                                        <!-- Command tags will be added here -->
                                     </div>
                                     <input type="text" id="moreCommands" 
                                            placeholder="Type command pattern and press Enter...">
@@ -234,17 +191,20 @@
                             </div>
                         </div>
 
-
                         <!-- Code Editor Section -->
                         <div class="form-section">
                             <div class="code-editor-header">
                                 <h4>Command Code</h4>
                                 <div class="code-actions">
                                     <button type="button" class="btn-code" id="openEditor">
-                                        <i class="fas fa-edit"></i> Full Editor
+                                        <i class="fas fa-edit"></i> 
+                                        <span class="btn-text-desktop">Full Editor</span>
+                                        <span class="btn-text-mobile">Editor</span>
                                     </button>
                                     <button type="button" class="btn-code" id="showTemplates">
-                                        <i class="fas fa-layer-group"></i> Templates
+                                        <i class="fas fa-layer-group"></i> 
+                                        <span class="btn-text-desktop">Templates</span>
+                                        <span class="btn-text-mobile">Templates</span>
                                     </button>
                                 </div>
                             </div>
@@ -293,7 +253,7 @@
                                 </label>
                             </div>
 
-                            <div id="answerHandlerSection" class="form-group" style="display: none;">
+                            <div id="answerHandlerSection" class="form-group">
                                 <div class="code-editor-header">
                                     <label for="answerHandler">Answer Handler Code</label>
                                     <div class="code-actions">
@@ -334,16 +294,9 @@
             </div>
             <div class="modal-body">
                 <div id="testCommandResult">
-                    <div class="test-success">
-                        <h4><i class="fas fa-check-circle"></i> Test Successful</h4>
-                        <div class="test-details">
-                            <p><strong>Command:</strong> /start</p>
-                            <p><strong>Execution Time:</strong> 120ms</p>
-                            <p><strong>Response:</strong></p>
-                            <div class="test-message">
-                                "Welcome to our bot! 🤖\n\nI'm here to help you with various tasks.\n\nUse /help to see available commands."
-                            </div>
-                        </div>
+                    <div class="test-loading">
+                        <div class="spinner"></div>
+                        <p>Testing command execution...</p>
                     </div>
                 </div>
             </div>
@@ -447,59 +400,12 @@
                 <div class="templates-categories">
                     <div class="category-tabs-container">
                         <div class="category-tabs">
-                            <button class="category-tab active" data-category="basic">Basic</button>
-                            <button class="category-tab" data-category="advanced">Advanced</button>
-                            <button class="category-tab" data-category="api">API</button>
-                            <button class="category-tab" data-category="database">DB</button>
+                            <!-- Categories will be loaded dynamically -->
                         </div>
                     </div>
                     
                     <div class="templates-content">
-                        <div class="template-category active" id="category-basic">
-                            <div class="templates-grid">
-                                <div class="template-card" data-template="welcome">
-                                    <div class="template-content">
-                                        <div class="template-icon">
-                                            <i class="fas fa-hand-wave"></i>
-                                        </div>
-                                        <div class="template-details">
-                                            <h4>Welcome Message</h4>
-                                            <p class="mobile-hidden">Simple welcome message with user greeting</p>
-                                            <div class="template-patterns">/start, hello, hi</div>
-                                            <div class="template-footer">
-                                                <span class="template-type simple">Simple</span>
-                                                <button class="btn-apply">
-                                                    <i class="fas fa-plus"></i>
-                                                    <span class="btn-text-desktop">Apply Template</span>
-                                                    <span class="btn-text-mobile">Apply</span>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="template-card" data-template="help">
-                                    <div class="template-content">
-                                        <div class="template-icon">
-                                            <i class="fas fa-question-circle"></i>
-                                        </div>
-                                        <div class="template-details">
-                                            <h4>Help Command</h4>
-                                            <p class="mobile-hidden">Display available commands and bot information</p>
-                                            <div class="template-patterns">/help, help, commands</div>
-                                            <div class="template-footer">
-                                                <span class="template-type simple">Simple</span>
-                                                <button class="btn-apply">
-                                                    <i class="fas fa-plus"></i>
-                                                    <span class="btn-text-desktop">Apply Template</span>
-                                                    <span class="btn-text-mobile">Apply</span>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        <!-- Templates will be loaded dynamically -->
                     </div>
                 </div>
             </div>
