@@ -72,13 +72,22 @@
             </div>
             <div class="header-actions">
                 <button class="btn btn-secondary" id="backToBots">
-                    <i class="fas fa-arrow-left"></i> Back to Bots
+                    <i class="fas fa-arrow-left"></i> 
+                    <span class="btn-text-mobile">Back</span>
+                    <span class="btn-text-desktop">Back to Bots</span>
                 </button>
                 <button class="btn btn-primary" id="quickTest">
-                    <i class="fas fa-bolt"></i> Quick Test
+                    <i class="fas fa-bolt"></i> 
+                    <span class="btn-text-mobile">Test</span>
+                    <span class="btn-text-desktop">Quick Test</span>
                 </button>
             </div>
         </div>
+
+        <!-- Mobile Floating Action Button -->
+        <button class="fab mobile-only" id="mobileFab">
+            <i class="fas fa-plus"></i>
+        </button>
 
         <div class="editor-layout">
             <!-- Sidebar -->
@@ -86,7 +95,8 @@
                 <div class="sidebar-header">
                     <h3>Commands</h3>
                     <button id="addCommandBtn" class="btn btn-primary btn-small">
-                        <i class="fas fa-plus"></i> New
+                        <i class="fas fa-plus"></i> 
+                        <span class="btn-text-desktop">New</span>
                     </button>
                 </div>
                 
@@ -96,7 +106,6 @@
                 </div>
 
                 <div id="commandsList" class="commands-list">
-                    <!-- Commands will be loaded here -->
                     <div class="command-group active" data-command-id="1">
                         <div class="command-icon">
                             <i class="fas fa-code"></i>
@@ -105,8 +114,8 @@
                             <div class="command-patterns">/start, start, hello</div>
                             <div class="command-meta">
                                 <span class="command-status active">Active</span>
-                                <span class="command-feature">Basic</span>
-                                <span class="command-id">CMD-001</span>
+                                <span class="command-feature mobile-hidden">Basic</span>
+                                <span class="command-id mobile-hidden">CMD-001</span>
                             </div>
                         </div>
                     </div>
@@ -119,8 +128,8 @@
                             <div class="command-patterns">/help, help, support</div>
                             <div class="command-meta">
                                 <span class="command-status active">Active</span>
-                                <span class="command-feature">Info</span>
-                                <span class="command-id">CMD-002</span>
+                                <span class="command-feature mobile-hidden">Info</span>
+                                <span class="command-id mobile-hidden">CMD-002</span>
                             </div>
                         </div>
                     </div>
@@ -139,8 +148,15 @@
 
             <!-- Main Editor -->
             <div class="editor-main">
+                <!-- Mobile Back Button -->
+                <div class="mobile-back-header mobile-only" style="display: none;">
+                    <button class="btn btn-secondary btn-small" id="mobileBackToList">
+                        <i class="fas fa-arrow-left"></i> Back to List
+                    </button>
+                </div>
+
                 <!-- No Command Selected -->
-                <div id="noCommandSelected" class="empty-state" style="display: none;">
+                <div id="noCommandSelected" class="empty-state">
                     <div class="empty-icon">
                         <i class="fas fa-code"></i>
                     </div>
@@ -152,27 +168,31 @@
                 </div>
 
                 <!-- Command Editor -->
-                <div id="commandEditor" class="command-editor">
+                <div id="commandEditor" class="command-editor" style="display: none;">
                     <div class="editor-header">
                         <div class="command-title">
                             <h3 id="currentCommandName">Welcome Command</h3>
                             <div class="command-status">
                                 <span class="status-badge active" id="commandStatus">Active</span>
-                                <span class="command-id" id="commandId">ID: CMD-001</span>
+                                <span class="command-id mobile-hidden" id="commandId">ID: CMD-001</span>
                             </div>
                         </div>
                         <div class="editor-actions">
-                            <button id="toggleCommandBtn" class="btn btn-warning btn-small">
-                                <i class="fas fa-power-off"></i> Toggle
+                            <button id="toggleCommandBtn" class="btn btn-warning btn-small btn-icon-mobile" title="Toggle Command">
+                                <i class="fas fa-power-off"></i>
+                                <span class="btn-text-desktop">Toggle</span>
                             </button>
-                            <button id="testCommandBtn" class="btn btn-success btn-small">
-                                <i class="fas fa-bolt"></i> Test
+                            <button id="testCommandBtn" class="btn btn-success btn-small btn-icon-mobile" title="Test Command">
+                                <i class="fas fa-bolt"></i>
+                                <span class="btn-text-desktop">Test</span>
                             </button>
-                            <button id="saveCommandBtn" class="btn btn-primary btn-small">
-                                <i class="fas fa-save"></i> Save
+                            <button id="saveCommandBtn" class="btn btn-primary btn-small btn-icon-mobile" title="Save Command">
+                                <i class="fas fa-save"></i>
+                                <span class="btn-text-desktop">Save</span>
                             </button>
-                            <button id="deleteCommandBtn" class="btn btn-danger btn-small">
-                                <i class="fas fa-trash"></i> Delete
+                            <button id="deleteCommandBtn" class="btn btn-danger btn-small btn-icon-mobile" title="Delete Command">
+                                <i class="fas fa-trash"></i>
+                                <span class="btn-text-desktop">Delete</span>
                             </button>
                         </div>
                     </div>
@@ -205,7 +225,7 @@
                                         </span>
                                     </div>
                                     <input type="text" id="moreCommands" 
-                                           placeholder="Type command pattern and press Enter or comma...">
+                                           placeholder="Type command pattern and press Enter...">
                                 </div>
                                 <div class="form-help">
                                     Add multiple command patterns separated by commas. All patterns will execute the same code.
@@ -213,6 +233,7 @@
                                 </div>
                             </div>
                         </div>
+
 
                         <!-- Code Editor Section -->
                         <div class="form-section">
@@ -229,14 +250,7 @@
                             </div>
                             <div class="form-group">
                                 <textarea id="commandCode" 
-                                          placeholder="Write your command code here...">// Welcome command example
-bot.sendMessage("Welcome to our bot! 🤖\n\nI'm here to help you with various tasks.\n\nUse /help to see available commands.");
-
-// Save user data
-User.saveData({
-    firstSeen: new Date().toISOString(),
-    language: 'en'
-});</textarea>
+                                          placeholder="Write your command code here..."></textarea>
                                 <div class="code-help">
                                     <strong>Available Functions:</strong> bot.sendMessage(), User.saveData(), waitForAnswer(), HTTP.get(), etc.
                                 </div>
@@ -249,10 +263,12 @@ User.saveData({
                             <div class="form-group">
                                 <div class="test-input-container">
                                     <input type="text" id="testInput" 
-                                           placeholder="Enter test input to simulate user message..." 
+                                           placeholder="Enter test input..." 
                                            value="/start">
                                     <button type="button" id="runTestBtn" class="btn btn-warning">
-                                        <i class="fas fa-play"></i> Run Test
+                                        <i class="fas fa-play"></i> 
+                                        <span class="btn-text-desktop">Run Test</span>
+                                        <span class="btn-text-mobile">Test</span>
                                     </button>
                                 </div>
                                 <div class="form-help">
@@ -268,7 +284,7 @@ User.saveData({
                                 <label class="toggle-label">
                                     <div class="toggle-text">
                                         <span class="toggle-title">Wait for Answer</span>
-                                        <span class="toggle-description">Enable to wait for user response after command execution</span>
+                                        <span class="toggle-description mobile-hidden">Enable to wait for user response after command execution</span>
                                     </div>
                                     <div class="toggle-switch">
                                         <input type="checkbox" id="waitForAnswer">
@@ -282,7 +298,9 @@ User.saveData({
                                     <label for="answerHandler">Answer Handler Code</label>
                                     <div class="code-actions">
                                         <button type="button" class="btn-code" id="openAnswerEditor">
-                                            <i class="fas fa-edit"></i> Full Editor
+                                            <i class="fas fa-edit"></i> 
+                                            <span class="btn-text-desktop">Full Editor</span>
+                                            <span class="btn-text-mobile">Editor</span>
                                         </button>
                                     </div>
                                 </div>
@@ -344,50 +362,50 @@ User.saveData({
                     <div class="toolbar-group">
                         <button class="btn-icon" id="undoBtn" title="Undo (Ctrl+Z)">
                             <i class="fas fa-undo"></i>
-                            <span class="btn-text">Undo</span>
+                            <span class="btn-text-desktop">Undo</span>
                         </button>
                         <button class="btn-icon" id="redoBtn" title="Redo (Ctrl+Y)">
                             <i class="fas fa-redo"></i>
-                            <span class="btn-text">Redo</span>
+                            <span class="btn-text-desktop">Redo</span>
                         </button>
                     </div>
                     <div class="toolbar-group">
                         <button class="btn-icon" id="selectAllBtn" title="Select All (Ctrl+A)">
                             <i class="fas fa-expand-arrows-alt"></i>
-                            <span class="btn-text">Select All</span>
+                            <span class="btn-text-desktop">Select All</span>
                         </button>
                         <button class="btn-icon" id="cutBtn" title="Cut (Ctrl+X)">
                             <i class="fas fa-cut"></i>
-                            <span class="btn-text">Cut</span>
+                            <span class="btn-text-desktop">Cut</span>
                         </button>
                         <button class="btn-icon" id="copyBtn" title="Copy (Ctrl+C)">
                             <i class="fas fa-copy"></i>
-                            <span class="btn-text">Copy</span>
+                            <span class="btn-text-desktop">Copy</span>
                         </button>
                         <button class="btn-icon" id="pasteBtn" title="Paste (Ctrl+V)">
                             <i class="fas fa-paste"></i>
-                            <span class="btn-text">Paste</span>
+                            <span class="btn-text-desktop">Paste</span>
                         </button>
                     </div>
                     <div class="toolbar-group">
                         <button class="btn-icon" id="clearBtn" title="Clear All">
                             <i class="fas fa-eraser"></i>
-                            <span class="btn-text">Clear</span>
+                            <span class="btn-text-desktop">Clear</span>
                         </button>
                         <button class="btn-icon" id="formatBtn" title="Format Code">
                             <i class="fas fa-indent"></i>
-                            <span class="btn-text">Format</span>
+                            <span class="btn-text-desktop">Format</span>
                         </button>
                     </div>
                 </div>
                 <div class="header-actions">
                     <button class="btn-icon btn-cancel" id="cancelEditTop">
                         <i class="fas fa-times"></i>
-                        <span class="btn-text">Cancel</span>
+                        <span class="btn-text-desktop">Cancel</span>
                     </button>
                     <button class="btn-icon btn-save" id="saveCodeTop">
                         <i class="fas fa-save"></i>
-                        <span class="btn-text">Save</span>
+                        <span class="btn-text-desktop">Save</span>
                     </button>
                     <button class="modal-close">&times;</button>
                 </div>
@@ -429,10 +447,10 @@ User.saveData({
                 <div class="templates-categories">
                     <div class="category-tabs-container">
                         <div class="category-tabs">
-                            <button class="category-tab active" data-category="basic">Basic Commands</button>
+                            <button class="category-tab active" data-category="basic">Basic</button>
                             <button class="category-tab" data-category="advanced">Advanced</button>
-                            <button class="category-tab" data-category="api">API Integration</button>
-                            <button class="category-tab" data-category="database">Database</button>
+                            <button class="category-tab" data-category="api">API</button>
+                            <button class="category-tab" data-category="database">DB</button>
                         </div>
                     </div>
                     
@@ -446,11 +464,15 @@ User.saveData({
                                         </div>
                                         <div class="template-details">
                                             <h4>Welcome Message</h4>
-                                            <p>Simple welcome message with user greeting</p>
+                                            <p class="mobile-hidden">Simple welcome message with user greeting</p>
                                             <div class="template-patterns">/start, hello, hi</div>
                                             <div class="template-footer">
                                                 <span class="template-type simple">Simple</span>
-                                                <button class="btn-apply">Apply Template</button>
+                                                <button class="btn-apply">
+                                                    <i class="fas fa-plus"></i>
+                                                    <span class="btn-text-desktop">Apply Template</span>
+                                                    <span class="btn-text-mobile">Apply</span>
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -463,11 +485,15 @@ User.saveData({
                                         </div>
                                         <div class="template-details">
                                             <h4>Help Command</h4>
-                                            <p>Display available commands and bot information</p>
+                                            <p class="mobile-hidden">Display available commands and bot information</p>
                                             <div class="template-patterns">/help, help, commands</div>
                                             <div class="template-footer">
                                                 <span class="template-type simple">Simple</span>
-                                                <button class="btn-apply">Apply Template</button>
+                                                <button class="btn-apply">
+                                                    <i class="fas fa-plus"></i>
+                                                    <span class="btn-text-desktop">Apply Template</span>
+                                                    <span class="btn-text-mobile">Apply</span>
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -481,6 +507,22 @@ User.saveData({
                 <button class="btn btn-secondary" id="closeTemplates">Close</button>
             </div>
         </div>
+    </div>
+
+    <!-- Mobile Bottom Action Bar -->
+    <div class="mobile-action-bar mobile-only">
+        <button class="mobile-action-btn" id="mobileSaveBtn">
+            <i class="fas fa-save"></i>
+            <span>Save</span>
+        </button>
+        <button class="mobile-action-btn" id="mobileTestBtn">
+            <i class="fas fa-bolt"></i>
+            <span>Test</span>
+        </button>
+        <button class="mobile-action-btn" id="mobileToggleBtn">
+            <i class="fas fa-power-off"></i>
+            <span>Toggle</span>
+        </button>
     </div>
 
     <script src="js/common.js"></script>
