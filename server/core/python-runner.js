@@ -1,4 +1,4 @@
-// server/core/python-runner.js - RESULT FORMATTING FIX
+// server/core/python-runner.js - PRINT vs RESULT FIX
 const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -48,32 +48,52 @@ class PythonRunner {
         });
     }
 
-    // ✅ FIXED: PROPER RESULT EXTRACTION
+    // ✅ FIXED: SEPARATE PRINT OUTPUT AND RESULT
     runPythonCodeSync(code) {
         try {
             console.log('🐍 Executing Python code synchronously...');
             
             const tempFile = path.join(this.tempDir, `script_${Date.now()}_${Math.random().toString(36).substring(7)}.py`);
             
-            // ✅ CLEANER PYTHON TEMPLATE
+            // ✅ IMPROVED PYTHON TEMPLATE WITH SEPARATE OUTPUT
             const pythonTemplate = `# Python Code Execution
 import sys
 import json
+import io
+from contextlib import redirect_stdout
+
+# Capture all print outputs
+print_output = io.StringIO()
+result_value = None
 
 try:
-    # User's code execution
+    # Redirect print statements to capture them
+    with redirect_stdout(print_output):
+        # User's code execution
 ${this.indentCode(code)}
+        
+        # Get the result value (if exists)
+        if 'result' in locals() or 'result' in globals():
+            result_value = locals().get('result') or globals().get('result')
+        else:
+            result_value = "Code executed successfully"
     
-    # Ensure result variable exists and is properly formatted
-    if 'result' not in locals() and 'result' not in globals():
-        result = "Python code executed successfully"
+    # Get all print outputs
+    all_prints = print_output.getvalue().strip()
     
-    # ✅ FIX: Return ONLY the result value, not JSON
-    print(str(result))
+    # Prepare final output
+    final_output = ""
+    if all_prints:
+        final_output += "📝 Print Output:\\n" + all_prints + "\\n\\n"
+    
+    final_output += "✅ Final Result: " + str(result_value)
+    
+    # Return combined output
+    print(final_output)
     
 except Exception as e:
-    # ✅ FIX: Return clean error message
-    print("Python Error: " + str(e))
+    # Return clean error message
+    print("❌ Python Error: " + str(e))
     sys.exit(1)`;
 
             // Write Python file
@@ -107,10 +127,10 @@ except Exception as e:
                 throw new Error(`Python execution failed: ${result.stderr || result.stdout || 'Unknown error'}`);
             }
 
-            // ✅ FIX: Return clean output
+            // Return clean output
             if (result.stdout) {
                 const output = result.stdout.trim();
-                console.log('✅ Python output:', output);
+                console.log('✅ Python output received');
                 return output;
             } else {
                 throw new Error('Python execution produced no output');
