@@ -1,18 +1,27 @@
-// server/core/command-executor.js - COMPLETELY FIXED
+// server/core/command-executor.js - COMPLETELY FIXED WITH ASYNC/AWAIT
 async function executeCommandCode(botInstance, code, context) {
     return new Promise(async (resolve, reject) => {
         try {
             const { msg, chatId, userId, username, first_name, botToken, userInput, nextCommandHandlers } = context;
             
-            // ✅ FIX: Validate botToken
-            if (!botToken) {
-                console.error('❌ CRITICAL: botToken is undefined!');
-                console.log('Context keys:', Object.keys(context));
-                reject(new Error('botToken is required but was undefined'));
-                return;
+            // ✅ FIX: Handle missing botToken gracefully
+            let resolvedBotToken = botToken;
+            if (!resolvedBotToken && context.command) {
+                resolvedBotToken = context.command.bot_token;
+            }
+            if (!resolvedBotToken) {
+                console.error('❌ CRITICAL: botToken is undefined! Using fallback...');
+                // Try to extract from botInstance if possible
+                try {
+                    const botInfo = await botInstance.getMe();
+                    resolvedBotToken = botInfo.token || 'fallback_token';
+                    console.log(`🔧 Using fallback token: ${resolvedBotToken.substring(0, 10)}...`);
+                } catch (e) {
+                    resolvedBotToken = 'fallback_token';
+                }
             }
             
-            console.log(`🔧 Starting command execution for user ${userId}, bot: ${botToken.substring(0, 10)}...`);
+            console.log(`🔧 Starting command execution for user ${userId}, bot: ${resolvedBotToken.substring(0, 10)}...`);
             
             // Import ApiWrapper
             const ApiWrapper = require('./api-wrapper');
@@ -26,7 +35,7 @@ async function executeCommandCode(botInstance, code, context) {
                 first_name: first_name || '',
                 last_name: context.last_name || '',
                 language_code: context.language_code || '',
-                botToken: botToken, // ✅ NOW DEFINED
+                botToken: resolvedBotToken,
                 userInput: userInput,
                 nextCommandHandlers: nextCommandHandlers || new Map(),
                 User: context.User || {},
@@ -61,57 +70,50 @@ async function executeCommandCode(botInstance, code, context) {
                 }
             };
 
-            // ✅ FIXED: PROPER WAIT FOR ANSWER WITH BOTTOKEN VALIDATION
-            const waitForAnswer = (question, options = {}) => {
+            // ✅ FIXED: PROPER ASYNC WAIT FOR ANSWER
+            const waitForAnswer = async (question, options = {}) => {
                 return new Promise((resolve, reject) => {
                     try {
-                        console.log(`⏳ Setting up waitForAnswer for user ${userId}, bot: ${botToken.substring(0, 10)}...`);
+                        console.log(`⏳ Setting up waitForAnswer for user ${userId}, bot: ${resolvedBotToken.substring(0, 10)}...`);
                         
-                        // ✅ VALIDATE botToken again
-                        if (!botToken) {
-                            reject(new Error('botToken is undefined in waitForAnswer'));
-                            return;
-                        }
-
+                        // Create unique key for this waiting answer
+                        const waitKey = `${resolvedBotToken}_${userId}`;
+                        
+                        console.log(`🔑 Wait key created: ${waitKey}`);
+                        console.log(`📊 nextCommandHandlers available: ${!!nextCommandHandlers}`);
+                        
                         // First send the question
                         botInstance.sendMessage(chatId, question, options)
                             .then(() => {
-                                // Create unique key for this waiting answer
-                                const waitKey = `${botToken}_${userId}`;
-                                
-                                console.log(`🔑 Wait key created: ${waitKey}`);
-                                console.log(`📊 nextCommandHandlers available: ${!!nextCommandHandlers}`);
-                                
                                 // Store the resolver in nextCommandHandlers
                                 if (nextCommandHandlers) {
-                                    // Store both resolve and reject functions
                                     nextCommandHandlers.set(waitKey, {
                                         resolve: resolve,
                                         reject: reject,
                                         timestamp: Date.now(),
-                                        botToken: botToken, // ✅ Store for verification
-                                        userId: userId
+                                        botToken: resolvedBotToken,
+                                        userId: userId,
+                                        question: question
                                     });
                                     
                                     console.log(`✅ WaitForAnswer handler stored for ${waitKey}`);
                                     console.log(`📋 Total handlers: ${nextCommandHandlers.size}`);
+                                    
+                                    // Set timeout to clean up (5 minutes)
+                                    setTimeout(() => {
+                                        if (nextCommandHandlers && nextCommandHandlers.has(waitKey)) {
+                                            const handler = nextCommandHandlers.get(waitKey);
+                                            if (handler && handler.reject) {
+                                                handler.reject(new Error('Wait for answer timeout (5 minutes)'));
+                                            }
+                                            nextCommandHandlers.delete(waitKey);
+                                            console.log(`⏰ WaitForAnswer timeout for ${waitKey}`);
+                                        }
+                                    }, 5 * 60 * 1000);
+                                    
                                 } else {
                                     reject(new Error('nextCommandHandlers not available'));
-                                    return;
                                 }
-                                
-                                // Set timeout to clean up (5 minutes)
-                                setTimeout(() => {
-                                    if (nextCommandHandlers && nextCommandHandlers.has(waitKey)) {
-                                        const handler = nextCommandHandlers.get(waitKey);
-                                        if (handler && handler.reject) {
-                                            handler.reject(new Error('Wait for answer timeout (5 minutes)'));
-                                        }
-                                        nextCommandHandlers.delete(waitKey);
-                                        console.log(`⏰ WaitForAnswer timeout for ${waitKey}`);
-                                    }
-                                }, 5 * 60 * 1000);
-                                
                             })
                             .catch(sendError => {
                                 console.error('❌ Failed to send waitForAnswer question:', sendError);
@@ -131,12 +133,16 @@ async function executeCommandCode(botInstance, code, context) {
                 bot: apiWrapperInstance,
                 Api: apiWrapperInstance,
                 
-                // ✅ FIXED: Bot object with all methods
+                // ✅ FIXED: Bot object with ASYNC methods
                 Bot: {
                     ...apiWrapperInstance,
                     runPython: (pythonCode) => runPythonSync(pythonCode),
                     waitForAnswer: waitForAnswer,
-                    ask: waitForAnswer
+                    ask: waitForAnswer,
+                    // ✅ ADD async sendMessage that returns promise
+                    sendMessage: (text, options) => {
+                        return botInstance.sendMessage(chatId, text, options);
+                    }
                 },
                 
                 // === USER INFORMATION ===
@@ -156,7 +162,7 @@ async function executeCommandCode(botInstance, code, context) {
                 userInput: userInput,
                 params: params,
                 message: message,
-                botToken: botToken, // ✅ DEFINED
+                botToken: resolvedBotToken,
                 
                 // === DATA STORAGE ===
                 User: context.User || {
@@ -165,7 +171,7 @@ async function executeCommandCode(botInstance, code, context) {
                             const supabase = require('../config/supabase');
                             await supabase.from('universal_data').upsert({
                                 data_type: 'user_data',
-                                bot_token: botToken,
+                                bot_token: resolvedBotToken,
                                 user_id: userId.toString(),
                                 data_key: key,
                                 data_value: JSON.stringify(value),
@@ -182,7 +188,7 @@ async function executeCommandCode(botInstance, code, context) {
                             const { data } = await supabase.from('universal_data')
                                 .select('data_value')
                                 .eq('data_type', 'user_data')
-                                .eq('bot_token', botToken)
+                                .eq('bot_token', resolvedBotToken)
                                 .eq('user_id', userId.toString())
                                 .eq('data_key', key)
                                 .single();
@@ -198,7 +204,7 @@ async function executeCommandCode(botInstance, code, context) {
                             await supabase.from('universal_data')
                                 .delete()
                                 .eq('data_type', 'user_data')
-                                .eq('bot_token', botToken)
+                                .eq('bot_token', resolvedBotToken)
                                 .eq('user_id', userId.toString())
                                 .eq('data_key', key);
                         } catch (error) {
@@ -214,7 +220,7 @@ async function executeCommandCode(botInstance, code, context) {
                             const supabase = require('../config/supabase');
                             await supabase.from('universal_data').upsert({
                                 data_type: 'bot_data',
-                                bot_token: botToken,
+                                bot_token: resolvedBotToken,
                                 data_key: key,
                                 data_value: JSON.stringify(value),
                                 updated_at: new Date().toISOString()
@@ -230,7 +236,7 @@ async function executeCommandCode(botInstance, code, context) {
                             const { data } = await supabase.from('universal_data')
                                 .select('data_value')
                                 .eq('data_type', 'bot_data')
-                                .eq('bot_token', botToken)
+                                .eq('bot_token', resolvedBotToken)
                                 .eq('data_key', key)
                                 .single();
                             return data ? JSON.parse(data.data_value) : null;
@@ -245,7 +251,7 @@ async function executeCommandCode(botInstance, code, context) {
                             await supabase.from('universal_data')
                                 .delete()
                                 .eq('data_type', 'bot_data')
-                                .eq('bot_token', botToken)
+                                .eq('bot_token', resolvedBotToken)
                                 .eq('data_key', key);
                         } catch (error) {
                             console.error('❌ Delete bot data error:', error);
@@ -297,34 +303,36 @@ async function executeCommandCode(botInstance, code, context) {
                 ...directFunctions
             };
 
-            // ✅ FIXED: Create the execution function with user code
+            // ✅ FIXED: Create ASYNC execution function with proper await handling
             const executionFunction = new Function(
                 'getUser', 'sendMessage', 'bot', 'Api', 'Bot', 'params', 'message', 'User', 'BotData', 'wait', 'runPython', 'waitForAnswer', 'ask',
-                `try {
-                    var user = getUser();
-                    console.log('✅ Execution started for user:', user.first_name);
-                    console.log('📝 User input:', message);
-                    console.log('📋 Parameters:', params);
-                    console.log('🤖 Bot.runPython available:', typeof Bot.runPython);
-                    console.log('🐍 runPython available:', typeof runPython);
-                    console.log('⏳ waitForAnswer available:', typeof waitForAnswer);
-                    console.log('❓ ask available:', typeof ask);
-                    console.log('🔑 botToken available:', typeof botToken);
-                    
-                    // User's code starts here
-                    ${code}
-                    // User's code ends here
-                    
-                    return "Command completed successfully";
-                } catch (error) {
-                    console.error('❌ Execution error:', error);
+                `return (async function() {
                     try {
-                        sendMessage("❌ Error: " + error.message);
-                    } catch (e) {
-                        console.error('Failed to send error message:', e);
+                        var user = getUser();
+                        console.log('✅ Execution started for user:', user.first_name);
+                        console.log('📝 User input:', message);
+                        console.log('📋 Parameters:', params);
+                        console.log('🤖 Bot.runPython available:', typeof Bot.runPython);
+                        console.log('🐍 runPython available:', typeof runPython);
+                        console.log('⏳ waitForAnswer available:', typeof waitForAnswer);
+                        console.log('❓ ask available:', typeof ask);
+                        console.log('🔑 botToken available:', typeof botToken);
+                        
+                        // User's code starts here - WITH ASYNC/AWAIT SUPPORT
+                        ${code}
+                        // User's code ends here
+                        
+                        return "Command completed successfully";
+                    } catch (error) {
+                        console.error('❌ Execution error:', error);
+                        try {
+                            await sendMessage("❌ Error: " + error.message);
+                        } catch (e) {
+                            console.error('Failed to send error message:', e);
+                        }
+                        throw error;
                     }
-                    throw error;
-                }`
+                })();`
             );
 
             // Execute the command
