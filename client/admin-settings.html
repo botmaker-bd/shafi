@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Bot Maker Pro</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/admin-settings.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <a href="dashboard.html" class="nav-brand">
+                <span class="brand-icon">🤖</span>
+                <span class="brand-text">Bot Maker Pro</span>
+            </a>
+            
+            <button class="mobile-menu-btn" id="mobileMenuBtn">
+                <i class="fas fa-bars"></i>
+            </button>
+            
+            <div class="nav-links" id="navLinks">
+                <a href="dashboard.html" class="nav-link">
+                    <i class="fas fa-home"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="bot-management.html" class="nav-link">
+                    <i class="fas fa-robot"></i>
+                    <span>My Bots</span>
+                </a>
+                <a href="command-editor.html" class="nav-link">
+                    <i class="fas fa-code"></i>
+                    <span>Commands</span>
+                </a>
+                <a href="admin-settings.html" class="nav-link active">
+                    <i class="fas fa-cog"></i>
+                    <span>Settings</span>
+                </a>
+                
+                <div class="user-menu">
+                    <button class="user-btn" id="userMenuBtn">
+                        <div class="user-avatar" id="userAvatar">U</div>
+                        <span id="userEmail">user@example.com</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <div class="user-dropdown" id="userDropdown">
+                        <a href="profile.html" class="dropdown-item">
+                            <i class="fas fa-user-edit"></i> Edit Profile
+                        </a>
+                        <a href="change-password.html" class="dropdown-item">
+                            <i class="fas fa-key"></i> Change Password
+                        </a>
+                        <div class="dropdown-divider"></div>
+                        <a href="#" id="logoutBtn" class="dropdown-item">
+                            <i class="fas fa-sign-out-alt"></i> Logout
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Page Header -->
+        <div class="page-header">
+            <div class="header-content">
+                <h1>Settings</h1>
+                <p>Configure your bot platform settings</p>
+            </div>
+        </div>
+
+        <div class="settings-layout">
+            <!-- Settings Sidebar -->
+            <div class="settings-sidebar">
+                <div class="settings-nav">
+                    <button class="nav-item active" data-tab="admin">
+                        <i class="fas fa-user-shield"></i> Admin Settings
+                    </button>
+                    <button class="nav-item" data-tab="general">
+                        <i class="fas fa-cog"></i> General
+                    </button>
+                    <button class="nav-item" data-tab="security">
+                        <i class="fas fa-shield-alt"></i> Security
+                    </button>
+                    <button class="nav-item" data-tab="advanced">
+                        <i class="fas fa-sliders-h"></i> Advanced
+                    </button>
+                </div>
+            </div>
+
+            <!-- Settings Content -->
+            <div class="settings-content">
+                <!-- Admin Settings -->
+                <div id="admin-tab" class="settings-tab active">
+                    <div class="tab-header">
+                        <h2>Admin Settings</h2>
+                        <p>Configure admin chat ID for testing commands</p>
+                    </div>
+
+                    <form id="adminSettingsForm" class="settings-form">
+                        <div class="form-group">
+                            <label for="adminChatId">Admin Chat ID *</label>
+                            <input type="text" id="adminChatId" required 
+                                   placeholder="Enter your Telegram chat ID">
+                            <div class="form-help">
+                                Required for testing commands. Get your chat ID from @userinfobot on Telegram.
+                            </div>
+                        </div>
+
+                        <div class="toggle-group">
+                            <label class="toggle-label">
+                                <div class="toggle-text">
+                                    <span class="toggle-title">Enable Command Testing</span>
+                                    <span class="toggle-description">Allow testing commands in the command editor</span>
+                                </div>
+                                <div class="toggle-switch">
+                                    <input type="checkbox" id="enableTesting" checked>
+                                    <span class="toggle-slider"></span>
+                                </div>
+                            </label>
+                            
+                            <label class="toggle-label">
+                                <div class="toggle-text">
+                                    <span class="toggle-title">Enable Activity Logging</span>
+                                    <span class="toggle-description">Log bot activities and command executions</span>
+                                </div>
+                                <div class="toggle-switch">
+                                    <input type="checkbox" id="enableLogging" checked>
+                                    <span class="toggle-slider"></span>
+                                </div>
+                            </label>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">Save Settings</button>
+                            <button type="button" class="btn btn-secondary" id="testAdminSettings">
+                                Test Settings
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- System Statistics -->
+                    <div class="admin-stats">
+                        <h3>System Overview</h3>
+                        <div class="stats-grid-mini">
+                            <div class="stat-mini-card">
+                                <div class="stat-value" id="totalUsers">0</div>
+                                <div class="stat-label">Total Users</div>
+                            </div>
+                            <div class="stat-mini-card">
+                                <div class="stat-value" id="totalBotsAdmin">0</div>
+                                <div class="stat-label">Total Bots</div>
+                            </div>
+                            <div class="stat-mini-card">
+                                <div class="stat-value" id="totalCommandsAdmin">0</div>
+                                <div class="stat-label">Commands</div>
+                            </div>
+                            <div class="stat-mini-card">
+                                <div class="stat-value" id="activeBotsAdmin">0</div>
+                                <div class="stat-label">Active Bots</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- General Settings -->
+                <div id="general-tab" class="settings-tab">
+                    <div class="tab-header">
+                        <h2>General Settings</h2>
+                        <p>Basic platform configuration</p>
+                    </div>
+
+                    <form id="generalSettingsForm" class="settings-form">
+                        <div class="form-group">
+                            <label for="siteName">Platform Name</label>
+                            <input type="text" id="siteName" value="Bot Maker Pro">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="siteDescription">Platform Description</label>
+                            <textarea id="siteDescription" rows="3">Create Advanced Telegram Bots Without Coding</textarea>
+                        </div>
+
+                        <div class="toggle-group">
+                            <label class="toggle-label">
+                                <div class="toggle-text">
+                                    <span class="toggle-title">Maintenance Mode</span>
+                                    <span class="toggle-description">Put the platform in maintenance mode</span>
+                                </div>
+                                <div class="toggle-switch">
+                                    <input type="checkbox" id="maintenanceMode">
+                                    <span class="toggle-slider"></span>
+                                </div>
+                            </label>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Security Settings -->
+                <div id="security-tab" class="settings-tab">
+                    <div class="tab-header">
+                        <h2>Security Settings</h2>
+                        <p>Configure security preferences</p>
+                    </div>
+
+                    <form id="securitySettingsForm" class="settings-form">
+                        <div class="form-group">
+                            <label for="sessionTimeout">Session Timeout (minutes)</label>
+                            <input type="number" id="sessionTimeout" value="60" min="15" max="1440">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="maxLoginAttempts">Max Login Attempts</label>
+                            <input type="number" id="maxLoginAttempts" value="5" min="3" max="10">
+                        </div>
+
+                        <div class="toggle-group">
+                            <label class="toggle-label">
+                                <div class="toggle-text">
+                                    <span class="toggle-title">Strong Password Policy</span>
+                                    <span class="toggle-description">Require complex passwords</span>
+                                </div>
+                                <div class="toggle-switch">
+                                    <input type="checkbox" id="passwordPolicy" checked>
+                                    <span class="toggle-slider"></span>
+                                </div>
+                            </label>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">Save Security Settings</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Advanced Settings -->
+                <div id="advanced-tab" class="settings-tab">
+                    <div class="tab-header">
+                        <h2>Advanced Settings</h2>
+                        <p>Advanced configuration options</p>
+                    </div>
+
+                    <form id="advancedSettingsForm" class="settings-form">
+                        <div class="form-group">
+                            <label for="apiRateLimit">API Rate Limit (requests/minute)</label>
+                            <input type="number" id="apiRateLimit" value="100" min="10" max="1000">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="webhookTimeout">Webhook Timeout (seconds)</label>
+                            <input type="number" id="webhookTimeout" value="30" min="5" max="60">
+                        </div>
+
+                        <div class="toggle-group">
+                            <label class="toggle-label">
+                                <div class="toggle-text">
+                                    <span class="toggle-title">Debug Mode</span>
+                                    <span class="toggle-description">Show detailed error messages</span>
+                                </div>
+                                <div class="toggle-switch">
+                                    <input type="checkbox" id="enableDebug">
+                                    <span class="toggle-slider"></span>
+                                </div>
+                            </label>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">Save Settings</button>
+                            <button type="button" class="btn btn-warning" id="clearCache">
+                                Clear Cache
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <p>Loading...</p>
+        </div>
+    </div>
+
+    <script src="js/common.js"></script>
+    <script src="js/admin-settings.js"></script>
+</body>
+</html>
