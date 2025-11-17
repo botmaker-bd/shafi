@@ -1,4 +1,4 @@
-// server/core/command-executor.js - BOT.RUNPYTHON FIX
+// server/core/command-executor.js - COMPLETE FIXED VERSION
 async function executeCommandCode(botInstance, code, context) {
     return new Promise(async (resolve, reject) => {
         try {
@@ -65,10 +65,19 @@ async function executeCommandCode(botInstance, code, context) {
                 bot: apiWrapperInstance,      // bot.sendMessage()
                 Api: apiWrapperInstance,      // Api.sendMessage()  
                 
-                // ✅ FIX: Bot object with runPython method
+                // ✅ FIX: Bot object with ALL methods including runPython
                 Bot: {
-                    // Copy all methods from apiWrapperInstance
-                    ...apiWrapperInstance,
+                    // Copy all methods from apiWrapperInstance using proper binding
+                    sendMessage: apiWrapperInstance.sendMessage.bind(apiWrapperInstance),
+                    send: apiWrapperInstance.send.bind(apiWrapperInstance),
+                    reply: apiWrapperInstance.reply.bind(apiWrapperInstance),
+                    sendPhoto: apiWrapperInstance.sendPhoto.bind(apiWrapperInstance),
+                    sendDocument: apiWrapperInstance.sendDocument.bind(apiWrapperInstance),
+                    sendVideo: apiWrapperInstance.sendVideo.bind(apiWrapperInstance),
+                    sendKeyboard: apiWrapperInstance.sendKeyboard.bind(apiWrapperInstance),
+                    sendReplyKeyboard: apiWrapperInstance.sendReplyKeyboard.bind(apiWrapperInstance),
+                    getUser: apiWrapperInstance.getUser.bind(apiWrapperInstance),
+                    wait: apiWrapperInstance.wait.bind(apiWrapperInstance),
                     // ✅ ADD runPython method specifically
                     runPython: (pythonCode) => runPythonSync(pythonCode)
                 },
@@ -219,38 +228,56 @@ async function executeCommandCode(botInstance, code, context) {
                 sendDocument: (doc, options) => {
                     return botInstance.sendDocument(chatId, doc, options);
                 },
+                sendVideo: (video, options) => {
+                    return botInstance.sendVideo(chatId, video, options);
+                },
+                sendKeyboard: (text, buttons, options) => {
+                    return apiWrapperInstance.sendKeyboard(text, buttons, options);
+                },
+                sendReplyKeyboard: (text, buttons, options) => {
+                    return apiWrapperInstance.sendReplyKeyboard(text, buttons, options);
+                },
                 getUser: () => executionEnv.getUser(),
                 wait: (ms) => executionEnv.wait(ms),
                 // ✅ SYNCHRONOUS PYTHON
                 runPython: (code) => executionEnv.runPython(code)
             };
 
-            // ✅ WAIT FOR ANSWER IMPLEMENTATION
+            // ✅ FIXED: PROPER WAIT FOR ANSWER IMPLEMENTATION
             const waitForAnswer = async (question, options = {}) => {
                 return new Promise(async (resolve) => {
                     try {
+                        console.log('⏳ WaitForAnswer started for question:', question);
+                        
                         // First send the question
                         await directFunctions.sendMessage(question, options);
                         
                         // Create unique key for this waiting answer
-                        const waitKey = `${botToken}_${userId}_${Date.now()}`;
+                        const waitKey = `wait_${botToken}_${userId}_${Date.now()}`;
+                        console.log('🔑 Wait key created:', waitKey);
                         
-                        // Store the resolver in waitingAnswers map
-                        if (waitingAnswers) {
-                            waitingAnswers.set(waitKey, resolve);
+                        // ✅ FIX: Use nextCommandHandlers instead of waitingAnswers
+                        if (nextCommandHandlers) {
+                            nextCommandHandlers.set(waitKey, (answer) => {
+                                console.log('✅ Answer received:', answer);
+                                resolve(answer);
+                            });
+                            
+                            // Set timeout to clean up (5 minutes)
+                            setTimeout(() => {
+                                if (nextCommandHandlers && nextCommandHandlers.has(waitKey)) {
+                                    nextCommandHandlers.delete(waitKey);
+                                    console.log('⏰ WaitForAnswer timeout');
+                                    resolve("Timeout - no answer received");
+                                }
+                            }, 5 * 60 * 1000);
+                        } else {
+                            resolve("Error: No command handlers available");
                         }
-                        
-                        // Set timeout to clean up (5 minutes)
-                        setTimeout(() => {
-                            if (waitingAnswers && waitingAnswers.has(waitKey)) {
-                                waitingAnswers.delete(waitKey);
-                                resolve("Timeout - no answer received");
-                            }
-                        }, 5 * 60 * 1000);
                         
                     } catch (error) {
                         console.error('WaitForAnswer error:', error);
-                        resolve("Error asking question");
+                        resolve("Error asking question: " + error.message);
                     }
                 });
             };
@@ -263,42 +290,18 @@ async function executeCommandCode(botInstance, code, context) {
                 ask: waitForAnswer
             };
 
-            // ✅ FIXED: SIMPLE EXECUTION FUNCTION
-            const executeUserCode = function(
-                getUser, sendMessage, bot, Api, Bot, 
-                params, message, User, BotData, waitForAnswer, wait, runPython
-            ) {
-                try {
-                    var user = getUser();
-                    console.log('✅ Execution started for user:', user.first_name);
-                    console.log('📝 User input:', message);
-                    console.log('📋 Parameters:', params);
-                    
-                    // ✅ USER'S CODE EXECUTES HERE - SYNCHRONOUSLY
-                    // The 'code' variable content is inserted here
-                    
-                    return "Command completed successfully";
-                } catch (error) {
-                    console.error('❌ Execution error:', error);
-                    try {
-                        sendMessage("❌ Error: " + error.message);
-                    } catch (e) {
-                        console.error('Failed to send error message:', e);
-                    }
-                    throw error;
-                }
-            };
-
             // ✅ FIXED: Create the execution function with user code properly injected
             const executionFunction = new Function(
-                'getUser', 'sendMessage', 'bot', 'Api', 'Bot', 'params', 'message', 'User', 'BotData', 'waitForAnswer', 'wait', 'runPython',
+                'getUser', 'sendMessage', 'bot', 'Api', 'Bot', 'params', 'message', 'User', 'BotData', 'waitForAnswer', 'ask', 'wait', 'runPython',
                 `try {
                     var user = getUser();
                     console.log('✅ Execution started for user:', user.first_name);
                     console.log('📝 User input:', message);
-                    console.log('📋 Parameters:', params);
+                    console.log('📋 Parameters count:', params.length);
                     console.log('🤖 Bot.runPython available:', typeof Bot.runPython);
                     console.log('🐍 runPython available:', typeof runPython);
+                    console.log('⏳ waitForAnswer available:', typeof waitForAnswer);
+                    console.log('❓ ask available:', typeof ask);
                     
                     // User's code starts here
                     ${code}
@@ -323,12 +326,13 @@ async function executeCommandCode(botInstance, code, context) {
                 finalContext.sendMessage,
                 finalContext.bot,
                 finalContext.Api,
-                finalContext.Bot,  // ✅ This now has runPython method
+                finalContext.Bot,  // ✅ This now has properly bound methods including runPython
                 finalContext.params,
                 finalContext.message,
                 finalContext.User,
                 finalContext.BotData,
                 finalContext.waitForAnswer,
+                finalContext.ask,  // ✅ Added ask function
                 finalContext.wait,
                 finalContext.runPython
             );
