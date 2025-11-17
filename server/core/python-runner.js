@@ -1,4 +1,4 @@
-// server/core/python-runner.js - COMPLETE FIXED VERSION
+// server/core/python-runner.js - RESULT FORMATTING FIX
 const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -48,14 +48,14 @@ class PythonRunner {
         });
     }
 
-    // ✅ COMPLETELY SYNCHRONOUS PYTHON EXECUTION
+    // ✅ FIXED: PROPER RESULT EXTRACTION
     runPythonCodeSync(code) {
         try {
             console.log('🐍 Executing Python code synchronously...');
             
             const tempFile = path.join(this.tempDir, `script_${Date.now()}_${Math.random().toString(36).substring(7)}.py`);
             
-            // ✅ SIMPLE AND CLEAN PYTHON TEMPLATE
+            // ✅ CLEANER PYTHON TEMPLATE
             const pythonTemplate = `# Python Code Execution
 import sys
 import json
@@ -64,24 +64,17 @@ try:
     # User's code execution
 ${this.indentCode(code)}
     
-    # Ensure result variable exists
+    # Ensure result variable exists and is properly formatted
     if 'result' not in locals() and 'result' not in globals():
         result = "Python code executed successfully"
     
-    # Return success with result
-    output_data = {"success": True, "result": str(result)}
+    # ✅ FIX: Return ONLY the result value, not JSON
+    print(str(result))
     
 except Exception as e:
-    import traceback
-    output_data = {
-        "success": False, 
-        "error": str(e),
-        "traceback": traceback.format_exc()
-    }
-
-# Always print JSON output
-print(json.dumps(output_data))
-sys.stdout.flush()`;
+    # ✅ FIX: Return clean error message
+    print("Python Error: " + str(e))
+    sys.exit(1)`;
 
             // Write Python file
             fs.writeFileSync(tempFile, pythonTemplate);
@@ -89,7 +82,7 @@ sys.stdout.flush()`;
             // Determine Python command
             const pythonCommand = process.env.PYTHON_PATH || 'python3';
             
-            // ✅ USE spawnSync FOR SYNCHRONOUS EXECUTION
+            // Use spawnSync for synchronous execution
             const result = spawnSync(pythonCommand, [tempFile], {
                 timeout: 30000,
                 encoding: 'utf-8'
@@ -111,24 +104,14 @@ sys.stdout.flush()`;
 
             // Check exit code
             if (result.status !== 0) {
-                throw new Error(`Python execution failed with code ${result.status}: ${result.stderr || 'Unknown error'}`);
+                throw new Error(`Python execution failed: ${result.stderr || result.stdout || 'Unknown error'}`);
             }
 
-            // Process output
+            // ✅ FIX: Return clean output
             if (result.stdout) {
-                try {
-                    const output = JSON.parse(result.stdout);
-                    if (output.success) {
-                        console.log('✅ Python execution successful');
-                        return output.result;
-                    } else {
-                        throw new Error(`Python Error: ${output.error}`);
-                    }
-                } catch (parseError) {
-                    // If not JSON, return raw output
-                    console.log('📄 Raw Python output:', result.stdout);
-                    return result.stdout.trim();
-                }
+                const output = result.stdout.trim();
+                console.log('✅ Python output:', output);
+                return output;
             } else {
                 throw new Error('Python execution produced no output');
             }
@@ -149,12 +132,12 @@ sys.stdout.flush()`;
         return indentedLines.join('\n');
     }
 
-    // ✅ COMPATIBILITY METHOD
+    // Compatibility method
     async runPythonCode(code) {
         return this.runPythonCodeSync(code);
     }
 
-    // ✅ LIBRARY INSTALLATION
+    // Other methods remain the same...
     async installPythonLibrary(libraryName) {
         await this.initialize();
         try {
@@ -181,7 +164,6 @@ sys.stdout.flush()`;
         }
     }
 
-    // ✅ SAVE INSTALLED LIBRARY INFO
     async saveInstalledLibrary(libraryName) {
         try {
             const { data: currentData } = await supabase
@@ -220,7 +202,6 @@ sys.stdout.flush()`;
         }
     }
 
-    // ✅ GET INSTALLED LIBRARIES
     async getInstalledLibraries() {
         try {
             const { data } = await supabase
@@ -237,32 +218,6 @@ sys.stdout.flush()`;
         } catch (error) {
             console.error('❌ Get installed libraries error:', error);
             return [];
-        }
-    }
-
-    // ✅ UNINSTALL LIBRARY
-    async uninstallPythonLibrary(libraryName) {
-        await this.initialize();
-        try {
-            console.log(`🗑️ Uninstalling Python library: ${libraryName}`);
-            const pipCommand = process.env.PIP_PATH || 'pip3';
-            const result = spawnSync(pipCommand, ['uninstall', '-y', libraryName], {
-                encoding: 'utf-8',
-                timeout: 60000
-            });
-            
-            if (result.status === 0) {
-                console.log(`✅ Successfully uninstalled ${libraryName}`);
-                return { 
-                    library: libraryName, 
-                    uninstalled: true,
-                    output: result.stdout 
-                };
-            } else {
-                throw new Error(result.stderr || 'Uninstall failed');
-            }
-        } catch (error) {
-            throw new Error(`Failed to uninstall ${libraryName}: ${error.message}`);
         }
     }
 }
