@@ -1,20 +1,12 @@
-/**
- * Enhanced Command Editor Class
- * With New Full Screen Code Editor
- */
-class CommandEditor {
+// Compact Command Editor JavaScript
+class CompactCommandEditor {
     constructor() {
         this.user = null;
         this.currentBot = null;
         this.currentCommand = null;
         this.commands = [];
         this.templates = {};
-        this.originalCode = '';
-        this.currentEditorType = null;
-        this.isModified = false;
-        this.isFullscreen = false;
-        this.editorMode = 'light';
-        
+        this.currentEditorType = 'main';
         this.init();
     }
 
@@ -24,178 +16,103 @@ class CommandEditor {
         this.setupEventListeners();
         await this.loadCommands();
         await this.loadTemplates();
-        this.setupCodeEditor();
         this.setupCommandsTags();
-        
-        console.log('🚀 Command Editor initialized successfully');
-        
-        // Warn before leaving if there are unsaved changes
-        window.addEventListener('beforeunload', (e) => {
-            if (this.isModified) {
-                e.preventDefault();
-                e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
-            }
-        });
+        this.setupCodeEditor();
+        console.log('✅ Compact command editor initialized completely');
     }
 
-    // Event Listeners Setup
+    async loadTemplates() {
+        try {
+            const token = localStorage.getItem('token');
+            console.log('🔄 Loading templates from API...');
+            
+            const response = await fetch('/api/templates', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log('📦 Templates API response:', data);
+
+            if (data.success) {
+                this.templates = data.templates || {};
+                console.log(`✅ Loaded ${Object.keys(this.templates).length} template categories`);
+                
+                Object.entries(this.templates).forEach(([category, templates]) => {
+                    console.log(`📁 ${category}: ${templates?.length || 0} templates`);
+                });
+            } else {
+                throw new Error(data.error || 'Failed to load templates');
+            }
+        } catch (error) {
+            console.error('❌ Load templates error:', error);
+            this.showError('Failed to load templates: ' + error.message);
+            // Fallback with basic templates
+            this.templates = {
+                'basic': [
+                    {
+                        id: 'fallback_welcome',
+                        name: 'Welcome Message',
+                        patterns: '/start, hello',
+                        description: 'Basic welcome template',
+                        code: 'const user = getUser();\nApi.sendMessage(`Hello ${user.first_name}! Welcome to our bot.`);',
+                        waitForAnswer: false,
+                        answerHandler: ''
+                    }
+                ]
+            };
+        }
+    }
+
     setupEventListeners() {
-        this.setupNavigationEvents();
-        this.setupCommandEvents();
-        this.setupFormEvents();
-        this.setupModalEvents();
-        this.setupSearchEvents();
-        this.setupFullscreenEditorEvents();
-    }
-
-    setupFullscreenEditorEvents() {
-        // Fullscreen toggle
-        const fullscreenToggle = document.getElementById('fullscreenToggle');
-        if (fullscreenToggle) {
-            fullscreenToggle.addEventListener('click', () => {
-                this.toggleFullscreen();
-            });
-        }
-
-        // Editor mode toggle
-        const modeButtons = document.querySelectorAll('.editor-mode-toggle .btn-icon');
-        modeButtons.forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const mode = e.target.closest('.btn-icon').dataset.mode;
-                this.setEditorMode(mode);
-            });
-        });
-
-        // Snippet buttons
-        const snippetItems = document.querySelectorAll('.snippet-item');
-        snippetItems.forEach(item => {
-            item.addEventListener('click', (e) => {
-                const snippetType = e.target.dataset.snippet;
-                this.insertSnippet(snippetType);
-            });
-        });
-
-        // Find & Replace
-        const findReplaceBtn = document.getElementById('findReplaceBtn');
-        if (findReplaceBtn) {
-            findReplaceBtn.addEventListener('click', () => {
-                this.showFindReplace();
-            });
-        }
-
-        // Keyboard shortcuts
-        document.addEventListener('keydown', (e) => {
-            if (e.target.id === 'advancedCodeEditor') {
-                this.handleEditorShortcuts(e);
-            }
-        });
-    }
-
-    setupNavigationEvents() {
+        // Navigation
         document.getElementById('backToBots').addEventListener('click', () => {
-            if (this.isModified && !confirm('You have unsaved changes. Are you sure you want to leave?')) {
-                return;
-            }
             window.location.href = 'bot-management.html';
         });
 
         document.getElementById('quickTest').addEventListener('click', () => {
             this.quickTest();
         });
-    }
 
-    setupCommandEvents() {
-        const commandButtons = [
-            'addCommandBtn', 'createFirstCommand', 'addFirstCommand'
-        ];
-
-        commandButtons.forEach(btnId => {
-            const btn = document.getElementById(btnId);
-            if (btn) {
-                btn.addEventListener('click', () => this.addNewCommand());
-            }
+        // Command actions
+        document.getElementById('addCommandBtn').addEventListener('click', () => {
+            this.addNewCommand();
         });
 
-        document.getElementById('refreshCommandsBtn').addEventListener('click', () => {
-            this.loadCommands();
+        document.getElementById('createFirstCommand').addEventListener('click', () => {
+            this.addNewCommand();
         });
 
-        // Command selection
-        document.addEventListener('click', (e) => {
-            const commandItem = e.target.closest('.command-item');
-            if (commandItem && commandItem.dataset.commandId) {
-                const commandId = commandItem.dataset.commandId;
-                if (this.currentCommand?.id !== commandId) {
-                    if (this.isModified && !confirm('You have unsaved changes. Switch command?')) {
-                        return;
-                    }
-                    this.selectCommand(commandId);
-                }
-            }
-        });
-    }
-
-    setupFormEvents() {
-        // Save actions
-        const saveButtons = ['saveCommandBtn', 'saveFooterBtn'];
-        saveButtons.forEach(btnId => {
-            const btn = document.getElementById(btnId);
-            if (btn) {
-                btn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    this.saveCommand();
-                });
-            }
+        document.getElementById('addFirstCommand').addEventListener('click', () => {
+            this.addNewCommand();
         });
 
-        // Test actions
-        const testButtons = ['testCommandBtn', 'testFooterBtn', 'runTestBtn'];
-        testButtons.forEach(btnId => {
-            const btn = document.getElementById(btnId);
-            if (btn) {
-                btn.addEventListener('click', () => {
-                    if (btnId === 'runTestBtn') {
-                        this.runCustomTest();
-                    } else {
-                        this.testCommand();
-                    }
-                });
-            }
+        // Form actions
+        document.getElementById('saveCommandBtnCompact').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.saveCommand();
         });
 
-        // Toggle actions
-        const toggleButtons = ['toggleCommandBtn', 'activateFooterBtn'];
-        toggleButtons.forEach(btnId => {
-            const btn = document.getElementById(btnId);
-            if (btn) {
-                btn.addEventListener('click', () => this.toggleCommand());
-            }
-        });
-
-        // Delete action
-        document.getElementById('deleteCommandBtn').addEventListener('click', () => {
+        document.getElementById('deleteCommandBtnCompact').addEventListener('click', () => {
             this.deleteCommand();
         });
 
-        // Form input changes
-        const formInputs = ['commandCode', 'answerHandler', 'moreCommands'];
-        formInputs.forEach(inputId => {
-            const input = document.getElementById(inputId);
-            if (input) {
-                input.addEventListener('input', () => {
-                    this.setModified(true);
-                });
-            }
+        document.getElementById('toggleCommandBtnCompact').addEventListener('click', () => {
+            this.toggleCommand();
         });
 
-        // Wait for answer toggle
-        const waitForAnswerToggle = document.getElementById('waitForAnswer');
-        if (waitForAnswerToggle) {
-            waitForAnswerToggle.addEventListener('change', (e) => {
-                this.toggleAnswerHandler(e.target.checked);
-                this.setModified(true);
-            });
-        }
+        document.getElementById('testCommandBtnCompact').addEventListener('click', () => {
+            this.testCommand();
+        });
+
+        document.getElementById('runTestBtnCompact').addEventListener('click', () => {
+            this.runCustomTest();
+        });
 
         // Advanced options toggle
         const advancedToggle = document.getElementById('advancedOptionsToggle');
@@ -205,93 +122,73 @@ class CommandEditor {
         if (advancedToggle && advancedContent) {
             advancedToggle.addEventListener('click', () => {
                 advancedContent.classList.toggle('show');
-                if (advancedIcon) {
-                    advancedIcon.classList.toggle('fa-chevron-down');
-                    advancedIcon.classList.toggle('fa-chevron-up');
-                }
+                advancedIcon.classList.toggle('fa-chevron-down');
+                advancedIcon.classList.toggle('fa-chevron-up');
             });
         }
 
-        // Code formatting
-        document.getElementById('formatCode').addEventListener('click', () => {
-            this.formatCode();
-        });
+        // Wait for answer toggle
+        const waitForAnswerToggle = document.getElementById('waitForAnswerCompact');
+        if (waitForAnswerToggle) {
+            waitForAnswerToggle.addEventListener('change', (e) => {
+                this.toggleAnswerHandler(e.target.checked);
+            });
+        }
 
-        // Clear buttons
-        document.getElementById('clearPatternsBtn').addEventListener('click', () => {
-            this.clearCommandPatterns();
-        });
+        // Code editor stats
+        const codeEditor = document.getElementById('commandCodeCompact');
+        if (codeEditor) {
+            codeEditor.addEventListener('input', () => {
+                this.updateCodeStats();
+            });
+        }
 
-        document.getElementById('clearCodeBtn').addEventListener('click', () => {
-            this.clearCommandCode();
-        });
+        // Footer buttons
+        const saveFooterBtn = document.getElementById('saveFooterBtn');
+        const testFooterBtn = document.getElementById('testFooterBtn');
+        const activateFooterBtn = document.getElementById('activateFooterBtn');
+        
+        if (saveFooterBtn) {
+            saveFooterBtn.addEventListener('click', () => {
+                this.saveCommand();
+            });
+        }
+        
+        if (testFooterBtn) {
+            testFooterBtn.addEventListener('click', () => {
+                this.testCommand();
+            });
+        }
+        
+        if (activateFooterBtn) {
+            activateFooterBtn.addEventListener('click', () => {
+                this.toggleCommand();
+            });
+        }
 
-        // Templates
-        document.getElementById('showTemplates').addEventListener('click', () => {
-            this.showTemplates();
-        });
+        // Format code button
+        const formatBtn = document.getElementById('formatCodeCompact');
+        if (formatBtn) {
+            formatBtn.addEventListener('click', () => {
+                this.formatCode();
+            });
+        }
 
         // Full editor buttons
-        document.getElementById('openEditor').addEventListener('click', () => {
+        document.getElementById('openEditorCompact').addEventListener('click', () => {
             this.openCodeEditor('main');
         });
 
-        document.getElementById('openAnswerEditor').addEventListener('click', () => {
+        document.getElementById('openAnswerEditorCompact').addEventListener('click', () => {
             this.openCodeEditor('answer');
         });
-    }
 
-    setupModalEvents() {
-        const modals = ['testCommandModal', 'codeEditorModal', 'templatesModal'];
-        
-        modals.forEach(modalId => {
-            const modal = document.getElementById(modalId);
-            if (!modal) return;
-            
-            const closeBtn = modal.querySelector('.modal-close');
-            if (closeBtn) {
-                closeBtn.addEventListener('click', () => this.closeModal(modalId));
-            }
+        // Templates
+        document.getElementById('showTemplatesCompact').addEventListener('click', () => {
+            this.showTemplates();
         });
 
-        // Specific modal close buttons
-        const closeTestBtn = document.getElementById('closeTestCommand');
-        if (closeTestBtn) {
-            closeTestBtn.addEventListener('click', () => this.closeModal('testCommandModal'));
-        }
-
-        const closeTemplatesBtn = document.getElementById('closeTemplates');
-        if (closeTemplatesBtn) {
-            closeTemplatesBtn.addEventListener('click', () => this.closeModal('templatesModal'));
-        }
-
-        // ESC key to close modals
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                // Don't close if in fullscreen mode
-                if (this.isFullscreen) {
-                    this.toggleFullscreen();
-                    return;
-                }
-                
-                modals.forEach(modalId => {
-                    const modal = document.getElementById(modalId);
-                    if (modal && modal.style.display === 'flex') {
-                        this.closeModal(modalId);
-                    }
-                });
-            }
-        });
-
-        // Close modals when clicking outside
-        window.addEventListener('click', (e) => {
-            if (e.target.classList.contains('modal')) {
-                this.closeModal(e.target.id);
-            }
-        });
-    }
-
-    setupSearchEvents() {
+        // Search
         let searchTimeout;
         document.getElementById('commandSearch').addEventListener('input', (e) => {
             clearTimeout(searchTimeout);
@@ -299,9 +196,114 @@ class CommandEditor {
                 this.filterCommands(e.target.value);
             }, 300);
         });
+
+        // Command list click events
+        document.addEventListener('click', (e) => {
+            const commandGroup = e.target.closest('.command-group-compact');
+            if (commandGroup && commandGroup.dataset.commandId) {
+                const commandId = commandGroup.dataset.commandId;
+                this.selectCommand(commandId);
+            }
+        });
+
+        // Modal events
+        this.setupModalEvents();
     }
 
-    // Full Screen Code Editor Functionality
+    setupCommandsTags() {
+        const moreCommandsInput = document.getElementById('moreCommandsCompact');
+        const commandsTags = document.getElementById('commandsTagsCompact');
+
+        if (!moreCommandsInput || !commandsTags) {
+            console.error('❌ Command tags elements not found');
+            return;
+        }
+
+        moreCommandsInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ',') {
+                e.preventDefault();
+                const command = moreCommandsInput.value.trim();
+                if (command) {
+                    this.addCommandTag(command);
+                    moreCommandsInput.value = '';
+                }
+            }
+        });
+
+        moreCommandsInput.addEventListener('blur', () => {
+            const command = moreCommandsInput.value.trim();
+            if (command) {
+                this.addCommandTag(command);
+                moreCommandsInput.value = '';
+            }
+        });
+
+        moreCommandsInput.addEventListener('paste', (e) => {
+            e.preventDefault();
+            const pastedText = e.clipboardData.getData('text');
+            const commands = pastedText.split(',').map(cmd => cmd.trim()).filter(cmd => cmd);
+            
+            commands.forEach(command => {
+                if (command && !this.commandExistsInTags(command)) {
+                    this.addCommandTag(command);
+                }
+            });
+            
+            moreCommandsInput.value = '';
+        });
+    }
+
+    addCommandTag(command) {
+        if (!command || this.commandExistsInTags(command)) return;
+
+        const commandsTags = document.getElementById('commandsTagsCompact');
+        if (!commandsTags) return;
+
+        const tag = document.createElement('div');
+        tag.className = 'command-tag-compact';
+        tag.innerHTML = `
+            <span class="tag-text">${this.escapeHtml(command)}</span>
+            <button type="button" class="remove-tag-compact">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        
+        tag.querySelector('.remove-tag-compact').addEventListener('click', () => {
+            tag.remove();
+        });
+        
+        commandsTags.appendChild(tag);
+    }
+
+    commandExistsInTags(command) {
+        const tags = Array.from(document.querySelectorAll('.command-tag-compact .tag-text'));
+        return tags.some(tag => tag.textContent.trim() === command);
+    }
+
+    getCommandsFromTags() {
+        const tags = Array.from(document.querySelectorAll('.command-tag-compact .tag-text'));
+        return tags.map(tag => tag.textContent.trim()).filter(cmd => cmd);
+    }
+
+    setCommandsToTags(commands) {
+        const commandsTags = document.getElementById('commandsTagsCompact');
+        if (!commandsTags) return;
+        
+        commandsTags.innerHTML = '';
+        
+        if (typeof commands === 'string') {
+            commands = commands.split(',').map(cmd => cmd.trim()).filter(cmd => cmd);
+        }
+        
+        if (Array.isArray(commands)) {
+            commands.forEach(command => {
+                if (command) {
+                    this.addCommandTag(command);
+                }
+            });
+        }
+    }
+
     setupCodeEditor() {
         const advancedEditor = document.getElementById('advancedCodeEditor');
         if (!advancedEditor) {
@@ -309,16 +311,16 @@ class CommandEditor {
             return;
         }
         
-        // Setup editor buttons
+        // Setup cancel button
         const cancelEditBtn = document.getElementById('cancelEdit');
-        const saveCodeBtn = document.getElementById('saveCode');
-        
         if (cancelEditBtn) {
             cancelEditBtn.addEventListener('click', () => {
                 this.closeCodeEditor();
             });
         }
         
+        // Setup save button
+        const saveCodeBtn = document.getElementById('saveCode');
         if (saveCodeBtn) {
             saveCodeBtn.addEventListener('click', () => {
                 this.saveCodeFromEditor();
@@ -328,139 +330,191 @@ class CommandEditor {
         // Setup toolbar buttons
         this.setupToolbarButtons();
 
-        advancedEditor.addEventListener('input', () => {
-            this.updateEditorStats();
-            this.updateLineNumbers();
-            this.updateSaveButtonState();
+        advancedEditor.addEventListener('input', (e) => {
+            this.updateEditorStats(e.target.value);
         });
 
-        advancedEditor.addEventListener('scroll', () => {
-            this.syncLineNumbersScroll();
-        });
-
-        advancedEditor.addEventListener('click', () => {
-            this.updateCursorPosition();
-        });
-
-        advancedEditor.addEventListener('keyup', () => {
-            this.updateCursorPosition();
-        });
-
-        // Initial setup
-        this.updateEditorStats();
-        this.updateLineNumbers();
-        this.setEditorMode('light');
+        // Initial stats update
+        this.updateEditorStats(advancedEditor.value);
     }
 
     setupToolbarButtons() {
         const editor = document.getElementById('advancedCodeEditor');
-        const toolbarButtons = {
-            'undoBtn': () => document.execCommand('undo'),
-            'redoBtn': () => document.execCommand('redo'),
-            'selectAllBtn': () => {
-                editor.select();
-                this.updateCursorPosition();
-            },
-            'cutBtn': () => document.execCommand('cut'),
-            'copyBtn': () => document.execCommand('copy'),
-            'pasteBtn': async () => {
-                try {
-                    const text = await navigator.clipboard.readText();
-                    this.insertTextAtCursor(text);
-                    this.updateEditorStats();
-                } catch (err) {
-                    document.execCommand('paste');
-                }
-            },
-            'clearBtn': () => {
-                if (confirm('Are you sure you want to clear all code?')) {
-                    editor.value = '';
-                    this.updateEditorStats();
-                    this.updateLineNumbers();
-                }
-            },
-            'formatBtn': () => this.formatAdvancedCode()
-        };
-
-        Object.entries(toolbarButtons).forEach(([btnId, handler]) => {
-            const btn = document.getElementById(btnId);
-            if (btn) {
-                btn.addEventListener('click', () => {
-                    handler();
-                    editor.focus();
-                    this.updateCursorPosition();
-                });
+        
+        // Undo/Redo functionality
+        document.getElementById('undoBtn').addEventListener('click', () => {
+            document.execCommand('undo');
+            editor.focus();
+        });
+        
+        document.getElementById('redoBtn').addEventListener('click', () => {
+            document.execCommand('redo');
+            editor.focus();
+        });
+        
+        // Select All
+        document.getElementById('selectAllBtn').addEventListener('click', () => {
+            editor.select();
+            editor.focus();
+        });
+        
+        // Cut
+        document.getElementById('cutBtn').addEventListener('click', () => {
+            document.execCommand('cut');
+            editor.focus();
+        });
+        
+        // Copy
+        document.getElementById('copyBtn').addEventListener('click', () => {
+            document.execCommand('copy');
+            editor.focus();
+        });
+        
+        // Paste
+        document.getElementById('pasteBtn').addEventListener('click', async () => {
+            try {
+                const text = await navigator.clipboard.readText();
+                editor.setRangeText(text, editor.selectionStart, editor.selectionEnd, 'end');
+                this.updateEditorStats(editor.value);
+            } catch (err) {
+                document.execCommand('paste');
             }
+            editor.focus();
+        });
+        
+        // Clear
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            if (confirm('Are you sure you want to clear all code?')) {
+                editor.value = '';
+                this.updateEditorStats('');
+                editor.focus();
+            }
+        });
+        
+        // Format (basic indentation)
+        document.getElementById('formatBtn').addEventListener('click', () => {
+            this.formatAdvancedCode();
+            editor.focus();
         });
     }
 
-    handleEditorShortcuts(e) {
-        // Ctrl+S - Save
-        if (e.ctrlKey && e.key === 's') {
-            e.preventDefault();
-            this.saveCodeFromEditor();
+    updateEditorStats(code) {
+        const lines = code.split('\n').length;
+        const chars = code.length;
+        const words = code.trim() ? code.trim().split(/\s+/).length : 0;
+        
+        const lineCountEl = document.getElementById('lineCount');
+        const charCountEl = document.getElementById('charCount');
+        const wordCountEl = document.getElementById('wordCount');
+        
+        if (lineCountEl) lineCountEl.textContent = `Lines: ${lines}`;
+        if (charCountEl) charCountEl.textContent = `Chars: ${chars}`;
+        if (wordCountEl) wordCountEl.textContent = `Words: ${words}`;
+    }
+
+    updateCodeStats() {
+        const codeEditor = document.getElementById('commandCodeCompact');
+        const statsElement = document.getElementById('codeStatsCompact');
+        
+        if (!codeEditor || !statsElement) return;
+        
+        const code = codeEditor.value;
+        const lines = code.split('\n').length;
+        const chars = code.length;
+        
+        statsElement.textContent = `Lines: ${lines}, Chars: ${chars}`;
+        
+        // Update last saved time when code changes
+        const lastSavedElement = document.getElementById('lastSavedCompact');
+        if (lastSavedElement && lastSavedElement.textContent !== 'Not saved yet') {
+            lastSavedElement.textContent = 'Unsaved changes';
+        }
+    }
+
+    formatCode() {
+        const editor = document.getElementById('commandCodeCompact');
+        if (!editor) return;
+        
+        let code = editor.value;
+        
+        // Basic formatting - add proper indentation
+        const lines = code.split('\n');
+        let formattedLines = [];
+        let indentLevel = 0;
+        
+        for (let line of lines) {
+            const trimmedLine = line.trim();
+            
+            // Decrease indent for closing braces
+            if (trimmedLine.endsWith('}') || trimmedLine.endsWith(']') || trimmedLine.endsWith(')')) {
+                indentLevel = Math.max(0, indentLevel - 1);
+            }
+            
+            // Add current line with proper indentation
+            formattedLines.push('    '.repeat(indentLevel) + trimmedLine);
+            
+            // Increase indent for opening braces
+            if (trimmedLine.endsWith('{') || trimmedLine.endsWith('[') || trimmedLine.endsWith('(')) {
+                indentLevel++;
+            }
         }
         
-        // Ctrl+F - Find
-        if (e.ctrlKey && e.key === 'f') {
-            e.preventDefault();
-            this.showFindReplace();
+        editor.value = formattedLines.join('\n');
+        this.updateCodeStats();
+        
+        this.showSuccess('Code formatted!');
+    }
+
+    formatAdvancedCode() {
+        const editor = document.getElementById('advancedCodeEditor');
+        if (!editor) return;
+        
+        let code = editor.value;
+        
+        // Basic formatting - add proper indentation
+        const lines = code.split('\n');
+        let formattedLines = [];
+        let indentLevel = 0;
+        
+        for (let line of lines) {
+            const trimmedLine = line.trim();
+            
+            // Decrease indent for closing braces
+            if (trimmedLine.endsWith('}') || trimmedLine.endsWith(']') || trimmedLine.endsWith(')')) {
+                indentLevel = Math.max(0, indentLevel - 1);
+            }
+            
+            // Add current line with proper indentation
+            formattedLines.push('    '.repeat(indentLevel) + trimmedLine);
+            
+            // Increase indent for opening braces
+            if (trimmedLine.endsWith('{') || trimmedLine.endsWith('[') || trimmedLine.endsWith('(')) {
+                indentLevel++;
+            }
         }
         
-        // Ctrl+Z - Undo
-        if (e.ctrlKey && e.key === 'z') {
-            // Let browser handle default undo
-        }
+        editor.value = formattedLines.join('\n');
+        this.updateEditorStats(editor.value);
         
-        // Ctrl+Y - Redo
-        if (e.ctrlKey && e.key === 'y') {
-            // Let browser handle default redo
-        }
-        
-        // Ctrl+A - Select All
-        if (e.ctrlKey && e.key === 'a') {
-            // Let browser handle default select all
-        }
-        
-        // Ctrl+Shift+F - Format
-        if (e.ctrlKey && e.shiftKey && e.key === 'F') {
-            e.preventDefault();
-            this.formatAdvancedCode();
-        }
+        this.showSuccess('Code formatted!');
     }
 
     openCodeEditor(editorType) {
         this.currentEditorType = editorType;
         let code = '';
-        let title = '';
-        let subtitle = '';
         
         if (editorType === 'main') {
-            const commandCodeEl = document.getElementById('commandCode');
+            const commandCodeEl = document.getElementById('commandCodeCompact');
             code = commandCodeEl ? commandCodeEl.value : '';
-            title = 'Command Code Editor';
-            subtitle = 'Main Command Logic';
         } else if (editorType === 'answer') {
-            const answerHandlerEl = document.getElementById('answerHandler');
+            const answerHandlerEl = document.getElementById('answerHandlerCompact');
             code = answerHandlerEl ? answerHandlerEl.value : '';
-            title = 'Answer Handler Editor';
-            subtitle = 'User Response Handling';
         }
         
         const advancedEditor = document.getElementById('advancedCodeEditor');
-        const editorTitle = document.getElementById('fullscreenEditorTitle');
-        const editorSubtitle = document.getElementById('fullscreenEditorSubtitle');
-        
         if (advancedEditor) {
             advancedEditor.value = code;
-            this.originalCode = code;
-            
-            if (editorTitle) editorTitle.textContent = title;
-            if (editorSubtitle) editorSubtitle.textContent = subtitle;
-            
-            this.updateEditorStats();
-            this.updateLineNumbers();
-            this.updateSaveButtonState();
+            this.updateEditorStats(code);
         }
         
         const codeEditorModal = document.getElementById('codeEditorModal');
@@ -474,7 +528,6 @@ class CommandEditor {
             if (editor) {
                 editor.focus();
                 editor.setSelectionRange(editor.value.length, editor.value.length);
-                this.updateCursorPosition();
             }
         }, 100);
     }
@@ -484,257 +537,163 @@ class CommandEditor {
         if (codeEditorModal) {
             codeEditorModal.style.display = 'none';
             document.body.style.overflow = '';
-            
-            // Exit fullscreen if active
-            if (this.isFullscreen) {
-                this.toggleFullscreen();
-            }
         }
     }
 
-    toggleFullscreen() {
-        const modal = document.getElementById('codeEditorModal');
-        const fullscreenBtn = document.getElementById('fullscreenToggle');
-        
-        if (!document.fullscreenElement) {
-            modal.requestFullscreen?.().catch(err => {
-                console.log('Fullscreen failed:', err);
-            });
-            this.isFullscreen = true;
-            if (fullscreenBtn) {
-                fullscreenBtn.innerHTML = '<i class="fas fa-compress"></i>';
-                fullscreenBtn.title = 'Exit Fullscreen (Esc)';
-            }
-        } else {
-            document.exitFullscreen?.();
-            this.isFullscreen = false;
-            if (fullscreenBtn) {
-                fullscreenBtn.innerHTML = '<i class="fas fa-expand"></i>';
-                fullscreenBtn.title = 'Enter Fullscreen';
-            }
-        }
-    }
-
-    setEditorMode(mode) {
-        this.editorMode = mode;
-        const modal = document.getElementById('codeEditorModal');
-        const modeButtons = document.querySelectorAll('.editor-mode-toggle .btn-icon');
-        
-        // Update active button
-        modeButtons.forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.mode === mode);
-        });
-        
-        // Apply mode styles
-        modal.classList.toggle('editor-dark-mode', mode === 'dark');
-        
-        // Update editor theme
-        const editor = document.getElementById('advancedCodeEditor');
-        if (mode === 'dark') {
-            editor.style.backgroundColor = '#1a1b26';
-            editor.style.color = '#c0caf5';
-        } else {
-            editor.style.backgroundColor = '';
-            editor.style.color = '';
-        }
-    }
-
-    updateLineNumbers() {
-        const editor = document.getElementById('advancedCodeEditor');
-        const lineNumbers = document.querySelector('.line-numbers-content');
-        
-        if (!editor || !lineNumbers) return;
-        
-        const lines = editor.value.split('\n');
-        let numbersHTML = '';
-        
-        for (let i = 1; i <= lines.length; i++) {
-            numbersHTML += `<div class="line-number">${i}</div>`;
-        }
-        
-        lineNumbers.innerHTML = numbersHTML;
-    }
-
-    syncLineNumbersScroll() {
-        const editor = document.getElementById('advancedCodeEditor');
-        const lineNumbers = document.querySelector('.editor-line-numbers');
-        
-        if (editor && lineNumbers) {
-            lineNumbers.scrollTop = editor.scrollTop;
-        }
-    }
-
-    updateCursorPosition() {
-        const editor = document.getElementById('advancedCodeEditor');
-        const cursorPosition = document.getElementById('cursorPosition');
-        
-        if (!editor || !cursorPosition) return;
-        
-        const lines = editor.value.substr(0, editor.selectionStart).split('\n');
-        const line = lines.length;
-        const column = lines[lines.length - 1].length + 1;
-        
-        cursorPosition.textContent = `Ln ${line}, Col ${column}`;
-    }
-
-    insertTextAtCursor(text) {
-        const editor = document.getElementById('advancedCodeEditor');
-        const start = editor.selectionStart;
-        const end = editor.selectionEnd;
-        
-        editor.value = editor.value.substring(0, start) + text + editor.value.substring(end);
-        editor.selectionStart = editor.selectionEnd = start + text.length;
-        editor.focus();
-    }
-
-    insertSnippet(snippetType) {
-        const snippets = {
-            'function': `function functionName(parameters) {
-    // Your code here
-    return result;
-}`,
-            'ifelse': `if (condition) {
-    // Code to execute if condition is true
-} else {
-    // Code to execute if condition is false
-}`,
-            'loop': `for (let i = 0; i < array.length; i++) {
-    // Code to execute for each element
-    console.log(array[i]);
-}`,
-            'api': `// Make API call
-const response = await fetch('https://api.example.com/data', {
-    method: 'GET',
-    headers: {
-        'Content-Type': 'application/json'
-    }
-});
-
-if (response.ok) {
-    const data = await response.json();
-    // Process data
-} else {
-    console.error('API call failed');
-}`,
-            'message': `// Send message to user
-const user = getUser();
-Api.sendMessage(\`Hello \${user.first_name}! 👋\`);`
-        };
-
-        const snippet = snippets[snippetType];
-        if (snippet) {
-            this.insertTextAtCursor(snippet);
-            this.showSuccess(`Inserted ${snippetType} snippet`);
-        }
-    }
-
-    showFindReplace() {
-        // Simple find functionality
-        const searchText = prompt('Enter text to find:');
-        if (searchText) {
-            const editor = document.getElementById('advancedCodeEditor');
-            const content = editor.value;
-            const index = content.indexOf(searchText);
-            
-            if (index !== -1) {
-                editor.focus();
-                editor.setSelectionRange(index, index + searchText.length);
-                this.showSuccess(`Found "${searchText}"`);
-            } else {
-                this.showError(`"${searchText}" not found`);
-            }
-        }
-    }
-
-    updateEditorStats() {
+    saveCodeFromEditor() {
         const advancedEditor = document.getElementById('advancedCodeEditor');
         if (!advancedEditor) return;
         
         const code = advancedEditor.value;
-        const lines = code.split('\n').length;
-        const chars = code.length;
-        const words = code.trim() ? code.trim().split(/\s+/).length : 0;
         
-        const lineCountEl = document.getElementById('lineCount');
-        const charCountEl = document.getElementById('charCount');
-        const wordCountEl = document.getElementById('wordCount');
+        if (this.currentEditorType === 'main') {
+            const commandCodeEl = document.getElementById('commandCodeCompact');
+            if (commandCodeEl) commandCodeEl.value = code;
+        } else if (this.currentEditorType === 'answer') {
+            const answerHandlerEl = document.getElementById('answerHandlerCompact');
+            if (answerHandlerEl) answerHandlerEl.value = code;
+        }
         
-        if (lineCountEl) lineCountEl.textContent = `Line: ${lines}`;
-        if (charCountEl) charCountEl.textContent = `Chars: ${chars}`;
-        if (wordCountEl) wordCountEl.textContent = `Words: ${words}`;
+        this.updateCodeStats();
+        this.closeCodeEditor();
+        this.showSuccess('Code saved successfully!');
     }
 
-    updateSaveButtonState() {
-        const advancedEditor = document.getElementById('advancedCodeEditor');
-        const saveBtn = document.getElementById('saveCode');
-        
-        if (!advancedEditor || !saveBtn) return;
-        
-        const hasChanged = advancedEditor.value !== this.originalCode;
-        const hasContent = advancedEditor.value.trim().length > 0;
-        
-        const shouldEnable = hasContent && hasChanged;
-        
-        saveBtn.disabled = !shouldEnable;
-        saveBtn.style.opacity = shouldEnable ? '1' : '0.6';
-        
-        if (shouldEnable) {
-            saveBtn.classList.add('btn-pulse');
-        } else {
-            saveBtn.classList.remove('btn-pulse');
+    toggleAnswerHandler(show) {
+        const section = document.getElementById('answerHandlerSectionCompact');
+        if (section) {
+            section.style.display = show ? 'block' : 'none';
         }
     }
 
-    formatAdvancedCode() {
-        const editor = document.getElementById('advancedCodeEditor');
-        if (!editor) return;
+    setupModalEvents() {
+        const modals = ['testCommandModal', 'codeEditorModal', 'templatesModal'];
         
-        let code = editor.value;
-        const formattedCode = this.formatCodeText(code);
-        editor.value = formattedCode;
-        this.updateEditorStats();
-        this.updateLineNumbers();
-        this.updateSaveButtonState();
-        
-        this.showSuccess('Code formatted successfully!');
+        modals.forEach(modalId => {
+            const modal = document.getElementById(modalId);
+            if (!modal) return;
+            
+            const closeBtn = modal.querySelector('.modal-close');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', () => {
+                    modal.style.display = 'none';
+                    if (modalId === 'codeEditorModal') {
+                        document.body.style.overflow = '';
+                    }
+                });
+            }
+            
+            // ESC key to close modal
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && modal.style.display === 'flex') {
+                    modal.style.display = 'none';
+                    if (modalId === 'codeEditorModal') {
+                        document.body.style.overflow = '';
+                    }
+                }
+            });
+        });
+
+        const closeTestCommandBtn = document.getElementById('closeTestCommand');
+        if (closeTestCommandBtn) {
+            closeTestCommandBtn.addEventListener('click', () => {
+                const testCommandModal = document.getElementById('testCommandModal');
+                if (testCommandModal) {
+                    testCommandModal.style.display = 'none';
+                }
+            });
+        }
+
+        const closeTemplatesBtn = document.getElementById('closeTemplates');
+        if (closeTemplatesBtn) {
+            closeTemplatesBtn.addEventListener('click', () => {
+                const templatesModal = document.getElementById('templatesModal');
+                if (templatesModal) {
+                    templatesModal.style.display = 'none';
+                }
+            });
+        }
+
+        window.addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal')) {
+                e.target.style.display = 'none';
+                document.body.style.overflow = '';
+            }
+        });
     }
 
-    // ... (বাকি মেথডগুলি আগের মতোই থাকবে, শুধু Full Screen Editor সম্পর্কিত অংশ যোগ করা হয়েছে)
+    async loadBotInfo() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const botId = urlParams.get('bot');
 
-    // Core Functionality (একই থাকবে)
+        if (!botId) {
+            this.showError('No bot specified');
+            setTimeout(() => {
+                window.location.href = 'bot-management.html';
+            }, 2000);
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/bots/${botId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                this.currentBot = data.bot;
+                this.updateBotInfo();
+            } else {
+                this.showError('Bot not found');
+                setTimeout(() => {
+                    window.location.href = 'bot-management.html';
+                }, 2000);
+            }
+        } catch (error) {
+            this.showError('Failed to load bot info');
+            setTimeout(() => {
+                window.location.href = 'bot-management.html';
+            }, 2000);
+        }
+    }
+
+    updateBotInfo() {
+        if (this.currentBot) {
+            const botNameEl = document.getElementById('botName');
+            const botUsernameEl = document.getElementById('botUsername');
+            
+            if (botNameEl) botNameEl.textContent = `Commands - ${this.currentBot.name}`;
+            if (botUsernameEl) botUsernameEl.textContent = `@${this.currentBot.username}`;
+        }
+    }
+
     async loadCommands() {
         if (!this.currentBot) return;
 
         this.showLoading(true);
 
         try {
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            // Sample data
-            this.commands = [
-                {
-                    id: 'cmd_1',
-                    command_patterns: '/start, hello',
-                    code: '// Welcome command\nconst user = getUser();\nApi.sendMessage(`Hello ${user.first_name}! Welcome to our bot.`);',
-                    is_active: true,
-                    wait_for_answer: false,
-                    answer_handler: ''
-                },
-                {
-                    id: 'cmd_2',
-                    command_patterns: '/help, assistance',
-                    code: '// Help command\nconst helpText = `Available commands:\\n/start - Welcome message\\n/help - Show this help\\n/settings - Bot settings`;\nApi.sendMessage(helpText);',
-                    is_active: true,
-                    wait_for_answer: false,
-                    answer_handler: ''
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/commands/bot/${this.currentBot.token}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
                 }
-            ];
+            });
 
-            this.displayCommands();
-            this.showSuccess('Commands loaded successfully!');
+            const data = await response.json();
+
+            if (data.success) {
+                this.commands = data.commands || [];
+                this.displayCommands();
+            } else {
+                this.showError('Failed to load commands');
+            }
         } catch (error) {
-            this.showError('Failed to load commands: ' + error.message);
+            this.showError('Network error while loading commands');
         } finally {
             this.showLoading(false);
         }
@@ -744,45 +703,41 @@ Api.sendMessage(\`Hello \${user.first_name}! 👋\`);`
         const commandsList = document.getElementById('commandsList');
         const emptyCommands = document.getElementById('emptyCommands');
         const noCommandSelected = document.getElementById('noCommandSelected');
-        const commandEditor = document.getElementById('commandEditor');
+        const commandEditor = document.getElementById('commandEditorCompact');
 
         if (!this.commands || this.commands.length === 0) {
-            if (emptyCommands) emptyCommands.style.display = 'flex';
-            if (noCommandSelected) noCommandSelected.style.display = 'flex';
+            if (commandsList) commandsList.style.display = 'none';
+            if (emptyCommands) emptyCommands.style.display = 'block';
+            if (noCommandSelected) noCommandSelected.style.display = 'block';
             if (commandEditor) commandEditor.style.display = 'none';
             return;
         }
 
+        if (commandsList) commandsList.style.display = 'block';
         if (emptyCommands) emptyCommands.style.display = 'none';
-        
-        // Only hide noCommandSelected if we have a current command
-        if (noCommandSelected && this.currentCommand) {
-            noCommandSelected.style.display = 'none';
-        }
-        
-        if (commandEditor && this.currentCommand) {
-            commandEditor.style.display = 'block';
-        }
 
         let html = '';
         this.commands.forEach(command => {
             const isActive = command.is_active;
             const isSelected = this.currentCommand?.id === command.id;
-            const patterns = command.command_patterns.split(',').slice(0, 3).join(', ');
-            const hasMorePatterns = command.command_patterns.split(',').length > 3;
             
             html += `
-                <div class="command-item ${isSelected ? 'active' : ''}" 
+                <div class="command-group-compact ${isSelected ? 'active' : ''}" 
                      data-command-id="${command.id}">
-                    <div class="command-patterns" title="${command.command_patterns}">
-                        ${this.escapeHtml(patterns)}${hasMorePatterns ? '...' : ''}
+                    <div class="command-icon">
+                        <i class="fas fa-code"></i>
                     </div>
-                    <div class="command-meta">
-                        <span class="command-status ${isActive ? 'status-active' : 'status-inactive'}">
-                            <i class="fas fa-circle"></i>
-                            ${isActive ? 'Active' : 'Inactive'}
-                        </span>
-                        ${command.wait_for_answer ? '<span class="command-feature">⏳ Waits</span>' : ''}
+                    <div class="command-content">
+                        <div class="command-patterns">
+                            ${this.escapeHtml(command.command_patterns)}
+                        </div>
+                        <div class="command-meta">
+                            <span class="command-status ${isActive ? 'active' : 'inactive'}">
+                                <i class="fas fa-circle"></i>
+                                ${isActive ? 'Active' : 'Inactive'}
+                            </span>
+                            ${command.wait_for_answer ? '<span class="command-feature">⏳ Waits</span>' : ''}
+                        </div>
                     </div>
                 </div>
             `;
@@ -793,67 +748,517 @@ Api.sendMessage(\`Hello \${user.first_name}! 👋\`);`
         }
     }
 
-    // ... (বাকি সকল মেথড আগের মতোই থাকবে)
+    filterCommands(searchTerm) {
+        const commandGroups = document.querySelectorAll('.command-group-compact');
+        const lowerSearch = searchTerm.toLowerCase().trim();
 
-    // Utility Methods
-    formatCodeText(code) {
-        const lines = code.split('\n');
-        let formattedLines = [];
-        let indentLevel = 0;
-        
-        for (let line of lines) {
-            const trimmedLine = line.trim();
-            
-            if (trimmedLine.endsWith('}') || trimmedLine.endsWith(']') || trimmedLine.endsWith(')')) {
-                indentLevel = Math.max(0, indentLevel - 1);
-            }
-            
-            formattedLines.push('    '.repeat(indentLevel) + trimmedLine);
-            
-            if (trimmedLine.endsWith('{') || trimmedLine.endsWith('[') || trimmedLine.endsWith('(')) {
-                indentLevel++;
-            }
+        if (!lowerSearch) {
+            commandGroups.forEach(group => group.style.display = 'flex');
+            return;
         }
-        
-        return formattedLines.join('\n');
-    }
 
-    closeModal(modalId) {
-        const modal = document.getElementById(modalId);
-        if (modal) {
-            modal.style.display = 'none';
-            if (modalId === 'codeEditorModal') {
-                document.body.style.overflow = '';
-                
-                // Exit fullscreen if active
-                if (this.isFullscreen) {
-                    this.toggleFullscreen();
-                }
-            }
-        }
-    }
-
-    // ... (বাকি ইউটিলিটি মেথডগুলি একই থাকবে)
-
-    // UI Helper Methods
-    
-    setModified(modified) {
-        this.isModified = modified;
-        
-        // Update UI to show modified state
-        const saveButtons = ['saveCommandBtn', 'saveFooterBtn'];
-        saveButtons.forEach(btnId => {
-            const btn = document.getElementById(btnId);
-            if (btn) {
-                if (modified) {
-                    btn.classList.add('btn-pulse');
-                    btn.innerHTML = `<i class="fas fa-save"></i> Save *`;
-                } else {
-                    btn.classList.remove('btn-pulse');
-                    btn.innerHTML = `<i class="fas fa-save"></i> Save`;
-                }
+        commandGroups.forEach(group => {
+            const commandPatternEl = group.querySelector('.command-patterns');
+            if (commandPatternEl) {
+                const commandPattern = commandPatternEl.textContent.toLowerCase();
+                const isVisible = commandPattern.includes(lowerSearch);
+                group.style.display = isVisible ? 'flex' : 'none';
             }
         });
+    }
+
+    addNewCommand() {
+        this.currentCommand = {
+            id: 'new',
+            command_patterns: '/start',
+            code: '// Write your command code here\nconst user = getUser();\nApi.sendMessage(`Hello ${user.first_name}! Welcome to our bot.`);',
+            is_active: true,
+            wait_for_answer: false,
+            answer_handler: ''
+        };
+
+        this.showCommandEditor();
+        this.populateCommandForm();
+        
+        setTimeout(() => {
+            const moreCommandsInput = document.getElementById('moreCommandsCompact');
+            if (moreCommandsInput) {
+                moreCommandsInput.focus();
+            }
+        }, 100);
+    }
+
+    async selectCommand(commandId) {
+        if (this.currentCommand?.id === commandId) return;
+
+        this.showLoading(true);
+
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/commands/${commandId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                this.currentCommand = data.command;
+                this.showCommandEditor();
+                this.populateCommandForm();
+                
+                // Update UI selection
+                document.querySelectorAll('.command-group-compact').forEach(group => {
+                    group.classList.remove('active');
+                });
+                
+                const selectedGroup = document.querySelector(`[data-command-id="${commandId}"]`);
+                if (selectedGroup) {
+                    selectedGroup.classList.add('active');
+                    selectedGroup.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            } else {
+                this.showError('Failed to load command');
+            }
+        } catch (error) {
+            this.showError('Network error while loading command');
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    showCommandEditor() {
+        const noCommandSelected = document.getElementById('noCommandSelected');
+        const commandEditor = document.getElementById('commandEditorCompact');
+        
+        if (noCommandSelected) noCommandSelected.style.display = 'none';
+        if (commandEditor) commandEditor.style.display = 'block';
+    }
+
+    hideCommandEditor() {
+        const noCommandSelected = document.getElementById('noCommandSelected');
+        const commandEditor = document.getElementById('commandEditorCompact');
+        
+        if (noCommandSelected) noCommandSelected.style.display = 'block';
+        if (commandEditor) commandEditor.style.display = 'none';
+        this.currentCommand = null;
+    }
+
+    populateCommandForm() {
+        if (!this.currentCommand) return;
+        
+        this.setCommandsToTags(this.currentCommand.command_patterns);
+        
+        const commandCodeEl = document.getElementById('commandCodeCompact');
+        if (commandCodeEl) commandCodeEl.value = this.currentCommand.code || '';
+        
+        const waitToggle = document.getElementById('waitForAnswerCompact');
+        if (waitToggle) {
+            waitToggle.checked = this.currentCommand.wait_for_answer || false;
+            this.toggleAnswerHandler(waitToggle.checked);
+        }
+        
+        const answerHandlerEl = document.getElementById('answerHandlerCompact');
+        if (answerHandlerEl) answerHandlerEl.value = this.currentCommand.answer_handler || '';
+        
+        const currentCommandNameEl = document.getElementById('currentCommandNameCompact');
+        if (currentCommandNameEl) currentCommandNameEl.textContent = 'Command Editor';
+        
+        const commandIdEl = document.getElementById('commandIdCompact');
+        if (commandIdEl) commandIdEl.textContent = `ID: ${this.currentCommand.id}`;
+        
+        const statusBadge = document.getElementById('commandStatusCompact');
+        if (statusBadge) {
+            statusBadge.textContent = this.currentCommand.is_active ? 'Active' : 'Inactive';
+            statusBadge.className = `command-status-badge ${this.currentCommand.is_active ? 'status-active' : 'status-inactive'}`;
+        }
+        
+        // Update footer button
+        const activateBtn = document.getElementById('activateFooterBtn');
+        if (activateBtn) {
+            activateBtn.innerHTML = this.currentCommand.is_active ? 
+                '<i class="fas fa-power-off"></i> Deactivate' : 
+                '<i class="fas fa-power-off"></i> Activate';
+        }
+        
+        this.updateCodeStats();
+        
+        // Reset last saved
+        const lastSavedElement = document.getElementById('lastSavedCompact');
+        if (lastSavedElement) {
+            lastSavedElement.textContent = 'Not saved yet';
+        }
+    }
+
+    async saveCommand() {
+        if (!this.currentCommand || !this.currentBot) {
+            this.showError('No command selected or bot not loaded');
+            return false;
+        }
+
+        const commands = this.getCommandsFromTags();
+        
+        if (commands.length === 0) {
+            this.showError('Please add at least one command pattern');
+            const moreCommandsInput = document.getElementById('moreCommandsCompact');
+            if (moreCommandsInput) moreCommandsInput.focus();
+            return false;
+        }
+
+        const commandCodeEl = document.getElementById('commandCodeCompact');
+        const commandCode = commandCodeEl ? commandCodeEl.value.trim() : '';
+
+        if (!commandCode) {
+            this.showError('Command code is required');
+            if (commandCodeEl) commandCodeEl.focus();
+            return false;
+        }
+
+        const waitForAnswerEl = document.getElementById('waitForAnswerCompact');
+        const answerHandlerEl = document.getElementById('answerHandlerCompact');
+        
+        const waitForAnswer = waitForAnswerEl ? waitForAnswerEl.checked : false;
+        const answerHandler = waitForAnswer && answerHandlerEl ? answerHandlerEl.value.trim() : '';
+
+        if (waitForAnswer && !answerHandler) {
+            this.showError('Answer handler code is required when "Wait for Answer" is enabled');
+            if (answerHandlerEl) {
+                answerHandlerEl.focus();
+                const answerSection = document.getElementById('answerHandlerSectionCompact');
+                if (answerSection) answerSection.style.display = 'block';
+            }
+            return false;
+        }
+
+        const formData = {
+            commandPatterns: commands.join(','),
+            code: commandCode,
+            waitForAnswer: waitForAnswer,
+            answerHandler: answerHandler,
+            botToken: this.currentBot.token
+        };
+
+        this.showLoading(true);
+
+        try {
+            const token = localStorage.getItem('token');
+            let response;
+            let url;
+            let method;
+
+            if (this.currentCommand.id === 'new') {
+                url = '/api/commands';
+                method = 'POST';
+            } else {
+                url = `/api/commands/${this.currentCommand.id}`;
+                method = 'PUT';
+            }
+
+            response = await fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.showSuccess('Command saved successfully!');
+                
+                // Update last saved time
+                const lastSavedElement = document.getElementById('lastSavedCompact');
+                if (lastSavedElement) {
+                    const now = new Date();
+                    lastSavedElement.textContent = `Last saved: ${now.toLocaleTimeString()}`;
+                }
+                
+                await this.loadCommands();
+                
+                if (data.command) {
+                    this.currentCommand = data.command;
+                    this.populateCommandForm();
+                    
+                    // Auto-select the saved command
+                    setTimeout(() => {
+                        const commandGroup = document.querySelector(`[data-command-id="${this.currentCommand.id}"]`);
+                        if (commandGroup) {
+                            commandGroup.click();
+                        }
+                    }, 500);
+                }
+                
+                return true;
+            } else {
+                this.showError(data.error || 'Failed to save command');
+                return false;
+            }
+        } catch (error) {
+            this.showError('Network error while saving command');
+            return false;
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    async deleteCommand() {
+        if (!this.currentCommand || this.currentCommand.id === 'new') {
+            return;
+        }
+
+        if (!confirm('Are you sure you want to delete this command?\n\nThis action cannot be undone.')) {
+            return;
+        }
+
+        this.showLoading(true);
+
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/commands/${this.currentCommand.id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (response.ok) {
+                this.showSuccess('Command deleted successfully');
+                this.hideCommandEditor();
+                await this.loadCommands();
+            } else {
+                const data = await response.json();
+                this.showError(data.error || 'Failed to delete command');
+            }
+        } catch (error) {
+            this.showError('Network error while deleting command');
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    async toggleCommand() {
+        if (!this.currentCommand || this.currentCommand.id === 'new') {
+            return;
+        }
+
+        const newStatus = !this.currentCommand.is_active;
+
+        this.showLoading(true);
+
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/commands/${this.currentCommand.id}/toggle`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    isActive: newStatus,
+                    botToken: this.currentBot.token
+                })
+            });
+
+            if (response.ok) {
+                this.currentCommand.is_active = newStatus;
+                this.populateCommandForm();
+                await this.loadCommands();
+                this.showSuccess(`Command ${newStatus ? 'activated' : 'deactivated'} successfully!`);
+            } else {
+                this.showError('Failed to toggle command status');
+            }
+        } catch (error) {
+            this.showError('Network error while toggling command');
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    async testCommand() {
+        if (!this.currentBot) {
+            this.showError('Bot information not loaded');
+            return;
+        }
+
+        const commands = this.getCommandsFromTags();
+        if (commands.length === 0) {
+            this.showError('Please add at least one command to test');
+            return;
+        }
+
+        const commandCodeEl = document.getElementById('commandCodeCompact');
+        const commandCode = commandCodeEl ? commandCodeEl.value.trim() : '';
+        
+        if (!commandCode) {
+            this.showError('Please add command code to test');
+            return;
+        }
+
+        this.showTestModal();
+        this.showTestLoading();
+
+        try {
+            const token = localStorage.getItem('token');
+            
+            const waitForAnswerEl = document.getElementById('waitForAnswerCompact');
+            const answerHandlerEl = document.getElementById('answerHandlerCompact');
+            
+            const tempCommand = {
+                command_patterns: commands.join(','),
+                code: commandCode,
+                wait_for_answer: waitForAnswerEl ? waitForAnswerEl.checked : false,
+                answer_handler: answerHandlerEl ? answerHandlerEl.value || '' : ''
+            };
+
+            const response = await fetch('/api/commands/test-temp', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    command: tempCommand,
+                    botToken: this.currentBot.token
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.showTestSuccess(`
+                    <h4>✅ Test Command Sent Successfully!</h4>
+                    <div class="test-details">
+                        <p><strong>Commands:</strong> ${commands.join(', ')}</p>
+                        <p><strong>Bot:</strong> ${this.currentBot.name}</p>
+                        <p><strong>Status:</strong> Command executed without errors</p>
+                    </div>
+                    <p class="test-message">Check your Telegram bot for the test results.</p>
+                `);
+            } else {
+                this.showTestError(`
+                    <h4>❌ Test Failed</h4>
+                    <p><strong>Error:</strong> ${data.error || 'Unknown error occurred'}</p>
+                    ${data.details ? `<p><strong>Details:</strong> ${data.details}</p>` : ''}
+                `);
+            }
+        } catch (error) {
+            this.showTestError(`
+                <h4>❌ Network Error</h4>
+                <p>Failed to connect to server: ${error.message}</p>
+            `);
+        }
+    }
+
+    async runCustomTest() {
+        if (!this.currentBot) {
+            this.showError('Bot information not loaded');
+            return;
+        }
+
+        const testInputEl = document.getElementById('testInputCompact');
+        const testInput = testInputEl ? testInputEl.value.trim() : '';
+        const commands = this.getCommandsFromTags();
+        
+        if (!testInput && commands.length === 0) {
+            this.showError('Please add commands or enter test input');
+            return;
+        }
+
+        const commandCodeEl = document.getElementById('commandCodeCompact');
+        const commandCode = commandCodeEl ? commandCodeEl.value.trim() : '';
+        
+        if (!commandCode) {
+            this.showError('Please add command code to test');
+            return;
+        }
+
+        this.showTestModal();
+        this.showTestLoading();
+
+        try {
+            const token = localStorage.getItem('token');
+            
+            const waitForAnswerEl = document.getElementById('waitForAnswerCompact');
+            const answerHandlerEl = document.getElementById('answerHandlerCompact');
+            
+            const tempCommand = {
+                command_patterns: testInput || commands.join(','),
+                code: commandCode,
+                wait_for_answer: waitForAnswerEl ? waitForAnswerEl.checked : false,
+                answer_handler: answerHandlerEl ? answerHandlerEl.value || '' : ''
+            };
+
+            const response = await fetch('/api/commands/test-temp', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    command: tempCommand,
+                    botToken: this.currentBot.token,
+                    testInput: testInput
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                let resultText = data.result || 'Command executed successfully';
+                
+                if (typeof resultText === 'object') {
+                    if (resultText.message) {
+                        resultText = resultText.message;
+                    } else {
+                        resultText = JSON.stringify(resultText, null, 2);
+                    }
+                }
+                
+                this.showTestSuccess(`
+                    <h4>✅ Test Command Executed Successfully!</h4>
+                    <div class="test-details">
+                        <p><strong>Test Input:</strong> ${testInput || commands.join(', ')}</p>
+                        <p><strong>Bot:</strong> ${this.currentBot.name}</p>
+                        <p><strong>Result:</strong> ${resultText}</p>
+                    </div>
+                    <p class="test-message">Command executed without errors.</p>
+                `);
+            } else {
+                this.showTestError(`
+                    <h4>❌ Test Failed</h4>
+                    <div class="error-details">
+                        <p><strong>Error:</strong> ${data.error || 'Unknown error occurred'}</p>
+                        ${data.details ? `<p><strong>Details:</strong> ${data.details}</p>` : ''}
+                    </div>
+                `);
+            }
+        } catch (error) {
+            this.showTestError(`
+                <h4>❌ Network Error</h4>
+                <p>Failed to connect to server: ${error.message}</p>
+            `);
+        }
+    }
+
+    async quickTest() {
+        if (this.currentCommand) {
+            await this.testCommand();
+        } else {
+            this.showError('Please select a command first');
+        }
+    }
+
+    showTemplates() {
+        const modal = document.getElementById('templatesModal');
+        if (!modal) {
+            this.showError('Templates modal not found');
+            return;
+        }
+        
+        modal.style.display = 'flex';
     }
 
     showTestModal() {
@@ -897,29 +1302,6 @@ Api.sendMessage(\`Hello \${user.first_name}! 👋\`);`
         }
     }
 
-    async loadBotInfo() {
-        // Simulate bot info loading
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        this.currentBot = {
-            id: 'bot_123',
-            name: 'My Test Bot',
-            username: 'test_bot',
-            token: 'bot_token_123'
-        };
-        this.updateBotInfo();
-    }
-
-    updateBotInfo() {
-        if (this.currentBot) {
-            const botNameEl = document.getElementById('botName');
-            const botUsernameEl = document.getElementById('botUsername');
-            
-            if (botNameEl) botNameEl.textContent = `Commands - ${this.currentBot.name}`;
-            if (botUsernameEl) botUsernameEl.textContent = `@${this.currentBot.username}`;
-        }
-    }
-
     async checkAuth() {
         const token = localStorage.getItem('token');
         const userData = localStorage.getItem('user');
@@ -929,10 +1311,28 @@ Api.sendMessage(\`Hello \${user.first_name}! 👋\`);`
             return;
         }
 
-        this.user = JSON.parse(userData);
+        try {
+            const response = await fetch('/api/auth/verify', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Invalid token');
+            }
+
+            this.user = JSON.parse(userData);
+        } catch (error) {
+            this.logout();
+        }
     }
 
-    // UI Helper Methods
+    logout() {
+        localStorage.clear();
+        window.location.href = 'index.html';
+    }
+
     showLoading(show) {
         const overlay = document.getElementById('loadingOverlay');
         if (overlay) {
@@ -948,33 +1348,49 @@ Api.sendMessage(\`Hello \${user.first_name}! 👋\`);`
         this.showNotification(message, 'success');
     }
 
+    showInfo(message) {
+        this.showNotification(message, 'info');
+    }
+
     showNotification(message, type = 'info') {
-        if (typeof commonApp !== 'undefined' && commonApp.showNotification) {
-            commonApp.showNotification(message, type);
-        } else {
-            // Fallback notification
-            console.log(`${type.toUpperCase()}: ${message}`);
-            
-            // Simple inline notification
-            const notification = document.createElement('div');
-            notification.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                padding: 1rem 1.5rem;
-                border-radius: 0.5rem;
-                color: white;
-                background: ${type === 'error' ? '#ef4444' : type === 'success' ? '#10b981' : '#3b82f6'};
-                z-index: 10000;
-                box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-            `;
-            notification.textContent = message;
-            document.body.appendChild(notification);
-            
-            setTimeout(() => {
-                notification.remove();
-            }, 5000);
-        }
+        const existing = document.querySelector('.notification');
+        if (existing) existing.remove();
+
+        const notification = document.createElement('div');
+        notification.className = `notification notification-${type}`;
+        notification.innerHTML = `
+            <div class="notification-content">
+                <i class="fas fa-${type === 'error' ? 'exclamation-triangle' : type === 'success' ? 'check-circle' : 'info-circle'}"></i>
+                <span class="notification-message">${message}</span>
+                <button class="notification-close">&times;</button>
+            </div>
+        `;
+
+        Object.assign(notification.style, {
+            position: 'fixed',
+            top: '20px',
+            right: '20px',
+            background: type === 'error' ? '#ef4444' : type === 'success' ? '#10b981' : '#3b82f6',
+            color: 'white',
+            padding: '1rem 1.5rem',
+            borderRadius: '0.5rem',
+            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+            zIndex: '10000',
+            maxWidth: '400px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem'
+        });
+
+        notification.querySelector('.notification-close').addEventListener('click', () => {
+            notification.remove();
+        });
+
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+            notification.remove();
+        }, 5000);
     }
 
     escapeHtml(unsafe) {
@@ -986,38 +1402,14 @@ Api.sendMessage(\`Hello \${user.first_name}! 👋\`);`
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;")
             .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
+            .replace(/'/g, "&#039;")
+            .replace(/\//g, "&#x2F;");
     }
 }
 
-// Initialize the command editor
-let commandEditor;
+// Initialize compact command editor
+let compactCommandEditor;
 
 document.addEventListener('DOMContentLoaded', () => {
-    commandEditor = new CommandEditor();
-    
-    // Additional event listeners for dynamic elements
-    document.addEventListener('click', (e) => {
-        // Open code editors
-        if (e.target.id === 'openEditor' || e.target.closest('#openEditor')) {
-            commandEditor.openCodeEditor('main');
-        }
-        if (e.target.id === 'openAnswerEditor' || e.target.closest('#openAnswerEditor')) {
-            commandEditor.openCodeEditor('answer');
-        }
-    });
-
-    // Handle fullscreen change events
-    document.addEventListener('fullscreenchange', () => {
-        const modal = document.getElementById('codeEditorModal');
-        const fullscreenBtn = document.getElementById('fullscreenToggle');
-        
-        if (!document.fullscreenElement) {
-            commandEditor.isFullscreen = false;
-            if (fullscreenBtn) {
-                fullscreenBtn.innerHTML = '<i class="fas fa-expand"></i>';
-                fullscreenBtn.title = 'Enter Fullscreen';
-            }
-        }
-    });
+    compactCommandEditor = new CompactCommandEditor();
 });
