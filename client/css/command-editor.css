@@ -1,12 +1,25 @@
 /* ===== COMPACT COMMAND EDITOR STYLES ===== */
 
+/* Main Layout */
+.editor-layout-compact {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 1.5rem;
+    min-height: calc(100vh - 200px);
+    align-items: start;
+}
+
 /* Commands Sidebar */
 .commands-sidebar-compact {
     background: var(--bg-primary);
     border-radius: var(--radius-lg);
     border: 1px solid var(--border-color);
-    margin-bottom: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
     box-shadow: var(--shadow-sm);
+    position: sticky;
+    top: 1rem;
 }
 
 .sidebar-header-compact {
@@ -15,12 +28,14 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-shrink: 0;
 }
 
 .sidebar-search-compact {
     position: relative;
     padding: 1rem 1.25rem;
     border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
 }
 
 .sidebar-search-compact input {
@@ -42,10 +57,25 @@
 }
 
 .commands-list-compact {
-    max-height: 400px;
+    flex: 1;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
+/* Editor Main Area */
+.editor-main-compact {
+    background: var(--bg-primary);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    box-shadow: var(--shadow-sm);
+    min-height: 600px;
+}
+
+/* Empty States */
 .empty-state-compact {
     display: flex;
     flex-direction: column;
@@ -53,6 +83,28 @@
     justify-content: center;
     padding: 3rem 2rem;
     text-align: center;
+    height: 100%;
+}
+
+.empty-state-compact .empty-icon {
+    font-size: 4rem;
+    color: var(--border-color);
+    margin-bottom: 1.5rem;
+    opacity: 0.7;
+}
+
+.empty-state-compact h3 {
+    margin-bottom: 0.75rem;
+    color: var(--text-primary);
+    font-size: 1.5rem;
+}
+
+.empty-state-compact p {
+    color: var(--text-secondary);
+    margin-bottom: 2rem;
+    font-size: 1rem;
+    line-height: 1.5;
+    max-width: 400px;
 }
 
 /* Command List Styles */
@@ -151,19 +203,32 @@
     color: white;
 }
 
-/* Compact Editor Container */
-.compact-editor-container {
-    max-width: 100%;
-    margin: 0 auto;
+.command-group-compact .command-feature {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    background: rgba(37, 99, 235, 0.1);
+    color: var(--primary-color);
+    border-radius: var(--radius-sm);
+    font-weight: 500;
+    flex-shrink: 0;
 }
 
+.command-group-compact.active .command-feature {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+/* Compact Editor Container */
 .compact-editor-card {
     background: var(--bg-primary);
     border-radius: var(--radius-xl);
     border: 1px solid var(--border-color);
     box-shadow: var(--shadow-lg);
     overflow: hidden;
-    margin-bottom: 1.5rem;
+    margin-bottom: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
 }
 
 .editor-header-compact {
@@ -175,6 +240,7 @@
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 1rem;
+    flex-shrink: 0;
 }
 
 .editor-title-section {
@@ -219,6 +285,9 @@
 
 .editor-body-compact {
     padding: 1.5rem;
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 .form-section-compact {
@@ -480,6 +549,7 @@
     align-items: center;
     flex-wrap: wrap;
     gap: 1rem;
+    flex-shrink: 0;
 }
 
 .footer-info {
@@ -512,6 +582,7 @@
     transition: var(--transition);
     cursor: pointer;
     text-decoration: none;
+    white-space: nowrap;
 }
 
 .btn-compact.btn-small {
@@ -547,9 +618,19 @@
     color: white;
 }
 
+.btn-success-compact:hover:not(:disabled) {
+    background: #0da371;
+    transform: translateY(-1px);
+}
+
 .btn-warning-compact {
     background: var(--warning-color);
     color: white;
+}
+
+.btn-warning-compact:hover:not(:disabled) {
+    background: #d97706;
+    transform: translateY(-1px);
 }
 
 .btn-danger-compact {
@@ -557,10 +638,33 @@
     color: white;
 }
 
+.btn-danger-compact:hover:not(:disabled) {
+    background: #dc2626;
+    transform: translateY(-1px);
+}
+
 /* Mobile Responsive Styles */
+@media (max-width: 1024px) {
+    .editor-layout-compact {
+        grid-template-columns: 280px 1fr;
+        gap: 1rem;
+    }
+    
+    .commands-sidebar-compact {
+        height: auto;
+        max-height: 500px;
+        position: static;
+    }
+}
+
 @media (max-width: 768px) {
-    .compact-editor-container {
-        padding: 0;
+    .editor-layout-compact {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .commands-sidebar-compact {
+        max-height: 400px;
     }
     
     .editor-header-compact {
@@ -634,8 +738,13 @@
         justify-content: center;
     }
     
-    .commands-sidebar-compact {
-        margin-bottom: 1rem;
+    .command-group-compact {
+        padding: 0.875rem 1rem;
+        min-height: 70px;
+    }
+    
+    .command-group-compact .command-meta {
+        gap: 0.5rem;
     }
 }
 
@@ -660,6 +769,23 @@
         font-size: 13px;
         padding: 0.75rem;
     }
+    
+    .empty-state-compact .empty-icon {
+        font-size: 3rem;
+    }
+    
+    .empty-state-compact h3 {
+        font-size: 1.3rem;
+    }
+    
+    .commands-tags-container {
+        padding: 0.5rem;
+    }
+    
+    .command-tag-compact {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+    }
 }
 
 /* Animation */
@@ -681,4 +807,52 @@
     to {
         opacity: 1;
     }
+}
+
+/* Focus states for accessibility */
+.btn-compact:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+.commands-tags-container:focus-within {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+/* Scrollbar styling */
+.commands-list-compact::-webkit-scrollbar {
+    width: 6px;
+}
+
+.commands-list-compact::-webkit-scrollbar-track {
+    background: var(--bg-tertiary);
+    border-radius: 3px;
+}
+
+.commands-list-compact::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 3px;
+}
+
+.commands-list-compact::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
+.editor-body-compact::-webkit-scrollbar {
+    width: 6px;
+}
+
+.editor-body-compact::-webkit-scrollbar-track {
+    background: var(--bg-tertiary);
+    border-radius: 3px;
+}
+
+.editor-body-compact::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 3px;
+}
+
+.editor-body-compact::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
 }
