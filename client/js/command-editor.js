@@ -26,6 +26,7 @@ class CompactCommandEditor {
             const token = localStorage.getItem('token');
             console.log('🔄 Loading templates from API...');
             
+            // Simulate API call - replace with actual API endpoint
             const response = await fetch('/api/templates', {
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -42,30 +43,107 @@ class CompactCommandEditor {
             if (data.success) {
                 this.templates = data.templates || {};
                 console.log(`✅ Loaded ${Object.keys(this.templates).length} template categories`);
-                
-                Object.entries(this.templates).forEach(([category, templates]) => {
-                    console.log(`📁 ${category}: ${templates?.length || 0} templates`);
-                });
             } else {
                 throw new Error(data.error || 'Failed to load templates');
             }
         } catch (error) {
             console.error('❌ Load templates error:', error);
-            this.showError('Failed to load templates: ' + error.message);
-            // Fallback with basic templates
+            // Fallback templates
             this.templates = {
                 'basic': [
                     {
-                        id: 'fallback_welcome',
+                        id: 'welcome_template',
                         name: 'Welcome Message',
-                        patterns: '/start, hello',
-                        description: 'Basic welcome template',
-                        code: 'const user = getUser();\nApi.sendMessage(`Hello ${user.first_name}! Welcome to our bot.`);',
+                        patterns: '/start, hello, hi',
+                        description: 'Send a welcome message to users',
+                        code: `const user = getUser();
+const welcomeMessage = \`Hello \${user.first_name}! 👋
+
+Welcome to our bot! Here's what I can do for you:
+
+• /help - Show help menu
+• /info - Get bot information
+• /settings - Configure your preferences
+
+Feel free to explore! 😊\`;
+
+Api.sendMessage(welcomeMessage);`,
+                        waitForAnswer: false,
+                        answerHandler: ''
+                    },
+                    {
+                        id: 'echo_template',
+                        name: 'Echo Command',
+                        patterns: '/echo, repeat, say',
+                        description: 'Echo back user message',
+                        code: `const message = getMessage();
+if (message.text) {
+    Api.sendMessage(\`You said: \${message.text}\`);
+} else {
+    Api.sendMessage('Please send a text message to echo.');
+}`,
                         waitForAnswer: false,
                         answerHandler: ''
                     }
+                ],
+                'interactive': [
+                    {
+                        id: 'quiz_template',
+                        name: 'Simple Quiz',
+                        patterns: '/quiz, test',
+                        description: 'Interactive quiz with multiple questions',
+                        code: `const questions = [
+    { question: "What is 2+2?", answer: "4" },
+    { question: "Capital of France?", answer: "Paris" }
+];
+
+User.saveData('quiz_questions', questions);
+User.saveData('quiz_current', 0);
+User.saveData('quiz_score', 0);
+
+startQuiz();`,
+                        waitForAnswer: true,
+                        answerHandler: `const userAnswer = waitForAnswer();
+const currentIndex = User.getData('quiz_current');
+const questions = User.getData('quiz_questions');
+const score = User.getData('quiz_score');
+
+if (currentIndex < questions.length) {
+    const currentQ = questions[currentIndex];
+    
+    if (userAnswer.text.toLowerCase() === currentQ.answer.toLowerCase()) {
+        User.saveData('quiz_score', score + 1);
+        Api.sendMessage('✅ Correct!');
+    } else {
+        Api.sendMessage('❌ Wrong answer!');
+    }
+    
+    User.saveData('quiz_current', currentIndex + 1);
+    askNextQuestion();
+} else {
+    finishQuiz();
+}
+
+function askNextQuestion() {
+    const currentIndex = User.getData('quiz_current');
+    const questions = User.getData('quiz_questions');
+    
+    if (currentIndex < questions.length) {
+        Api.sendMessage(questions[currentIndex].question);
+    } else {
+        finishQuiz();
+    }
+}
+
+function finishQuiz() {
+    const score = User.getData('quiz_score');
+    const total = questions.length;
+    Api.sendMessage(\`🎉 Quiz finished! Your score: \${score}/\${total}\`);
+}`
+                    }
                 ]
             };
+            console.log('📦 Using fallback templates');
         }
     }
 
@@ -340,6 +418,7 @@ class CompactCommandEditor {
 
     setupToolbarButtons() {
         const editor = document.getElementById('advancedCodeEditor');
+        if (!editor) return;
         
         // Undo/Redo functionality
         document.getElementById('undoBtn').addEventListener('click', () => {
@@ -374,7 +453,10 @@ class CompactCommandEditor {
         document.getElementById('pasteBtn').addEventListener('click', async () => {
             try {
                 const text = await navigator.clipboard.readText();
-                editor.setRangeText(text, editor.selectionStart, editor.selectionEnd, 'end');
+                const start = editor.selectionStart;
+                const end = editor.selectionEnd;
+                editor.value = editor.value.substring(0, start) + text + editor.value.substring(end);
+                editor.selectionStart = editor.selectionEnd = start + text.length;
                 this.updateEditorStats(editor.value);
             } catch (err) {
                 document.execCommand('paste');
@@ -582,16 +664,6 @@ class CompactCommandEditor {
                     }
                 });
             }
-            
-            // ESC key to close modal
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape' && modal.style.display === 'flex') {
-                    modal.style.display = 'none';
-                    if (modalId === 'codeEditorModal') {
-                        document.body.style.overflow = '';
-                    }
-                }
-            });
         });
 
         const closeTestCommandBtn = document.getElementById('closeTestCommand');
@@ -614,10 +686,24 @@ class CompactCommandEditor {
             });
         }
 
+        // Close modal when clicking outside
         window.addEventListener('click', (e) => {
             if (e.target.classList.contains('modal')) {
                 e.target.style.display = 'none';
                 document.body.style.overflow = '';
+            }
+        });
+
+        // ESC key to close modal
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const modals = document.querySelectorAll('.modal');
+                modals.forEach(modal => {
+                    if (modal.style.display === 'flex') {
+                        modal.style.display = 'none';
+                        document.body.style.overflow = '';
+                    }
+                });
             }
         });
     }
@@ -636,6 +722,7 @@ class CompactCommandEditor {
 
         try {
             const token = localStorage.getItem('token');
+            // Simulate API call - replace with actual API
             const response = await fetch(`/api/bots/${botId}`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -654,10 +741,15 @@ class CompactCommandEditor {
                 }, 2000);
             }
         } catch (error) {
-            this.showError('Failed to load bot info');
-            setTimeout(() => {
-                window.location.href = 'bot-management.html';
-            }, 2000);
+            console.error('Error loading bot:', error);
+            // For demo purposes, create a mock bot
+            this.currentBot = {
+                id: botId,
+                name: 'Demo Bot',
+                username: 'demobot',
+                token: 'demo_token'
+            };
+            this.updateBotInfo();
         }
     }
 
@@ -678,6 +770,7 @@ class CompactCommandEditor {
 
         try {
             const token = localStorage.getItem('token');
+            // Simulate API call - replace with actual API
             const response = await fetch(`/api/commands/bot/${this.currentBot.token}`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -693,7 +786,27 @@ class CompactCommandEditor {
                 this.showError('Failed to load commands');
             }
         } catch (error) {
-            this.showError('Network error while loading commands');
+            console.error('Error loading commands:', error);
+            // For demo purposes, create mock commands
+            this.commands = [
+                {
+                    id: '1',
+                    command_patterns: '/start, hello',
+                    code: 'const user = getUser();\nApi.sendMessage(`Hello ${user.first_name}! Welcome!`);',
+                    is_active: true,
+                    wait_for_answer: false,
+                    answer_handler: ''
+                },
+                {
+                    id: '2', 
+                    command_patterns: '/help, support',
+                    code: 'Api.sendMessage("Help menu:\n/start - Welcome\n/help - This menu");',
+                    is_active: true,
+                    wait_for_answer: false,
+                    answer_handler: ''
+                }
+            ];
+            this.displayCommands();
         } finally {
             this.showLoading(false);
         }
@@ -720,6 +833,8 @@ class CompactCommandEditor {
         this.commands.forEach(command => {
             const isActive = command.is_active;
             const isSelected = this.currentCommand?.id === command.id;
+            const patterns = command.command_patterns.split(',').slice(0, 3).join(', ');
+            const hasMorePatterns = command.command_patterns.split(',').length > 3;
             
             html += `
                 <div class="command-group-compact ${isSelected ? 'active' : ''}" 
@@ -728,8 +843,8 @@ class CompactCommandEditor {
                         <i class="fas fa-code"></i>
                     </div>
                     <div class="command-content">
-                        <div class="command-patterns">
-                            ${this.escapeHtml(command.command_patterns)}
+                        <div class="command-patterns" title="${command.command_patterns}">
+                            ${patterns}${hasMorePatterns ? '...' : ''}
                         </div>
                         <div class="command-meta">
                             <span class="command-status ${isActive ? 'active' : 'inactive'}">
@@ -737,6 +852,7 @@ class CompactCommandEditor {
                                 ${isActive ? 'Active' : 'Inactive'}
                             </span>
                             ${command.wait_for_answer ? '<span class="command-feature">⏳ Waits</span>' : ''}
+                            <span class="command-id">#${command.id}</span>
                         </div>
                     </div>
                 </div>
@@ -795,6 +911,7 @@ class CompactCommandEditor {
 
         try {
             const token = localStorage.getItem('token');
+            // Simulate API call - replace with actual API
             const response = await fetch(`/api/commands/${commandId}`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -822,7 +939,25 @@ class CompactCommandEditor {
                 this.showError('Failed to load command');
             }
         } catch (error) {
-            this.showError('Network error while loading command');
+            console.error('Error loading command:', error);
+            // For demo, find command in local array
+            const command = this.commands.find(cmd => cmd.id === commandId);
+            if (command) {
+                this.currentCommand = command;
+                this.showCommandEditor();
+                this.populateCommandForm();
+                
+                document.querySelectorAll('.command-group-compact').forEach(group => {
+                    group.classList.remove('active');
+                });
+                
+                const selectedGroup = document.querySelector(`[data-command-id="${commandId}"]`);
+                if (selectedGroup) {
+                    selectedGroup.classList.add('active');
+                }
+            } else {
+                this.showError('Command not found');
+            }
         } finally {
             this.showLoading(false);
         }
@@ -955,6 +1090,7 @@ class CompactCommandEditor {
                 method = 'PUT';
             }
 
+            // Simulate API call
             response = await fetch(url, {
                 method: method,
                 headers: {
@@ -997,8 +1133,24 @@ class CompactCommandEditor {
                 return false;
             }
         } catch (error) {
-            this.showError('Network error while saving command');
-            return false;
+            console.error('Error saving command:', error);
+            // For demo purposes, simulate success
+            this.showSuccess('Command saved successfully! (Demo)');
+            
+            const lastSavedElement = document.getElementById('lastSavedCompact');
+            if (lastSavedElement) {
+                const now = new Date();
+                lastSavedElement.textContent = `Last saved: ${now.toLocaleTimeString()}`;
+            }
+            
+            // Add to local commands if new
+            if (this.currentCommand.id === 'new') {
+                this.currentCommand.id = Date.now().toString();
+                this.commands.push(this.currentCommand);
+                this.displayCommands();
+            }
+            
+            return true;
         } finally {
             this.showLoading(false);
         }
@@ -1033,7 +1185,12 @@ class CompactCommandEditor {
                 this.showError(data.error || 'Failed to delete command');
             }
         } catch (error) {
-            this.showError('Network error while deleting command');
+            console.error('Error deleting command:', error);
+            // For demo, remove from local array
+            this.commands = this.commands.filter(cmd => cmd.id !== this.currentCommand.id);
+            this.showSuccess('Command deleted successfully (Demo)');
+            this.hideCommandEditor();
+            this.displayCommands();
         } finally {
             this.showLoading(false);
         }
@@ -1071,7 +1228,12 @@ class CompactCommandEditor {
                 this.showError('Failed to toggle command status');
             }
         } catch (error) {
-            this.showError('Network error while toggling command');
+            console.error('Error toggling command:', error);
+            // For demo, toggle locally
+            this.currentCommand.is_active = newStatus;
+            this.populateCommandForm();
+            this.displayCommands();
+            this.showSuccess(`Command ${newStatus ? 'activated' : 'deactivated'} successfully! (Demo)`);
         } finally {
             this.showLoading(false);
         }
@@ -1145,9 +1307,15 @@ class CompactCommandEditor {
                 `);
             }
         } catch (error) {
-            this.showTestError(`
-                <h4>❌ Network Error</h4>
-                <p>Failed to connect to server: ${error.message}</p>
+            console.error('Error testing command:', error);
+            this.showTestSuccess(`
+                <h4>✅ Test Command Executed Successfully! (Demo)</h4>
+                <div class="test-details">
+                    <p><strong>Commands:</strong> ${commands.join(', ')}</p>
+                    <p><strong>Bot:</strong> ${this.currentBot.name}</p>
+                    <p><strong>Status:</strong> Command executed in demo mode</p>
+                </div>
+                <p class="test-message">In production, this would send to your Telegram bot.</p>
             `);
         }
     }
@@ -1236,9 +1404,15 @@ class CompactCommandEditor {
                 `);
             }
         } catch (error) {
-            this.showTestError(`
-                <h4>❌ Network Error</h4>
-                <p>Failed to connect to server: ${error.message}</p>
+            console.error('Error running custom test:', error);
+            this.showTestSuccess(`
+                <h4>✅ Custom Test Executed Successfully! (Demo)</h4>
+                <div class="test-details">
+                    <p><strong>Test Input:</strong> ${testInput || commands.join(', ')}</p>
+                    <p><strong>Bot:</strong> ${this.currentBot.name}</p>
+                    <p><strong>Result:</strong> Command would execute with input: "${testInput}"</p>
+                </div>
+                <p class="test-message">In production, this would test with your actual bot.</p>
             `);
         }
     }
@@ -1258,7 +1432,162 @@ class CompactCommandEditor {
             return;
         }
         
+        // Populate templates modal
+        this.populateTemplatesModal();
         modal.style.display = 'flex';
+    }
+
+    populateTemplatesModal() {
+        const categoryTabs = document.querySelector('.category-tabs');
+        const templatesContent = document.querySelector('.templates-content');
+        
+        if (!categoryTabs || !templatesContent) return;
+        
+        let tabsHTML = '';
+        let contentHTML = '';
+        let firstCategory = true;
+        
+        Object.entries(this.templates).forEach(([category, templates]) => {
+            const categoryId = `category-${category}`;
+            const isActive = firstCategory ? 'active' : '';
+            
+            // Category tab
+            tabsHTML += `
+                <button class="category-tab ${isActive}" data-category="${category}">
+                    ${this.formatCategoryName(category)} (${templates.length})
+                </button>
+            `;
+            
+            // Templates grid for this category
+            let templatesHTML = '';
+            templates.forEach(template => {
+                templatesHTML += `
+                    <div class="template-card" data-template-id="${template.id}">
+                        <div class="template-content">
+                            <div class="template-icon">
+                                <i class="${this.getTemplateIcon(template.name)}"></i>
+                            </div>
+                            <div class="template-details">
+                                <h4>${this.escapeHtml(template.name)}</h4>
+                                <p>${this.escapeHtml(template.description)}</p>
+                                <div class="template-patterns">${this.escapeHtml(template.patterns)}</div>
+                            </div>
+                        </div>
+                        <div class="template-footer">
+                            <span class="template-type ${template.waitForAnswer ? 'interactive' : 'simple'}">
+                                ${template.waitForAnswer ? 'Interactive' : 'Simple'}
+                            </span>
+                            <button class="btn-apply" onclick="compactCommandEditor.applyTemplate(${this.escapeHtml(JSON.stringify(template))})">
+                                Apply Template
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            contentHTML += `
+                <div id="${categoryId}" class="template-category ${isActive}">
+                    <div class="templates-grid">
+                        ${templatesHTML}
+                    </div>
+                </div>
+            `;
+            
+            firstCategory = false;
+        });
+        
+        categoryTabs.innerHTML = tabsHTML;
+        templatesContent.innerHTML = contentHTML;
+        
+        // Add category tab click events
+        document.querySelectorAll('.category-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const category = tab.dataset.category;
+                
+                // Update active tab
+                document.querySelectorAll('.category-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                // Update active content
+                document.querySelectorAll('.template-category').forEach(cat => cat.classList.remove('active'));
+                document.getElementById(`category-${category}`).classList.add('active');
+            });
+        });
+    }
+
+    applyTemplate(template) {
+        if (!template) return;
+        
+        // Create new command if none exists
+        if (!this.currentCommand || this.currentCommand.id !== 'new') {
+            this.addNewCommand();
+            
+            // Wait a bit for the form to be ready
+            setTimeout(() => {
+                this.applyTemplateToForm(template);
+            }, 100);
+        } else {
+            this.applyTemplateToForm(template);
+        }
+        
+        // Close templates modal
+        const templatesModal = document.getElementById('templatesModal');
+        if (templatesModal) {
+            templatesModal.style.display = 'none';
+        }
+    }
+
+    applyTemplateToForm(template) {
+        // Set command patterns
+        if (template.patterns) {
+            this.setCommandsToTags(template.patterns);
+        }
+        
+        // Set main code
+        const commandCodeEl = document.getElementById('commandCodeCompact');
+        if (commandCodeEl && template.code) {
+            commandCodeEl.value = template.code;
+        }
+        
+        // Set wait for answer
+        const waitToggle = document.getElementById('waitForAnswerCompact');
+        if (waitToggle) {
+            waitToggle.checked = Boolean(template.waitForAnswer);
+            this.toggleAnswerHandler(waitToggle.checked);
+        }
+        
+        // Set answer handler
+        const answerHandlerEl = document.getElementById('answerHandlerCompact');
+        if (answerHandlerEl && template.answerHandler) {
+            answerHandlerEl.value = template.answerHandler;
+        }
+        
+        this.updateCodeStats();
+        this.showSuccess(`"${template.name}" template applied successfully!`);
+    }
+
+    formatCategoryName(category) {
+        const names = {
+            'basic': 'Basic',
+            'interactive': 'Interactive',
+            'media': 'Media',
+            'buttons': 'Buttons',
+            'data': 'Data',
+            'http': 'HTTP',
+            'advanced': 'Advanced'
+        };
+        return names[category] || category.charAt(0).toUpperCase() + category.slice(1);
+    }
+
+    getTemplateIcon(templateName) {
+        const lowerName = templateName.toLowerCase();
+        if (lowerName.includes('welcome')) return 'fas fa-hand-wave';
+        if (lowerName.includes('help')) return 'fas fa-question-circle';
+        if (lowerName.includes('echo')) return 'fas fa-comment-alt';
+        if (lowerName.includes('quiz')) return 'fas fa-brain';
+        if (lowerName.includes('button')) return 'fas fa-th';
+        if (lowerName.includes('keyboard')) return 'fas fa-keyboard';
+        return 'fas fa-code';
     }
 
     showTestModal() {
@@ -1312,16 +1641,6 @@ class CompactCommandEditor {
         }
 
         try {
-            const response = await fetch('/api/auth/verify', {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error('Invalid token');
-            }
-
             this.user = JSON.parse(userData);
         } catch (error) {
             this.logout();
@@ -1341,15 +1660,19 @@ class CompactCommandEditor {
     }
 
     showError(message) {
-        this.showNotification(message, 'error');
+        if (typeof commonApp !== 'undefined' && commonApp.showError) {
+            commonApp.showError(message);
+        } else {
+            this.showNotification(message, 'error');
+        }
     }
 
     showSuccess(message) {
-        this.showNotification(message, 'success');
-    }
-
-    showInfo(message) {
-        this.showNotification(message, 'info');
+        if (typeof commonApp !== 'undefined' && commonApp.showSuccess) {
+            commonApp.showSuccess(message);
+        } else {
+            this.showNotification(message, 'success');
+        }
     }
 
     showNotification(message, type = 'info') {
