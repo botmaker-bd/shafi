@@ -195,7 +195,7 @@
                                         <h4 class="form-section-title">Command Code</h4>
                                         <div class="section-actions">
                                             <button type="button" class="btn btn-secondary btn-small" id="openEditor">
-                                                <i class="fas fa-edit"></i> Full Editor
+                                                <i class="fas fa-expand"></i> Full Editor
                                             </button>
                                             <button type="button" class="btn btn-secondary btn-small" id="formatCode">
                                                 <i class="fas fa-indent"></i> Format
@@ -274,7 +274,7 @@
                                                 <h4 class="form-section-title">Answer Handler Code</h4>
                                                 <div class="section-actions">
                                                     <button type="button" class="btn btn-secondary btn-small" id="openAnswerEditor">
-                                                        <i class="fas fa-edit"></i> Full Editor
+                                                        <i class="fas fa-expand"></i> Full Editor
                                                     </button>
                                                 </div>
                                             </div>
@@ -347,70 +347,161 @@
         </div>
     </div>
 
-    <!-- Full Screen Code Editor Modal -->
+    <!-- New Full Screen Code Editor Modal -->
     <div id="codeEditorModal" class="modal fullscreen-modal">
         <div class="modal-content fullscreen-content">
-            <div class="modal-header compact-header">
-                <div class="editor-toolbar">
-                    <div class="toolbar-group">
-                        <button class="btn-icon" id="undoBtn" title="Undo">
-                            <i class="fas fa-undo"></i>
-                            <span class="btn-text">Undo</span>
-                        </button>
-                        <button class="btn-icon" id="redoBtn" title="Redo">
-                            <i class="fas fa-redo"></i>
-                            <span class="btn-text">Redo</span>
-                        </button>
+            <div class="modal-header">
+                <div class="editor-header-content">
+                    <div class="editor-title">
+                        <i class="fas fa-code"></i>
+                        <h3 id="fullscreenEditorTitle">Full Screen Code Editor</h3>
+                        <span class="editor-subtitle" id="fullscreenEditorSubtitle">Command Code</span>
                     </div>
-                    <div class="toolbar-group">
-                        <button class="btn-icon" id="selectAllBtn" title="Select All">
-                            <i class="fas fa-expand-arrows-alt"></i>
-                            <span class="btn-text">Select All</span>
-                        </button>
-                        <button class="btn-icon" id="cutBtn" title="Cut">
-                            <i class="fas fa-cut"></i>
-                            <span class="btn-text">Cut</span>
-                        </button>
-                        <button class="btn-icon" id="copyBtn" title="Copy">
-                            <i class="fas fa-copy"></i>
-                            <span class="btn-text">Copy</span>
-                        </button>
-                        <button class="btn-icon" id="pasteBtn" title="Paste">
-                            <i class="fas fa-paste"></i>
-                            <span class="btn-text">Paste</span>
-                        </button>
-                    </div>
-                    <div class="toolbar-group">
-                        <button class="btn-icon" id="clearBtn" title="Clear All">
-                            <i class="fas fa-eraser"></i>
-                            <span class="btn-text">Clear</span>
-                        </button>
-                        <button class="btn-icon" id="formatBtn" title="Format Code">
-                            <i class="fas fa-indent"></i>
-                            <span class="btn-text">Format</span>
+                    <div class="editor-header-actions">
+                        <div class="editor-mode-toggle">
+                            <button class="btn-icon active" data-mode="light" title="Light Mode">
+                                <i class="fas fa-sun"></i>
+                            </button>
+                            <button class="btn-icon" data-mode="dark" title="Dark Mode">
+                                <i class="fas fa-moon"></i>
+                            </button>
+                        </div>
+                        <button class="btn-icon" id="fullscreenToggle" title="Toggle Fullscreen">
+                            <i class="fas fa-expand"></i>
                         </button>
                     </div>
                 </div>
+                <button class="modal-close">&times;</button>
             </div>
-            <div class="modal-body fullscreen-body">
+
+            <div class="editor-toolbar">
+                <div class="toolbar-section">
+                    <div class="toolbar-group">
+                        <button class="toolbar-btn" id="undoBtn" title="Undo (Ctrl+Z)">
+                            <i class="fas fa-undo"></i>
+                            <span>Undo</span>
+                        </button>
+                        <button class="toolbar-btn" id="redoBtn" title="Redo (Ctrl+Y)">
+                            <i class="fas fa-redo"></i>
+                            <span>Redo</span>
+                        </button>
+                    </div>
+                    <div class="toolbar-group">
+                        <button class="toolbar-btn" id="cutBtn" title="Cut (Ctrl+X)">
+                            <i class="fas fa-cut"></i>
+                            <span>Cut</span>
+                        </button>
+                        <button class="toolbar-btn" id="copyBtn" title="Copy (Ctrl+C)">
+                            <i class="fas fa-copy"></i>
+                            <span>Copy</span>
+                        </button>
+                        <button class="toolbar-btn" id="pasteBtn" title="Paste (Ctrl+V)">
+                            <i class="fas fa-paste"></i>
+                            <span>Paste</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="toolbar-section">
+                    <div class="toolbar-group">
+                        <button class="toolbar-btn" id="selectAllBtn" title="Select All (Ctrl+A)">
+                            <i class="fas fa-object-group"></i>
+                            <span>Select All</span>
+                        </button>
+                        <button class="toolbar-btn" id="findReplaceBtn" title="Find & Replace (Ctrl+F)">
+                            <i class="fas fa-search"></i>
+                            <span>Find</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="toolbar-section">
+                    <div class="toolbar-group">
+                        <button class="toolbar-btn" id="formatBtn" title="Format Code (Ctrl+Shift+F)">
+                            <i class="fas fa-indent"></i>
+                            <span>Format</span>
+                        </button>
+                        <button class="toolbar-btn" id="clearBtn" title="Clear All">
+                            <i class="fas fa-eraser"></i>
+                            <span>Clear</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="toolbar-section">
+                    <div class="toolbar-group">
+                        <div class="snippet-dropdown">
+                            <button class="toolbar-btn" id="snippetsBtn">
+                                <i class="fas fa-code-branch"></i>
+                                <span>Snippets</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </button>
+                            <div class="snippet-menu">
+                                <button class="snippet-item" data-snippet="function">Function Template</button>
+                                <button class="snippet-item" data-snippet="ifelse">If-Else Statement</button>
+                                <button class="snippet-item" data-snippet="loop">For Loop</button>
+                                <button class="snippet-item" data-snippet="api">API Call</button>
+                                <button class="snippet-item" data-snippet="message">Send Message</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="editor-container">
+                <div class="editor-line-numbers" id="lineNumbers">
+                    <div class="line-numbers-content"></div>
+                </div>
                 <textarea id="advancedCodeEditor" class="fullscreen-editor" 
                          placeholder="Write your code here..."></textarea>
             </div>
-            <div class="modal-footer">
-                <div class="editor-info">
-                    <span id="lineCount">Lines: 1</span>
-                    <span id="charCount">Chars: 0</span>
-                    <span id="wordCount">Words: 0</span>
+
+            <div class="editor-footer">
+                <div class="footer-left">
+                    <div class="editor-info">
+                        <span class="info-item">
+                            <i class="fas fa-code"></i>
+                            <span id="languageInfo">JavaScript</span>
+                        </span>
+                        <span class="info-item">
+                            <i class="fas fa-font"></i>
+                            <span id="encodingInfo">UTF-8</span>
+                        </span>
+                    </div>
                 </div>
-                <div class="editor-actions">
-                    <button class="btn btn-secondary" id="cancelEdit">
-                        <i class="fas fa-times"></i>
-                        <span>Cancel</span>
-                    </button>
-                    <button class="btn btn-primary" id="saveCode">
-                        <i class="fas fa-save"></i>
-                        <span>Save Code</span>
-                    </button>
+                
+                <div class="footer-center">
+                    <div class="editor-stats">
+                        <span class="stat-item">
+                            <i class="fas fa-bars"></i>
+                            <span id="lineCount">Line: 1</span>
+                        </span>
+                        <span class="stat-item">
+                            <i class="fas fa-keyboard"></i>
+                            <span id="charCount">Chars: 0</span>
+                        </span>
+                        <span class="stat-item">
+                            <i class="fas fa-font"></i>
+                            <span id="wordCount">Words: 0</span>
+                        </span>
+                        <span class="stat-item">
+                            <i class="fas fa-clock"></i>
+                            <span id="cursorPosition">Ln 1, Col 1</span>
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="footer-right">
+                    <div class="editor-actions">
+                        <button class="btn btn-secondary" id="cancelEdit">
+                            <i class="fas fa-times"></i>
+                            <span>Cancel</span>
+                        </button>
+                        <button class="btn btn-primary" id="saveCode">
+                            <i class="fas fa-save"></i>
+                            <span>Save Changes</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
