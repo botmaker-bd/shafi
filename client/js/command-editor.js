@@ -43,6 +43,25 @@ class CommandEditor {
         this.setupFormEvents();
         this.setupModalEvents();
         this.setupSearchEvents();
+        
+        // ✅ NEW: Command list click event setup
+        this.setupCommandListEvents();
+    }
+
+    // ✅ NEW: Separate method for command list events
+    setupCommandListEvents() {
+        document.addEventListener('click', (e) => {
+            const commandItem = e.target.closest('.command-item');
+            if (commandItem && commandItem.dataset.commandId) {
+                const commandId = commandItem.dataset.commandId;
+                if (this.currentCommand?.id !== commandId) {
+                    if (this.isModified && !confirm('You have unsaved changes. Switch command?')) {
+                        return;
+                    }
+                    this.selectCommand(commandId);
+                }
+            }
+        });
     }
 
     setupNavigationEvents() {
@@ -72,20 +91,6 @@ class CommandEditor {
 
         document.getElementById('refreshCommandsBtn').addEventListener('click', () => {
             this.loadCommands();
-        });
-
-        // Command selection
-        document.addEventListener('click', (e) => {
-            const commandItem = e.target.closest('.command-item');
-            if (commandItem && commandItem.dataset.commandId) {
-                const commandId = commandItem.dataset.commandId;
-                if (this.currentCommand?.id !== commandId) {
-                    if (this.isModified && !confirm('You have unsaved changes. Switch command?')) {
-                        return;
-                    }
-                    this.selectCommand(commandId);
-                }
-            }
         });
     }
 
@@ -184,6 +189,15 @@ class CommandEditor {
         document.getElementById('showTemplates').addEventListener('click', () => {
             this.showTemplates();
         });
+
+        // ✅ FIXED: Full editor buttons
+        document.getElementById('openEditor').addEventListener('click', () => {
+            this.openCodeEditor('main');
+        });
+
+        document.getElementById('openAnswerEditor').addEventListener('click', () => {
+            this.openCodeEditor('answer');
+        });
     }
 
     setupModalEvents() {
@@ -208,6 +222,22 @@ class CommandEditor {
         const closeTemplatesBtn = document.getElementById('closeTemplates');
         if (closeTemplatesBtn) {
             closeTemplatesBtn.addEventListener('click', () => this.closeModal('templatesModal'));
+        }
+
+        // ✅ FIXED: Code editor buttons
+        const cancelEditBtn = document.getElementById('cancelEdit');
+        const saveCodeBtn = document.getElementById('saveCode');
+        
+        if (cancelEditBtn) {
+            cancelEditBtn.addEventListener('click', () => {
+                this.closeCodeEditor();
+            });
+        }
+        
+        if (saveCodeBtn) {
+            saveCodeBtn.addEventListener('click', () => {
+                this.saveCodeFromEditor();
+            });
         }
 
         // ESC key to close modals
@@ -245,22 +275,6 @@ class CommandEditor {
         if (!advancedEditor) {
             console.error('❌ Advanced code editor not found');
             return;
-        }
-        
-        // Setup editor buttons
-        const cancelEditBtn = document.getElementById('cancelEdit');
-        const saveCodeBtn = document.getElementById('saveCode');
-        
-        if (cancelEditBtn) {
-            cancelEditBtn.addEventListener('click', () => {
-                this.closeCodeEditor();
-            });
-        }
-        
-        if (saveCodeBtn) {
-            saveCodeBtn.addEventListener('click', () => {
-                this.saveCodeFromEditor();
-            });
         }
 
         // Setup toolbar buttons
@@ -312,47 +326,55 @@ class CommandEditor {
         });
     }
 
-    // Core Functionality
+    // ✅ FIXED: Core Functionality - Improved command loading
     async loadCommands() {
-        if (!this.currentBot) return;
+        if (!this.currentBot) {
+            console.log('⚠️ No current bot found, waiting for bot info...');
+            return;
+        }
 
         this.showLoading(true);
 
         try {
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            console.log('🔄 Loading commands for bot:', this.currentBot.name);
             
-            // Sample data
+            // Simulate API call with sample data
+            await new Promise(resolve => setTimeout(resolve, 800));
+            
+            // Sample commands data
             this.commands = [
                 {
                     id: 'cmd_1',
-                    command_patterns: '/start, hello',
-                    code: '// Welcome command\nconst user = getUser();\nApi.sendMessage(`Hello ${user.first_name}! Welcome to our bot.`);',
+                    command_patterns: '/start, hello, hi',
+                    code: '// Welcome command\nconst user = getUser();\nApi.sendMessage(`Hello ${user.first_name}! Welcome to our bot. 👋`);',
                     is_active: true,
                     wait_for_answer: false,
                     answer_handler: ''
                 },
                 {
                     id: 'cmd_2',
-                    command_patterns: '/help, assistance',
-                    code: '// Help command\nconst helpText = `Available commands:\\n/start - Welcome message\\n/help - Show this help\\n/settings - Bot settings`;\nApi.sendMessage(helpText);',
+                    command_patterns: '/help, assistance, support',
+                    code: '// Help command\nconst helpText = `🤖 *Available Commands:*\\n\\n/start - Welcome message\\n/help - Show this help\\n/settings - Bot settings\\n/info - Bot information`;\nApi.sendMessage(helpText, { parse_mode: "Markdown" });',
                     is_active: true,
                     wait_for_answer: false,
                     answer_handler: ''
                 },
                 {
                     id: 'cmd_3',
-                    command_patterns: '/feedback',
-                    code: '// Feedback command\nApi.sendMessage(\'Please share your feedback:\');',
+                    command_patterns: '/feedback, opinion, review',
+                    code: '// Feedback command\nApi.sendMessage(\'💬 Please share your feedback with us:\');',
                     is_active: false,
                     wait_for_answer: true,
-                    answer_handler: '// Handle feedback\nconst feedback = getMessage().text;\nApi.sendMessage(`Thank you for your feedback: ${feedback}`);'
+                    answer_handler: '// Handle feedback\nconst feedback = getMessage().text;\nUser.saveData(\'last_feedback\', feedback);\nApi.sendMessage(`✅ Thank you for your feedback! We appreciate: ${feedback}`);'
                 }
             ];
 
+            console.log(`✅ Loaded ${this.commands.length} commands`);
             this.displayCommands();
             this.showSuccess('Commands loaded successfully!');
+            
         } catch (error) {
+            console.error('❌ Failed to load commands:', error);
             this.showError('Failed to load commands: ' + error.message);
         } finally {
             this.showLoading(false);
@@ -366,21 +388,25 @@ class CommandEditor {
         const commandEditor = document.getElementById('commandEditor');
 
         if (!this.commands || this.commands.length === 0) {
+            console.log('📭 No commands to display');
             if (emptyCommands) emptyCommands.style.display = 'flex';
-            if (noCommandSelected) noCommandSelected.style.display = 'flex';
+            if (noCommandSelected && !this.currentCommand) noCommandSelected.style.display = 'flex';
             if (commandEditor) commandEditor.style.display = 'none';
+            if (commandsList) commandsList.innerHTML = '';
             return;
         }
 
+        console.log(`🎯 Displaying ${this.commands.length} commands`);
+        
         if (emptyCommands) emptyCommands.style.display = 'none';
         
-        // Only hide noCommandSelected if we have a current command
-        if (noCommandSelected && this.currentCommand) {
-            noCommandSelected.style.display = 'none';
+        // Show no command selected only if no command is selected
+        if (noCommandSelected) {
+            noCommandSelected.style.display = this.currentCommand ? 'none' : 'flex';
         }
         
-        if (commandEditor && this.currentCommand) {
-            commandEditor.style.display = 'block';
+        if (commandEditor) {
+            commandEditor.style.display = this.currentCommand ? 'block' : 'none';
         }
 
         let html = '';
@@ -409,6 +435,7 @@ class CommandEditor {
         
         if (commandsList) {
             commandsList.innerHTML = html;
+            console.log('✅ Command list updated in DOM');
         }
     }
 
@@ -449,6 +476,8 @@ class CommandEditor {
         this.showLoading(true);
 
         try {
+            console.log(`🔄 Selecting command: ${commandId}`);
+            
             // Simulate API call
             await new Promise(resolve => setTimeout(resolve, 500));
             
@@ -469,8 +498,14 @@ class CommandEditor {
                     selectedItem.classList.add('active');
                     selectedItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 }
+                
+                console.log(`✅ Command selected: ${commandId}`);
+            } else {
+                console.error(`❌ Command not found: ${commandId}`);
+                this.showError('Command not found');
             }
         } catch (error) {
+            console.error('❌ Failed to load command:', error);
             this.showError('Failed to load command: ' + error.message);
         } finally {
             this.showLoading(false);
@@ -487,6 +522,8 @@ class CommandEditor {
 
     populateCommandForm() {
         if (!this.currentCommand) return;
+        
+        console.log(`📝 Populating form for command: ${this.currentCommand.id}`);
         
         this.setCommandsToTags(this.currentCommand.command_patterns);
         
@@ -519,6 +556,8 @@ class CommandEditor {
         this.updateButtonStates();
         this.updateCodeStats();
         this.updateLastSaved();
+        
+        console.log('✅ Form populated successfully');
     }
 
     updateButtonStates() {
@@ -946,7 +985,7 @@ class CommandEditor {
         }
     }
 
-    // Code Editor Functionality
+    // ✅ FIXED: Code Editor Functionality - Updated for better modal
     openCodeEditor(editorType) {
         this.currentEditorType = editorType;
         let code = '';
@@ -970,7 +1009,7 @@ class CommandEditor {
         const codeEditorModal = document.getElementById('codeEditorModal');
         if (codeEditorModal) {
             codeEditorModal.style.display = 'flex';
-            document.body.style.overflow = 'hidden';
+            // Don't hide body scroll for partial modal
         }
         
         setTimeout(() => {
@@ -986,7 +1025,6 @@ class CommandEditor {
         const codeEditorModal = document.getElementById('codeEditorModal');
         if (codeEditorModal) {
             codeEditorModal.style.display = 'none';
-            document.body.style.overflow = '';
         }
     }
 
@@ -1123,6 +1161,40 @@ class CommandEditor {
         }
     }
 
+    // ✅ FIXED: Bot Info Loading - Improved sequence
+    async loadBotInfo() {
+        try {
+            console.log('🔄 Loading bot information...');
+            
+            // Simulate bot info loading
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            this.currentBot = {
+                id: 'bot_123',
+                name: 'My Awesome Bot',
+                username: 'my_awesome_bot',
+                token: 'bot_token_123'
+            };
+            
+            this.updateBotInfo();
+            console.log('✅ Bot info loaded:', this.currentBot.name);
+            
+        } catch (error) {
+            console.error('❌ Failed to load bot info:', error);
+            this.showError('Failed to load bot information');
+        }
+    }
+
+    updateBotInfo() {
+        if (this.currentBot) {
+            const botNameEl = document.getElementById('botName');
+            const botUsernameEl = document.getElementById('botUsername');
+            
+            if (botNameEl) botNameEl.textContent = `Commands - ${this.currentBot.name}`;
+            if (botUsernameEl) botUsernameEl.textContent = `@${this.currentBot.username}`;
+        }
+    }
+
     // Templates Functionality
     async loadTemplates() {
         try {
@@ -1209,7 +1281,7 @@ switch(feedback) {
         User.saveData('feedback', 'average');
         break;
     case 'feedback_poor':
-        Api.sendMessage('😔 We're sorry to hear that. We'll improve!');
+        Api.sendMessage('😔 We\\'re sorry to hear that. We\\'ll improve!');
         User.saveData('feedback', 'poor');
         break;
 }`
@@ -1511,9 +1583,6 @@ switch(feedback) {
         const modal = document.getElementById(modalId);
         if (modal) {
             modal.style.display = 'none';
-            if (modalId === 'codeEditorModal') {
-                document.body.style.overflow = '';
-            }
         }
     }
 
@@ -1577,29 +1646,6 @@ switch(feedback) {
         }
     }
 
-    async loadBotInfo() {
-        // Simulate bot info loading
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        this.currentBot = {
-            id: 'bot_123',
-            name: 'My Test Bot',
-            username: 'test_bot',
-            token: 'bot_token_123'
-        };
-        this.updateBotInfo();
-    }
-
-    updateBotInfo() {
-        if (this.currentBot) {
-            const botNameEl = document.getElementById('botName');
-            const botUsernameEl = document.getElementById('botUsername');
-            
-            if (botNameEl) botNameEl.textContent = `Commands - ${this.currentBot.name}`;
-            if (botUsernameEl) botUsernameEl.textContent = `@${this.currentBot.username}`;
-        }
-    }
-
     async checkAuth() {
         const token = localStorage.getItem('token');
         const userData = localStorage.getItem('user');
@@ -1647,12 +1693,15 @@ switch(feedback) {
                 background: ${type === 'error' ? '#ef4444' : type === 'success' ? '#10b981' : '#3b82f6'};
                 z-index: 10000;
                 box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+                font-family: inherit;
             `;
             notification.textContent = message;
             document.body.appendChild(notification);
             
             setTimeout(() => {
-                notification.remove();
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
             }, 5000);
         }
     }
@@ -1675,15 +1724,4 @@ let commandEditor;
 
 document.addEventListener('DOMContentLoaded', () => {
     commandEditor = new CommandEditor();
-    
-    // Additional event listeners for dynamic elements
-    document.addEventListener('click', (e) => {
-        // Open code editors
-        if (e.target.id === 'openEditor' || e.target.closest('#openEditor')) {
-            commandEditor.openCodeEditor('main');
-        }
-        if (e.target.id === 'openAnswerEditor' || e.target.closest('#openAnswerEditor')) {
-            commandEditor.openCodeEditor('answer');
-        }
-    });
 });
