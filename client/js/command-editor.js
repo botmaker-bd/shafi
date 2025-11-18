@@ -328,54 +328,28 @@ class CommandEditor {
 
     // ✅ FIXED: Core Functionality - Improved command loading
     async loadCommands() {
-        if (!this.currentBot) {
-            console.log('⚠️ No current bot found, waiting for bot info...');
-            return;
-        }
+        if (!this.currentBot) return;
 
         this.showLoading(true);
 
         try {
-            console.log('🔄 Loading commands for bot:', this.currentBot.name);
-            
-            // Simulate API call with sample data
-            await new Promise(resolve => setTimeout(resolve, 800));
-            
-            // Sample commands data
-            this.commands = [
-                {
-                    id: 'cmd_1',
-                    command_patterns: '/start, hello, hi',
-                    code: '// Welcome command\nconst user = getUser();\nApi.sendMessage(`Hello ${user.first_name}! Welcome to our bot. 👋`);',
-                    is_active: true,
-                    wait_for_answer: false,
-                    answer_handler: ''
-                },
-                {
-                    id: 'cmd_2',
-                    command_patterns: '/help, assistance, support',
-                    code: '// Help command\nconst helpText = `🤖 *Available Commands:*\\n\\n/start - Welcome message\\n/help - Show this help\\n/settings - Bot settings\\n/info - Bot information`;\nApi.sendMessage(helpText, { parse_mode: "Markdown" });',
-                    is_active: true,
-                    wait_for_answer: false,
-                    answer_handler: ''
-                },
-                {
-                    id: 'cmd_3',
-                    command_patterns: '/feedback, opinion, review',
-                    code: '// Feedback command\nApi.sendMessage(\'💬 Please share your feedback with us:\');',
-                    is_active: false,
-                    wait_for_answer: true,
-                    answer_handler: '// Handle feedback\nconst feedback = getMessage().text;\nUser.saveData(\'last_feedback\', feedback);\nApi.sendMessage(`✅ Thank you for your feedback! We appreciate: ${feedback}`);'
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/commands/bot/${this.currentBot.token}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
                 }
-            ];
+            });
 
-            console.log(`✅ Loaded ${this.commands.length} commands`);
-            this.displayCommands();
-            this.showSuccess('Commands loaded successfully!');
-            
+            const data = await response.json();
+
+            if (data.success) {
+                this.commands = data.commands || [];
+                this.displayCommands();
+            } else {
+                this.showError('Failed to load commands');
+            }
         } catch (error) {
-            console.error('❌ Failed to load commands:', error);
-            this.showError('Failed to load commands: ' + error.message);
+            this.showError('Network error while loading commands');
         } finally {
             this.showLoading(false);
         }
@@ -476,37 +450,35 @@ class CommandEditor {
         this.showLoading(true);
 
         try {
-            console.log(`🔄 Selecting command: ${commandId}`);
-            
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            const command = this.commands.find(cmd => cmd.id === commandId);
-            if (command) {
-                this.currentCommand = command;
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/commands/${commandId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                this.currentCommand = data.command;
                 this.showCommandEditor();
                 this.populateCommandForm();
-                this.setModified(false);
                 
                 // Update UI selection
-                document.querySelectorAll('.command-item').forEach(item => {
-                    item.classList.remove('active');
+                document.querySelectorAll('.command-group').forEach(group => {
+                    group.classList.remove('active');
                 });
                 
-                const selectedItem = document.querySelector(`[data-command-id="${commandId}"]`);
-                if (selectedItem) {
-                    selectedItem.classList.add('active');
-                    selectedItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                const selectedGroup = document.querySelector(`[data-command-id="${commandId}"]`);
+                if (selectedGroup) {
+                    selectedGroup.classList.add('active');
+                    selectedGroup.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 }
-                
-                console.log(`✅ Command selected: ${commandId}`);
             } else {
-                console.error(`❌ Command not found: ${commandId}`);
-                this.showError('Command not found');
+                this.showError('Failed to load command');
             }
         } catch (error) {
-            console.error('❌ Failed to load command:', error);
-            this.showError('Failed to load command: ' + error.message);
+            this.showError('Network error while loading command');
         } finally {
             this.showLoading(false);
         }
@@ -726,97 +698,115 @@ class CommandEditor {
 
     // Save Command with Validation
     async saveCommand() {
-        if (!this.currentCommand || !this.currentBot) {
-            this.showError('No command selected or bot not loaded');
-            return false;
+    if (!this.currentCommand || !this.currentBot) {
+        this.showError('No command selected or bot not loaded');
+        return false;
+    }
+
+    const commands = this.getCommandsFromTags();
+    
+    if (commands.length === 0) {
+        this.showError('Please add at least one command pattern');
+        const moreCommandsInput = document.getElementById('moreCommands');
+        if (moreCommandsInput) moreCommandsInput.focus();
+        return false;
+    }
+
+    const commandCodeEl = document.getElementById('commandCode');
+    const commandCode = commandCodeEl ? commandCodeEl.value.trim() : '';
+
+    if (!commandCode) {
+        this.showError('Command code is required');
+        if (commandCodeEl) commandCodeEl.focus();
+        return false;
+    }
+
+    const waitForAnswerEl = document.getElementById('waitForAnswer');
+    const answerHandlerEl = document.getElementById('answerHandler');
+    
+    const waitForAnswer = waitForAnswerEl ? waitForAnswerEl.checked : false;
+    const answerHandler = waitForAnswer && answerHandlerEl ? answerHandlerEl.value.trim() : '';
+
+    // ✅ NEW: Client-side validation
+    if (waitForAnswer && !answerHandler) {
+        this.showError('Answer handler code is required when "Wait for Answer" is enabled');
+        if (answerHandlerEl) {
+            answerHandlerEl.focus();
+            // Show the answer handler section if hidden
+            const answerSection = document.getElementById('answerHandlerSection');
+            if (answerSection) answerSection.style.display = 'block';
+        }
+        return false;
+    }
+
+    const formData = {
+        commandPatterns: commands.join(','),
+        code: commandCode,
+        waitForAnswer: waitForAnswer,
+        answerHandler: answerHandler,
+        botToken: this.currentBot.token
+    };
+
+    this.showLoading(true);
+
+    try {
+        const token = localStorage.getItem('token');
+        let response;
+        let url;
+        let method;
+
+        if (this.currentCommand.id === 'new') {
+            url = '/api/commands';
+            method = 'POST';
+        } else {
+            url = `/api/commands/${this.currentCommand.id}`;
+            method = 'PUT';
         }
 
-        const commands = this.getCommandsFromTags();
-        
-        if (commands.length === 0) {
-            this.showError('Please add at least one command pattern');
-            const moreCommandsInput = document.getElementById('moreCommands');
-            if (moreCommandsInput) moreCommandsInput.focus();
-            return false;
-        }
+        response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(formData)
+        });
 
-        const commandCodeEl = document.getElementById('commandCode');
-        const commandCode = commandCodeEl ? commandCodeEl.value.trim() : '';
+        const data = await response.json();
 
-        if (!commandCode) {
-            this.showError('Command code is required');
-            if (commandCodeEl) commandCodeEl.focus();
-            return false;
-        }
-
-        const waitForAnswerEl = document.getElementById('waitForAnswer');
-        const answerHandlerEl = document.getElementById('answerHandler');
-        
-        const waitForAnswer = waitForAnswerEl ? waitForAnswerEl.checked : false;
-        const answerHandler = waitForAnswer && answerHandlerEl ? answerHandlerEl.value.trim() : '';
-
-        // Client-side validation
-        if (waitForAnswer && !answerHandler) {
-            this.showError('Answer handler code is required when "Wait for Answer" is enabled');
-            if (answerHandlerEl) {
-                answerHandlerEl.focus();
-                // Show the answer handler section if hidden
-                const answerSection = document.getElementById('answerHandlerSection');
-                if (answerSection) answerSection.style.display = 'block';
-            }
-            return false;
-        }
-
-        this.showLoading(true);
-
-        try {
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            if (this.currentCommand.id === 'new') {
-                // Create new command
-                const newCommand = {
-                    id: 'cmd_' + Date.now(),
-                    command_patterns: commands.join(','),
-                    code: commandCode,
-                    is_active: true,
-                    wait_for_answer: waitForAnswer,
-                    answer_handler: answerHandler
-                };
-                
-                this.commands.push(newCommand);
-                this.currentCommand = newCommand;
-            } else {
-                // Update existing command
-                const commandIndex = this.commands.findIndex(cmd => cmd.id === this.currentCommand.id);
-                if (commandIndex !== -1) {
-                    this.commands[commandIndex] = {
-                        ...this.commands[commandIndex],
-                        command_patterns: commands.join(','),
-                        code: commandCode,
-                        wait_for_answer: waitForAnswer,
-                        answer_handler: answerHandler
-                    };
-                }
-            }
-            
+        if (response.ok) {
             this.showSuccess('Command saved successfully!');
-            this.displayCommands();
-            this.populateCommandForm();
-            this.setModified(false);
+            
+            await this.loadCommands();
+            
+            if (data.command) {
+                this.currentCommand = data.command;
+                this.populateCommandForm();
+                
+                // Auto-select the saved command
+                setTimeout(() => {
+                    const commandGroup = document.querySelector(`[data-command-id="${this.currentCommand.id}"]`);
+                    if (commandGroup) {
+                        commandGroup.click();
+                    }
+                }, 500);
+            }
             
             return true;
-        } catch (error) {
-            this.showError('Failed to save command: ' + error.message);
+        } else {
+            this.showError(data.error || 'Failed to save command');
             return false;
-        } finally {
-            this.showLoading(false);
         }
+    } catch (error) {
+        this.showError('Network error while saving command');
+        return false;
+    } finally {
+        this.showLoading(false);
     }
+}
 
     async toggleCommand() {
         if (!this.currentCommand || this.currentCommand.id === 'new') {
-            this.showError('Cannot toggle unsaved command');
             return;
         }
 
@@ -825,22 +815,29 @@ class CommandEditor {
         this.showLoading(true);
 
         try {
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            this.currentCommand.is_active = newStatus;
-            
-            // Update in commands array
-            const commandIndex = this.commands.findIndex(cmd => cmd.id === this.currentCommand.id);
-            if (commandIndex !== -1) {
-                this.commands[commandIndex].is_active = newStatus;
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/commands/${this.currentCommand.id}/toggle`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    isActive: newStatus,
+                    botToken: this.currentBot.token
+                })
+            });
+
+            if (response.ok) {
+                this.currentCommand.is_active = newStatus;
+                this.populateCommandForm();
+                await this.loadCommands();
+                this.showSuccess(`Command ${newStatus ? 'activated' : 'deactivated'} successfully!`);
+            } else {
+                this.showError('Failed to toggle command status');
             }
-            
-            this.populateCommandForm();
-            this.displayCommands();
-            this.showSuccess(`Command ${newStatus ? 'activated' : 'deactivated'} successfully!`);
         } catch (error) {
-            this.showError('Failed to toggle command status: ' + error.message);
+            this.showError('Network error while toggling command');
         } finally {
             this.showLoading(false);
         }
@@ -848,7 +845,6 @@ class CommandEditor {
 
     async deleteCommand() {
         if (!this.currentCommand || this.currentCommand.id === 'new') {
-            this.showError('Cannot delete unsaved command');
             return;
         }
 
@@ -859,18 +855,24 @@ class CommandEditor {
         this.showLoading(true);
 
         try {
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            // Remove from commands array
-            this.commands = this.commands.filter(cmd => cmd.id !== this.currentCommand.id);
-            
-            this.showSuccess('Command deleted successfully');
-            this.hideCommandEditor();
-            await this.loadCommands();
-            this.setModified(false);
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/commands/${this.currentCommand.id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (response.ok) {
+                this.showSuccess('Command deleted successfully');
+                this.hideCommandEditor();
+                await this.loadCommands();
+            } else {
+                const data = await response.json();
+                this.showError(data.error || 'Failed to delete command');
+            }
         } catch (error) {
-            this.showError('Failed to delete command: ' + error.message);
+            this.showError('Network error while deleting command');
         } finally {
             this.showLoading(false);
         }
@@ -910,22 +912,53 @@ class CommandEditor {
         this.showTestLoading();
 
         try {
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            const token = localStorage.getItem('token');
             
-            this.showTestSuccess(`
-                <h4>✅ Test Command Sent Successfully!</h4>
-                <div class="test-details">
-                    <p><strong>Commands:</strong> ${commands.join(', ')}</p>
-                    <p><strong>Bot:</strong> ${this.currentBot.name}</p>
-                    <p><strong>Status:</strong> Command executed without errors</p>
-                </div>
-                <p class="test-message">Check your Telegram bot for the test results.</p>
-            `);
+            const waitForAnswerEl = document.getElementById('waitForAnswer');
+            const answerHandlerEl = document.getElementById('answerHandler');
+            
+            const tempCommand = {
+                command_patterns: commands.join(','),
+                code: commandCode,
+                wait_for_answer: waitForAnswerEl ? waitForAnswerEl.checked : false,
+                answer_handler: answerHandlerEl ? answerHandlerEl.value || '' : ''
+            };
+
+            const response = await fetch('/api/commands/test-temp', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    command: tempCommand,
+                    botToken: this.currentBot.token
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.showTestSuccess(`
+                    <h4>✅ Test Command Sent Successfully!</h4>
+                    <div class="test-details">
+                        <p><strong>Commands:</strong> ${commands.join(', ')}</p>
+                        <p><strong>Bot:</strong> ${this.currentBot.name}</p>
+                        <p><strong>Status:</strong> Command executed without errors</p>
+                    </div>
+                    <p class="test-message">Check your Telegram bot for the test results.</p>
+                `);
+            } else {
+                this.showTestError(`
+                    <h4>❌ Test Failed</h4>
+                    <p><strong>Error:</strong> ${data.error || 'Unknown error occurred'}</p>
+                    ${data.details ? `<p><strong>Details:</strong> ${data.details}</p>` : ''}
+                `);
+            }
         } catch (error) {
             this.showTestError(`
-                <h4>❌ Test Failed</h4>
-                <p><strong>Error:</strong> ${error.message}</p>
+                <h4>❌ Network Error</h4>
+                <p>Failed to connect to server: ${error.message}</p>
             `);
         }
     }
@@ -957,22 +990,67 @@ class CommandEditor {
         this.showTestLoading();
 
         try {
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1500));
+            const token = localStorage.getItem('token');
             
-            this.showTestSuccess(`
-                <h4>✅ Test Command Executed Successfully!</h4>
-                <div class="test-details">
-                    <p><strong>Test Input:</strong> ${testInput || commands.join(', ')}</p>
-                    <p><strong>Bot:</strong> ${this.currentBot.name}</p>
-                    <p><strong>Result:</strong> Command executed without errors</p>
-                </div>
-                <p class="test-message">Command executed successfully.</p>
-            `);
+            const waitForAnswerEl = document.getElementById('waitForAnswer');
+            const answerHandlerEl = document.getElementById('answerHandler');
+            
+            const tempCommand = {
+                command_patterns: testInput || commands.join(','),
+                code: commandCode,
+                wait_for_answer: waitForAnswerEl ? waitForAnswerEl.checked : false,
+                answer_handler: answerHandlerEl ? answerHandlerEl.value || '' : ''
+            };
+
+            const response = await fetch('/api/commands/test-temp', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    command: tempCommand,
+                    botToken: this.currentBot.token,
+                    testInput: testInput
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                let resultText = data.result || 'Command executed successfully';
+                
+                // Handle object results
+                if (typeof resultText === 'object') {
+                    if (resultText.message) {
+                        resultText = resultText.message;
+                    } else {
+                        resultText = JSON.stringify(resultText, null, 2);
+                    }
+                }
+                
+                this.showTestSuccess(`
+                    <h4>✅ Test Command Executed Successfully!</h4>
+                    <div class="test-details">
+                        <p><strong>Test Input:</strong> ${testInput || commands.join(', ')}</p>
+                        <p><strong>Bot:</strong> ${this.currentBot.name}</p>
+                        <p><strong>Result:</strong> ${resultText}</p>
+                    </div>
+                    <p class="test-message">Command executed without errors.</p>
+                `);
+            } else {
+                this.showTestError(`
+                    <h4>❌ Test Failed</h4>
+                    <div class="error-details">
+                        <p><strong>Error:</strong> ${data.error || 'Unknown error occurred'}</p>
+                        ${data.details ? `<p><strong>Details:</strong> ${data.details}</p>` : ''}
+                    </div>
+                `);
+            }
         } catch (error) {
             this.showTestError(`
-                <h4>❌ Test Failed</h4>
-                <p><strong>Error:</strong> ${error.message}</p>
+                <h4>❌ Network Error</h4>
+                <p>Failed to connect to server: ${error.message}</p>
             `);
         }
     }
@@ -1163,25 +1241,41 @@ class CommandEditor {
 
     // ✅ FIXED: Bot Info Loading - Improved sequence
     async loadBotInfo() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const botId = urlParams.get('bot');
+
+        if (!botId) {
+            this.showError('No bot specified');
+            setTimeout(() => {
+                window.location.href = 'bot-management.html';
+            }, 2000);
+            return;
+        }
+
         try {
-            console.log('🔄 Loading bot information...');
-            
-            // Simulate bot info loading
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            this.currentBot = {
-                id: 'bot_123',
-                name: 'My Awesome Bot',
-                username: 'my_awesome_bot',
-                token: 'bot_token_123'
-            };
-            
-            this.updateBotInfo();
-            console.log('✅ Bot info loaded:', this.currentBot.name);
-            
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/bots/${botId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                this.currentBot = data.bot;
+                this.updateBotInfo();
+            } else {
+                this.showError('Bot not found');
+                setTimeout(() => {
+                    window.location.href = 'bot-management.html';
+                }, 2000);
+            }
         } catch (error) {
-            console.error('❌ Failed to load bot info:', error);
-            this.showError('Failed to load bot information');
+            this.showError('Failed to load bot info');
+            setTimeout(() => {
+                window.location.href = 'bot-management.html';
+            }, 2000);
         }
     }
 
@@ -1198,102 +1292,53 @@ class CommandEditor {
     // Templates Functionality
     async loadTemplates() {
         try {
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            const token = localStorage.getItem('token');
+            console.log('🔄 Loading templates from API...');
             
-            // Sample templates data
+            const response = await fetch('/api/templates', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log('📦 Templates API response:', data);
+
+            if (data.success) {
+                this.templates = data.templates || {};
+                console.log(`✅ Loaded ${Object.keys(this.templates).length} template categories`);
+                
+                // Debug: Log template counts
+                Object.entries(this.templates).forEach(([category, templates]) => {
+                    console.log(`📁 ${category}: ${templates?.length || 0} templates`);
+                });
+                
+                this.populateTemplatesModal();
+            } else {
+                throw new Error(data.error || 'Failed to load templates');
+            }
+        } catch (error) {
+            console.error('❌ Load templates error:', error);
+            this.showError('Failed to load templates: ' + error.message);
+            // Fallback with basic templates
             this.templates = {
                 'basic': [
                     {
-                        id: 'welcome_template',
+                        id: 'fallback_welcome',
                         name: 'Welcome Message',
-                        patterns: '/start, hello, hi',
-                        description: 'Send a welcome message to new users',
-                        code: `// Welcome command template
-const user = getUser();
-const welcomeMessage = \`Hello \${user.first_name}! 👋
-
-Welcome to our bot! Here's what I can do for you:
-
-• /help - Show help information
-• /settings - Configure your preferences
-• /info - Get bot information
-
-Feel free to explore! 😊\`;
-
-Api.sendMessage(welcomeMessage);`,
+                        patterns: '/start, hello',
+                        description: 'Basic welcome template',
+                        code: 'const user = getUser();\nApi.sendMessage(`Hello ${user.first_name}! Welcome to our bot.`);',
                         waitForAnswer: false,
                         answerHandler: ''
-                    },
-                    {
-                        id: 'echo_template',
-                        name: 'Echo Command',
-                        patterns: '/echo, repeat',
-                        description: 'Echo back user message',
-                        code: `// Echo command template
-const message = getMessage();
-if (message.text) {
-    Api.sendMessage(\`You said: \${message.text}\`);
-} else {
-    Api.sendMessage('Please send a text message to echo.');
-}`,
-                        waitForAnswer: false,
-                        answerHandler: ''
-                    }
-                ],
-                'interactive': [
-                    {
-                        id: 'feedback_template',
-                        name: 'Feedback Collector',
-                        patterns: '/feedback, opinion',
-                        description: 'Collect user feedback with interactive buttons',
-                        code: `// Feedback collection template
-Api.sendMessage('How would you rate our service?', {
-    reply_markup: {
-        inline_keyboard: [
-            [
-                { text: '⭐ Excellent', callback_data: 'feedback_excellent' },
-                { text: '👍 Good', callback_data: 'feedback_good' }
-            ],
-            [
-                { text: '😐 Average', callback_data: 'feedback_average' },
-                { text: '👎 Poor', callback_data: 'feedback_poor' }
-            ]
-        ]
-    }
-});`,
-                        waitForAnswer: true,
-                        answerHandler: `// Handle feedback response
-const feedback = getCallbackData();
-const user = getUser();
-
-switch(feedback) {
-    case 'feedback_excellent':
-        Api.sendMessage('🎉 Thank you for the excellent rating!');
-        User.saveData('feedback', 'excellent');
-        break;
-    case 'feedback_good':
-        Api.sendMessage('👍 Thanks for the positive feedback!');
-        User.saveData('feedback', 'good');
-        break;
-    case 'feedback_average':
-        Api.sendMessage('😊 We appreciate your honest feedback!');
-        User.saveData('feedback', 'average');
-        break;
-    case 'feedback_poor':
-        Api.sendMessage('😔 We\\'re sorry to hear that. We\\'ll improve!');
-        User.saveData('feedback', 'poor');
-        break;
-}`
                     }
                 ]
             };
-            
-            console.log('✅ Templates loaded successfully');
             this.populateTemplatesModal();
-        } catch (error) {
-            console.error('❌ Load templates error:', error);
-            this.showError('Failed to load templates');
         }
     }
 
@@ -1655,7 +1700,21 @@ switch(feedback) {
             return;
         }
 
-        this.user = JSON.parse(userData);
+        try {
+            const response = await fetch('/api/auth/verify', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Invalid token');
+            }
+
+            this.user = JSON.parse(userData);
+        } catch (error) {
+            this.logout();
+        }
     }
 
     // UI Helper Methods
