@@ -80,204 +80,206 @@
             </div>
         </div>
 
-        <!-- Commands List Sidebar -->
-        <div class="commands-sidebar-compact">
-            <div class="sidebar-header-compact">
-                <h3>Commands</h3>
-                <button id="addCommandBtn" class="btn btn-primary btn-small">
-                    <i class="fas fa-plus"></i> New
-                </button>
-            </div>
-            
-            <div class="sidebar-search-compact">
-                <input type="text" id="commandSearch" placeholder="Search commands...">
-                <i class="fas fa-search"></i>
-            </div>
-
-            <div id="commandsList" class="commands-list-compact">
-                <!-- Commands will be loaded here -->
-            </div>
-
-            <div id="emptyCommands" class="empty-state-compact" style="display: none;">
-                <div class="empty-icon">
-                    <i class="fas fa-code"></i>
+        <div class="editor-layout-compact">
+            <!-- Commands List Sidebar -->
+            <div class="commands-sidebar-compact">
+                <div class="sidebar-header-compact">
+                    <h3>Commands</h3>
+                    <button id="addCommandBtn" class="btn btn-primary btn-small">
+                        <i class="fas fa-plus"></i> New
+                    </button>
                 </div>
-                <p>No commands yet</p>
-                <button class="btn btn-primary btn-small" id="addFirstCommand">
-                    Create First Command
-                </button>
-            </div>
-        </div>
-
-        <!-- Compact Command Editor -->
-        <div class="compact-editor-container">
-            <!-- No Command Selected -->
-            <div id="noCommandSelected" class="empty-state-compact">
-                <div class="empty-icon">
-                    <i class="fas fa-code"></i>
+                
+                <div class="sidebar-search-compact">
+                    <input type="text" id="commandSearch" placeholder="Search commands...">
+                    <i class="fas fa-search"></i>
                 </div>
-                <h3>No Command Selected</h3>
-                <p>Select a command from the list or create a new one to start editing</p>
-                <button class="btn btn-primary" id="createFirstCommand">
-                    <i class="fas fa-plus"></i> Create New Command
-                </button>
+
+                <div id="commandsList" class="commands-list-compact">
+                    <!-- Commands will be loaded here -->
+                </div>
+
+                <div id="emptyCommands" class="empty-state-compact" style="display: none;">
+                    <div class="empty-icon">
+                        <i class="fas fa-code"></i>
+                    </div>
+                    <p>No commands yet</p>
+                    <button class="btn btn-primary btn-small" id="addFirstCommand">
+                        Create First Command
+                    </button>
+                </div>
             </div>
 
-            <!-- Command Editor -->
-            <div id="commandEditorCompact" class="compact-editor-card" style="display: none;">
-                <div class="editor-header-compact">
-                    <div class="editor-title-section">
-                        <h3 id="currentCommandNameCompact">Command Editor</h3>
-                        <div class="command-status-info">
-                            <span class="command-status-badge status-active" id="commandStatusCompact">Active</span>
-                            <span class="command-id-compact" id="commandIdCompact">ID: new</span>
+            <!-- Main Editor Area -->
+            <div class="editor-main-compact">
+                <!-- No Command Selected -->
+                <div id="noCommandSelected" class="empty-state-compact">
+                    <div class="empty-icon">
+                        <i class="fas fa-code"></i>
+                    </div>
+                    <h3>No Command Selected</h3>
+                    <p>Select a command from the list or create a new one to start editing</p>
+                    <button class="btn btn-primary" id="createFirstCommand">
+                        <i class="fas fa-plus"></i> Create New Command
+                    </button>
+                </div>
+
+                <!-- Command Editor -->
+                <div id="commandEditorCompact" class="compact-editor-card" style="display: none;">
+                    <div class="editor-header-compact">
+                        <div class="editor-title-section">
+                            <h3 id="currentCommandNameCompact">Command Editor</h3>
+                            <div class="command-status-info">
+                                <span class="command-status-badge status-active" id="commandStatusCompact">Active</span>
+                                <span class="command-id-compact" id="commandIdCompact">ID: new</span>
+                            </div>
+                        </div>
+                        <div class="editor-actions-compact">
+                            <button id="toggleCommandBtnCompact" class="btn btn-warning btn-compact btn-small">
+                                <i class="fas fa-power-off"></i> Toggle
+                            </button>
+                            <button id="testCommandBtnCompact" class="btn btn-success btn-compact btn-small">
+                                <i class="fas fa-bolt"></i> Test
+                            </button>
+                            <button id="saveCommandBtnCompact" class="btn btn-primary btn-compact btn-small">
+                                <i class="fas fa-save"></i> Save
+                            </button>
+                            <button id="deleteCommandBtnCompact" class="btn btn-danger btn-compact btn-small">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
                         </div>
                     </div>
-                    <div class="editor-actions-compact">
-                        <button id="toggleCommandBtnCompact" class="btn btn-warning btn-compact btn-small">
-                            <i class="fas fa-power-off"></i> Toggle
-                        </button>
-                        <button id="testCommandBtnCompact" class="btn btn-success btn-compact btn-small">
-                            <i class="fas fa-bolt"></i> Test
-                        </button>
-                        <button id="saveCommandBtnCompact" class="btn btn-primary btn-compact btn-small">
-                            <i class="fas fa-save"></i> Save
-                        </button>
-                        <button id="deleteCommandBtnCompact" class="btn btn-danger btn-compact btn-small">
-                            <i class="fas fa-trash"></i> Delete
-                        </button>
-                    </div>
-                </div>
 
-                <div class="editor-body-compact">
-                    <form id="commandFormCompact">
-                        <!-- Command Patterns Section -->
-                        <div class="form-section-compact">
-                            <div class="form-section-header">
-                                <h4 class="form-section-title">Command Patterns</h4>
-                                <div class="section-actions">
-                                    <button type="button" class="btn btn-secondary-compact btn-compact btn-small" id="showTemplatesCompact">
-                                        <i class="fas fa-layer-group"></i> Templates
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <div class="commands-tags-container">
-                                    <div id="commandsTagsCompact" class="commands-tags">
-                                        <!-- Command tags will be added here -->
-                                    </div>
-                                    <input type="text" id="moreCommandsCompact" 
-                                           placeholder="Type command pattern and press Enter...">
-                                </div>
-                                <div class="code-help-compact">
-                                    Add multiple command patterns separated by commas. All patterns will execute the same code.
-                                    Example: /start, start, hello
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Code Editor Section -->
-                        <div class="form-section-compact">
-                            <div class="form-section-header">
-                                <h4 class="form-section-title">Command Code</h4>
-                                <div class="section-actions">
-                                    <button type="button" class="btn btn-secondary-compact btn-compact btn-small" id="openEditorCompact">
-                                        <i class="fas fa-edit"></i> Full Editor
-                                    </button>
-                                    <button type="button" class="btn btn-secondary-compact btn-compact btn-small" id="formatCodeCompact">
-                                        <i class="fas fa-indent"></i> Format
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <textarea id="commandCodeCompact" class="code-editor-compact"
-                                          placeholder="Write your command code here..."></textarea>
-                                <div class="code-help-compact">
-                                    <strong>Available Functions:</strong> bot.sendMessage(), User.saveData(), waitForAnswer(), HTTP.get(), etc.
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Test Section -->
-                        <div class="form-section-compact">
-                            <h4 class="form-section-title">Test Command</h4>
-                            <div class="test-section-compact">
-                                <div class="form-group">
-                                    <div class="test-input-group">
-                                        <input type="text" id="testInputCompact" 
-                                               placeholder="Enter test input to simulate user message...">
-                                        <button type="button" id="runTestBtnCompact" class="btn btn-warning-compact btn-compact">
-                                            <i class="fas fa-play"></i> Run Test
+                    <div class="editor-body-compact">
+                        <form id="commandFormCompact">
+                            <!-- Command Patterns Section -->
+                            <div class="form-section-compact">
+                                <div class="form-section-header">
+                                    <h4 class="form-section-title">Command Patterns</h4>
+                                    <div class="section-actions">
+                                        <button type="button" class="btn btn-secondary-compact btn-compact btn-small" id="showTemplatesCompact">
+                                            <i class="fas fa-layer-group"></i> Templates
                                         </button>
                                     </div>
+                                </div>
+                                <div class="form-group">
+                                    <div class="commands-tags-container">
+                                        <div id="commandsTagsCompact" class="commands-tags">
+                                            <!-- Command tags will be added here -->
+                                        </div>
+                                        <input type="text" id="moreCommandsCompact" 
+                                               placeholder="Type command pattern and press Enter...">
+                                    </div>
                                     <div class="code-help-compact">
-                                        Enter test input to simulate how users will trigger this command.
+                                        Add multiple command patterns separated by commas. All patterns will execute the same code.
+                                        Example: /start, start, hello
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <!-- Advanced Options -->
-                        <div class="form-section-compact">
-                            <div class="advanced-options-toggle" id="advancedOptionsToggle">
-                                <div class="toggle-text-compact">
-                                    <span class="toggle-title-compact">Advanced Options</span>
-                                    <span class="toggle-description-compact">Additional settings for command behavior</span>
+                            <!-- Code Editor Section -->
+                            <div class="form-section-compact">
+                                <div class="form-section-header">
+                                    <h4 class="form-section-title">Command Code</h4>
+                                    <div class="section-actions">
+                                        <button type="button" class="btn btn-secondary-compact btn-compact btn-small" id="openEditorCompact">
+                                            <i class="fas fa-edit"></i> Full Editor
+                                        </button>
+                                        <button type="button" class="btn btn-secondary-compact btn-compact btn-small" id="formatCodeCompact">
+                                            <i class="fas fa-indent"></i> Format
+                                        </button>
+                                    </div>
                                 </div>
-                                <i class="fas fa-chevron-down" id="advancedOptionsIcon"></i>
+                                <div class="form-group">
+                                    <textarea id="commandCodeCompact" class="code-editor-compact"
+                                              placeholder="Write your command code here..."></textarea>
+                                    <div class="code-help-compact">
+                                        <strong>Available Functions:</strong> bot.sendMessage(), User.saveData(), waitForAnswer(), HTTP.get(), etc.
+                                    </div>
+                                </div>
                             </div>
-                            
-                            <div id="advancedOptionsContent" class="advanced-options-content">
-                                <!-- Wait for Answer Toggle -->
-                                <div class="toggle-group-compact">
-                                    <label class="toggle-label-compact">
-                                        <div class="toggle-text-compact">
-                                            <span class="toggle-title-compact">Wait for Answer</span>
-                                            <span class="toggle-description-compact">Enable to wait for user response after command execution</span>
-                                        </div>
-                                        <div class="toggle-switch-compact">
-                                            <input type="checkbox" id="waitForAnswerCompact">
-                                            <span class="toggle-slider-compact"></span>
-                                        </div>
-                                    </label>
-                                </div>
 
-                                <!-- Answer Handler Section -->
-                                <div id="answerHandlerSectionCompact" class="form-group" style="display: none;">
-                                    <div class="form-section-header">
-                                        <label for="answerHandlerCompact" class="form-section-title">Answer Handler Code</label>
-                                        <div class="section-actions">
-                                            <button type="button" class="btn btn-secondary-compact btn-compact btn-small" id="openAnswerEditorCompact">
-                                                <i class="fas fa-edit"></i> Full Editor
+                            <!-- Test Section -->
+                            <div class="form-section-compact">
+                                <h4 class="form-section-title">Test Command</h4>
+                                <div class="test-section-compact">
+                                    <div class="form-group">
+                                        <div class="test-input-group">
+                                            <input type="text" id="testInputCompact" 
+                                                   placeholder="Enter test input to simulate user message...">
+                                            <button type="button" id="runTestBtnCompact" class="btn btn-warning-compact btn-compact">
+                                                <i class="fas fa-play"></i> Run Test
                                             </button>
                                         </div>
-                                    </div>
-                                    <textarea id="answerHandlerCompact" class="code-editor-compact"
-                                              placeholder="Code to handle user's answer..."></textarea>
-                                    <div class="code-help-compact">
-                                        This code will execute when user responds. Use waitForAnswer() to get user's response.
+                                        <div class="code-help-compact">
+                                            Enter test input to simulate how users will trigger this command.
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    </form>
-                </div>
 
-                <div class="editor-footer-compact">
-                    <div class="footer-info">
-                        <span id="lastSavedCompact">Not saved yet</span>
-                        <span id="codeStatsCompact">Lines: 0, Chars: 0</span>
+                            <!-- Advanced Options -->
+                            <div class="form-section-compact">
+                                <div class="advanced-options-toggle" id="advancedOptionsToggle">
+                                    <div class="toggle-text-compact">
+                                        <span class="toggle-title-compact">Advanced Options</span>
+                                        <span class="toggle-description-compact">Additional settings for command behavior</span>
+                                    </div>
+                                    <i class="fas fa-chevron-down" id="advancedOptionsIcon"></i>
+                                </div>
+                                
+                                <div id="advancedOptionsContent" class="advanced-options-content">
+                                    <!-- Wait for Answer Toggle -->
+                                    <div class="toggle-group-compact">
+                                        <label class="toggle-label-compact">
+                                            <div class="toggle-text-compact">
+                                                <span class="toggle-title-compact">Wait for Answer</span>
+                                                <span class="toggle-description-compact">Enable to wait for user response after command execution</span>
+                                            </div>
+                                            <div class="toggle-switch-compact">
+                                                <input type="checkbox" id="waitForAnswerCompact">
+                                                <span class="toggle-slider-compact"></span>
+                                            </div>
+                                        </label>
+                                    </div>
+
+                                    <!-- Answer Handler Section -->
+                                    <div id="answerHandlerSectionCompact" class="form-group" style="display: none;">
+                                        <div class="form-section-header">
+                                            <label for="answerHandlerCompact" class="form-section-title">Answer Handler Code</label>
+                                            <div class="section-actions">
+                                                <button type="button" class="btn btn-secondary-compact btn-compact btn-small" id="openAnswerEditorCompact">
+                                                    <i class="fas fa-edit"></i> Full Editor
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <textarea id="answerHandlerCompact" class="code-editor-compact"
+                                                  placeholder="Code to handle user's answer..."></textarea>
+                                        <div class="code-help-compact">
+                                            This code will execute when user responds. Use waitForAnswer() to get user's response.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
                     </div>
-                    <div class="footer-actions">
-                        <button id="saveFooterBtn" class="btn btn-primary-compact btn-compact">
-                            <i class="fas fa-save"></i> Save
-                        </button>
-                        <button id="testFooterBtn" class="btn btn-success-compact btn-compact">
-                            <i class="fas fa-bolt"></i> Test
-                        </button>
-                        <button id="activateFooterBtn" class="btn btn-warning-compact btn-compact">
-                            <i class="fas fa-power-off"></i> Activate
-                        </button>
+
+                    <div class="editor-footer-compact">
+                        <div class="footer-info">
+                            <span id="lastSavedCompact">Not saved yet</span>
+                            <span id="codeStatsCompact">Lines: 0, Chars: 0</span>
+                        </div>
+                        <div class="footer-actions">
+                            <button id="saveFooterBtn" class="btn btn-primary-compact btn-compact">
+                                <i class="fas fa-save"></i> Save
+                            </button>
+                            <button id="testFooterBtn" class="btn btn-success-compact btn-compact">
+                                <i class="fas fa-bolt"></i> Test
+                            </button>
+                            <button id="activateFooterBtn" class="btn btn-warning-compact btn-compact">
+                                <i class="fas fa-power-off"></i> Activate
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
