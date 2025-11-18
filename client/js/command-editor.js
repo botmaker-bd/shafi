@@ -924,7 +924,7 @@ class CommandEditor {
                 answer_handler: answerHandlerEl ? answerHandlerEl.value || '' : ''
             };
 
-            const response = await fetch('/api/commands/test-temp', {
+            const response = await fetch('/api/commandId/test', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1002,7 +1002,7 @@ class CommandEditor {
                 answer_handler: answerHandlerEl ? answerHandlerEl.value || '' : ''
             };
 
-            const response = await fetch('/api/commands/test-temp', {
+            const response = await fetch('/api/commands/test', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
