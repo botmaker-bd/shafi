@@ -1,11 +1,12 @@
-class CommandEditor {
+// Compact Command Editor JavaScript
+class CompactCommandEditor {
     constructor() {
         this.user = null;
         this.currentBot = null;
         this.currentCommand = null;
         this.commands = [];
         this.templates = {};
-        this.originalCode = ''; // Track original code for save button state
+        this.currentEditorType = 'main';
         this.init();
     }
 
@@ -15,9 +16,9 @@ class CommandEditor {
         this.setupEventListeners();
         await this.loadCommands();
         await this.loadTemplates();
-        this.setupCodeEditor();
         this.setupCommandsTags();
-        console.log('✅ Command editor initialized completely');
+        this.setupCodeEditor();
+        console.log('✅ Compact command editor initialized completely');
     }
 
     async loadTemplates() {
@@ -42,12 +43,9 @@ class CommandEditor {
                 this.templates = data.templates || {};
                 console.log(`✅ Loaded ${Object.keys(this.templates).length} template categories`);
                 
-                // Debug: Log template counts
                 Object.entries(this.templates).forEach(([category, templates]) => {
                     console.log(`📁 ${category}: ${templates?.length || 0} templates`);
                 });
-                
-                this.populateTemplatesModal();
             } else {
                 throw new Error(data.error || 'Failed to load templates');
             }
@@ -68,243 +66,7 @@ class CommandEditor {
                     }
                 ]
             };
-            this.populateTemplatesModal();
         }
-    }
-
-    populateTemplatesModal() {
-        const templatesContent = document.querySelector('.templates-content');
-        const categoryTabsContainer = document.querySelector('.category-tabs');
-        
-        if (!templatesContent || !categoryTabsContainer) {
-            console.error('❌ Templates modal elements not found');
-            return;
-        }
-
-        // Clear existing content
-        templatesContent.innerHTML = '';
-        categoryTabsContainer.innerHTML = '';
-
-        // If no templates available
-        if (!this.templates || Object.keys(this.templates).length === 0) {
-            templatesContent.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-icon">
-                        <i class="fas fa-layer-group"></i>
-                    </div>
-                    <h3>No Templates Available</h3>
-                    <p>Templates could not be loaded. Please check your connection.</p>
-                    <button class="btn btn-primary" onclick="commandEditor.loadTemplates()">
-                        <i class="fas fa-sync"></i> Reload Templates
-                    </button>
-                </div>
-            `;
-            return;
-        }
-
-        let categoriesHTML = '';
-        let templatesHTML = '';
-        let firstCategory = true;
-
-        // Generate category tabs and template content
-        Object.entries(this.templates).forEach(([category, templates]) => {
-            if (!Array.isArray(templates) || templates.length === 0) {
-                console.warn(`⚠️ No templates found for category: ${category}`);
-                return;
-            }
-
-            const categoryId = `${category}-templates`;
-            const isActive = firstCategory ? 'active' : '';
-            const displayName = this.formatCategoryName(category);
-            
-            // Category tab
-            categoriesHTML += `
-                <button class="category-tab ${isActive}" data-category="${category}">
-                    ${displayName} (${templates.length})
-                </button>
-            `;
-
-            // Template category content
-            const categoryTemplatesHTML = templates.map(template => {
-                try {
-                    return this.createTemplateCard(template);
-                } catch (error) {
-                    console.error('❌ Error creating template card:', error, template);
-                    return `<div class="template-card error">
-                        <div class="template-icon">
-                            <i class="fas fa-exclamation-triangle"></i>
-                        </div>
-                        <h4>Invalid Template</h4>
-                        <p>Failed to load this template</p>
-                    </div>`;
-                }
-            }).join('');
-
-            templatesHTML += `
-                <div id="${categoryId}" class="template-category ${isActive}">
-                    <div class="templates-grid">
-                        ${categoryTemplatesHTML}
-                    </div>
-                </div>
-            `;
-
-            firstCategory = false;
-        });
-
-        categoryTabsContainer.innerHTML = categoriesHTML;
-        templatesContent.innerHTML = templatesHTML;
-
-        // Setup template events
-        this.setupTemplateEvents();
-        
-        console.log('✅ Templates modal populated successfully');
-    }
-
-    createTemplateCard(template) {
-        if (!template || typeof template !== 'object') {
-            console.error('❌ Invalid template object:', template);
-            return '<div class="template-card invalid">Invalid Template</div>';
-        }
-        
-        // Validate required fields
-        if (!template.id || !template.name || !template.code) {
-            console.error('❌ Template missing required fields:', template);
-            return '<div class="template-card invalid">Invalid Template Data</div>';
-        }
-
-        const safeTemplate = {
-            id: template.id,
-            name: template.name,
-            patterns: template.patterns || '/command',
-            code: template.code,
-            description: template.description || 'No description available',
-            waitForAnswer: Boolean(template.waitForAnswer),
-            answerHandler: template.answerHandler || ''
-        };
-
-        // Get appropriate icon
-        const templateIcon = this.getTemplateIcon(safeTemplate.name);
-
-        // FIXED: Simple JSON stringification without complex escaping
-        const templateJson = JSON.stringify(safeTemplate);
-
-        return `
-            <div class="template-card" data-template-id="${safeTemplate.id}">
-                <div class="template-content">
-                    <div class="template-icon">
-                        <i class="${templateIcon}"></i>
-                    </div>
-                    <div class="template-details">
-                        <h4>${this.escapeHtml(safeTemplate.name)}</h4>
-                        <p>${this.escapeHtml(safeTemplate.description)}</p>
-                        <div class="template-patterns">${this.escapeHtml(safeTemplate.patterns)}</div>
-                    </div>
-                </div>
-                <div class="template-footer">
-                    <span class="template-type">${safeTemplate.waitForAnswer ? 'Interactive' : 'Simple'}</span>
-                    <button class="btn-apply" data-template='${this.escapeHtml(templateJson)}'>
-                        Apply Template
-                    </button>
-                </div>
-            </div>
-        `;
-    }
-
-    setupTemplateEvents() {
-        // Template apply button events
-        document.addEventListener('click', (e) => {
-            if (e.target.classList.contains('btn-apply')) {
-                const button = e.target;
-                const templateData = button.getAttribute('data-template');
-                
-                if (templateData) {
-                    try {
-                        // Parse the template data
-                        const template = JSON.parse(templateData);
-                        console.log('🔄 Applying template from button:', template.name);
-                        this.applyTemplate(template);
-                    } catch (error) {
-                        console.error('❌ Template parse error from button:', error);
-                        this.showError('Failed to parse template data: ' + error.message);
-                    }
-                }
-            }
-        });
-
-        // Category tab events
-        document.addEventListener('click', (e) => {
-            if (e.target.classList.contains('category-tab')) {
-                const category = e.target.dataset.category;
-                const categoryTabs = document.querySelectorAll('.category-tab');
-                const templateCategories = document.querySelectorAll('.template-category');
-                
-                // Update tabs
-                categoryTabs.forEach(t => t.classList.remove('active'));
-                e.target.classList.add('active');
-                
-                // Update content
-                templateCategories.forEach(cat => cat.classList.remove('active'));
-                const targetCategory = document.getElementById(`${category}-templates`);
-                if (targetCategory) {
-                    targetCategory.classList.add('active');
-                }
-            }
-        });
-    }
-
-    getTemplateIcon(templateName) {
-        const iconMap = {
-            'welcome': 'fas fa-hand-wave',
-            'help': 'fas fa-question-circle',
-            'info': 'fas fa-info-circle',
-            'echo': 'fas fa-comment-alt',
-            'conversation': 'fas fa-comments',
-            'registration': 'fas fa-user-plus',
-            'feedback': 'fas fa-star',
-            'quiz': 'fas fa-brain',
-            'photo': 'fas fa-image',
-            'video': 'fas fa-video',
-            'document': 'fas fa-file',
-            'buttons': 'fas fa-th',
-            'keyboard': 'fas fa-keyboard',
-            'url': 'fas fa-link',
-            'data': 'fas fa-database',
-            'cleanup': 'fas fa-broom',
-            'export': 'fas fa-file-export',
-            'http': 'fas fa-cloud-download-alt',
-            'weather': 'fas fa-cloud-sun',
-            'news': 'fas fa-newspaper',
-            'admin': 'fas fa-shield-alt',
-            'broadcast': 'fas fa-bullhorn',
-            'scheduler': 'fas fa-clock',
-            'error': 'fas fa-bug',
-            'calculator': 'fas fa-calculator',
-            'python': 'fab fa-python'
-        };
-
-        const lowerName = templateName.toLowerCase();
-        for (const [key, icon] of Object.entries(iconMap)) {
-            if (lowerName.includes(key)) {
-                return icon;
-            }
-        }
-
-        return 'fas fa-code'; // Default icon
-    }
-
-    formatCategoryName(category) {
-        const nameMap = {
-            'basic': 'Basic',
-            'interactive': 'Interactive',
-            'media': 'Media',
-            'buttons': 'Buttons',
-            'data': 'Data',
-            'http': 'HTTP',
-            'advanced': 'Advanced',
-            'python': 'Python'
-        };
-        
-        return nameMap[category] || category.charAt(0).toUpperCase() + category.slice(1);
     }
 
     setupEventListeners() {
@@ -331,43 +93,98 @@ class CommandEditor {
         });
 
         // Form actions
-        document.getElementById('saveCommandBtn').addEventListener('click', (e) => {
+        document.getElementById('saveCommandBtnCompact').addEventListener('click', (e) => {
             e.preventDefault();
             this.saveCommand();
         });
 
-        document.getElementById('deleteCommandBtn').addEventListener('click', () => {
+        document.getElementById('deleteCommandBtnCompact').addEventListener('click', () => {
             this.deleteCommand();
         });
 
-        document.getElementById('toggleCommandBtn').addEventListener('click', () => {
+        document.getElementById('toggleCommandBtnCompact').addEventListener('click', () => {
             this.toggleCommand();
         });
 
-        document.getElementById('testCommandBtn').addEventListener('click', () => {
+        document.getElementById('testCommandBtnCompact').addEventListener('click', () => {
             this.testCommand();
         });
 
-        document.getElementById('runTestBtn').addEventListener('click', () => {
+        document.getElementById('runTestBtnCompact').addEventListener('click', () => {
             this.runCustomTest();
         });
 
-        // Toggle switches
-        document.getElementById('waitForAnswer').addEventListener('change', (e) => {
-            this.toggleAnswerHandler(e.target.checked);
-        });
+        // Advanced options toggle
+        const advancedToggle = document.getElementById('advancedOptionsToggle');
+        const advancedContent = document.getElementById('advancedOptionsContent');
+        const advancedIcon = document.getElementById('advancedOptionsIcon');
+        
+        if (advancedToggle && advancedContent) {
+            advancedToggle.addEventListener('click', () => {
+                advancedContent.classList.toggle('show');
+                advancedIcon.classList.toggle('fa-chevron-down');
+                advancedIcon.classList.toggle('fa-chevron-up');
+            });
+        }
 
-        // Code editor buttons
-        document.getElementById('openEditor').addEventListener('click', () => {
+        // Wait for answer toggle
+        const waitForAnswerToggle = document.getElementById('waitForAnswerCompact');
+        if (waitForAnswerToggle) {
+            waitForAnswerToggle.addEventListener('change', (e) => {
+                this.toggleAnswerHandler(e.target.checked);
+            });
+        }
+
+        // Code editor stats
+        const codeEditor = document.getElementById('commandCodeCompact');
+        if (codeEditor) {
+            codeEditor.addEventListener('input', () => {
+                this.updateCodeStats();
+            });
+        }
+
+        // Footer buttons
+        const saveFooterBtn = document.getElementById('saveFooterBtn');
+        const testFooterBtn = document.getElementById('testFooterBtn');
+        const activateFooterBtn = document.getElementById('activateFooterBtn');
+        
+        if (saveFooterBtn) {
+            saveFooterBtn.addEventListener('click', () => {
+                this.saveCommand();
+            });
+        }
+        
+        if (testFooterBtn) {
+            testFooterBtn.addEventListener('click', () => {
+                this.testCommand();
+            });
+        }
+        
+        if (activateFooterBtn) {
+            activateFooterBtn.addEventListener('click', () => {
+                this.toggleCommand();
+            });
+        }
+
+        // Format code button
+        const formatBtn = document.getElementById('formatCodeCompact');
+        if (formatBtn) {
+            formatBtn.addEventListener('click', () => {
+                this.formatCode();
+            });
+        }
+
+        // Full editor buttons
+        document.getElementById('openEditorCompact').addEventListener('click', () => {
             this.openCodeEditor('main');
         });
 
-        document.getElementById('openAnswerEditor').addEventListener('click', () => {
+        document.getElementById('openAnswerEditorCompact').addEventListener('click', () => {
             this.openCodeEditor('answer');
         });
 
         // Templates
-        document.getElementById('showTemplates').addEventListener('click', () => {
+        document.getElementById('showTemplatesCompact').addEventListener('click', () => {
             this.showTemplates();
         });
 
@@ -380,272 +197,22 @@ class CommandEditor {
             }, 300);
         });
 
+        // Command list click events
+        document.addEventListener('click', (e) => {
+            const commandGroup = e.target.closest('.command-group-compact');
+            if (commandGroup && commandGroup.dataset.commandId) {
+                const commandId = commandGroup.dataset.commandId;
+                this.selectCommand(commandId);
+            }
+        });
+
         // Modal events
         this.setupModalEvents();
     }
 
-    setupCodeEditor() {
-        const advancedEditor = document.getElementById('advancedCodeEditor');
-        if (!advancedEditor) {
-            console.error('❌ Advanced code editor not found');
-            return;
-        }
-        
-        // Setup both cancel buttons
-        const cancelEditBtn = document.getElementById('cancelEdit');
-        const cancelEditTopBtn = document.getElementById('cancelEditTop');
-        
-        // Setup both save buttons
-        const saveCodeBtn = document.getElementById('saveCode');
-        const saveCodeTopBtn = document.getElementById('saveCodeTop');
-        
-        if (cancelEditBtn) {
-            cancelEditBtn.addEventListener('click', () => {
-                this.closeCodeEditor();
-            });
-        }
-        
-        if (cancelEditTopBtn) {
-            cancelEditTopBtn.addEventListener('click', () => {
-                this.closeCodeEditor();
-            });
-        }
-        
-        if (saveCodeBtn) {
-            saveCodeBtn.addEventListener('click', () => {
-                this.saveCodeFromEditor();
-            });
-        }
-        
-        if (saveCodeTopBtn) {
-            saveCodeTopBtn.addEventListener('click', () => {
-                this.saveCodeFromEditor();
-            });
-        }
-
-        // Setup toolbar buttons
-        this.setupToolbarButtons();
-
-        advancedEditor.addEventListener('input', (e) => {
-            this.updateEditorStats(e.target.value);
-            this.updateSaveButtonState();
-        });
-
-        // Initial stats update
-        this.updateEditorStats(advancedEditor.value);
-        this.updateSaveButtonState();
-    }
-
-    setupToolbarButtons() {
-        const editor = document.getElementById('advancedCodeEditor');
-        
-        // Undo/Redo functionality
-        document.getElementById('undoBtn').addEventListener('click', () => {
-            document.execCommand('undo');
-            editor.focus();
-        });
-        
-        document.getElementById('redoBtn').addEventListener('click', () => {
-            document.execCommand('redo');
-            editor.focus();
-        });
-        
-        // Select All
-        document.getElementById('selectAllBtn').addEventListener('click', () => {
-            editor.select();
-            editor.focus();
-        });
-        
-        // Cut
-        document.getElementById('cutBtn').addEventListener('click', () => {
-            document.execCommand('cut');
-            editor.focus();
-        });
-        
-        // Copy
-        document.getElementById('copyBtn').addEventListener('click', () => {
-            document.execCommand('copy');
-            editor.focus();
-        });
-        
-        // Paste
-        document.getElementById('pasteBtn').addEventListener('click', async () => {
-            try {
-                const text = await navigator.clipboard.readText();
-                editor.setRangeText(text, editor.selectionStart, editor.selectionEnd, 'end');
-                this.updateEditorStats(editor.value);
-                this.updateSaveButtonState();
-            } catch (err) {
-                document.execCommand('paste');
-            }
-            editor.focus();
-        });
-        
-        // Clear
-        document.getElementById('clearBtn').addEventListener('click', () => {
-            if (confirm('Are you sure you want to clear all code?')) {
-                editor.value = '';
-                this.updateEditorStats('');
-                this.updateSaveButtonState();
-                editor.focus();
-            }
-        });
-        
-        // Format (basic indentation)
-        document.getElementById('formatBtn').addEventListener('click', () => {
-            this.formatCode();
-            editor.focus();
-        });
-    }
-
-    updateEditorStats(code) {
-        const lines = code.split('\n').length;
-        const chars = code.length;
-        const words = code.trim() ? code.trim().split(/\s+/).length : 0;
-        
-        const lineCountEl = document.getElementById('lineCount');
-        const charCountEl = document.getElementById('charCount');
-        const wordCountEl = document.getElementById('wordCount');
-        
-        if (lineCountEl) lineCountEl.textContent = `Lines: ${lines}`;
-        if (charCountEl) charCountEl.textContent = `Chars: ${chars}`;
-        if (wordCountEl) wordCountEl.textContent = `Words: ${words}`;
-    }
-
-    updateSaveButtonState() {
-        const advancedEditor = document.getElementById('advancedCodeEditor');
-        const saveBtn = document.getElementById('saveCode');
-        const saveTopBtn = document.getElementById('saveCodeTop');
-        
-        // Check if content has changed
-        const hasChanged = advancedEditor.value !== this.originalCode;
-        const hasContent = advancedEditor.value.trim().length > 0;
-        
-        const shouldEnable = hasContent && hasChanged;
-        
-        if (saveBtn) {
-            saveBtn.disabled = !shouldEnable;
-            saveBtn.style.opacity = shouldEnable ? '1' : '0.6';
-            if (shouldEnable) {
-                saveBtn.classList.add('btn-pulse');
-            } else {
-                saveBtn.classList.remove('btn-pulse');
-            }
-        }
-        
-        if (saveTopBtn) {
-            saveTopBtn.disabled = !shouldEnable;
-            saveTopBtn.style.opacity = shouldEnable ? '1' : '0.6';
-            if (shouldEnable) {
-                saveTopBtn.classList.add('btn-pulse');
-            } else {
-                saveTopBtn.classList.remove('btn-pulse');
-            }
-        }
-    }
-
-    formatCode() {
-        const editor = document.getElementById('advancedCodeEditor');
-        let code = editor.value;
-        
-        // Basic formatting - add proper indentation
-        const lines = code.split('\n');
-        let formattedLines = [];
-        let indentLevel = 0;
-        
-        for (let line of lines) {
-            const trimmedLine = line.trim();
-            
-            // Decrease indent for closing braces
-            if (trimmedLine.endsWith('}') || trimmedLine.endsWith(']') || trimmedLine.endsWith(')')) {
-                indentLevel = Math.max(0, indentLevel - 1);
-            }
-            
-            // Add current line with proper indentation
-            formattedLines.push('    '.repeat(indentLevel) + trimmedLine);
-            
-            // Increase indent for opening braces
-            if (trimmedLine.endsWith('{') || trimmedLine.endsWith('[') || trimmedLine.endsWith('(')) {
-                indentLevel++;
-            }
-        }
-        
-        editor.value = formattedLines.join('\n');
-        this.updateEditorStats(editor.value);
-        this.updateSaveButtonState();
-        
-        this.showSuccess('Code formatted!');
-    }
-
-    openCodeEditor(editorType) {
-        this.currentEditorType = editorType;
-        let code = '';
-        
-        if (editorType === 'main') {
-            const commandCodeEl = document.getElementById('commandCode');
-            code = commandCodeEl ? commandCodeEl.value : '';
-        } else if (editorType === 'answer') {
-            const answerHandlerEl = document.getElementById('answerHandler');
-            code = answerHandlerEl ? answerHandlerEl.value : '';
-        }
-        
-        const advancedEditor = document.getElementById('advancedCodeEditor');
-        if (advancedEditor) {
-            advancedEditor.value = code;
-            this.originalCode = code; // Store original code for change detection
-            this.updateEditorStats(code);
-            this.updateSaveButtonState();
-        }
-        
-        const codeEditorModal = document.getElementById('codeEditorModal');
-        if (codeEditorModal) {
-            codeEditorModal.style.display = 'flex';
-            // Prevent body scroll
-            document.body.style.overflow = 'hidden';
-        }
-        
-        setTimeout(() => {
-            const editor = document.getElementById('advancedCodeEditor');
-            if (editor) {
-                editor.focus();
-                // Move cursor to end
-                editor.setSelectionRange(editor.value.length, editor.value.length);
-            }
-        }, 100);
-    }
-
-    closeCodeEditor() {
-        const codeEditorModal = document.getElementById('codeEditorModal');
-        if (codeEditorModal) {
-            codeEditorModal.style.display = 'none';
-            // Restore body scroll
-            document.body.style.overflow = '';
-        }
-    }
-
-    saveCodeFromEditor() {
-        const advancedEditor = document.getElementById('advancedCodeEditor');
-        if (!advancedEditor) return;
-        
-        const code = advancedEditor.value;
-        
-        if (this.currentEditorType === 'main') {
-            const commandCodeEl = document.getElementById('commandCode');
-            if (commandCodeEl) commandCodeEl.value = code;
-        } else if (this.currentEditorType === 'answer') {
-            const answerHandlerEl = document.getElementById('answerHandler');
-            if (answerHandlerEl) answerHandlerEl.value = code;
-        }
-        
-        this.originalCode = code; // Update original code after save
-        this.updateSaveButtonState();
-        this.closeCodeEditor();
-        this.showSuccess('Code saved successfully!');
-    }
-
     setupCommandsTags() {
-        const moreCommandsInput = document.getElementById('moreCommands');
-        const commandsTags = document.getElementById('commandsTags');
+        const moreCommandsInput = document.getElementById('moreCommandsCompact');
+        const commandsTags = document.getElementById('commandsTagsCompact');
 
         if (!moreCommandsInput || !commandsTags) {
             console.error('❌ Command tags elements not found');
@@ -689,19 +256,19 @@ class CommandEditor {
     addCommandTag(command) {
         if (!command || this.commandExistsInTags(command)) return;
 
-        const commandsTags = document.getElementById('commandsTags');
+        const commandsTags = document.getElementById('commandsTagsCompact');
         if (!commandsTags) return;
 
         const tag = document.createElement('div');
-        tag.className = 'command-tag';
+        tag.className = 'command-tag-compact';
         tag.innerHTML = `
             <span class="tag-text">${this.escapeHtml(command)}</span>
-            <button type="button" class="remove-tag">
+            <button type="button" class="remove-tag-compact">
                 <i class="fas fa-times"></i>
             </button>
         `;
         
-        tag.querySelector('.remove-tag').addEventListener('click', () => {
+        tag.querySelector('.remove-tag-compact').addEventListener('click', () => {
             tag.remove();
         });
         
@@ -709,17 +276,17 @@ class CommandEditor {
     }
 
     commandExistsInTags(command) {
-        const tags = Array.from(document.querySelectorAll('.command-tag .tag-text'));
+        const tags = Array.from(document.querySelectorAll('.command-tag-compact .tag-text'));
         return tags.some(tag => tag.textContent.trim() === command);
     }
 
     getCommandsFromTags() {
-        const tags = Array.from(document.querySelectorAll('.command-tag .tag-text'));
+        const tags = Array.from(document.querySelectorAll('.command-tag-compact .tag-text'));
         return tags.map(tag => tag.textContent.trim()).filter(cmd => cmd);
     }
 
     setCommandsToTags(commands) {
-        const commandsTags = document.getElementById('commandsTags');
+        const commandsTags = document.getElementById('commandsTagsCompact');
         if (!commandsTags) return;
         
         commandsTags.innerHTML = '';
@@ -734,6 +301,268 @@ class CommandEditor {
                     this.addCommandTag(command);
                 }
             });
+        }
+    }
+
+    setupCodeEditor() {
+        const advancedEditor = document.getElementById('advancedCodeEditor');
+        if (!advancedEditor) {
+            console.error('❌ Advanced code editor not found');
+            return;
+        }
+        
+        // Setup cancel button
+        const cancelEditBtn = document.getElementById('cancelEdit');
+        if (cancelEditBtn) {
+            cancelEditBtn.addEventListener('click', () => {
+                this.closeCodeEditor();
+            });
+        }
+        
+        // Setup save button
+        const saveCodeBtn = document.getElementById('saveCode');
+        if (saveCodeBtn) {
+            saveCodeBtn.addEventListener('click', () => {
+                this.saveCodeFromEditor();
+            });
+        }
+
+        // Setup toolbar buttons
+        this.setupToolbarButtons();
+
+        advancedEditor.addEventListener('input', (e) => {
+            this.updateEditorStats(e.target.value);
+        });
+
+        // Initial stats update
+        this.updateEditorStats(advancedEditor.value);
+    }
+
+    setupToolbarButtons() {
+        const editor = document.getElementById('advancedCodeEditor');
+        
+        // Undo/Redo functionality
+        document.getElementById('undoBtn').addEventListener('click', () => {
+            document.execCommand('undo');
+            editor.focus();
+        });
+        
+        document.getElementById('redoBtn').addEventListener('click', () => {
+            document.execCommand('redo');
+            editor.focus();
+        });
+        
+        // Select All
+        document.getElementById('selectAllBtn').addEventListener('click', () => {
+            editor.select();
+            editor.focus();
+        });
+        
+        // Cut
+        document.getElementById('cutBtn').addEventListener('click', () => {
+            document.execCommand('cut');
+            editor.focus();
+        });
+        
+        // Copy
+        document.getElementById('copyBtn').addEventListener('click', () => {
+            document.execCommand('copy');
+            editor.focus();
+        });
+        
+        // Paste
+        document.getElementById('pasteBtn').addEventListener('click', async () => {
+            try {
+                const text = await navigator.clipboard.readText();
+                editor.setRangeText(text, editor.selectionStart, editor.selectionEnd, 'end');
+                this.updateEditorStats(editor.value);
+            } catch (err) {
+                document.execCommand('paste');
+            }
+            editor.focus();
+        });
+        
+        // Clear
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            if (confirm('Are you sure you want to clear all code?')) {
+                editor.value = '';
+                this.updateEditorStats('');
+                editor.focus();
+            }
+        });
+        
+        // Format (basic indentation)
+        document.getElementById('formatBtn').addEventListener('click', () => {
+            this.formatAdvancedCode();
+            editor.focus();
+        });
+    }
+
+    updateEditorStats(code) {
+        const lines = code.split('\n').length;
+        const chars = code.length;
+        const words = code.trim() ? code.trim().split(/\s+/).length : 0;
+        
+        const lineCountEl = document.getElementById('lineCount');
+        const charCountEl = document.getElementById('charCount');
+        const wordCountEl = document.getElementById('wordCount');
+        
+        if (lineCountEl) lineCountEl.textContent = `Lines: ${lines}`;
+        if (charCountEl) charCountEl.textContent = `Chars: ${chars}`;
+        if (wordCountEl) wordCountEl.textContent = `Words: ${words}`;
+    }
+
+    updateCodeStats() {
+        const codeEditor = document.getElementById('commandCodeCompact');
+        const statsElement = document.getElementById('codeStatsCompact');
+        
+        if (!codeEditor || !statsElement) return;
+        
+        const code = codeEditor.value;
+        const lines = code.split('\n').length;
+        const chars = code.length;
+        
+        statsElement.textContent = `Lines: ${lines}, Chars: ${chars}`;
+        
+        // Update last saved time when code changes
+        const lastSavedElement = document.getElementById('lastSavedCompact');
+        if (lastSavedElement && lastSavedElement.textContent !== 'Not saved yet') {
+            lastSavedElement.textContent = 'Unsaved changes';
+        }
+    }
+
+    formatCode() {
+        const editor = document.getElementById('commandCodeCompact');
+        if (!editor) return;
+        
+        let code = editor.value;
+        
+        // Basic formatting - add proper indentation
+        const lines = code.split('\n');
+        let formattedLines = [];
+        let indentLevel = 0;
+        
+        for (let line of lines) {
+            const trimmedLine = line.trim();
+            
+            // Decrease indent for closing braces
+            if (trimmedLine.endsWith('}') || trimmedLine.endsWith(']') || trimmedLine.endsWith(')')) {
+                indentLevel = Math.max(0, indentLevel - 1);
+            }
+            
+            // Add current line with proper indentation
+            formattedLines.push('    '.repeat(indentLevel) + trimmedLine);
+            
+            // Increase indent for opening braces
+            if (trimmedLine.endsWith('{') || trimmedLine.endsWith('[') || trimmedLine.endsWith('(')) {
+                indentLevel++;
+            }
+        }
+        
+        editor.value = formattedLines.join('\n');
+        this.updateCodeStats();
+        
+        this.showSuccess('Code formatted!');
+    }
+
+    formatAdvancedCode() {
+        const editor = document.getElementById('advancedCodeEditor');
+        if (!editor) return;
+        
+        let code = editor.value;
+        
+        // Basic formatting - add proper indentation
+        const lines = code.split('\n');
+        let formattedLines = [];
+        let indentLevel = 0;
+        
+        for (let line of lines) {
+            const trimmedLine = line.trim();
+            
+            // Decrease indent for closing braces
+            if (trimmedLine.endsWith('}') || trimmedLine.endsWith(']') || trimmedLine.endsWith(')')) {
+                indentLevel = Math.max(0, indentLevel - 1);
+            }
+            
+            // Add current line with proper indentation
+            formattedLines.push('    '.repeat(indentLevel) + trimmedLine);
+            
+            // Increase indent for opening braces
+            if (trimmedLine.endsWith('{') || trimmedLine.endsWith('[') || trimmedLine.endsWith('(')) {
+                indentLevel++;
+            }
+        }
+        
+        editor.value = formattedLines.join('\n');
+        this.updateEditorStats(editor.value);
+        
+        this.showSuccess('Code formatted!');
+    }
+
+    openCodeEditor(editorType) {
+        this.currentEditorType = editorType;
+        let code = '';
+        
+        if (editorType === 'main') {
+            const commandCodeEl = document.getElementById('commandCodeCompact');
+            code = commandCodeEl ? commandCodeEl.value : '';
+        } else if (editorType === 'answer') {
+            const answerHandlerEl = document.getElementById('answerHandlerCompact');
+            code = answerHandlerEl ? answerHandlerEl.value : '';
+        }
+        
+        const advancedEditor = document.getElementById('advancedCodeEditor');
+        if (advancedEditor) {
+            advancedEditor.value = code;
+            this.updateEditorStats(code);
+        }
+        
+        const codeEditorModal = document.getElementById('codeEditorModal');
+        if (codeEditorModal) {
+            codeEditorModal.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+        
+        setTimeout(() => {
+            const editor = document.getElementById('advancedCodeEditor');
+            if (editor) {
+                editor.focus();
+                editor.setSelectionRange(editor.value.length, editor.value.length);
+            }
+        }, 100);
+    }
+
+    closeCodeEditor() {
+        const codeEditorModal = document.getElementById('codeEditorModal');
+        if (codeEditorModal) {
+            codeEditorModal.style.display = 'none';
+            document.body.style.overflow = '';
+        }
+    }
+
+    saveCodeFromEditor() {
+        const advancedEditor = document.getElementById('advancedCodeEditor');
+        if (!advancedEditor) return;
+        
+        const code = advancedEditor.value;
+        
+        if (this.currentEditorType === 'main') {
+            const commandCodeEl = document.getElementById('commandCodeCompact');
+            if (commandCodeEl) commandCodeEl.value = code;
+        } else if (this.currentEditorType === 'answer') {
+            const answerHandlerEl = document.getElementById('answerHandlerCompact');
+            if (answerHandlerEl) answerHandlerEl.value = code;
+        }
+        
+        this.updateCodeStats();
+        this.closeCodeEditor();
+        this.showSuccess('Code saved successfully!');
+    }
+
+    toggleAnswerHandler(show) {
+        const section = document.getElementById('answerHandlerSectionCompact');
+        if (section) {
+            section.style.display = show ? 'block' : 'none';
         }
     }
 
@@ -792,39 +621,6 @@ class CommandEditor {
             }
         });
     }
-
-// client/js/command-editor.js - toggleAnswerHandler() method এ improvement
-toggleAnswerHandler(show) {
-    const section = document.getElementById('answerHandlerSection');
-    const waitForAnswerEl = document.getElementById('waitForAnswer');
-    const answerHandlerEl = document.getElementById('answerHandler');
-    
-    if (section) {
-        section.style.display = show ? 'block' : 'none';
-        
-        // ✅ NEW: Add visual indication for required field
-        if (show) {
-            section.classList.add('required-field');
-            if (answerHandlerEl) {
-                answerHandlerEl.placeholder = '⚠️ Required: Code to handle user\'s answer...';
-                answerHandlerEl.required = true;
-            }
-        } else {
-            section.classList.remove('required-field');
-            if (answerHandlerEl) {
-                answerHandlerEl.placeholder = 'Code to handle user\'s answer...';
-                answerHandlerEl.required = false;
-            }
-        }
-    }
-    
-    // ✅ NEW: Also validate immediately when toggled
-    if (!show) {
-        // If turning off waitForAnswer, clear any previous errors
-        const errorElements = document.querySelectorAll('.answer-handler-error');
-        errorElements.forEach(el => el.remove());
-    }
-}
 
     async loadBotInfo() {
         const urlParams = new URLSearchParams(window.location.search);
@@ -907,7 +703,7 @@ toggleAnswerHandler(show) {
         const commandsList = document.getElementById('commandsList');
         const emptyCommands = document.getElementById('emptyCommands');
         const noCommandSelected = document.getElementById('noCommandSelected');
-        const commandEditor = document.getElementById('commandEditor');
+        const commandEditor = document.getElementById('commandEditorCompact');
 
         if (!this.commands || this.commands.length === 0) {
             if (commandsList) commandsList.style.display = 'none';
@@ -926,7 +722,7 @@ toggleAnswerHandler(show) {
             const isSelected = this.currentCommand?.id === command.id;
             
             html += `
-                <div class="command-group ${isSelected ? 'active' : ''}" 
+                <div class="command-group-compact ${isSelected ? 'active' : ''}" 
                      data-command-id="${command.id}">
                     <div class="command-icon">
                         <i class="fas fa-code"></i>
@@ -953,11 +749,11 @@ toggleAnswerHandler(show) {
     }
 
     filterCommands(searchTerm) {
-        const commandGroups = document.querySelectorAll('.command-group');
+        const commandGroups = document.querySelectorAll('.command-group-compact');
         const lowerSearch = searchTerm.toLowerCase().trim();
 
         if (!lowerSearch) {
-            commandGroups.forEach(group => group.style.display = 'block');
+            commandGroups.forEach(group => group.style.display = 'flex');
             return;
         }
 
@@ -966,7 +762,7 @@ toggleAnswerHandler(show) {
             if (commandPatternEl) {
                 const commandPattern = commandPatternEl.textContent.toLowerCase();
                 const isVisible = commandPattern.includes(lowerSearch);
-                group.style.display = isVisible ? 'block' : 'none';
+                group.style.display = isVisible ? 'flex' : 'none';
             }
         });
     }
@@ -985,7 +781,7 @@ toggleAnswerHandler(show) {
         this.populateCommandForm();
         
         setTimeout(() => {
-            const moreCommandsInput = document.getElementById('moreCommands');
+            const moreCommandsInput = document.getElementById('moreCommandsCompact');
             if (moreCommandsInput) {
                 moreCommandsInput.focus();
             }
@@ -1013,7 +809,7 @@ toggleAnswerHandler(show) {
                 this.populateCommandForm();
                 
                 // Update UI selection
-                document.querySelectorAll('.command-group').forEach(group => {
+                document.querySelectorAll('.command-group-compact').forEach(group => {
                     group.classList.remove('active');
                 });
                 
@@ -1034,7 +830,7 @@ toggleAnswerHandler(show) {
 
     showCommandEditor() {
         const noCommandSelected = document.getElementById('noCommandSelected');
-        const commandEditor = document.getElementById('commandEditor');
+        const commandEditor = document.getElementById('commandEditorCompact');
         
         if (noCommandSelected) noCommandSelected.style.display = 'none';
         if (commandEditor) commandEditor.style.display = 'block';
@@ -1042,7 +838,7 @@ toggleAnswerHandler(show) {
 
     hideCommandEditor() {
         const noCommandSelected = document.getElementById('noCommandSelected');
-        const commandEditor = document.getElementById('commandEditor');
+        const commandEditor = document.getElementById('commandEditorCompact');
         
         if (noCommandSelected) noCommandSelected.style.display = 'block';
         if (commandEditor) commandEditor.style.display = 'none';
@@ -1054,156 +850,159 @@ toggleAnswerHandler(show) {
         
         this.setCommandsToTags(this.currentCommand.command_patterns);
         
-        const commandCodeEl = document.getElementById('commandCode');
+        const commandCodeEl = document.getElementById('commandCodeCompact');
         if (commandCodeEl) commandCodeEl.value = this.currentCommand.code || '';
         
-        const waitToggle = document.getElementById('waitForAnswer');
+        const waitToggle = document.getElementById('waitForAnswerCompact');
         if (waitToggle) {
             waitToggle.checked = this.currentCommand.wait_for_answer || false;
             this.toggleAnswerHandler(waitToggle.checked);
         }
         
-        const answerHandlerEl = document.getElementById('answerHandler');
+        const answerHandlerEl = document.getElementById('answerHandlerCompact');
         if (answerHandlerEl) answerHandlerEl.value = this.currentCommand.answer_handler || '';
         
-        const currentCommandNameEl = document.getElementById('currentCommandName');
+        const currentCommandNameEl = document.getElementById('currentCommandNameCompact');
         if (currentCommandNameEl) currentCommandNameEl.textContent = 'Command Editor';
         
-        const commandIdEl = document.getElementById('commandId');
+        const commandIdEl = document.getElementById('commandIdCompact');
         if (commandIdEl) commandIdEl.textContent = `ID: ${this.currentCommand.id}`;
         
-        const statusBadge = document.getElementById('commandStatus');
+        const statusBadge = document.getElementById('commandStatusCompact');
         if (statusBadge) {
             statusBadge.textContent = this.currentCommand.is_active ? 'Active' : 'Inactive';
-            statusBadge.className = `status-badge ${this.currentCommand.is_active ? 'active' : 'inactive'}`;
+            statusBadge.className = `command-status-badge ${this.currentCommand.is_active ? 'status-active' : 'status-inactive'}`;
         }
         
-        this.updateButtonStates();
-    }
-
-    updateButtonStates() {
-        const isNew = this.currentCommand?.id === 'new';
-        const deleteBtn = document.getElementById('deleteCommandBtn');
-        const toggleBtn = document.getElementById('toggleCommandBtn');
-        
-        if (deleteBtn) {
-            deleteBtn.disabled = isNew;
+        // Update footer button
+        const activateBtn = document.getElementById('activateFooterBtn');
+        if (activateBtn) {
+            activateBtn.innerHTML = this.currentCommand.is_active ? 
+                '<i class="fas fa-power-off"></i> Deactivate' : 
+                '<i class="fas fa-power-off"></i> Activate';
         }
         
-        if (toggleBtn) {
-            const text = this.currentCommand?.is_active ? 'Deactivate' : 'Activate';
-            toggleBtn.innerHTML = `<i class="fas fa-power-off"></i> ${text}`;
+        this.updateCodeStats();
+        
+        // Reset last saved
+        const lastSavedElement = document.getElementById('lastSavedCompact');
+        if (lastSavedElement) {
+            lastSavedElement.textContent = 'Not saved yet';
         }
     }
 
-// client/js/command-editor.js - saveCommand() method এ যোগ করুন
-async saveCommand() {
-    if (!this.currentCommand || !this.currentBot) {
-        this.showError('No command selected or bot not loaded');
-        return false;
-    }
-
-    const commands = this.getCommandsFromTags();
-    
-    if (commands.length === 0) {
-        this.showError('Please add at least one command pattern');
-        const moreCommandsInput = document.getElementById('moreCommands');
-        if (moreCommandsInput) moreCommandsInput.focus();
-        return false;
-    }
-
-    const commandCodeEl = document.getElementById('commandCode');
-    const commandCode = commandCodeEl ? commandCodeEl.value.trim() : '';
-
-    if (!commandCode) {
-        this.showError('Command code is required');
-        if (commandCodeEl) commandCodeEl.focus();
-        return false;
-    }
-
-    const waitForAnswerEl = document.getElementById('waitForAnswer');
-    const answerHandlerEl = document.getElementById('answerHandler');
-    
-    const waitForAnswer = waitForAnswerEl ? waitForAnswerEl.checked : false;
-    const answerHandler = waitForAnswer && answerHandlerEl ? answerHandlerEl.value.trim() : '';
-
-    // ✅ NEW: Client-side validation
-    if (waitForAnswer && !answerHandler) {
-        this.showError('Answer handler code is required when "Wait for Answer" is enabled');
-        if (answerHandlerEl) {
-            answerHandlerEl.focus();
-            // Show the answer handler section if hidden
-            const answerSection = document.getElementById('answerHandlerSection');
-            if (answerSection) answerSection.style.display = 'block';
-        }
-        return false;
-    }
-
-    const formData = {
-        commandPatterns: commands.join(','),
-        code: commandCode,
-        waitForAnswer: waitForAnswer,
-        answerHandler: answerHandler,
-        botToken: this.currentBot.token
-    };
-
-    this.showLoading(true);
-
-    try {
-        const token = localStorage.getItem('token');
-        let response;
-        let url;
-        let method;
-
-        if (this.currentCommand.id === 'new') {
-            url = '/api/commands';
-            method = 'POST';
-        } else {
-            url = `/api/commands/${this.currentCommand.id}`;
-            method = 'PUT';
-        }
-
-        response = await fetch(url, {
-            method: method,
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(formData)
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-            this.showSuccess('Command saved successfully!');
-            
-            await this.loadCommands();
-            
-            if (data.command) {
-                this.currentCommand = data.command;
-                this.populateCommandForm();
-                
-                // Auto-select the saved command
-                setTimeout(() => {
-                    const commandGroup = document.querySelector(`[data-command-id="${this.currentCommand.id}"]`);
-                    if (commandGroup) {
-                        commandGroup.click();
-                    }
-                }, 500);
-            }
-            
-            return true;
-        } else {
-            this.showError(data.error || 'Failed to save command');
+    async saveCommand() {
+        if (!this.currentCommand || !this.currentBot) {
+            this.showError('No command selected or bot not loaded');
             return false;
         }
-    } catch (error) {
-        this.showError('Network error while saving command');
-        return false;
-    } finally {
-        this.showLoading(false);
+
+        const commands = this.getCommandsFromTags();
+        
+        if (commands.length === 0) {
+            this.showError('Please add at least one command pattern');
+            const moreCommandsInput = document.getElementById('moreCommandsCompact');
+            if (moreCommandsInput) moreCommandsInput.focus();
+            return false;
+        }
+
+        const commandCodeEl = document.getElementById('commandCodeCompact');
+        const commandCode = commandCodeEl ? commandCodeEl.value.trim() : '';
+
+        if (!commandCode) {
+            this.showError('Command code is required');
+            if (commandCodeEl) commandCodeEl.focus();
+            return false;
+        }
+
+        const waitForAnswerEl = document.getElementById('waitForAnswerCompact');
+        const answerHandlerEl = document.getElementById('answerHandlerCompact');
+        
+        const waitForAnswer = waitForAnswerEl ? waitForAnswerEl.checked : false;
+        const answerHandler = waitForAnswer && answerHandlerEl ? answerHandlerEl.value.trim() : '';
+
+        if (waitForAnswer && !answerHandler) {
+            this.showError('Answer handler code is required when "Wait for Answer" is enabled');
+            if (answerHandlerEl) {
+                answerHandlerEl.focus();
+                const answerSection = document.getElementById('answerHandlerSectionCompact');
+                if (answerSection) answerSection.style.display = 'block';
+            }
+            return false;
+        }
+
+        const formData = {
+            commandPatterns: commands.join(','),
+            code: commandCode,
+            waitForAnswer: waitForAnswer,
+            answerHandler: answerHandler,
+            botToken: this.currentBot.token
+        };
+
+        this.showLoading(true);
+
+        try {
+            const token = localStorage.getItem('token');
+            let response;
+            let url;
+            let method;
+
+            if (this.currentCommand.id === 'new') {
+                url = '/api/commands';
+                method = 'POST';
+            } else {
+                url = `/api/commands/${this.currentCommand.id}`;
+                method = 'PUT';
+            }
+
+            response = await fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.showSuccess('Command saved successfully!');
+                
+                // Update last saved time
+                const lastSavedElement = document.getElementById('lastSavedCompact');
+                if (lastSavedElement) {
+                    const now = new Date();
+                    lastSavedElement.textContent = `Last saved: ${now.toLocaleTimeString()}`;
+                }
+                
+                await this.loadCommands();
+                
+                if (data.command) {
+                    this.currentCommand = data.command;
+                    this.populateCommandForm();
+                    
+                    // Auto-select the saved command
+                    setTimeout(() => {
+                        const commandGroup = document.querySelector(`[data-command-id="${this.currentCommand.id}"]`);
+                        if (commandGroup) {
+                            commandGroup.click();
+                        }
+                    }, 500);
+                }
+                
+                return true;
+            } else {
+                this.showError(data.error || 'Failed to save command');
+                return false;
+            }
+        } catch (error) {
+            this.showError('Network error while saving command');
+            return false;
+        } finally {
+            this.showLoading(false);
+        }
     }
-}
 
     async deleteCommand() {
         if (!this.currentCommand || this.currentCommand.id === 'new') {
@@ -1290,7 +1089,7 @@ async saveCommand() {
             return;
         }
 
-        const commandCodeEl = document.getElementById('commandCode');
+        const commandCodeEl = document.getElementById('commandCodeCompact');
         const commandCode = commandCodeEl ? commandCodeEl.value.trim() : '';
         
         if (!commandCode) {
@@ -1304,8 +1103,8 @@ async saveCommand() {
         try {
             const token = localStorage.getItem('token');
             
-            const waitForAnswerEl = document.getElementById('waitForAnswer');
-            const answerHandlerEl = document.getElementById('answerHandler');
+            const waitForAnswerEl = document.getElementById('waitForAnswerCompact');
+            const answerHandlerEl = document.getElementById('answerHandlerCompact');
             
             const tempCommand = {
                 command_patterns: commands.join(','),
@@ -1359,7 +1158,7 @@ async saveCommand() {
             return;
         }
 
-        const testInputEl = document.getElementById('testInput');
+        const testInputEl = document.getElementById('testInputCompact');
         const testInput = testInputEl ? testInputEl.value.trim() : '';
         const commands = this.getCommandsFromTags();
         
@@ -1368,7 +1167,7 @@ async saveCommand() {
             return;
         }
 
-        const commandCodeEl = document.getElementById('commandCode');
+        const commandCodeEl = document.getElementById('commandCodeCompact');
         const commandCode = commandCodeEl ? commandCodeEl.value.trim() : '';
         
         if (!commandCode) {
@@ -1382,8 +1181,8 @@ async saveCommand() {
         try {
             const token = localStorage.getItem('token');
             
-            const waitForAnswerEl = document.getElementById('waitForAnswer');
-            const answerHandlerEl = document.getElementById('answerHandler');
+            const waitForAnswerEl = document.getElementById('waitForAnswerCompact');
+            const answerHandlerEl = document.getElementById('answerHandlerCompact');
             
             const tempCommand = {
                 command_patterns: testInput || commands.join(','),
@@ -1410,7 +1209,6 @@ async saveCommand() {
             if (response.ok) {
                 let resultText = data.result || 'Command executed successfully';
                 
-                // Handle object results
                 if (typeof resultText === 'object') {
                     if (resultText.message) {
                         resultText = resultText.message;
@@ -1453,6 +1251,16 @@ async saveCommand() {
         }
     }
 
+    showTemplates() {
+        const modal = document.getElementById('templatesModal');
+        if (!modal) {
+            this.showError('Templates modal not found');
+            return;
+        }
+        
+        modal.style.display = 'flex';
+    }
+
     showTestModal() {
         const testCommandModal = document.getElementById('testCommandModal');
         if (testCommandModal) {
@@ -1491,126 +1299,6 @@ async saveCommand() {
                     ${html}
                 </div>
             `;
-        }
-    }
-
-    showTemplates() {
-        const modal = document.getElementById('templatesModal');
-        if (!modal) {
-            this.showError('Templates modal not found');
-            return;
-        }
-        
-        modal.style.display = 'flex';
-        
-        // Load templates if not already loaded
-        if (Object.keys(this.templates).length === 0) {
-            this.loadTemplates();
-        }
-    }
-
-    applyTemplate(template) {
-        try {
-            console.log('🔄 Starting template application:', template);
-
-            // Validate template
-            if (!template || typeof template !== 'object') {
-                throw new Error('Template data is invalid or empty');
-            }
-
-            if (!template.code) {
-                throw new Error('Template code is missing');
-            }
-
-            // Create new command if none exists
-            if (!this.currentCommand || this.currentCommand.id !== 'new') {
-                console.log('📝 Creating new command for template...');
-                this.addNewCommand();
-                
-                // Wait for form to be ready
-                setTimeout(() => {
-                    this.finalizeTemplateApplication(template);
-                }, 100);
-            } else {
-                this.finalizeTemplateApplication(template);
-            }
-
-        } catch (error) {
-            console.error('❌ Template application failed:', error);
-            this.showError('Template application failed: ' + error.message);
-        }
-    }
-
-    finalizeTemplateApplication(template) {
-        try {
-            console.log('🎯 Finalizing template application:', template.name);
-
-            // 1. Set command patterns
-            if (template.patterns) {
-                this.setCommandsToTags(template.patterns);
-                console.log('✅ Patterns set:', template.patterns);
-            }
-
-            // 2. Set main code (FIXED: Properly handle code)
-            const commandCodeEl = document.getElementById('commandCode');
-            if (commandCodeEl && template.code) {
-                // Clean the code - fix escaped characters
-                let cleanCode = template.code;
-                
-                // Replace escaped characters
-                cleanCode = cleanCode.replace(/\\\\n/g, '\n');
-                cleanCode = cleanCode.replace(/\\\\t/g, '\t');
-                cleanCode = cleanCode.replace(/\\\\"/g, '"');
-                cleanCode = cleanCode.replace(/\\\\'/g, "'");
-                cleanCode = cleanCode.replace(/\\\\\\\\/g, '\\');
-                
-                commandCodeEl.value = cleanCode;
-                console.log('✅ Code applied, length:', cleanCode.length);
-            }
-
-            // 3. Handle wait for answer
-            const waitForAnswerEl = document.getElementById('waitForAnswer');
-            if (waitForAnswerEl) {
-                const shouldWait = Boolean(template.waitForAnswer);
-                waitForAnswerEl.checked = shouldWait;
-                this.toggleAnswerHandler(shouldWait);
-                console.log('✅ Wait for answer:', shouldWait);
-            }
-
-            // 4. Set answer handler if needed
-            const answerHandlerEl = document.getElementById('answerHandler');
-            if (answerHandlerEl && template.answerHandler) {
-                let cleanAnswerHandler = template.answerHandler;
-                cleanAnswerHandler = cleanAnswerHandler.replace(/\\\\n/g, '\n');
-                cleanAnswerHandler = cleanAnswerHandler.replace(/\\\\t/g, '\t');
-                answerHandlerEl.value = cleanAnswerHandler;
-                console.log('✅ Answer handler applied');
-            }
-
-            // 5. Close templates modal
-            const templatesModal = document.getElementById('templatesModal');
-            if (templatesModal) {
-                templatesModal.style.display = 'none';
-            }
-
-            // 6. Focus on code editor
-            setTimeout(() => {
-                const commandCodeEl = document.getElementById('commandCode');
-                if (commandCodeEl) {
-                    commandCodeEl.focus();
-                    commandCodeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }
-            }, 200);
-
-            // 7. Show success message
-            this.showSuccess(`"${template.name}" template applied successfully! 🎉`);
-
-            // 8. Debug log
-            console.log('✅ Template application completed successfully');
-
-        } catch (error) {
-            console.error('❌ Final template application error:', error);
-            this.showError('Failed to apply template: ' + error.message);
         }
     }
 
@@ -1719,34 +1407,9 @@ async saveCommand() {
     }
 }
 
-// Initialize command editor
-let commandEditor;
+// Initialize compact command editor
+let compactCommandEditor;
 
 document.addEventListener('DOMContentLoaded', () => {
-    commandEditor = new CommandEditor();
-    
-    // Add click event for command groups
-    document.addEventListener('click', (e) => {
-        const commandGroup = e.target.closest('.command-group');
-        if (commandGroup && commandGroup.dataset.commandId) {
-            const commandId = commandGroup.dataset.commandId;
-            
-            // Prevent multiple rapid clicks
-            if (commandEditor.currentCommand?.id === commandId) {
-                return;
-            }
-            
-            if (commandEditor.selectCommand) {
-                commandEditor.selectCommand(commandId);
-            }
-        }
-    });
-    
-    // Add event listener for waitForAnswer toggle
-    const waitForAnswerToggle = document.getElementById('waitForAnswer');
-    if (waitForAnswerToggle && commandEditor) {
-        waitForAnswerToggle.addEventListener('change', (e) => {
-            commandEditor.toggleAnswerHandler(e.target.checked);
-        });
-    }
+    compactCommandEditor = new CompactCommandEditor();
 });
