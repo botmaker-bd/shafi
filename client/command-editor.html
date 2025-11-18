@@ -1276,108 +1276,56 @@
             }
 
             async loadTemplates() {
-                try {
-                    const token = localStorage.getItem('token');
-                    console.log('🔄 Loading templates from API...');
-                    
-                    // Simulate API call - replace with actual API endpoint
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                    
-                    // Sample templates data
-                    this.templates = {
-                        'basic': [
-                            {
-                                id: 'welcome_template',
-                                name: 'Welcome Message',
-                                patterns: '/start, hello, hi',
-                                description: 'Send a welcome message to new users',
-                                code: `// Welcome command template
-const user = getUser();
-const welcomeMessage = \`Hello \${user.first_name}! 👋
-
-Welcome to our bot! Here's what I can do for you:
-
-• /help - Show help information
-• /settings - Configure your preferences
-• /info - Get bot information
-
-Feel free to explore! 😊\`;
-
-Api.sendMessage(welcomeMessage);`,
-                                waitForAnswer: false,
-                                answerHandler: ''
-                            },
-                            {
-                                id: 'echo_template',
-                                name: 'Echo Command',
-                                patterns: '/echo, repeat',
-                                description: 'Echo back user message',
-                                code: `// Echo command template
-const message = getMessage();
-if (message.text) {
-    Api.sendMessage(\`You said: \${message.text}\`);
-} else {
-    Api.sendMessage('Please send a text message to echo.');
-}`,
-                                waitForAnswer: false,
-                                answerHandler: ''
-                            }
-                        ],
-                        'interactive': [
-                            {
-                                id: 'feedback_template',
-                                name: 'Feedback Collector',
-                                patterns: '/feedback, opinion',
-                                description: 'Collect user feedback with interactive buttons',
-                                code: `// Feedback collection template
-Api.sendMessage('How would you rate our service?', {
-    reply_markup: {
-        inline_keyboard: [
-            [
-                { text: '⭐ Excellent', callback_data: 'feedback_excellent' },
-                { text: '👍 Good', callback_data: 'feedback_good' }
-            ],
-            [
-                { text: '😐 Average', callback_data: 'feedback_average' },
-                { text: '👎 Poor', callback_data: 'feedback_poor' }
-            ]
-        ]
-    }
-});`,
-                                waitForAnswer: true,
-                                answerHandler: `// Handle feedback response
-const feedback = getCallbackData();
-const user = getUser();
-
-switch(feedback) {
-    case 'feedback_excellent':
-        Api.sendMessage('🎉 Thank you for the excellent rating!');
-        User.saveData('feedback', 'excellent');
-        break;
-    case 'feedback_good':
-        Api.sendMessage('👍 Thanks for the positive feedback!');
-        User.saveData('feedback', 'good');
-        break;
-    case 'feedback_average':
-        Api.sendMessage('😊 We appreciate your honest feedback!');
-        User.saveData('feedback', 'average');
-        break;
-    case 'feedback_poor':
-        Api.sendMessage('😔 We\'re sorry to hear that. We\'ll improve!');
-        User.saveData('feedback', 'poor');
-        break;
-}`
-                            }
-                        ]
-                    };
-                    
-                    console.log('✅ Templates loaded successfully');
-                    this.populateTemplatesModal();
-                } catch (error) {
-                    console.error('❌ Load templates error:', error);
-                    this.showError('Failed to load templates');
+        try {
+            const token = localStorage.getItem('token');
+            console.log('🔄 Loading templates from API...');
+            
+            const response = await fetch('/api/templates', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
                 }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
+
+            const data = await response.json();
+            console.log('📦 Templates API response:', data);
+
+            if (data.success) {
+                this.templates = data.templates || {};
+                console.log(`✅ Loaded ${Object.keys(this.templates).length} template categories`);
+                
+                // Debug: Log template counts
+                Object.entries(this.templates).forEach(([category, templates]) => {
+                    console.log(`📁 ${category}: ${templates?.length || 0} templates`);
+                });
+                
+                this.populateTemplatesModal();
+            } else {
+                throw new Error(data.error || 'Failed to load templates');
+            }
+        } catch (error) {
+            console.error('❌ Load templates error:', error);
+            this.showError('Failed to load templates: ' + error.message);
+            // Fallback with basic templates
+            this.templates = {
+                'basic': [
+                    {
+                        id: 'fallback_welcome',
+                        name: 'Welcome Message',
+                        patterns: '/start, hello',
+                        description: 'Basic welcome template',
+                        code: 'const user = getUser();\nApi.sendMessage(`Hello ${user.first_name}! Welcome to our bot.`);',
+                        waitForAnswer: false,
+                        answerHandler: ''
+                    }
+                ]
+            };
+            this.populateTemplatesModal();
+        }
+    }
 
             async loadCommands() {
                 if (!this.currentBot) return;
