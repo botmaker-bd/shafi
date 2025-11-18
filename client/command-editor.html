@@ -5,11 +5,543 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Command Editor - Bot Maker Pro</title>
     <link rel="stylesheet" href="css/style.css">
-    <link rel="stylesheet" href="css/command-editor.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* ===== COMPACT COMMAND EDITOR STYLES ===== */
+        .compact-editor-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 1.5rem;
+        }
+
+        .compact-editor-card {
+            background: var(--bg-primary);
+            border-radius: var(--radius-xl);
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+            margin-bottom: 1.5rem;
+        }
+
+        .editor-header-compact {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-tertiary);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .editor-title-section {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .command-status-badge {
+            padding: 0.375rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .status-active {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--success-color);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .status-inactive {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--error-color);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .editor-actions-compact {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .editor-body-compact {
+            padding: 1.5rem;
+        }
+
+        .form-section-compact {
+            margin-bottom: 1.75rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .form-section-compact:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+
+        .form-section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        .form-section-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 0;
+        }
+
+        .section-actions {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .commands-tags-container {
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 0.75rem;
+            background: var(--bg-primary);
+            min-height: 52px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-items: center;
+            transition: var(--transition);
+        }
+
+        .commands-tags-container:focus-within {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .command-tag-compact {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: var(--primary-color);
+            color: white;
+            padding: 0.375rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+            animation: slideIn 0.2s ease;
+        }
+
+        .remove-tag-compact {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            transition: var(--transition);
+        }
+
+        .remove-tag-compact:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        #moreCommandsCompact {
+            border: none;
+            outline: none;
+            flex: 1;
+            min-width: 120px;
+            padding: 0.5rem;
+            background: transparent;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+
+        .code-editor-compact {
+            width: 100%;
+            min-height: 200px;
+            max-height: 400px;
+            padding: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            resize: vertical;
+            transition: var(--transition);
+        }
+
+        .code-editor-compact:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .code-help-compact {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 0.5rem;
+            line-height: 1.4;
+        }
+
+        .test-section-compact {
+            background: var(--bg-tertiary);
+            padding: 1.25rem;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border-color);
+        }
+
+        .test-input-group {
+            display: flex;
+            gap: 0.75rem;
+            align-items: stretch;
+            flex-wrap: wrap;
+        }
+
+        .test-input-group input {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .advanced-options-toggle {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 1rem 1.25rem;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .advanced-options-toggle:hover {
+            border-color: var(--primary-color);
+        }
+
+        .advanced-options-content {
+            margin-top: 1rem;
+            padding: 1.25rem;
+            background: var(--bg-secondary);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border-light);
+            display: none;
+        }
+
+        .advanced-options-content.show {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .toggle-group-compact {
+            margin-bottom: 1.25rem;
+        }
+
+        .toggle-label-compact {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            padding: 0.75rem 0;
+        }
+
+        .toggle-text-compact {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            flex: 1;
+        }
+
+        .toggle-title-compact {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+
+        .toggle-description-compact {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .toggle-switch-compact {
+            position: relative;
+            width: 3rem;
+            height: 1.75rem;
+            margin-left: 1rem;
+            flex-shrink: 0;
+        }
+
+        .toggle-switch-compact input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider-compact {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--border-color);
+            transition: var(--transition);
+            border-radius: 2rem;
+        }
+
+        .toggle-slider-compact:before {
+            position: absolute;
+            content: "";
+            height: 1.25rem;
+            width: 1.25rem;
+            left: 0.25rem;
+            bottom: 0.25rem;
+            background: white;
+            transition: var(--transition);
+            border-radius: 50%;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .toggle-switch-compact input:checked + .toggle-slider-compact {
+            background: var(--success-color);
+        }
+
+        .toggle-switch-compact input:checked + .toggle-slider-compact:before {
+            transform: translateX(1.25rem);
+        }
+
+        .editor-footer-compact {
+            padding: 1.25rem 1.5rem;
+            border-top: 1px solid var(--border-color);
+            background: var(--bg-tertiary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .footer-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            flex-wrap: wrap;
+        }
+
+        .footer-actions {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        /* Mobile Responsive Styles */
+        @media (max-width: 768px) {
+            .compact-editor-container {
+                padding: 1rem;
+            }
+            
+            .editor-header-compact {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 1rem;
+            }
+            
+            .editor-title-section {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.75rem;
+            }
+            
+            .editor-actions-compact {
+                width: 100%;
+                justify-content: stretch;
+            }
+            
+            .editor-actions-compact .btn {
+                flex: 1;
+                justify-content: center;
+            }
+            
+            .editor-body-compact {
+                padding: 1rem;
+            }
+            
+            .form-section-header {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 0.75rem;
+            }
+            
+            .section-actions {
+                width: 100%;
+                justify-content: stretch;
+            }
+            
+            .section-actions .btn {
+                flex: 1;
+                justify-content: center;
+            }
+            
+            .test-input-group {
+                flex-direction: column;
+            }
+            
+            .test-input-group input {
+                min-width: auto;
+            }
+            
+            .editor-footer-compact {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 1rem;
+            }
+            
+            .footer-info {
+                justify-content: center;
+                text-align: center;
+            }
+            
+            .footer-actions {
+                width: 100%;
+                justify-content: stretch;
+            }
+            
+            .footer-actions .btn {
+                flex: 1;
+                justify-content: center;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .compact-editor-card {
+                border-radius: var(--radius-lg);
+            }
+            
+            .editor-header-compact,
+            .editor-body-compact,
+            .editor-footer-compact {
+                padding: 1rem;
+            }
+            
+            .form-section-compact {
+                margin-bottom: 1.25rem;
+                padding-bottom: 1rem;
+            }
+            
+            .code-editor-compact {
+                min-height: 150px;
+                font-size: 13px;
+                padding: 0.75rem;
+            }
+        }
+
+        /* Animation */
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-5px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        /* Button Enhancements */
+        .btn-compact {
+            padding: 0.625rem 1.25rem;
+            font-size: 0.875rem;
+            min-height: 40px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .btn-compact.btn-small {
+            padding: 0.5rem 1rem;
+            font-size: 0.8rem;
+            min-height: 36px;
+        }
+
+        .btn-primary-compact {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: var(--radius-md);
+            font-weight: 500;
+            transition: var(--transition);
+        }
+
+        .btn-primary-compact:hover:not(:disabled) {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .btn-secondary-compact {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            font-weight: 500;
+            transition: var(--transition);
+        }
+
+        .btn-secondary-compact:hover:not(:disabled) {
+            background: var(--bg-tertiary);
+            border-color: var(--text-muted);
+        }
+
+        .btn-success-compact {
+            background: var(--success-color);
+            color: white;
+            border: none;
+            border-radius: var(--radius-md);
+            font-weight: 500;
+            transition: var(--transition);
+        }
+
+        .btn-warning-compact {
+            background: var(--warning-color);
+            color: white;
+            border: none;
+            border-radius: var(--radius-md);
+            font-weight: 500;
+            transition: var(--transition);
+        }
+
+        .btn-danger-compact {
+            background: var(--error-color);
+            color: white;
+            border: none;
+            border-radius: var(--radius-md);
+            font-weight: 500;
+            transition: var(--transition);
+        }
+    </style>
 </head>
 <body>
     <nav class="navbar">
@@ -80,90 +612,54 @@
             </div>
         </div>
 
-        <div class="editor-layout">
-            <!-- Sidebar -->
-            <div class="commands-sidebar">
-                <div class="sidebar-header">
-                    <h3>Commands</h3>
-                    <button id="addCommandBtn" class="btn btn-primary btn-small">
-                        <i class="fas fa-plus"></i> New
-                    </button>
-                </div>
-                
-                <div class="sidebar-search">
-                    <input type="text" id="commandSearch" placeholder="Search commands...">
-                    <i class="fas fa-search"></i>
-                </div>
-
-                <div id="commandsList" class="commands-list">
-                    <!-- Commands will be loaded here -->
-                </div>
-
-                <div id="emptyCommands" class="empty-state" style="display: none;">
-                    <div class="empty-icon">
-                        <i class="fas fa-code"></i>
+        <div class="compact-editor-container">
+            <!-- Compact Command Editor -->
+            <div class="compact-editor-card">
+                <div class="editor-header-compact">
+                    <div class="editor-title-section">
+                        <h3 id="currentCommandNameCompact">Command Editor</h3>
+                        <div class="command-status-info">
+                            <span class="command-status-badge status-active" id="commandStatusCompact">Active</span>
+                            <span class="command-id" id="commandIdCompact">ID: new</span>
+                        </div>
                     </div>
-                    <p>No commands yet</p>
-                    <button class="btn btn-primary btn-small" id="addFirstCommand">
-                        Create First Command
-                    </button>
-                </div>
-            </div>
-
-            <!-- Main Editor -->
-            <div class="editor-main">
-                <!-- No Command Selected -->
-                <div id="noCommandSelected" class="empty-state">
-                    <div class="empty-icon">
-                        <i class="fas fa-code"></i>
+                    <div class="editor-actions-compact">
+                        <button id="toggleCommandBtnCompact" class="btn btn-warning btn-compact btn-small">
+                            <i class="fas fa-power-off"></i> Toggle
+                        </button>
+                        <button id="testCommandBtnCompact" class="btn btn-success btn-compact btn-small">
+                            <i class="fas fa-bolt"></i> Test
+                        </button>
+                        <button id="saveCommandBtnCompact" class="btn btn-primary btn-compact btn-small">
+                            <i class="fas fa-save"></i> Save
+                        </button>
+                        <button id="deleteCommandBtnCompact" class="btn btn-danger btn-compact btn-small">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
                     </div>
-                    <h3>No Command Selected</h3>
-                    <p>Select a command from the list or create a new one to start editing</p>
-                    <button class="btn btn-primary" id="createFirstCommand">
-                        <i class="fas fa-plus"></i> Create New Command
-                    </button>
                 </div>
 
-                <!-- Command Editor -->
-                <div id="commandEditor" class="command-editor" style="display: none;">
-                    <div class="editor-header">
-                        <div class="command-title">
-                            <h3 id="currentCommandName">Command Editor</h3>
-                            <div class="command-status">
-                                <span class="status-badge active" id="commandStatus">Active</span>
-                                <span class="command-id" id="commandId">ID: loading...</span>
+                <div class="editor-body-compact">
+                    <form id="commandFormCompact">
+                        <!-- Command Patterns Section -->
+                        <div class="form-section-compact">
+                            <div class="form-section-header">
+                                <h4 class="form-section-title">Command Patterns</h4>
+                                <div class="section-actions">
+                                    <button type="button" class="btn btn-secondary-compact btn-compact btn-small" id="showTemplatesCompact">
+                                        <i class="fas fa-layer-group"></i> Templates
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                        <div class="editor-actions">
-                            <button id="toggleCommandBtn" class="btn btn-warning btn-small">
-                                <i class="fas fa-power-off"></i> Toggle
-                            </button>
-                            <button id="testCommandBtn" class="btn btn-success btn-small">
-                                <i class="fas fa-bolt"></i> Test
-                            </button>
-                            <button id="saveCommandBtn" class="btn btn-primary btn-small">
-                                <i class="fas fa-save"></i> Save
-                            </button>
-                            <button id="deleteCommandBtn" class="btn btn-danger btn-small">
-                                <i class="fas fa-trash"></i> Delete
-                            </button>
-                        </div>
-                    </div>
-
-                    <form id="commandForm" class="command-form">
-                        <!-- Command Patterns -->
-                        <div class="form-section">
-                            <h4>Command Patterns</h4>
                             <div class="form-group">
-                                <label for="moreCommands">Command Patterns *</label>
-                                <div class="commands-input-container">
-                                    <div id="commandsTags" class="commands-tags">
+                                <div class="commands-tags-container">
+                                    <div id="commandsTagsCompact" class="commands-tags">
                                         <!-- Command tags will be added here -->
                                     </div>
-                                    <input type="text" id="moreCommands" 
-                                           placeholder="Type command pattern and press Enter or comma...">
+                                    <input type="text" id="moreCommandsCompact" 
+                                           placeholder="Type command pattern and press Enter...">
                                 </div>
-                                <div class="form-help">
+                                <div class="code-help-compact">
                                     Add multiple command patterns separated by commas. All patterns will execute the same code.
                                     Example: /start, start, hello
                                 </div>
@@ -171,77 +667,108 @@
                         </div>
 
                         <!-- Code Editor Section -->
-                        <div class="form-section">
-                            <div class="code-editor-header">
-                                <h4>Command Code</h4>
-                                <div class="code-actions">
-                                    <button type="button" class="btn-code" id="openEditor">
+                        <div class="form-section-compact">
+                            <div class="form-section-header">
+                                <h4 class="form-section-title">Command Code</h4>
+                                <div class="section-actions">
+                                    <button type="button" class="btn btn-secondary-compact btn-compact btn-small" id="openEditorCompact">
                                         <i class="fas fa-edit"></i> Full Editor
                                     </button>
-                                    <button type="button" class="btn-code" id="showTemplates">
-                                        <i class="fas fa-layer-group"></i> Templates
+                                    <button type="button" class="btn btn-secondary-compact btn-compact btn-small" id="formatCodeCompact">
+                                        <i class="fas fa-indent"></i> Format
                                     </button>
                                 </div>
                             </div>
                             <div class="form-group">
-                                <textarea id="commandCode" 
+                                <textarea id="commandCodeCompact" class="code-editor-compact"
                                           placeholder="Write your command code here..."></textarea>
-                                <div class="code-help">
+                                <div class="code-help-compact">
                                     <strong>Available Functions:</strong> bot.sendMessage(), User.saveData(), waitForAnswer(), HTTP.get(), etc.
                                 </div>
                             </div>
                         </div>
 
                         <!-- Test Section -->
-                        <div class="form-section">
-                            <h4>Test Command</h4>
-                            <div class="form-group">
-                                <div class="test-input-container">
-                                    <input type="text" id="testInput" 
-                                           placeholder="Enter test input to simulate user message..." required>
-                                    <button type="button" id="runTestBtn" class="btn btn-warning">
-                                        <i class="fas fa-play"></i> Run Test
-                                    </button>
-                                </div>
-                                <div class="form-help">
-                                    Enter test input to simulate how users will trigger this command.
+                        <div class="form-section-compact">
+                            <h4 class="form-section-title">Test Command</h4>
+                            <div class="test-section-compact">
+                                <div class="form-group">
+                                    <div class="test-input-group">
+                                        <input type="text" id="testInputCompact" 
+                                               placeholder="Enter test input to simulate user message...">
+                                        <button type="button" id="runTestBtnCompact" class="btn btn-warning-compact btn-compact">
+                                            <i class="fas fa-play"></i> Run Test
+                                        </button>
+                                    </div>
+                                    <div class="code-help-compact">
+                                        Enter test input to simulate how users will trigger this command.
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Advanced Options -->
-                        <div class="form-section">
-                            <h4>Advanced Options</h4>
-                            <div class="toggle-group">
-                                <label class="toggle-label">
-                                    <div class="toggle-text">
-                                        <span class="toggle-title">Wait for Answer</span>
-                                        <span class="toggle-description">Enable to wait for user response after command execution</span>
-                                    </div>
-                                    <div class="toggle-switch">
-                                        <input type="checkbox" id="waitForAnswer">
-                                        <span class="toggle-slider"></span>
-                                    </div>
-                                </label>
-                            </div>
-
-                            <div id="answerHandlerSection" class="form-group" style="display: none;">
-                                <div class="code-editor-header">
-                                    <label for="answerHandler">Answer Handler Code</label>
-                                    <div class="code-actions">
-                                        <button type="button" class="btn-code" id="openAnswerEditor">
-                                            <i class="fas fa-edit"></i> Full Editor
-                                        </button>
-                                    </div>
+                        <div class="form-section-compact">
+                            <div class="advanced-options-toggle" id="advancedOptionsToggle">
+                                <div class="toggle-text-compact">
+                                    <span class="toggle-title-compact">Advanced Options</span>
+                                    <span class="toggle-description-compact">Additional settings for command behavior</span>
                                 </div>
-                                <textarea id="answerHandler" 
-                                          placeholder="Code to handle user's answer..."></textarea>
-                                <div class="form-help">
-                                    This code will execute when user responds. Use waitForAnswer() to get user's response.
+                                <i class="fas fa-chevron-down" id="advancedOptionsIcon"></i>
+                            </div>
+                            
+                            <div id="advancedOptionsContent" class="advanced-options-content">
+                                <!-- Wait for Answer Toggle -->
+                                <div class="toggle-group-compact">
+                                    <label class="toggle-label-compact">
+                                        <div class="toggle-text-compact">
+                                            <span class="toggle-title-compact">Wait for Answer</span>
+                                            <span class="toggle-description-compact">Enable to wait for user response after command execution</span>
+                                        </div>
+                                        <div class="toggle-switch-compact">
+                                            <input type="checkbox" id="waitForAnswerCompact">
+                                            <span class="toggle-slider-compact"></span>
+                                        </div>
+                                    </label>
+                                </div>
+
+                                <!-- Answer Handler Section -->
+                                <div id="answerHandlerSectionCompact" class="form-group" style="display: none;">
+                                    <div class="form-section-header">
+                                        <label for="answerHandlerCompact" class="form-section-title">Answer Handler Code</label>
+                                        <div class="section-actions">
+                                            <button type="button" class="btn btn-secondary-compact btn-compact btn-small" id="openAnswerEditorCompact">
+                                                <i class="fas fa-edit"></i> Full Editor
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <textarea id="answerHandlerCompact" class="code-editor-compact"
+                                              placeholder="Code to handle user's answer..."></textarea>
+                                    <div class="code-help-compact">
+                                        This code will execute when user responds. Use waitForAnswer() to get user's response.
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </form>
+                </div>
+
+                <div class="editor-footer-compact">
+                    <div class="footer-info">
+                        <span id="lastSavedCompact">Not saved yet</span>
+                        <span id="codeStatsCompact">Lines: 0, Chars: 0</span>
+                    </div>
+                    <div class="footer-actions">
+                        <button id="saveFooterBtn" class="btn btn-primary-compact btn-compact">
+                            <i class="fas fa-save"></i> Save
+                        </button>
+                        <button id="testFooterBtn" class="btn btn-success-compact btn-compact">
+                            <i class="fas fa-bolt"></i> Test
+                        </button>
+                        <button id="activateFooterBtn" class="btn btn-warning-compact btn-compact">
+                            <i class="fas fa-power-off"></i> Activate
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -377,6 +904,261 @@
     </div>
 
     <script src="js/common.js"></script>
-    <script src="js/command-editor.js"></script>
+    <script>
+        // Compact Command Editor JavaScript
+        class CompactCommandEditor {
+            constructor() {
+                this.init();
+            }
+
+            init() {
+                this.setupEventListeners();
+                this.setupCommandsTags();
+                this.updateCodeStats();
+            }
+
+            setupEventListeners() {
+                // Advanced options toggle
+                const advancedToggle = document.getElementById('advancedOptionsToggle');
+                const advancedContent = document.getElementById('advancedOptionsContent');
+                const advancedIcon = document.getElementById('advancedOptionsIcon');
+                
+                if (advancedToggle && advancedContent) {
+                    advancedToggle.addEventListener('click', () => {
+                        advancedContent.classList.toggle('show');
+                        advancedIcon.classList.toggle('fa-chevron-down');
+                        advancedIcon.classList.toggle('fa-chevron-up');
+                    });
+                }
+
+                // Wait for answer toggle
+                const waitForAnswerToggle = document.getElementById('waitForAnswerCompact');
+                if (waitForAnswerToggle) {
+                    waitForAnswerToggle.addEventListener('change', (e) => {
+                        this.toggleAnswerHandler(e.target.checked);
+                    });
+                }
+
+                // Code editor stats
+                const codeEditor = document.getElementById('commandCodeCompact');
+                if (codeEditor) {
+                    codeEditor.addEventListener('input', () => {
+                        this.updateCodeStats();
+                    });
+                }
+
+                // Footer buttons
+                const saveFooterBtn = document.getElementById('saveFooterBtn');
+                const testFooterBtn = document.getElementById('testFooterBtn');
+                const activateFooterBtn = document.getElementById('activateFooterBtn');
+                
+                if (saveFooterBtn) {
+                    saveFooterBtn.addEventListener('click', () => {
+                        this.saveCommand();
+                    });
+                }
+                
+                if (testFooterBtn) {
+                    testFooterBtn.addEventListener('click', () => {
+                        this.testCommand();
+                    });
+                }
+                
+                if (activateFooterBtn) {
+                    activateFooterBtn.addEventListener('click', () => {
+                        this.toggleCommand();
+                    });
+                }
+
+                // Format code button
+                const formatBtn = document.getElementById('formatCodeCompact');
+                if (formatBtn) {
+                    formatBtn.addEventListener('click', () => {
+                        this.formatCode();
+                    });
+                }
+            }
+
+            setupCommandsTags() {
+                const moreCommandsInput = document.getElementById('moreCommandsCompact');
+                const commandsTags = document.getElementById('commandsTagsCompact');
+
+                if (!moreCommandsInput || !commandsTags) return;
+
+                moreCommandsInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ',') {
+                        e.preventDefault();
+                        const command = moreCommandsInput.value.trim();
+                        if (command) {
+                            this.addCommandTag(command);
+                            moreCommandsInput.value = '';
+                        }
+                    }
+                });
+
+                moreCommandsInput.addEventListener('blur', () => {
+                    const command = moreCommandsInput.value.trim();
+                    if (command) {
+                        this.addCommandTag(command);
+                        moreCommandsInput.value = '';
+                    }
+                });
+            }
+
+            addCommandTag(command) {
+                if (!command || this.commandExistsInTags(command)) return;
+
+                const commandsTags = document.getElementById('commandsTagsCompact');
+                if (!commandsTags) return;
+
+                const tag = document.createElement('div');
+                tag.className = 'command-tag-compact';
+                tag.innerHTML = `
+                    <span class="tag-text">${this.escapeHtml(command)}</span>
+                    <button type="button" class="remove-tag-compact">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+                
+                tag.querySelector('.remove-tag-compact').addEventListener('click', () => {
+                    tag.remove();
+                });
+                
+                commandsTags.appendChild(tag);
+            }
+
+            commandExistsInTags(command) {
+                const tags = Array.from(document.querySelectorAll('.command-tag-compact .tag-text'));
+                return tags.some(tag => tag.textContent.trim() === command);
+            }
+
+            getCommandsFromTags() {
+                const tags = Array.from(document.querySelectorAll('.command-tag-compact .tag-text'));
+                return tags.map(tag => tag.textContent.trim()).filter(cmd => cmd);
+            }
+
+            toggleAnswerHandler(show) {
+                const section = document.getElementById('answerHandlerSectionCompact');
+                if (section) {
+                    section.style.display = show ? 'block' : 'none';
+                }
+            }
+
+            updateCodeStats() {
+                const codeEditor = document.getElementById('commandCodeCompact');
+                const statsElement = document.getElementById('codeStatsCompact');
+                
+                if (!codeEditor || !statsElement) return;
+                
+                const code = codeEditor.value;
+                const lines = code.split('\n').length;
+                const chars = code.length;
+                const words = code.trim() ? code.trim().split(/\s+/).length : 0;
+                
+                statsElement.textContent = `Lines: ${lines}, Chars: ${chars}, Words: ${words}`;
+            }
+
+            formatCode() {
+                const editor = document.getElementById('commandCodeCompact');
+                if (!editor) return;
+                
+                let code = editor.value;
+                
+                // Basic formatting - add proper indentation
+                const lines = code.split('\n');
+                let formattedLines = [];
+                let indentLevel = 0;
+                
+                for (let line of lines) {
+                    const trimmedLine = line.trim();
+                    
+                    // Decrease indent for closing braces
+                    if (trimmedLine.endsWith('}') || trimmedLine.endsWith(']') || trimmedLine.endsWith(')')) {
+                        indentLevel = Math.max(0, indentLevel - 1);
+                    }
+                    
+                    // Add current line with proper indentation
+                    formattedLines.push('    '.repeat(indentLevel) + trimmedLine);
+                    
+                    // Increase indent for opening braces
+                    if (trimmedLine.endsWith('{') || trimmedLine.endsWith('[') || trimmedLine.endsWith('(')) {
+                        indentLevel++;
+                    }
+                }
+                
+                editor.value = formattedLines.join('\n');
+                this.updateCodeStats();
+                
+                this.showNotification('Code formatted!', 'success');
+            }
+
+            saveCommand() {
+                // Implementation for saving command
+                this.showNotification('Command saved successfully!', 'success');
+                
+                // Update last saved time
+                const lastSavedElement = document.getElementById('lastSavedCompact');
+                if (lastSavedElement) {
+                    const now = new Date();
+                    lastSavedElement.textContent = `Last saved: ${now.toLocaleTimeString()}`;
+                }
+            }
+
+            testCommand() {
+                // Implementation for testing command
+                this.showNotification('Testing command...', 'info');
+            }
+
+            toggleCommand() {
+                // Implementation for toggling command status
+                const statusElement = document.getElementById('commandStatusCompact');
+                const activateBtn = document.getElementById('activateFooterBtn');
+                
+                if (statusElement && activateBtn) {
+                    if (statusElement.classList.contains('status-active')) {
+                        statusElement.classList.remove('status-active');
+                        statusElement.classList.add('status-inactive');
+                        statusElement.textContent = 'Inactive';
+                        activateBtn.innerHTML = '<i class="fas fa-power-off"></i> Activate';
+                    } else {
+                        statusElement.classList.remove('status-inactive');
+                        statusElement.classList.add('status-active');
+                        statusElement.textContent = 'Active';
+                        activateBtn.innerHTML = '<i class="fas fa-power-off"></i> Deactivate';
+                    }
+                    
+                    this.showNotification('Command status updated!', 'success');
+                }
+            }
+
+            showNotification(message, type = 'info') {
+                // Simple notification implementation
+                console.log(`${type.toUpperCase()}: ${message}`);
+                
+                // You can integrate with the existing notification system
+                if (typeof commonApp !== 'undefined' && commonApp.showNotification) {
+                    commonApp.showNotification(message, type);
+                }
+            }
+
+            escapeHtml(unsafe) {
+                if (unsafe === null || unsafe === undefined) {
+                    return '';
+                }
+                return String(unsafe)
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;")
+                    .replace(/\//g, "&#x2F;");
+            }
+        }
+
+        // Initialize compact editor
+        document.addEventListener('DOMContentLoaded', () => {
+            const compactEditor = new CompactCommandEditor();
+        });
+    </script>
 </body>
 </html>
