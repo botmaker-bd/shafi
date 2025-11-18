@@ -471,35 +471,34 @@
     color: var(--error-color);
 }
 
-/* Full Screen Code Editor */
-.fullscreen-modal {
-    align-items: stretch;
-    padding: 0;
+/* Large Modal Styles */
+.large-modal {
+    max-width: 900px;
+    width: 95%;
+    max-height: 85vh;
 }
 
-.fullscreen-content {
-    max-width: none;
+/* Advanced Code Editor */
+.advanced-editor {
     width: 100%;
-    height: 100vh;
-    margin: 0;
-    display: flex;
-    flex-direction: column;
-    position: relative;
-    border-radius: 0;
+    min-height: 400px;
+    max-height: 500px;
+    padding: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    resize: vertical;
+    outline: none;
+    transition: var(--transition);
 }
 
-.compact-header {
-    padding: 1rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: var(--bg-primary);
-    border-bottom: 1px solid var(--border-color);
-    position: sticky;
-    top: 0;
-    z-index: 1000;
-    flex-shrink: 0;
-    box-shadow: var(--shadow-sm);
+.advanced-editor:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
 .editor-toolbar {
@@ -507,7 +506,11 @@
     gap: 0.5rem;
     align-items: center;
     flex-wrap: wrap;
-    flex: 1;
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
 }
 
 .toolbar-group {
@@ -518,7 +521,7 @@
 }
 
 .btn-icon {
-    background: var(--bg-tertiary);
+    background: var(--bg-primary);
     border: 1px solid var(--border-color);
     padding: 0.5rem;
     border-radius: var(--radius-sm);
@@ -526,7 +529,6 @@
     color: var(--text-secondary);
     transition: var(--transition);
     font-size: 0.75rem;
-    white-space: nowrap;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -541,30 +543,9 @@
     border-color: var(--primary-color);
 }
 
-.fullscreen-body {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    padding: 0;
-    overflow: hidden;
-    position: relative;
-}
-
-.fullscreen-editor {
-    flex: 1;
-    width: 100%;
-    border: none;
-    border-radius: 0;
-    padding: 1rem;
-    font-family: 'Inter', sans-serif;
-    font-size: 14px;
-    line-height: 1.5;
-    resize: none;
-    outline: none;
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
+.btn-icon:focus {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
 }
 
 .editor-info {
@@ -573,6 +554,8 @@
     font-size: 0.875rem;
     color: var(--text-muted);
     flex-wrap: wrap;
+    margin-top: 0.75rem;
+    padding: 0.5rem 0;
 }
 
 /* Templates System */
@@ -929,6 +912,11 @@
         gap: 1rem;
         padding: 1rem;
     }
+    
+    .large-modal {
+        max-width: 95%;
+        margin: 1rem;
+    }
 }
 
 @media (max-width: 768px) {
@@ -1062,6 +1050,11 @@
         flex: 1;
         justify-content: center;
     }
+    
+    .large-modal {
+        margin: 0.5rem;
+        max-height: 95vh;
+    }
 }
 
 @media (max-width: 480px) {
@@ -1089,6 +1082,11 @@
         min-height: 200px;
         font-size: 13px;
         padding: 0.75rem;
+    }
+    
+    .advanced-editor {
+        min-height: 300px;
+        font-size: 13px;
     }
     
     .template-card h4 {
@@ -1160,7 +1158,9 @@
     outline-offset: 2px;
 }
 
-.btn-apply:focus {
+.btn-apply:focus,
+.btn-icon:focus,
+.modal-footer .btn:focus {
     outline: 2px solid var(--primary-color);
     outline-offset: 2px;
 }
@@ -1168,4 +1168,19 @@
 .category-tab:focus {
     outline: 2px solid var(--primary-color);
     outline-offset: 2px;
+}
+
+/* Ensure modal footer buttons are properly styled */
+.modal-footer {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+    padding: 1.25rem;
+    border-top: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
+}
+
+.modal-footer .btn {
+    min-width: 100px;
+    justify-content: center;
 }
