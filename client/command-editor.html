@@ -348,77 +348,69 @@
     </div>
 
     <!-- Full Screen Code Editor Modal -->
-    <div id="codeEditorModal" class="modal fullscreen-modal">
-        <div class="modal-content fullscreen-content">
-            <div class="modal-header compact-header">
+    <div id="codeEditorModal" class="modal">
+        <div class="modal-content large-modal">
+            <div class="modal-header">
+                <h3>Code Editor</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
                 <div class="editor-toolbar">
                     <div class="toolbar-group">
                         <button class="btn-icon" id="undoBtn" title="Undo">
                             <i class="fas fa-undo"></i>
-                            <span class="btn-text">Undo</span>
                         </button>
                         <button class="btn-icon" id="redoBtn" title="Redo">
                             <i class="fas fa-redo"></i>
-                            <span class="btn-text">Redo</span>
+                        </button>
+                        <button class="btn-icon" id="selectAllBtn" title="Select All">
+                            <i class="fas fa-expand-arrows-alt"></i>
                         </button>
                     </div>
                     <div class="toolbar-group">
-                        <button class="btn-icon" id="selectAllBtn" title="Select All">
-                            <i class="fas fa-expand-arrows-alt"></i>
-                            <span class="btn-text">Select All</span>
-                        </button>
                         <button class="btn-icon" id="cutBtn" title="Cut">
                             <i class="fas fa-cut"></i>
-                            <span class="btn-text">Cut</span>
                         </button>
                         <button class="btn-icon" id="copyBtn" title="Copy">
                             <i class="fas fa-copy"></i>
-                            <span class="btn-text">Copy</span>
                         </button>
                         <button class="btn-icon" id="pasteBtn" title="Paste">
                             <i class="fas fa-paste"></i>
-                            <span class="btn-text">Paste</span>
                         </button>
                     </div>
                     <div class="toolbar-group">
                         <button class="btn-icon" id="clearBtn" title="Clear All">
                             <i class="fas fa-eraser"></i>
-                            <span class="btn-text">Clear</span>
                         </button>
                         <button class="btn-icon" id="formatBtn" title="Format Code">
                             <i class="fas fa-indent"></i>
-                            <span class="btn-text">Format</span>
                         </button>
                     </div>
                 </div>
-            </div>
-            <div class="modal-body fullscreen-body">
-                <textarea id="advancedCodeEditor" class="fullscreen-editor" 
+                <textarea id="advancedCodeEditor" class="advanced-editor" 
                          placeholder="Write your code here..."></textarea>
-            </div>
-            <div class="modal-footer">
                 <div class="editor-info">
                     <span id="lineCount">Lines: 1</span>
                     <span id="charCount">Chars: 0</span>
                     <span id="wordCount">Words: 0</span>
                 </div>
-                <div class="editor-actions">
-                    <button class="btn btn-secondary" id="cancelEdit">
-                        <i class="fas fa-times"></i>
-                        <span>Cancel</span>
-                    </button>
-                    <button class="btn btn-primary" id="saveCode">
-                        <i class="fas fa-save"></i>
-                        <span>Save Code</span>
-                    </button>
-                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelEdit">
+                    <i class="fas fa-times"></i>
+                    <span>Cancel</span>
+                </button>
+                <button class="btn btn-primary" id="saveCode">
+                    <i class="fas fa-save"></i>
+                    <span>Save Code</span>
+                </button>
             </div>
         </div>
     </div>
 
     <!-- Templates Modal -->
     <div id="templatesModal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content large-modal">
             <div class="modal-header">
                 <h3>Code Templates</h3>
                 <button class="modal-close">&times;</button>
