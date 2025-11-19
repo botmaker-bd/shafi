@@ -1,6 +1,6 @@
 /* ===== FULL SCREEN CODE EDITOR STYLES ===== */
 :root {
-    /* Dark Theme (Default) */
+    /* Light Theme */
     --editor-bg: #1e1e1e;
     --editor-text: #d4d4d4;
     --editor-border: #333;
@@ -215,6 +215,19 @@ body {
     border-color: transparent;
 }
 
+.font-size-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.font-size-display {
+    font-size: 12px;
+    color: var(--editor-text);
+    min-width: 40px;
+    text-align: center;
+}
+
 /* Main Editor Area */
 .editor-main {
     flex: 1;
@@ -260,6 +273,22 @@ body {
 
 .code-editor::selection {
     background: var(--selection-bg);
+}
+
+.editor-minimap {
+    width: 200px;
+    background: var(--header-bg);
+    border-left: 1px solid var(--editor-border);
+    overflow: hidden;
+    position: relative;
+}
+
+.minimap-content {
+    transform: scale(0.1);
+    transform-origin: top left;
+    width: 1000%;
+    height: 1000%;
+    pointer-events: none;
 }
 
 /* Editor Footer */
@@ -317,8 +346,8 @@ body {
     gap: 10px;
 }
 
-/* Find Panel */
-.find-panel {
+/* Find & Replace Panel */
+.find-replace-panel {
     position: absolute;
     top: calc(var(--header-height) + var(--toolbar-height));
     right: 20px;
@@ -332,7 +361,7 @@ body {
     display: none;
 }
 
-.find-panel.show {
+.find-replace-panel.show {
     display: block;
     animation: slideDown 0.2s ease;
 }
@@ -348,13 +377,14 @@ body {
     }
 }
 
-.find-section {
+.find-section, .replace-section {
     display: flex;
     align-items: center;
     gap: 10px;
+    margin-bottom: 10px;
 }
 
-.find-input {
+.find-input, .replace-input {
     flex: 1;
     background: var(--editor-bg);
     border: 1px solid var(--editor-border);
@@ -364,7 +394,7 @@ body {
     font-size: 14px;
 }
 
-.find-input:focus {
+.find-input:focus, .replace-input:focus {
     outline: none;
     border-color: var(--editor-accent);
 }
@@ -375,7 +405,29 @@ body {
     opacity: 0.7;
 }
 
+.find-options {
+    display: flex;
+    gap: 15px;
+    margin-top: 10px;
+}
+
+.option-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    color: var(--editor-text);
+    cursor: pointer;
+}
+
+.option-checkbox input {
+    margin: 0;
+}
+
 .close-find {
+    position: absolute;
+    top: 10px;
+    right: 10px;
     background: none;
     border: none;
     color: var(--editor-text);
@@ -386,6 +438,218 @@ body {
 
 .close-find:hover {
     background: rgba(255, 255, 255, 0.1);
+}
+
+/* Snippets Modal */
+.snippets-modal {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--header-bg);
+    border: 1px solid var(--editor-border);
+    border-radius: 8px;
+    width: 90%;
+    max-width: 800px;
+    height: 80%;
+    z-index: 1001;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    display: none;
+    flex-direction: column;
+}
+
+.snippets-modal.show {
+    display: flex;
+    animation: modalAppear 0.3s ease;
+}
+
+@keyframes modalAppear {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -48%);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%);
+    }
+}
+
+.snippets-header {
+    padding: 20px;
+    border-bottom: 1px solid var(--editor-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.snippets-header h3 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--editor-text);
+}
+
+.snippets-search {
+    flex: 1;
+    position: relative;
+    max-width: 300px;
+}
+
+.snippets-search i {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--editor-text);
+    opacity: 0.7;
+}
+
+.snippets-search input {
+    width: 100%;
+    background: var(--editor-bg);
+    border: 1px solid var(--editor-border);
+    color: var(--editor-text);
+    padding: 10px 10px 10px 35px;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+.snippets-search input:focus {
+    outline: none;
+    border-color: var(--editor-accent);
+}
+
+.close-snippets {
+    background: none;
+    border: none;
+    color: var(--editor-text);
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 4px;
+    font-size: 16px;
+}
+
+.close-snippets:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.snippets-content {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 15px;
+}
+
+.snippet-item {
+    background: var(--editor-bg);
+    border: 1px solid var(--editor-border);
+    border-radius: 6px;
+    padding: 15px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.snippet-item:hover {
+    border-color: var(--editor-accent);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.snippet-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.snippet-title {
+    font-weight: 600;
+    color: var(--editor-text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.snippet-title i {
+    color: var(--editor-accent);
+}
+
+.snippet-language {
+    background: var(--editor-accent);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 500;
+}
+
+.snippet-description {
+    color: var(--editor-text);
+    opacity: 0.8;
+    font-size: 13px;
+    line-height: 1.4;
+    margin-bottom: 10px;
+}
+
+.snippet-code {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+    padding: 10px;
+    font-family: 'Fira Code', monospace;
+    font-size: 12px;
+    color: var(--editor-string);
+    overflow-x: auto;
+    white-space: pre;
+}
+
+/* Status Notifications */
+.status-notification {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--editor-accent);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    z-index: 1002;
+    display: none;
+}
+
+.status-notification.show {
+    display: flex;
+    animation: notificationSlide 0.3s ease;
+}
+
+@keyframes notificationSlide {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+.notification-close {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+}
+
+.notification-close:hover {
+    background: rgba(255, 255, 255, 0.2);
 }
 
 /* Buttons */
@@ -442,6 +706,28 @@ body {
 }
 
 /* Responsive Design */
+@media (max-width: 1024px) {
+    .editor-toolbar {
+        flex-direction: column;
+        height: auto;
+        padding: 10px 20px;
+        gap: 10px;
+    }
+    
+    .toolbar-section {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    .snippets-content {
+        grid-template-columns: 1fr;
+    }
+    
+    .find-replace-panel {
+        width: 350px;
+    }
+}
+
 @media (max-width: 768px) {
     .editor-header {
         flex-direction: column;
@@ -459,22 +745,6 @@ body {
         display: none;
     }
     
-    .editor-toolbar {
-        flex-direction: column;
-        height: auto;
-        padding: 10px 20px;
-        gap: 10px;
-    }
-    
-    .toolbar-section {
-        width: 100%;
-        justify-content: space-between;
-    }
-    
-    .toolbar-group {
-        border-right: none;
-    }
-    
     .editor-footer {
         flex-direction: column;
         height: auto;
@@ -487,13 +757,45 @@ body {
         justify-content: space-between;
     }
     
-    .find-panel {
-        width: calc(100% - 40px);
-        right: 20px;
+    .find-replace-panel {
+        width: 300px;
+        right: 10px;
+    }
+    
+    .snippets-modal {
+        width: 95%;
+        height: 90%;
+    }
+}
+
+@media (max-width: 480px) {
+    .toolbar-section {
+        flex-direction: column;
+        gap: 5px;
+    }
+    
+    .toolbar-group {
+        border-right: none;
+        padding-right: 0;
+        justify-content: center;
     }
     
     .btn-text {
         display: none;
+    }
+    
+    .find-replace-panel {
+        width: calc(100% - 40px);
+        right: 20px;
+    }
+    
+    .find-section, .replace-section {
+        flex-direction: column;
+    }
+    
+    .find-options {
+        flex-direction: column;
+        gap: 5px;
     }
 }
 
@@ -516,6 +818,11 @@ body {
     background: var(--editor-accent);
 }
 
+/* Code Syntax Highlighting (Basic) */
+.code-editor {
+    /* These will be applied via JavaScript for syntax highlighting */
+}
+
 /* Selection Styling */
 .code-editor::selection {
     background: var(--selection-bg);
@@ -530,4 +837,30 @@ body {
 .code-editor::placeholder {
     color: var(--line-numbers);
     opacity: 0.6;
+}
+
+/* Print Styles */
+@media print {
+    .editor-toolbar,
+    .editor-footer,
+    .find-replace-panel,
+    .snippets-modal {
+        display: none !important;
+    }
+    
+    .editor-header {
+        background: white !important;
+        color: black !important;
+        border-bottom: 1px solid #ccc;
+    }
+    
+    .code-editor {
+        background: white !important;
+        color: black !important;
+    }
+    
+    .line-numbers {
+        background: #f5f5f5 !important;
+        color: #666 !important;
+    }
 }
