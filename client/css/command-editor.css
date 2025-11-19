@@ -423,6 +423,29 @@
     flex-wrap: wrap;
 }
 
+.btn-icon {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    padding: 0.5rem;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: var(--transition);
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    min-height: 36px;
+    min-width: 36px;
+}
+
+.btn-icon:hover {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
 .code-editor-textarea {
     width: 100%;
     min-height: 250px;
@@ -912,10 +935,6 @@
         align-items: stretch;
     }
     
-    .editor-toolbar {
-        justify-content: center;
-    }
-    
     .snippet-card,
     .template-card {
         padding: 1.25rem;
@@ -997,11 +1016,6 @@
         min-height: 200px;
         font-size: 13px;
         padding: 0.75rem;
-    }
-    
-    .advanced-editor {
-        min-height: 300px;
-        font-size: 13px;
     }
     
     .snippet-card h4,
