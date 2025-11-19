@@ -145,63 +145,30 @@ const runPythonSync = (pythonCode) => {
                 });
             };
 
-            // ✅ FIXED: ENHANCED USER OBJECT - AUTO JSON STRING CONVERSION
+            // ✅ REAL AUTOMATIC: USE TELEGRAM'S ORIGINAL OBJECTS
             const createUserObject = () => {
-                const userData = {
+                // ✅ Directly use Telegram's original user object with all fields
+                const userObj = msg.from ? Object.assign({}, msg.from) : {
                     id: userId,
-                    username: username || '',
                     first_name: first_name || '',
-                    last_name: context.last_name || '',
-                    language_code: context.language_code || '',
-                    chat_id: chatId,
-                    
-                    // ✅ AUTO JSON string conversion - user লিখলেই JSON string হবে
-                    [Symbol.toPrimitive](hint) {
-                        if (hint === 'string' || hint === 'default') {
-                            return JSON.stringify({
-                                id: this.id,
-                                username: this.username,
-                                first_name: this.first_name,
-                                last_name: this.last_name,
-                                language_code: this.language_code,
-                                chat_id: this.chat_id,
-                                full_name: this.first_name && this.last_name ? 
-                                    `${this.first_name} ${this.last_name}` : this.first_name,
-                                display_name: this.first_name || (this.username ? `@${this.username}` : `User${this.id}`)
-                            }, null, 2);
-                        }
-                        return null;
-                    },
-                    
-                    // ✅ JSON representation
-                    toJSON() {
-                        return {
-                            id: this.id,
-                            username: this.username,
-                            first_name: this.first_name,
-                            last_name: this.last_name,
-                            language_code: this.language_code,
-                            chat_id: this.chat_id
-                        };
-                    },
-                    
-                    // ✅ Full JSON object property
-                    get jsonobject() {
-                        return {
-                            id: this.id,
-                            username: this.username,
-                            first_name: this.first_name,
-                            last_name: this.last_name,
-                            language_code: this.language_code,
-                            chat_id: this.chat_id,
-                            full_name: this.first_name && this.last_name ? 
-                                `${this.first_name} ${this.last_name}` : this.first_name,
-                            display_name: this.first_name || (this.username ? `@${this.username}` : `User${this.id}`)
-                        };
-                    },
-                    
-                    // ✅ String representation property
-                    get string() {
+                    username: username || '',
+                    language_code: context.language_code || ''
+                };
+                
+                // ✅ Add chat_id for convenience
+                userObj.chat_id = chatId;
+                
+                // ✅ AUTO JSON conversion - NO MANUAL STRUCTURE
+                userObj[Symbol.toPrimitive] = function(hint) {
+                    if (hint === 'string' || hint === 'default') {
+                        return JSON.stringify(this, null, 2);
+                    }
+                    return null;
+                };
+                
+                // ✅ Add useful helper properties
+                Object.defineProperty(userObj, 'string', {
+                    get: function() {
                         if (this.first_name && this.last_name) {
                             return `${this.first_name} ${this.last_name}`;
                         } else if (this.first_name) {
@@ -211,95 +178,66 @@ const runPythonSync = (pythonCode) => {
                         } else {
                             return `User${this.id}`;
                         }
-                    },
-                    
-                    // ✅ Full info property
-                    get info() {
-                        return `👤 ${this.first_name || 'User'} (ID: ${this.id})` +
-                               (this.username ? ` @${this.username}` : '') +
-                               (this.language_code ? ` [${this.language_code}]` : '');
                     }
-                };
+                });
                 
-                return userData;
+                Object.defineProperty(userObj, 'jsonobject', {
+                    get: function() {
+                        return Object.assign({}, this);
+                    }
+                });
+                
+                return userObj;
             };
 
-            // ✅ FIXED: ENHANCED CHAT OBJECT - AUTO JSON STRING CONVERSION
+            // ✅ REAL AUTOMATIC: USE TELEGRAM'S ORIGINAL CHAT OBJECT
             const createChatObject = () => {
-                const chatData = {
+                // ✅ Directly use Telegram's original chat object with all fields
+                const chatObj = msg.chat ? Object.assign({}, msg.chat) : {
                     id: chatId,
-                    type: msg.chat.type || 'private',
-                    title: msg.chat.title || '',
-                    username: msg.chat.username || '',
-                    first_name: msg.chat.first_name || '',
-                    last_name: msg.chat.last_name || '',
-                    
-                    // ✅ AUTO JSON string conversion - chat লিখলেই JSON string হবে
-                    [Symbol.toPrimitive](hint) {
-                        if (hint === 'string' || hint === 'default') {
-                            return JSON.stringify({
-                                id: this.id,
-                                type: this.type,
-                                title: this.title,
-                                username: this.username,
-                                first_name: this.first_name,
-                                last_name: this.last_name,
-                                is_private: this.type === 'private',
-                                is_group: this.type === 'group',
-                                is_channel: this.type === 'channel'
-                            }, null, 2);
-                        }
-                        return null;
-                    },
-                    
-                    // ✅ JSON representation
-                    toJSON() {
-                        return {
-                            id: this.id,
-                            type: this.type,
-                            title: this.title,
-                            username: this.username,
-                            first_name: this.first_name,
-                            last_name: this.last_name
-                        };
-                    },
-                    
-                    // ✅ Full JSON object property
-                    get jsonobject() {
-                        return {
-                            id: this.id,
-                            type: this.type,
-                            title: this.title,
-                            username: this.username,
-                            first_name: this.first_name,
-                            last_name: this.last_name,
-                            is_private: this.type === 'private',
-                            is_group: this.type === 'group',
-                            is_channel: this.type === 'channel',
-                            display_name: this.title || this.first_name || `Chat${this.id}`
-                        };
-                    },
-                    
-                    // ✅ String representation property
-                    get string() {
-                        return this.title || this.first_name || `Chat${this.id}`;
-                    },
-                    
-                    // ✅ Type check properties
-                    get is_private() {
-                        return this.type === 'private';
-                    },
-                    
-                    get is_group() {
-                        return this.type === 'group';
-                    },
-                    
-                    get is_channel() {
-                        return this.type === 'channel';
-                    }
+                    type: 'private'
                 };
                 
-                return chatData;
+                // ✅ AUTO JSON conversion - NO MANUAL STRUCTURE
+                chatObj[Symbol.toPrimitive] = function(hint) {
+                    if (hint === 'string' || hint === 'default') {
+                        return JSON.stringify(this, null, 2);
+                    }
+                    return null;
+                };
+                
+                // ✅ Add useful helper properties
+                Object.defineProperty(chatObj, 'string', {
+                    get: function() {
+                        return this.title || this.first_name || `Chat${this.id}`;
+                    }
+                });
+                
+                Object.defineProperty(chatObj, 'jsonobject', {
+                    get: function() {
+                        return Object.assign({}, this);
+                    }
+                });
+                
+                Object.defineProperty(chatObj, 'is_private', {
+                    get: function() {
+                        return this.type === 'private';
+                    }
+                });
+                
+                Object.defineProperty(chatObj, 'is_group', {
+                    get: function() {
+                        return this.type === 'group' || this.type === 'supergroup';
+                    }
+                });
+                
+                Object.defineProperty(chatObj, 'is_channel', {
+                    get: function() {
+                        return this.type === 'channel';
+                    }
+                });
+                
+                return chatObj;
             };
 
             // Create execution environment
