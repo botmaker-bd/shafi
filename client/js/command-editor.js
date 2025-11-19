@@ -887,182 +887,163 @@ class CommandEditor {
         this.currentCommand = null;
     }
 
-    // Test Functionality
-// testCommand() ফাংশন রিপ্লেস করুন
-async testCommand() {
-    if (!this.currentBot) {
-        this.showError('Bot information not loaded');
-        return;
-    }
-
-    const commands = this.getCommandsFromTags();
-    if (commands.length === 0) {
-        this.showError('Please add at least one command to test');
-        return;
-    }
-
-    const commandCodeEl = document.getElementById('commandCode');
-    const commandCode = commandCodeEl ? commandCodeEl.value.trim() : '';
-    
-    if (!commandCode) {
-        this.showError('Please add command code to test');
-        return;
-    }
-
-    this.showTestModal();
-    this.showTestLoading();
-
-    try {
-        const token = localStorage.getItem('token');
-        
-        const waitForAnswerEl = document.getElementById('waitForAnswer');
-        const answerHandlerEl = document.getElementById('answerHandler');
-        
-        // ✅ সঠিক কমান্ড অবজেক্ট তৈরি করুন
-        const tempCommand = {
-            id: 'temp_test_' + Date.now(),
-            command_patterns: commands.join(','),
-            code: commandCode,
-            bot_token: this.currentBot.token,  // বট টোকেন যোগ করুন
-            wait_for_answer: waitForAnswerEl ? waitForAnswerEl.checked : false,
-            answer_handler: answerHandlerEl ? answerHandlerEl.value || '' : '',
-            is_active: true
-        };
-
-        // ✅ সঠিক এন্ডপয়েন্ট ব্যবহার করুন
-        const response = await fetch('/api/commands/test/temp', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-                command: tempCommand,
-                botToken: this.currentBot.token,
-                testInput: commands[0]  // প্রথম কমান্ড作为 টেস্ট ইনপুট
-            })
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-            this.showTestSuccess(`
-                <h4>✅ Test Command Sent Successfully!</h4>
-                <div class="test-details">
-                    <p><strong>Commands:</strong> ${commands.join(', ')}</p>
-                    <p><strong>Bot:</strong> ${this.currentBot.name}</p>
-                    <p><strong>Status:</strong> Command executed without errors</p>
-                    ${data.chatId ? `<p><strong>Test Chat:</strong> ${data.chatId}</p>` : ''}
-                </div>
-                <p class="test-message">Check your Telegram bot for the test results.</p>
-            `);
-        } else {
-            this.showTestError(`
-                <h4>❌ Test Failed</h4>
-                <p><strong>Error:</strong> ${data.error || 'Unknown error occurred'}</p>
-                ${data.details ? `<p><strong>Details:</strong> ${data.details}</p>` : ''}
-            `);
+    // Test Functionality - COMPLETELY FIXED VERSION
+    async testCommand() {
+        if (!this.currentBot) {
+            this.showError('Bot information not loaded');
+            return;
         }
-    } catch (error) {
-        this.showTestError(`
-            <h4>❌ Network Error</h4>
-            <p>Failed to connect to server: ${error.message}</p>
-        `);
-    }
-}
 
-async runCustomTest() {
-    if (!this.currentBot) {
-        this.showError('Bot information not loaded');
-        return;
-    }
+        const commands = this.getCommandsFromTags();
+        if (commands.length === 0) {
+            this.showError('Please add at least one command to test');
+            return;
+        }
 
-    const testInputEl = document.getElementById('testInput');
-    const testInput = testInputEl ? testInputEl.value.trim() : '';
-    const commands = this.getCommandsFromTags();
-    
-    if (!testInput && commands.length === 0) {
-        this.showError('Please add commands or enter test input');
-        return;
-    }
-
-    const commandCodeEl = document.getElementById('commandCode');
-    const commandCode = commandCodeEl ? commandCodeEl.value.trim() : '';
-    
-    if (!commandCode) {
-        this.showError('Please add command code to test');
-        return;
-    }
-
-    this.showTestModal();
-    this.showTestLoading();
-
-    try {
-        const token = localStorage.getItem('token');
+        const commandCodeEl = document.getElementById('commandCode');
+        const commandCode = commandCodeEl ? commandCodeEl.value.trim() : '';
         
-        const waitForAnswerEl = document.getElementById('waitForAnswer');
-        const answerHandlerEl = document.getElementById('answerHandler');
-        
-        // ✅ সঠিক কমান্ড অবজেক্ট
-        const tempCommand = {
-            id: 'temp_custom_test_' + Date.now(),
-            command_patterns: testInput || commands.join(','),
-            code: commandCode,
-            bot_token: this.currentBot.token,
-            wait_for_answer: waitForAnswerEl ? waitForAnswerEl.checked : false,
-            answer_handler: answerHandlerEl ? answerHandlerEl.value || '' : '',
-            is_active: true
-        };
+        if (!commandCode) {
+            this.showError('Please add command code to test');
+            return;
+        }
 
-        // ✅ সঠিক এন্ডপয়েন্ট
-        const response = await fetch('/api/commands/test/temp', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-                command: tempCommand,
-                botToken: this.currentBot.token,
-                testInput: testInput || commands[0]
-            })
-        });
+        this.showTestModal();
+        this.showTestLoading();
 
-        const data = await response.json();
-
-        if (response.ok) {
-            let resultText = data.result || 'Command executed successfully';
+        try {
+            const token = localStorage.getItem('token');
             
-            if (typeof resultText === 'object') {
-                resultText = JSON.stringify(resultText, null, 2);
-            }
+            const waitForAnswerEl = document.getElementById('waitForAnswer');
+            const answerHandlerEl = document.getElementById('answerHandler');
             
-            this.showTestSuccess(`
-                <h4>✅ Test Command Executed Successfully!</h4>
-                <div class="test-details">
-                    <p><strong>Test Input:</strong> ${testInput || commands.join(', ')}</p>
-                    <p><strong>Bot:</strong> ${this.currentBot.name}</p>
-                    <p><strong>Result:</strong> ${resultText}</p>
-                    ${data.chatId ? `<p><strong>Test Chat:</strong> ${data.chatId}</p>` : ''}
-                </div>
-                <p class="test-message">Command executed without errors.</p>
-            `);
-        } else {
-            this.showTestError(`
-                <h4>❌ Test Failed</h4>
-                <div class="error-details">
+            // ✅ FIXED: Use the correct API endpoint and data structure
+            const response = await fetch('/api/commands/test/temp', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    code: commandCode, // ✅ সরাসরি code পাঠান
+                    botToken: this.currentBot.token, // ✅ সরাসরি botToken পাঠান
+                    testInput: commands[0], // ✅ প্রথম কমান্ড作为 টেস্ট ইনপুট
+                    waitForAnswer: waitForAnswerEl ? waitForAnswerEl.checked : false,
+                    answerHandler: answerHandlerEl ? answerHandlerEl.value || '' : ''
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.showTestSuccess(`
+                    <h4>✅ Test Command Sent Successfully!</h4>
+                    <div class="test-details">
+                        <p><strong>Commands:</strong> ${commands.join(', ')}</p>
+                        <p><strong>Bot:</strong> ${this.currentBot.name}</p>
+                        <p><strong>Status:</strong> Command executed without errors</p>
+                        ${data.chatId ? `<p><strong>Test Chat:</strong> ${data.chatId}</p>` : ''}
+                    </div>
+                    <p class="test-message">Check your Telegram bot for the test results.</p>
+                `);
+            } else {
+                this.showTestError(`
+                    <h4>❌ Test Failed</h4>
                     <p><strong>Error:</strong> ${data.error || 'Unknown error occurred'}</p>
                     ${data.details ? `<p><strong>Details:</strong> ${data.details}</p>` : ''}
-                </div>
+                `);
+            }
+        } catch (error) {
+            this.showTestError(`
+                <h4>❌ Network Error</h4>
+                <p>Failed to connect to server: ${error.message}</p>
             `);
         }
-    } catch (error) {
-        this.showTestError(`
-            <h4>❌ Network Error</h4>
-            <p>Failed to connect to server: ${error.message}</p>
-        `);
     }
-}
+
+    async runCustomTest() {
+        if (!this.currentBot) {
+            this.showError('Bot information not loaded');
+            return;
+        }
+
+        const testInputEl = document.getElementById('testInput');
+        const testInput = testInputEl ? testInputEl.value.trim() : '';
+        const commands = this.getCommandsFromTags();
+        
+        if (!testInput && commands.length === 0) {
+            this.showError('Please add commands or enter test input');
+            return;
+        }
+
+        const commandCodeEl = document.getElementById('commandCode');
+        const commandCode = commandCodeEl ? commandCodeEl.value.trim() : '';
+        
+        if (!commandCode) {
+            this.showError('Please add command code to test');
+            return;
+        }
+
+        this.showTestModal();
+        this.showTestLoading();
+
+        try {
+            const token = localStorage.getItem('token');
+            
+            const waitForAnswerEl = document.getElementById('waitForAnswer');
+            const answerHandlerEl = document.getElementById('answerHandler');
+            
+            // ✅ FIXED: Use the correct API endpoint and data structure
+            const response = await fetch('/api/commands/test/temp', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    code: commandCode, // ✅ সরাসরি code পাঠান
+                    botToken: this.currentBot.token, // ✅ সরাসরি botToken পাঠান
+                    testInput: testInput || commands[0], // ✅ কাস্টম ইনপুট অথবা প্রথম কমান্ড
+                    waitForAnswer: waitForAnswerEl ? waitForAnswerEl.checked : false,
+                    answerHandler: answerHandlerEl ? answerHandlerEl.value || '' : ''
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                let resultText = data.result || 'Command executed successfully';
+                
+                if (typeof resultText === 'object') {
+                    resultText = JSON.stringify(resultText, null, 2);
+                }
+                
+                this.showTestSuccess(`
+                    <h4>✅ Test Command Executed Successfully!</h4>
+                    <div class="test-details">
+                        <p><strong>Test Input:</strong> ${testInput || commands.join(', ')}</p>
+                        <p><strong>Bot:</strong> ${this.currentBot.name}</p>
+                        <p><strong>Result:</strong> ${resultText}</p>
+                        ${data.chatId ? `<p><strong>Test Chat:</strong> ${data.chatId}</p>` : ''}
+                    </div>
+                    <p class="test-message">Command executed without errors.</p>
+                `);
+            } else {
+                this.showTestError(`
+                    <h4>❌ Test Failed</h4>
+                    <div class="error-details">
+                        <p><strong>Error:</strong> ${data.error || 'Unknown error occurred'}</p>
+                        ${data.details ? `<p><strong>Details:</strong> ${data.details}</p>` : ''}
+                    </div>
+                `);
+            }
+        } catch (error) {
+            this.showTestError(`
+                <h4>❌ Network Error</h4>
+                <p>Failed to connect to server: ${error.message}</p>
+            `);
+        }
+    }
 
     async quickTest() {
         if (this.currentCommand) {
@@ -1753,15 +1734,17 @@ async runCustomTest() {
             const notification = document.createElement('div');
             notification.style.cssText = `
                 position: fixed;
-                top: 20px;
-                right: 20px;
-                padding: 1rem 1.5rem;
-                border-radius: 0.5rem;
-                color: white;
-                background: ${type === 'error' ? '#ef4444' : type === 'success' ? '#10b981' : '#3b82f6'};
-                z-index: 10000;
-                box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-                font-family: inherit;
+                top: '20px',
+                right: '20px',
+                padding: '1rem 1.5rem',
+                borderRadius: '0.5rem',
+                background: ${type === 'error' ? '#ef4444' : type === 'success' ? '#10b981' : '#3b82f6'},
+                color: 'white',
+                zIndex: '10000',
+                maxWidth: '400px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem'
             `;
             notification.textContent = message;
             document.body.appendChild(notification);
