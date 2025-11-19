@@ -145,6 +145,75 @@ const runPythonSync = (pythonCode) => {
                 });
             };
 
+            // ✅ FIXED: ENHANCED USER OBJECT WITH AUTO STRING CONVERSION
+            const createUserObject = () => {
+                const userData = {
+                    id: userId,
+                    username: username || '',
+                    first_name: first_name || '',
+                    last_name: context.last_name || '',
+                    language_code: context.language_code || '',
+                    chat_id: chatId,
+                    
+                    // ✅ AUTO string conversion - no need to call toString()
+                    [Symbol.toPrimitive](hint) {
+                        if (hint === 'string' || hint === 'default') {
+                            if (this.first_name && this.last_name) {
+                                return `${this.first_name} ${this.last_name}`;
+                            } else if (this.first_name) {
+                                return this.first_name;
+                            } else if (this.username) {
+                                return `@${this.username}`;
+                            } else {
+                                return `User${this.id}`;
+                            }
+                        }
+                        return null;
+                    },
+                    
+                    // ✅ JSON representation
+                    toJSON() {
+                        return {
+                            id: this.id,
+                            username: this.username,
+                            first_name: this.first_name,
+                            last_name: this.last_name,
+                            language_code: this.language_code,
+                            chat_id: this.chat_id
+                        };
+                    },
+                    
+                    // ✅ Full JSON object property
+                    get jsonobject() {
+                        return {
+                            id: this.id,
+                            username: this.username,
+                            first_name: this.first_name,
+                            last_name: this.last_name,
+                            language_code: this.language_code,
+                            chat_id: this.chat_id,
+                            full_name: this.first_name && this.last_name ? 
+                                `${this.first_name} ${this.last_name}` : this.first_name,
+                            display_name: this.first_name || (this.username ? `@${this.username}` : `User${this.id}`)
+                        };
+                    },
+                    
+                    // ✅ String representation property
+                    get string() {
+                        return this[Symbol.toPrimitive]('string');
+                    },
+                    
+                    // ✅ Full info property
+                    get info() {
+                        return `👤 ${this.first_name || 'User'} (ID: ${this.id})` +
+                               (this.username ? ` @${this.username}` : '') +
+                               (this.language_code ? ` [${this.language_code}]` : '');
+                    }
+                };
+                
+                return userData;
+            };
+
             // Create execution environment
             const executionEnv = {
                 // === BOT INSTANCES ===
@@ -164,14 +233,7 @@ const runPythonSync = (pythonCode) => {
                 },
                 
                 // === USER INFORMATION ===
-                getUser: () => ({
-                    id: userId,
-                    username: username || '',
-                    first_name: first_name || '',
-                    last_name: context.last_name || '',
-                    language_code: context.language_code || '',
-                    chat_id: chatId
-                }),
+                getUser: createUserObject,
                 
                 // === MESSAGE & PARAMS ===
                 msg: msg,
@@ -308,7 +370,7 @@ const runPythonSync = (pythonCode) => {
                 sendDocument: (doc, options) => {
                     return botInstance.sendDocument(chatId, doc, options);
                 },
-                getUser: () => executionEnv.getUser(),
+                getUser: createUserObject,
                 wait: (ms) => executionEnv.wait(ms),
                 runPython: (code) => executionEnv.runPython(code),
                 waitForAnswer: waitForAnswer,
