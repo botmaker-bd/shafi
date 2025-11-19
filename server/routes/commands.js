@@ -304,91 +304,91 @@ router.delete('/:commandId', async (req, res) => {
 });
 
 // Test command execution
-// router.post('/:commandId/test', async (req, res) => {
-    // try {
-        // const { commandId } = req.params;
-        // const { botToken, testInput } = req.body;
+router.post('/:commandId/test', async (req, res) => {
+    try {
+        const { commandId } = req.params;
+        const { botToken, testInput } = req.body;
 
-        // console.log('🔄 Testing command:', { commandId, botToken: botToken?.substring(0, 10) + '...' });
+        console.log('🔄 Testing command:', { commandId, botToken: botToken?.substring(0, 10) + '...' });
 
-        // if (!botToken) {
-            // return res.status(400).json({ 
-                // success: false,
-                // error: 'Bot token is required for testing' 
-            // });
-        // }
+        if (!botToken) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Bot token is required for testing' 
+            });
+        }
 
-        // // Get command details
-        // const { data: command, error } = await supabase
-            // .from('commands')
-            // .select('*')
-            // .eq('id', commandId)
-            // .single();
+        // Get command details
+        const { data: command, error } = await supabase
+            .from('commands')
+            .select('*')
+            .eq('id', commandId)
+            .single();
 
-        // if (error || !command) {
-            // return res.status(404).json({ 
-                // success: false,
-                // error: 'Command not found' 
-            // });
-        // }
+        if (error || !command) {
+            return res.status(404).json({ 
+                success: false,
+                error: 'Command not found' 
+            });
+        }
 
-        // // Get bot instance
-        // const bot = botManager.getBotInstance(botToken);
-        // if (!bot) {
-            // return res.status(400).json({ 
-                // success: false,
-                // error: 'Bot is not active. Please check if bot is properly initialized.' 
-            // });
-        // }
+        // Get bot instance
+        const bot = botManager.getBotInstance(botToken);
+        if (!bot) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Bot is not active. Please check if bot is properly initialized.' 
+            });
+        }
 
-        // // Get admin chat ID
-        // const { data: adminSettings, error: adminError } = await supabase
-            // .from('admin_settings')
-            // .select('admin_chat_id')
-            // .single();
+        // Get admin chat ID
+        const { data: adminSettings, error: adminError } = await supabase
+            .from('admin_settings')
+            .select('admin_chat_id')
+            .single();
 
-        // if (adminError || !adminSettings?.admin_chat_id) {
-            // return res.status(400).json({ 
-                // success: false,
-                // error: 'Admin chat ID not set. Please set admin settings first.' 
-            // });
-        // }
+        if (adminError || !adminSettings?.admin_chat_id) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Admin chat ID not set. Please set admin settings first.' 
+            });
+        }
 
-        // // Create test message
-        // const testMessage = {
-            // chat: { id: adminSettings.admin_chat_id },
-            // from: {
-                // id: adminSettings.admin_chat_id,
-                // first_name: 'Test User',
-                // username: 'testuser',
-                // language_code: 'en'
-            // },
-            // message_id: Math.floor(Math.random() * 1000000),
-            // text: testInput || command.command_patterns.split(',')[0].trim(),
-            // date: Math.floor(Date.now() / 1000)
-        // };
+        // Create test message
+        const testMessage = {
+            chat: { id: adminSettings.admin_chat_id },
+            from: {
+                id: adminSettings.admin_chat_id,
+                first_name: 'Test User',
+                username: 'testuser',
+                language_code: 'en'
+            },
+            message_id: Math.floor(Math.random() * 1000000),
+            text: testInput || command.command_patterns.split(',')[0].trim(),
+            date: Math.floor(Date.now() / 1000)
+        };
 
-        // console.log(`🧪 Testing command with REAL chat ID: ${adminSettings.admin_chat_id}`);
+        console.log(`🧪 Testing command with REAL chat ID: ${adminSettings.admin_chat_id}`);
 
-        // // Execute command
-        // const result = await botManager.executeCommand(bot, command, testMessage, testInput);
+        // Execute command
+        const result = await botManager.executeCommand(bot, command, testMessage, testInput);
 
-        // res.json({
-            // success: true,
-            // message: 'Command executed successfully! Check your Telegram bot for the message.',
-            // testInput: testInput,
-            // chatId: adminSettings.admin_chat_id,
-            // result: result
-        // });
+        res.json({
+            success: true,
+            message: 'Command executed successfully! Check your Telegram bot for the message.',
+            testInput: testInput,
+            chatId: adminSettings.admin_chat_id,
+            result: result
+        });
 
-    // } catch (error) {
-        // console.error('❌ Test command error:', error);
-        // res.status(500).json({ 
-            // success: false,
-            // error: 'Failed to test command: ' + error.message
-        // });
-    // }
-// });
+    } catch (error) {
+        console.error('❌ Test command error:', error);
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to test command: ' + error.message
+        });
+    }
+});
 
 // ✅ FIXED: Temporary command test
 router.post('/test/temp', async (req, res) => {
@@ -473,37 +473,37 @@ router.post('/test/temp', async (req, res) => {
 });
 
 // ✅ NEW: Test Python execution directly
-// router.post('/test/python', async (req, res) => {
-    // try {
-        // const { code } = req.body;
+router.post('/test/python', async (req, res) => {
+    try {
+        const { code } = req.body;
 
-        // console.log('🧪 Testing Python code execution');
+        console.log('🧪 Testing Python code execution');
 
-        // if (!code) {
-            // return res.status(400).json({ 
-                // success: false,
-                // error: 'Python code is required' 
-            // });
-        // }
+        if (!code) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Python code is required' 
+            });
+        }
 
-        // // Test Python execution directly
-        // const result = pythonRunner.runPythonCodeSync(code);
+        // Test Python execution directly
+        const result = pythonRunner.runPythonCodeSync(code);
 
-        // res.json({
-            // success: true,
-            // message: 'Python code executed successfully',
-            // output: result,
-            // code: code
-        // });
+        res.json({
+            success: true,
+            message: 'Python code executed successfully',
+            output: result,
+            code: code
+        });
 
-    // } catch (error) {
-        // console.error('❌ Python test error:', error);
-        // res.status(500).json({ 
-            // success: false,
-            // error: 'Python execution failed: ' + error.message
-        // });
-    // }
-// });
+    } catch (error) {
+        console.error('❌ Python test error:', error);
+        res.status(500).json({ 
+            success: false,
+            error: 'Python execution failed: ' + error.message
+        });
+    }
+});
 
 // Toggle command status
 router.patch('/:commandId/toggle', async (req, res) => {
