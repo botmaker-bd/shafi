@@ -1129,50 +1129,32 @@ class CommandEditor {
     }
 
     // Full Screen Editor Integration
-    // command-editor.js-তে এই ফাংশনটি যোগ/আপডেট করুন
-openFullScreenEditor(type = 'main') {
-    let code = '';
-    let fileName = 'command.js';
+    // command-editor.js-তে এই ফাংশন যোগ করুন
+openFullScreenEditor(code = '', type = 'main') {
+    const editorWindow = window.open('full-editor.html', 'fullEditor', 
+        'width=1200,height=800,resizable=yes,scrollbars=yes');
     
-    if (type === 'main') {
-        const commandCodeEl = document.getElementById('commandCode');
-        code = commandCodeEl ? commandCodeEl.value : '';
-    } else if (type === 'answer') {
-        const answerHandlerEl = document.getElementById('answerHandler');
-        code = answerHandlerEl ? answerHandlerEl.value : '';
-        fileName = 'answer-handler.js';
-    }
+    // Editor লোড হওয়ার পর code সেট করুন
+    const checkEditor = setInterval(() => {
+        if (editorWindow && editorWindow.fullEditor) {
+            clearInterval(checkEditor);
+            editorWindow.fullEditor.setCode(code);
+            editorWindow.fullEditor.setFileName(type === 'main' ? 'command.js' : 'answer-handler.js');
+        }
+    }, 100);
     
-    // URL parameters দিয়ে full editor খুলুন
-    const encodedCode = encodeURIComponent(code);
-    const fullEditorUrl = `full-editor.html?code=${encodedCode}&fileName=${fileName}&type=${type}`;
-    
-    const features = 'width=1200,height=800,resizable=yes,scrollbars=yes,location=no';
-    const editorWindow = window.open(fullEditorUrl, 'fullScreenEditor', features);
-    
-    if (!editorWindow) {
-        this.showError('Popup blocked! Please allow popups for this site.');
-        return;
-    }
-    
-    // Listen for messages from the full editor
-    const messageHandler = (event) => {
-        if (event.data.type === 'FULL_EDITOR_SAVE') {
+    // Code save/update হ্যান্ডেল করুন
+    window.addEventListener('message', (event) => {
+        if (event.data.type === 'CODE_SAVED' || event.data.type === 'CODE_UPDATED') {
             if (type === 'main') {
                 document.getElementById('commandCode').value = event.data.code;
-            } else if (type === 'answer') {
+            } else {
                 document.getElementById('answerHandler').value = event.data.code;
             }
             this.setModified(true);
             this.updateCodeStats();
-            this.showSuccess('Code updated from full editor');
-            
-            // Clean up event listener
-            window.removeEventListener('message', messageHandler);
         }
-    };
-    
-    window.addEventListener('message', messageHandler);
+    });
 }
 
     // Snippets Functionality
