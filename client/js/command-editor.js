@@ -467,36 +467,86 @@ class CommandEditor {
         }
     }
 
-    addNewCommand() {
-        if (this.isModified && !confirm('You have unsaved changes. Create new command?')) {
-            return;
-        }
-
-        this.currentCommand = {
-            id: 'new',
-            command_patterns: '/start',
-            code: '// Write your command code here\nconst user = getUser();\nApi.sendMessage(`Hello ${user.first_name}! Welcome to our bot.`);',
-            is_active: true,
-            wait_for_answer: false,
-            answer_handler: ''
-        };
-
-        this.showCommandEditor();
-        this.populateCommandForm();
-        this.setModified(false);
-        
-        // Update UI selection
-        document.querySelectorAll('.command-item').forEach(item => {
-            item.classList.remove('active');
-        });
-        
-        setTimeout(() => {
-            const moreCommandsInput = document.getElementById('moreCommands');
-            if (moreCommandsInput) {
-                moreCommandsInput.focus();
-            }
-        }, 100);
+addNewCommand() {
+    if (this.isModified && !confirm('You have unsaved changes. Create new command?')) {
+        return;
     }
+
+    // ✅ FIXED: Use unique default pattern
+    let defaultPattern = '/mycommand';
+    let counter = 1;
+    
+    // Find a unique pattern
+    while (this.commands.some(cmd => 
+        cmd.command_patterns.split(',').map(p => p.trim()).includes(defaultPattern)
+    )) {
+        defaultPattern = `/mycommand${counter}`;
+        counter++;
+    }
+
+    this.currentCommand = {
+        id: 'new',
+        command_patterns: defaultPattern,
+        code: '// Write your command code here\nApi.sendMessage(`Hello ${user.first_name}! Welcome to our bot.`);',
+        is_active: true,
+        wait_for_answer: false,
+        answer_handler: ''
+    };
+
+    this.showCommandEditor();
+    this.populateCommandForm();
+    this.setModified(false);
+    
+    // Update UI selection
+    document.querySelectorAll('.command-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    
+    setTimeout(() => {
+        const moreCommandsInput = document.getElementById('moreCommands');
+        if (moreCommandsInput) {
+            moreCommandsInput.focus();
+            moreCommandsInput.select();
+        }
+    }, 100);
+}
+
+// Utility function to check for duplicate patterns
+
+// Update command tags with visual warnings
+addCommandTag(command) {
+    if (!command || this.commandExistsInTags(command)) return;
+
+    const commandsTags = document.getElementById('commandsTags');
+    if (!commandsTags) return;
+
+    // Check for duplicates
+    const isDuplicate = this.commands.some(cmd => 
+        cmd.id !== this.currentCommand?.id && 
+        cmd.command_patterns.split(',').map(p => p.trim()).includes(command)
+    );
+
+    const tag = document.createElement('div');
+    tag.className = `command-tag ${isDuplicate ? 'duplicate' : ''}`;
+    tag.innerHTML = `
+        <span class="tag-text">${this.escapeHtml(command)}</span>
+        ${isDuplicate ? '<span class="duplicate-warning" title="This pattern already exists in another command">⚠️</span>' : ''}
+        <button type="button" class="remove-tag">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    
+    tag.querySelector('.remove-tag').addEventListener('click', () => {
+        tag.remove();
+        this.setModified(true);
+    });
+    
+    commandsTags.appendChild(tag);
+    
+    if (isDuplicate) {
+        this.showError(`Warning: Pattern "${command}" already exists in another command`);
+    }
+}
 
     async selectCommand(commandId) {
         if (this.currentCommand?.id === commandId) return;
@@ -619,71 +669,42 @@ class CommandEditor {
     }
 
     // Command Tags Management
-    setupCommandsTags() {
-        const moreCommandsInput = document.getElementById('moreCommands');
-        const commandsTags = document.getElementById('commandsTags');
+// Command Tags Management - IMPROVED
+setupCommandsTags() {
+    const moreCommandsInput = document.getElementById('moreCommands');
+    const commandsTags = document.getElementById('commandsTags');
 
-        if (!moreCommandsInput || !commandsTags) return;
+    if (!moreCommandsInput || !commandsTags) return;
 
-        moreCommandsInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ',') {
-                e.preventDefault();
-                const command = moreCommandsInput.value.trim();
-                if (command) {
-                    this.addCommandTag(command);
-                    moreCommandsInput.value = '';
-                    this.setModified(true);
-                }
-            }
-        });
-
-        moreCommandsInput.addEventListener('blur', () => {
+    moreCommandsInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ',') {
+            e.preventDefault();
             const command = moreCommandsInput.value.trim();
             if (command) {
+                // ✅ FIXED: Check for duplicates before adding
+                if (this.commandExistsInTags(command)) {
+                    this.showError(`Pattern "${command}" is already added`);
+                    return;
+                }
+                
+                // ✅ FIXED: Check if pattern exists in other commands
+                const existingCommand = this.commands.find(cmd => 
+                    cmd.id !== this.currentCommand?.id && 
+                    cmd.command_patterns.split(',').map(p => p.trim()).includes(command)
+                );
+                
+                if (existingCommand) {
+                    this.showError(`Pattern "${command}" already exists in another command`);
+                    return;
+                }
+                
                 this.addCommandTag(command);
                 moreCommandsInput.value = '';
                 this.setModified(true);
             }
-        });
+        }
+    });
 
-        moreCommandsInput.addEventListener('paste', (e) => {
-            e.preventDefault();
-            const pastedText = e.clipboardData.getData('text');
-            const commands = pastedText.split(',').map(cmd => cmd.trim()).filter(cmd => cmd);
-            
-            commands.forEach(command => {
-                if (command && !this.commandExistsInTags(command)) {
-                    this.addCommandTag(command);
-                }
-            });
-            
-            moreCommandsInput.value = '';
-            this.setModified(true);
-        });
-    }
-
-    addCommandTag(command) {
-        if (!command || this.commandExistsInTags(command)) return;
-
-        const commandsTags = document.getElementById('commandsTags');
-        if (!commandsTags) return;
-
-        const tag = document.createElement('div');
-        tag.className = 'command-tag';
-        tag.innerHTML = `
-            <span class="tag-text">${this.escapeHtml(command)}</span>
-            <button type="button" class="remove-tag">
-                <i class="fas fa-times"></i>
-            </button>
-        `;
-        
-        tag.querySelector('.remove-tag').addEventListener('click', () => {
-            tag.remove();
-            this.setModified(true);
-        });
-        
-        commandsTags.appendChild(tag);
-    }
 
     commandExistsInTags(command) {
         const tags = Array.from(document.querySelectorAll('.command-tag .tag-text'));
@@ -761,117 +782,167 @@ class CommandEditor {
     }
 
     // Save Command with Validation
-    async saveCommand() {
-        if (!this.currentCommand || !this.currentBot) {
-            this.showError('No command selected or bot not loaded');
-            return false;
-        }
+    async saveCommand() {// Save Command with Validation - FIXED DUPLICATE CHECK
+async saveCommand() {
+    if (!this.currentCommand || !this.currentBot) {
+        this.showError('No command selected or bot not loaded');
+        return false;
+    }
 
-        const commands = this.getCommandsFromTags();
+    const commands = this.getCommandsFromTags();
+    
+    if (commands.length === 0) {
+        this.showError('Please add at least one command pattern');
+        const moreCommandsInput = document.getElementById('moreCommands');
+        if (moreCommandsInput) moreCommandsInput.focus();
+        return false;
+    }
+
+    const commandCodeEl = document.getElementById('commandCode');
+    const commandCode = commandCodeEl ? commandCodeEl.value.trim() : '';
+
+    if (!commandCode) {
+        this.showError('Command code is required');
+        if (commandCodeEl) commandCodeEl.focus();
+        return false;
+    }
+
+    const waitForAnswerEl = document.getElementById('waitForAnswer');
+    const answerHandlerEl = document.getElementById('answerHandler');
+    
+    const waitForAnswer = waitForAnswerEl ? waitForAnswerEl.checked : false;
+    const answerHandler = waitForAnswer && answerHandlerEl ? answerHandlerEl.value.trim() : '';
+
+    // ✅ NEW: Client-side validation
+    if (waitForAnswer && !answerHandler) {
+        this.showError('Answer handler code is required when "Wait for Answer" is enabled');
+        if (answerHandlerEl) {
+            answerHandlerEl.focus();
+            // Show the answer handler section if hidden
+            const answerSection = document.getElementById('answerHandlerSection');
+            if (answerSection) answerSection.style.display = 'block';
+        }
+        return false;
+    }
+
+    // ✅ FIXED: Client-side duplicate check before sending to server
+    if (this.currentCommand.id === 'new') {
+        // For new commands, check if any pattern already exists in current bot
+        const duplicatePatterns = [];
         
-        if (commands.length === 0) {
-            this.showError('Please add at least one command pattern');
-            const moreCommandsInput = document.getElementById('moreCommands');
-            if (moreCommandsInput) moreCommandsInput.focus();
-            return false;
-        }
-
-        const commandCodeEl = document.getElementById('commandCode');
-        const commandCode = commandCodeEl ? commandCodeEl.value.trim() : '';
-
-        if (!commandCode) {
-            this.showError('Command code is required');
-            if (commandCodeEl) commandCodeEl.focus();
-            return false;
-        }
-
-        const waitForAnswerEl = document.getElementById('waitForAnswer');
-        const answerHandlerEl = document.getElementById('answerHandler');
-        
-        const waitForAnswer = waitForAnswerEl ? waitForAnswerEl.checked : false;
-        const answerHandler = waitForAnswer && answerHandlerEl ? answerHandlerEl.value.trim() : '';
-
-        // ✅ NEW: Client-side validation
-        if (waitForAnswer && !answerHandler) {
-            this.showError('Answer handler code is required when "Wait for Answer" is enabled');
-            if (answerHandlerEl) {
-                answerHandlerEl.focus();
-                // Show the answer handler section if hidden
-                const answerSection = document.getElementById('answerHandlerSection');
-                if (answerSection) answerSection.style.display = 'block';
-            }
-            return false;
-        }
-
-        const formData = {
-            commandPatterns: commands.join(','),
-            code: commandCode,
-            waitForAnswer: waitForAnswer,
-            answerHandler: answerHandler,
-            botToken: this.currentBot.token
-        };
-
-        this.showLoading(true);
-
-        try {
-            const token = localStorage.getItem('token');
-            let response;
-            let url;
-            let method;
-
-            if (this.currentCommand.id === 'new') {
-                url = '/api/commands';
-                method = 'POST';
-            } else {
-                url = `/api/commands/${this.currentCommand.id}`;
-                method = 'PUT';
-            }
-
-            console.log(`🔄 Saving command: ${method} ${url}`, formData);
+        for (const pattern of commands) {
+            const existingCommand = this.commands.find(cmd => 
+                cmd.command_patterns.split(',').map(p => p.trim()).includes(pattern)
+            );
             
-            response = await fetch(url, {
-                method: method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(formData)
-            });
+            if (existingCommand) {
+                duplicatePatterns.push(pattern);
+            }
+        }
+        
+        if (duplicatePatterns.length > 0) {
+            this.showError(`Command pattern "${duplicatePatterns[0]}" already exists in another command. Please use a different pattern.`);
+            return false;
+        }
+    } else {
+        // For existing commands, check duplicates excluding current command
+        const duplicatePatterns = [];
+        
+        for (const pattern of commands) {
+            const existingCommand = this.commands.find(cmd => 
+                cmd.id !== this.currentCommand.id && 
+                cmd.command_patterns.split(',').map(p => p.trim()).includes(pattern)
+            );
+            
+            if (existingCommand) {
+                duplicatePatterns.push(pattern);
+            }
+        }
+        
+        if (duplicatePatterns.length > 0) {
+            this.showError(`Command pattern "${duplicatePatterns[0]}" already exists in another command. Please use a different pattern.`);
+            return false;
+        }
+    }
 
-            const data = await response.json();
-            console.log('📦 Save command response:', data);
+    const formData = {
+        commandPatterns: commands.join(','),
+        code: commandCode,
+        waitForAnswer: waitForAnswer,
+        answerHandler: answerHandler,
+        botToken: this.currentBot.token
+    };
 
-            if (response.ok) {
-                this.showSuccess('Command saved successfully!');
+    this.showLoading(true);
+
+    try {
+        const token = localStorage.getItem('token');
+        let response;
+        let url;
+        let method;
+
+        if (this.currentCommand.id === 'new') {
+            url = '/api/commands';
+            method = 'POST';
+        } else {
+            url = `/api/commands/${this.currentCommand.id}`;
+            method = 'PUT';
+        }
+
+        console.log(`🔄 Saving command: ${method} ${url}`, formData);
+        
+        response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(formData)
+        });
+
+        const data = await response.json();
+        console.log('📦 Save command response:', data);
+
+        if (response.ok) {
+            this.showSuccess('Command saved successfully!');
+            
+            await this.loadCommands();
+            
+            if (data.command) {
+                this.currentCommand = data.command;
+                this.populateCommandForm();
                 
-                await this.loadCommands();
-                
-                if (data.command) {
-                    this.currentCommand = data.command;
-                    this.populateCommandForm();
-                    
-                    // Auto-select the saved command
-                    setTimeout(() => {
-                        const commandItem = document.querySelector(`[data-command-id="${this.currentCommand.id}"]`);
-                        if (commandItem) {
-                            commandItem.click();
-                        }
-                    }, 500);
-                }
-                
-                this.setModified(false);
-                return true;
+                // Auto-select the saved command
+                setTimeout(() => {
+                    const commandItem = document.querySelector(`[data-command-id="${this.currentCommand.id}"]`);
+                    if (commandItem) {
+                        commandItem.click();
+                    }
+                }, 500);
+            }
+            
+            this.setModified(false);
+            return true;
+        } else {
+            // ✅ FIXED: Better error handling for duplicate patterns
+            if (data.error && data.error.includes('already exists')) {
+                // Extract the duplicate pattern from error message
+                const patternMatch = data.error.match(/"(.*?)"/);
+                const duplicatePattern = patternMatch ? patternMatch[1] : 'the pattern';
+                this.showError(`Command pattern "${duplicatePattern}" already exists. Please use a different pattern.`);
             } else {
                 throw new Error(data.error || 'Failed to save command');
             }
-        } catch (error) {
-            console.error('❌ Save command error:', error);
-            this.showError('Failed to save command: ' + error.message);
             return false;
-        } finally {
-            this.showLoading(false);
         }
+    } catch (error) {
+        console.error('❌ Save command error:', error);
+        this.showError('Failed to save command: ' + error.message);
+        return false;
+    } finally {
+        this.showLoading(false);
     }
+}
 
     async toggleCommand() {
         if (!this.currentCommand || this.currentCommand.id === 'new') {
