@@ -1098,476 +1098,413 @@ class CommandEditor {
     }
 
     // ✅ FIXED: Snippets functionality - এখন টেমপ্লেট থেকে লোড হবে
+    async showSnippetsFromTemplates() {
+        try {
+            // Ensure templates are loaded
+            if (Object.keys(this.templates).length === 0) {
+                await this.loadTemplates();
+            }
+
+            // Collect all templates as snippets
+            const allSnippets = [];
+            Object.values(this.templates).forEach(categoryTemplates => {
+                if (Array.isArray(categoryTemplates)) {
+                    categoryTemplates.forEach(template => {
+                        if (template.code) {
+                            allSnippets.push({
+                                name: template.name,
+                                code: template.code,
+                                description: template.description || 'No description available',
+                                category: template.category || 'General'
+                            });
+                        }
+                    });
+                }
+            });
+
+            // If no templates found, use fallback snippets
+            if (allSnippets.length === 0) {
+                console.log('📝 No templates found, using fallback snippets');
+                this.showSnippetsFallback();
+                return;
+            }
+
+            console.log(`📝 Found ${allSnippets.length} snippets from templates`);
+
+            // Create snippets modal
+            this.createSnippetsModal(allSnippets);
+
+        } catch (error) {
+            console.error('❌ Error loading snippets from templates:', error);
+            // Fallback to basic snippets
+            this.showSnippetsFallback();
+        }
+    }
 
     // Fallback snippets if templates fail to load
+    showSnippetsFallback() {
+        const fallbackSnippets = [
+            {
+                name: 'Send Message',
+                code: 'Api.sendMessage("Hello world!");',
+                description: 'Send a simple text message',
+                category: 'Basic'
+            },
+            {
+                name: 'Get User Info',
+                code: 'const user = getUser();\nApi.sendMessage(`Hello ${user.first_name}! Your ID: ${user.id}`);',
+                description: 'Get user information and send greeting',
+                category: 'User'
+            },
+            {
+                name: 'Send Button',
+                code: 'const buttons = [\n  { text: "Button 1", callback_data: "btn1" },\n  { text: "Button 2", callback_data: "btn2" }\n];\nApi.sendMessage("Choose an option:", { inline_keyboard: [buttons] });',
+                description: 'Send message with inline buttons',
+                category: 'Buttons'
+            },
+            {
+                name: 'Save User Data',
+                code: 'const user = getUser();\nUser.saveData("last_command", "/start");\nApi.sendMessage("Your data has been saved!");',
+                description: 'Save user data to database',
+                category: 'Data'
+            },
+            {
+                name: 'HTTP Request',
+                code: 'try {\n  const response = await HTTP.get("https://api.example.com/data");\n  Api.sendMessage(`Data: ${response.data}`);\n} catch (error) {\n  Api.sendMessage("Error fetching data");\n}',
+                description: 'Make HTTP GET request',
+                category: 'HTTP'
+            }
+        ];
 
+        this.createSnippetsModal(fallbackSnippets);
+    }
 
-
-// ✅ FIXED: Snippets functionality - এখন টেমপ্লেট থেকে লোড হবে
-async showSnippetsFromTemplates() {
-    try {
-        // Ensure templates are loaded
-        if (Object.keys(this.templates).length === 0) {
-            await this.loadTemplates();
+    createSnippetsModal(snippets) {
+        // Remove existing snippets modal if any
+        const existingModal = document.querySelector('.snippets-modal-overlay');
+        if (existingModal) {
+            existingModal.remove();
         }
 
-        // Collect all templates as snippets
-        const allSnippets = [];
-        Object.values(this.templates).forEach(categoryTemplates => {
-            if (Array.isArray(categoryTemplates)) {
-                categoryTemplates.forEach(template => {
-                    if (template.code) {
-                        allSnippets.push({
-                            name: template.name,
-                            code: template.code,
-                            description: template.description || 'No description available',
-                            category: 'Templates'
-                        });
-                    }
-                });
+        // Group snippets by category
+        const snippetsByCategory = {};
+        snippets.forEach(snippet => {
+            const category = snippet.category || 'General';
+            if (!snippetsByCategory[category]) {
+                snippetsByCategory[category] = [];
             }
+            snippetsByCategory[category].push(snippet);
         });
 
-        // If no templates found, use fallback snippets
-        if (allSnippets.length === 0) {
-            console.log('📝 No templates found, using fallback snippets');
-            this.showSnippetsFallback();
-            return;
-        }
-
-        console.log(`📝 Found ${allSnippets.length} snippets from templates`);
-
-        // Create snippets modal
-        this.createSnippetsModal(allSnippets);
-
-    } catch (error) {
-        console.error('❌ Error loading snippets from templates:', error);
-        // Fallback to basic snippets
-        this.showSnippetsFallback();
-    }
-}
-
-// Fallback snippets if templates fail to load
-showSnippetsFallback() {
-    const fallbackSnippets = [
-        {
-            name: 'Send Message',
-            code: 'Api.sendMessage("Hello world!");',
-            description: 'Send a simple text message',
-            category: 'Basic'
-        },
-        {
-            name: 'Get User Info',
-            code: 'const user = getUser();\nApi.sendMessage(`Hello ${user.first_name}! Your ID: ${user.id}`);',
-            description: 'Get user information and send greeting',
-            category: 'User'
-        },
-        {
-            name: 'Send Button',
-            code: 'const buttons = [\n  { text: "Button 1", callback_data: "btn1" },\n  { text: "Button 2", callback_data: "btn2" }\n];\nApi.sendMessage("Choose an option:", { inline_keyboard: [buttons] });',
-            description: 'Send message with inline buttons',
-            category: 'Buttons'
-        }
-    ];
-
-    this.createSnippetsModal(fallbackSnippets);
-}
-
-createSnippetsModal(snippets) {
-    // Remove existing snippets modal if any
-    const existingModal = document.querySelector('.snippets-modal-overlay');
-    if (existingModal) {
-        existingModal.remove();
-    }
-
-    // Create modal HTML - COMPACT AND BEAUTIFUL DESIGN
-    const snippetsHTML = `
-        <div class="snippets-modal">
-            <div class="snippets-header">
-                <h3><i class="fas fa-code"></i> Code Snippets</h3>
-                <div class="snippets-controls">
-                    <span class="snippets-count">${snippets.length} snippets</span>
+        // Create modal HTML
+        const snippetsHTML = `
+            <div class="snippets-modal">
+                <div class="snippets-header">
+                    <h3>Code Snippets</h3>
+                    <span class="snippets-count">${snippets.length} snippets available</span>
                     <button class="snippets-close">&times;</button>
                 </div>
-            </div>
-            <div class="snippets-body">
-                <div class="snippets-search">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="snippetsSearch" placeholder="Search snippets...">
-                </div>
-                <div class="snippets-list">
-                    ${snippets.map((snippet, index) => `
-                        <div class="snippet-item" data-index="${index}">
-                            <div class="snippet-info">
-                                <h5 class="snippet-title">${snippet.name}</h5>
-                                <p class="snippet-desc">${snippet.description}</p>
+                <div class="snippets-body">
+                    <div class="snippets-categories">
+                        ${Object.entries(snippetsByCategory).map(([category, categorySnippets]) => `
+                            <div class="snippets-category">
+                                <h4 class="category-title">${category} (${categorySnippets.length})</h4>
+                                <div class="snippets-grid">
+                                    ${categorySnippets.map(snippet => `
+                                        <div class="snippet-card" data-code="${this.escapeHtml(snippet.code)}">
+                                            <div class="snippet-header">
+                                                <h5>${snippet.name}</h5>
+                                                <button class="btn-insert" title="Insert snippet">
+                                                    <i class="fas fa-code"></i> Insert
+                                                </button>
+                                            </div>
+                                            <p class="snippet-desc">${snippet.description}</p>
+                                            <pre class="snippet-code">${this.escapeHtml(snippet.code)}</pre>
+                                        </div>
+                                    `).join('')}
+                                </div>
                             </div>
-                            <button class="snippet-insert-btn" data-code="${this.escapeHtml(snippet.code)}" title="Insert snippet">
-                                <i class="fas fa-plus"></i>
-                            </button>
-                        </div>
-                    `).join('')}
+                        `).join('')}
+                    </div>
+                </div>
+                <div class="snippets-footer">
+                    <button class="btn btn-secondary" id="closeSnippets">Close</button>
                 </div>
             </div>
-            <div class="snippets-footer">
-                <button class="btn btn-secondary btn-small" id="closeSnippets">
-                    <i class="fas fa-times"></i> Close
-                </button>
-            </div>
-        </div>
-    `;
+        `;
 
-    // Create and show modal
-    const modalOverlay = document.createElement('div');
-    modalOverlay.className = 'snippets-modal-overlay';
-    modalOverlay.innerHTML = snippetsHTML;
-    document.body.appendChild(modalOverlay);
+        // Create and show modal
+        const modalOverlay = document.createElement('div');
+        modalOverlay.className = 'snippets-modal-overlay';
+        modalOverlay.innerHTML = snippetsHTML;
+        document.body.appendChild(modalOverlay);
 
-    // Add CSS for snippets modal
-    this.addSnippetsModalStyles();
+        // Add CSS for snippets modal
+        this.addSnippetsModalStyles();
 
-    // Add event listeners
-    modalOverlay.querySelector('.snippets-close').addEventListener('click', () => {
-        modalOverlay.remove();
-    });
-
-    modalOverlay.querySelector('#closeSnippets').addEventListener('click', () => {
-        modalOverlay.remove();
-    });
-
-    modalOverlay.addEventListener('click', (e) => {
-        if (e.target === modalOverlay) {
-            modalOverlay.remove();
-        }
-    });
-
-    // Insert snippet functionality
-    modalOverlay.querySelectorAll('.snippet-insert-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const code = e.target.closest('.snippet-insert-btn').dataset.code;
-            this.insertSnippet(code);
+        // Add event listeners
+        modalOverlay.querySelector('.snippets-close').addEventListener('click', () => {
             modalOverlay.remove();
         });
-    });
 
-    // Search functionality
-    const searchInput = modalOverlay.querySelector('#snippetsSearch');
-    if (searchInput) {
-        searchInput.addEventListener('input', (e) => {
-            const searchTerm = e.target.value.toLowerCase();
-            const snippetItems = modalOverlay.querySelectorAll('.snippet-item');
-            
-            snippetItems.forEach(item => {
-                const title = item.querySelector('.snippet-title').textContent.toLowerCase();
-                const desc = item.querySelector('.snippet-desc').textContent.toLowerCase();
-                const matches = title.includes(searchTerm) || desc.includes(searchTerm);
-                item.style.display = matches ? 'flex' : 'none';
+        modalOverlay.querySelector('#closeSnippets').addEventListener('click', () => {
+            modalOverlay.remove();
+        });
+
+        modalOverlay.addEventListener('click', (e) => {
+            if (e.target === modalOverlay) {
+                modalOverlay.remove();
+            }
+        });
+
+        // Insert snippet functionality
+        modalOverlay.querySelectorAll('.btn-insert').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const snippetCard = e.target.closest('.snippet-card');
+                const code = snippetCard.dataset.code;
+                this.insertSnippet(code);
+                modalOverlay.remove();
             });
         });
-        
-        // Focus on search input
-        setTimeout(() => searchInput.focus(), 100);
+
+        // ESC key to close
+        const handleEsc = (e) => {
+            if (e.key === 'Escape') {
+                modalOverlay.remove();
+                document.removeEventListener('keydown', handleEsc);
+            }
+        };
+        document.addEventListener('keydown', handleEsc);
     }
 
-    // ESC key to close
-    const handleEsc = (e) => {
-        if (e.key === 'Escape') {
-            modalOverlay.remove();
-            document.removeEventListener('keydown', handleEsc);
-        }
-    };
-    document.addEventListener('keydown', handleEsc);
-}
+    addSnippetsModalStyles() {
+        if (document.getElementById('snippets-modal-styles')) return;
 
-addSnippetsModalStyles() {
-    if (document.getElementById('snippets-modal-styles')) return;
-
-    const styles = `
-        <style id="snippets-modal-styles">
-            .snippets-modal-overlay {
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0, 0, 0, 0.6);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                z-index: 10000;
-                padding: 1rem;
-                backdrop-filter: blur(5px);
-            }
-
-            .snippets-modal {
-                background: var(--bg-primary);
-                border-radius: var(--radius-xl);
-                box-shadow: var(--shadow-xl);
-                width: 100%;
-                max-width: 500px;
-                max-height: 70vh;
-                display: flex;
-                flex-direction: column;
-                border: 1px solid var(--border-color);
-                overflow: hidden;
-            }
-
-            .snippets-header {
-                padding: 1.25rem 1.5rem;
-                border-bottom: 1px solid var(--border-color);
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                background: var(--bg-tertiary);
-            }
-
-            .snippets-header h3 {
-                margin: 0;
-                color: var(--text-primary);
-                font-size: 1.1rem;
-                font-weight: 600;
-                display: flex;
-                align-items: center;
-                gap: 0.5rem;
-            }
-
-            .snippets-controls {
-                display: flex;
-                align-items: center;
-                gap: 1rem;
-            }
-
-            .snippets-count {
-                color: var(--text-muted);
-                font-size: 0.8rem;
-                background: var(--bg-secondary);
-                padding: 0.25rem 0.5rem;
-                border-radius: var(--radius-sm);
-            }
-
-            .snippets-close {
-                background: none;
-                border: none;
-                font-size: 1.25rem;
-                cursor: pointer;
-                color: var(--text-muted);
-                width: 32px;
-                height: 32px;
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                transition: var(--transition);
-            }
-
-            .snippets-close:hover {
-                background: var(--error-color);
-                color: white;
-            }
-
-            .snippets-body {
-                flex: 1;
-                overflow: hidden;
-                display: flex;
-                flex-direction: column;
-            }
-
-            .snippets-search {
-                padding: 1rem 1.5rem;
-                border-bottom: 1px solid var(--border-light);
-                background: var(--bg-secondary);
-                position: relative;
-            }
-
-            .snippets-search i {
-                position: absolute;
-                left: 2rem;
-                top: 50%;
-                transform: translateY(-50%);
-                color: var(--text-muted);
-            }
-
-            .snippets-search input {
-                width: 100%;
-                padding: 0.75rem 1rem 0.75rem 2.5rem;
-                border: 1px solid var(--border-color);
-                border-radius: var(--radius-lg);
-                background: var(--bg-primary);
-                color: var(--text-primary);
-                font-size: 0.9rem;
-                transition: var(--transition);
-            }
-
-            .snippets-search input:focus {
-                outline: none;
-                border-color: var(--primary-color);
-                box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-            }
-
-            .snippets-list {
-                flex: 1;
-                overflow-y: auto;
-                padding: 1rem 0;
-            }
-
-            .snippet-item {
-                display: flex;
-                align-items: center;
-                gap: 1rem;
-                padding: 1rem 1.5rem;
-                border-bottom: 1px solid var(--border-light);
-                transition: var(--transition);
-                cursor: pointer;
-            }
-
-            .snippet-item:hover {
-                background: var(--bg-tertiary);
-            }
-
-            .snippet-item:last-child {
-                border-bottom: none;
-            }
-
-            .snippet-info {
-                flex: 1;
-                min-width: 0;
-            }
-
-            .snippet-title {
-                margin: 0 0 0.375rem 0;
-                color: var(--text-primary);
-                font-size: 0.95rem;
-                font-weight: 600;
-                line-height: 1.3;
-            }
-
-            .snippet-desc {
-                margin: 0;
-                color: var(--text-secondary);
-                font-size: 0.8rem;
-                line-height: 1.4;
-                display: -webkit-box;
-                -webkit-line-clamp: 2;
-                -webkit-box-orient: vertical;
-                overflow: hidden;
-            }
-
-            .snippet-insert-btn {
-                background: var(--primary-color);
-                color: white;
-                border: none;
-                width: 36px;
-                height: 36px;
-                border-radius: var(--radius-md);
-                cursor: pointer;
-                transition: var(--transition);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                flex-shrink: 0;
-                font-size: 0.9rem;
-            }
-
-            .snippet-insert-btn:hover {
-                background: var(--primary-dark);
-                transform: scale(1.05);
-            }
-
-            .snippets-footer {
-                padding: 1rem 1.5rem;
-                border-top: 1px solid var(--border-color);
-                background: var(--bg-tertiary);
-                display: flex;
-                justify-content: flex-end;
-            }
-
-            /* Scrollbar styling */
-            .snippets-list::-webkit-scrollbar {
-                width: 6px;
-            }
-
-            .snippets-list::-webkit-scrollbar-track {
-                background: var(--bg-secondary);
-            }
-
-            .snippets-list::-webkit-scrollbar-thumb {
-                background: var(--border-color);
-                border-radius: 3px;
-            }
-
-            .snippets-list::-webkit-scrollbar-thumb:hover {
-                background: var(--text-muted);
-            }
-
-            @media (max-width: 768px) {
+        const styles = `
+            <style id="snippets-modal-styles">
                 .snippets-modal-overlay {
-                    padding: 0.5rem;
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0, 0, 0, 0.7);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 10000;
+                    padding: 2rem;
+                    backdrop-filter: blur(4px);
                 }
-                
-                .snippets-modal {
-                    max-height: 85vh;
-                    max-width: 95vw;
-                }
-                
-                .snippet-item {
-                    padding: 0.875rem 1rem;
-                }
-                
-                .snippets-header,
-                .snippets-search {
-                    padding: 1rem;
-                }
-            }
 
-            @media (max-width: 480px) {
                 .snippets-modal {
-                    max-height: 90vh;
-                }
-                
-                .snippet-item {
+                    background: var(--bg-primary);
+                    border-radius: var(--radius-xl);
+                    box-shadow: var(--shadow-xl);
+                    max-width: 900px;
+                    width: 100%;
+                    max-height: 80vh;
+                    display: flex;
                     flex-direction: column;
-                    align-items: stretch;
+                    border: 1px solid var(--border-color);
+                }
+
+                .snippets-header {
+                    padding: 1.5rem;
+                    border-bottom: 1px solid var(--border-color);
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    background: var(--bg-tertiary);
+                    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+                }
+
+                .snippets-header h3 {
+                    margin: 0;
+                    color: var(--text-primary);
+                    font-size: 1.25rem;
+                }
+
+                .snippets-count {
+                    color: var(--text-muted);
+                    font-size: 0.875rem;
+                }
+
+                .snippets-close {
+                    background: none;
+                    border: none;
+                    font-size: 1.5rem;
+                    cursor: pointer;
+                    color: var(--text-muted);
+                    width: 32px;
+                    height: 32px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: var(--transition);
+                }
+
+                .snippets-close:hover {
+                    background: var(--bg-secondary);
+                    color: var(--error-color);
+                }
+
+                .snippets-body {
+                    flex: 1;
+                    overflow-y: auto;
+                    padding: 1.5rem;
+                }
+
+                .snippets-categories {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 2rem;
+                }
+
+                .category-title {
+                    margin: 0 0 1rem 0;
+                    color: var(--text-primary);
+                    font-size: 1.1rem;
+                    font-weight: 600;
+                    padding-bottom: 0.5rem;
+                    border-bottom: 2px solid var(--primary-color);
+                }
+
+                .snippets-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+                    gap: 1rem;
+                }
+
+                .snippet-card {
+                    border: 1px solid var(--border-color);
+                    border-radius: var(--radius-lg);
+                    padding: 1.25rem;
+                    background: var(--bg-primary);
+                    transition: var(--transition);
+                    display: flex;
+                    flex-direction: column;
                     gap: 0.75rem;
                 }
-                
-                .snippet-insert-btn {
-                    align-self: flex-end;
-                    width: 100%;
-                    max-width: 120px;
+
+                .snippet-card:hover {
+                    border-color: var(--primary-color);
+                    box-shadow: var(--shadow-md);
+                    transform: translateY(-2px);
                 }
-            }
-        </style>
-    `;
 
-    document.head.insertAdjacentHTML('beforeend', styles);
-}
+                .snippet-header {
+                    display: flex;
+                    align-items: flex-start;
+                    justify-content: space-between;
+                    gap: 1rem;
+                }
 
-insertSnippet(code) {
-    const commandCodeEl = document.getElementById('commandCode');
-    if (!commandCodeEl) return;
+                .snippet-header h5 {
+                    margin: 0;
+                    color: var(--text-primary);
+                    font-size: 1rem;
+                    font-weight: 600;
+                    flex: 1;
+                }
 
-    const currentCode = commandCodeEl.value;
-    const cursorPos = commandCodeEl.selectionStart;
-    
-    // Insert code at cursor position with proper formatting
-    const newCode = currentCode.substring(0, cursorPos) + 
-                   '\n' + code + '\n' + 
-                   currentCode.substring(cursorPos);
-    
-    commandCodeEl.value = newCode;
-    
-    // Set cursor position after inserted code
-    const newCursorPos = cursorPos + code.length + 2;
-    commandCodeEl.setSelectionRange(newCursorPos, newCursorPos);
-    
-    // Focus back to editor
-    commandCodeEl.focus();
-    
-    this.setModified(true);
-    this.updateCodeStats();
-    
-    this.showSuccess('Snippet inserted successfully!');
-}
+                .btn-insert {
+                    background: var(--primary-color);
+                    color: white;
+                    border: none;
+                    padding: 0.5rem 0.75rem;
+                    border-radius: var(--radius-md);
+                    font-size: 0.75rem;
+                    cursor: pointer;
+                    transition: var(--transition);
+                    display: flex;
+                    align-items: center;
+                    gap: 0.375rem;
+                    white-space: nowrap;
+                }
+
+                .btn-insert:hover {
+                    background: var(--primary-dark);
+                    transform: translateY(-1px);
+                }
+
+                .snippet-desc {
+                    color: var(--text-secondary);
+                    font-size: 0.875rem;
+                    line-height: 1.4;
+                    margin: 0;
+                }
+
+                .snippet-code {
+                    background: var(--bg-secondary);
+                    border: 1px solid var(--border-light);
+                    border-radius: var(--radius-md);
+                    padding: 0.75rem;
+                    font-family: 'Courier New', monospace;
+                    font-size: 0.75rem;
+                    color: var(--text-primary);
+                    overflow-x: auto;
+                    margin: 0;
+                    max-height: 120px;
+                    overflow-y: auto;
+                }
+
+                .snippets-footer {
+                    padding: 1.25rem 1.5rem;
+                    border-top: 1px solid var(--border-color);
+                    background: var(--bg-tertiary);
+                    border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+                    display: flex;
+                    justify-content: flex-end;
+                }
+
+                @media (max-width: 768px) {
+                    .snippets-modal-overlay {
+                        padding: 1rem;
+                    }
+                    
+                    .snippets-grid {
+                        grid-template-columns: 1fr;
+                    }
+                    
+                    .snippets-modal {
+                        max-height: 90vh;
+                    }
+                }
+            </style>
+        `;
+
+        document.head.insertAdjacentHTML('beforeend', styles);
+    }
+
+    insertSnippet(code) {
+        const commandCodeEl = document.getElementById('commandCode');
+        if (!commandCodeEl) return;
+
+        const currentCode = commandCodeEl.value;
+        const cursorPos = commandCodeEl.selectionStart;
+        
+        // Insert code at cursor position
+        const newCode = currentCode.substring(0, cursorPos) + 
+                       '\n' + code + '\n' + 
+                       currentCode.substring(cursorPos);
+        
+        commandCodeEl.value = newCode;
+        
+        // Set cursor position after inserted code
+        const newCursorPos = cursorPos + code.length + 2;
+        commandCodeEl.setSelectionRange(newCursorPos, newCursorPos);
+        
+        // Focus back to editor
+        commandCodeEl.focus();
+        
+        this.setModified(true);
+        this.updateCodeStats();
+        
+        this.showSuccess('Snippet inserted successfully!');
+    }
+
     // ✅ FIXED: Code Editor Functionality - Updated for better modal
     openCodeEditor(editorType) {
         this.currentEditorType = editorType;
