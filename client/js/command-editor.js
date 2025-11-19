@@ -434,7 +434,15 @@ class CommandEditor {
         // Update UI selection
         document.querySelectorAll('.command-item').forEach(item => {
             item.classList.remove('active');
-        });
+        });// ❌ ভুল - command-group class নেই HTML এ
+// document.querySelectorAll('.command-group').forEach(group => {
+    // group.classList.remove('active');
+// });
+
+// // ✅ সঠিক - command-item class ব্যবহার করুন
+// document.querySelectorAll('.command-item').forEach(item => {
+    // item.classList.remove('active');
+// });
         
         setTimeout(() => {
             const moreCommandsInput = document.getElementById('moreCommands');
@@ -465,9 +473,15 @@ class CommandEditor {
                 this.populateCommandForm();
                 
                 // Update UI selection
-                document.querySelectorAll('.command-group').forEach(group => {
-                    group.classList.remove('active');
-                });
+                // // ❌ ভুল - command-group class নেই HTML এ
+// document.querySelectorAll('.command-group').forEach(group => {
+    // group.classList.remove('active');
+// });
+
+// ✅ সঠিক - command-item class ব্যবহার করুন
+document.querySelectorAll('.command-item').forEach(item => {
+    item.classList.remove('active');
+});
                 
                 const selectedGroup = document.querySelector(`[data-command-id="${commandId}"]`);
                 if (selectedGroup) {
