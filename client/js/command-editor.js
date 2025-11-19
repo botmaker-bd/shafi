@@ -213,6 +213,22 @@ class CommandEditor {
             });
         }
 
+        // Full editor buttons
+        const openFullEditor = document.getElementById('openFullEditor');
+        const openAnswerFullEditor = document.getElementById('openAnswerFullEditor');
+        
+        if (openFullEditor) {
+            openFullEditor.addEventListener('click', () => {
+                this.openFullScreenEditor('main');
+            });
+        }
+        
+        if (openAnswerFullEditor) {
+            openAnswerFullEditor.addEventListener('click', () => {
+                this.openFullScreenEditor('answer');
+            });
+        }
+
         // Templates
         const showTemplatesBtn = document.getElementById('showTemplates');
         if (showTemplatesBtn) {
@@ -1110,6 +1126,123 @@ class CommandEditor {
         } else {
             this.showError('Please select a command first');
         }
+    }
+
+    // Full Screen Editor Integration
+    openFullScreenEditor(type = 'main') {
+        let code = '';
+        let fileName = 'command.js';
+        
+        if (type === 'main') {
+            const commandCodeEl = document.getElementById('commandCode');
+            code = commandCodeEl ? commandCodeEl.value : '';
+        } else if (type === 'answer') {
+            const answerHandlerEl = document.getElementById('answerHandler');
+            code = answerHandlerEl ? answerHandlerEl.value : '';
+            fileName = 'answer-handler.js';
+        }
+        
+        // Create a new window for full screen editor
+        const features = 'width=1200,height=800,resizable=yes,scrollbars=yes,location=no';
+        const editorWindow = window.open('', 'fullScreenEditor', features);
+        
+        if (!editorWindow) {
+            this.showError('Popup blocked! Please allow popups for this site.');
+            return;
+        }
+        
+        // Create basic full editor HTML
+        const fullEditorHTML = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Full Screen Editor - ${fileName}</title>
+                <style>
+                    body {
+                        margin: 0;
+                        padding: 20px;
+                        background: #1e1e1e;
+                        color: #d4d4d4;
+                        font-family: 'Fira Code', monospace;
+                    }
+                    .full-editor {
+                        width: 100%;
+                        height: calc(100vh - 40px);
+                        background: #1e1e1e;
+                        color: #d4d4d4;
+                        border: none;
+                        outline: none;
+                        font-family: 'Fira Code', monospace;
+                        font-size: 14px;
+                        line-height: 1.5;
+                        resize: none;
+                    }
+                    .editor-actions {
+                        position: fixed;
+                        top: 10px;
+                        right: 10px;
+                        display: flex;
+                        gap: 10px;
+                    }
+                    .btn {
+                        padding: 8px 16px;
+                        background: #007acc;
+                        color: white;
+                        border: none;
+                        border-radius: 4px;
+                        cursor: pointer;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="editor-actions">
+                    <button class="btn" onclick="saveAndClose()">Save & Close</button>
+                    <button class="btn" onclick="window.close()">Cancel</button>
+                </div>
+                <textarea class="full-editor" id="fullEditor">${this.escapeHtml(code)}</textarea>
+                <script>
+                    const editor = document.getElementById('fullEditor');
+                    editor.focus();
+                    
+                    function saveAndClose() {
+                        if (window.opener) {
+                            window.opener.postMessage({
+                                type: 'FULL_EDITOR_SAVE',
+                                code: editor.value,
+                                editorType: '${type}'
+                            }, '*');
+                        }
+                        window.close();
+                    }
+                    
+                    // Handle keyboard shortcuts
+                    editor.addEventListener('keydown', function(e) {
+                        if (e.ctrlKey && e.key === 's') {
+                            e.preventDefault();
+                            saveAndClose();
+                        }
+                    });
+                </script>
+            </body>
+            </html>
+        `;
+        
+        editorWindow.document.write(fullEditorHTML);
+        editorWindow.document.close();
+        
+        // Listen for messages from the full editor
+        window.addEventListener('message', (event) => {
+            if (event.data.type === 'FULL_EDITOR_SAVE') {
+                if (event.data.editorType === 'main') {
+                    document.getElementById('commandCode').value = event.data.code;
+                } else if (event.data.editorType === 'answer') {
+                    document.getElementById('answerHandler').value = event.data.code;
+                }
+                this.setModified(true);
+                this.updateCodeStats();
+                this.showSuccess('Code updated from full editor');
+            }
+        });
     }
 
     // Snippets Functionality
