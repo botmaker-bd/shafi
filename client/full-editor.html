@@ -9,6 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
+    <!-- Full Screen Editor Container -->
     <div class="full-editor-container">
         <!-- Editor Header -->
         <div class="editor-header">
@@ -40,6 +41,9 @@
                 <div class="header-actions">
                     <button class="btn btn-icon" id="themeToggle" title="Toggle Theme">
                         <i class="fas fa-moon"></i>
+                    </button>
+                    <button class="btn btn-icon" id="fullscreenToggle" title="Fullscreen">
+                        <i class="fas fa-expand"></i>
                     </button>
                     <button class="btn btn-secondary" id="closeEditor">
                         <i class="fas fa-times"></i>
@@ -83,14 +87,29 @@
                         <i class="fas fa-expand-arrows-alt"></i>
                         <span class="btn-text">Select All</span>
                     </button>
+                    <button class="toolbar-btn" id="findReplaceBtn" title="Find & Replace (Ctrl+F)">
+                        <i class="fas fa-search"></i>
+                        <span class="btn-text">Find</span>
+                    </button>
                 </div>
             </div>
 
             <div class="toolbar-section">
                 <div class="toolbar-group">
-                    <button class="toolbar-btn" id="formatBtn" title="Format Code">
+                    <button class="toolbar-btn" id="formatBtn" title="Format Code (Ctrl+Shift+F)">
                         <i class="fas fa-indent"></i>
                         <span class="btn-text">Format</span>
+                    </button>
+                    <button class="toolbar-btn" id="commentBtn" title="Toggle Comment (Ctrl+/)">
+                        <i class="fas fa-comment"></i>
+                        <span class="btn-text">Comment</span>
+                    </button>
+                </div>
+
+                <div class="toolbar-group">
+                    <button class="toolbar-btn" id="snippetsBtn" title="Insert Snippet">
+                        <i class="fas fa-magic"></i>
+                        <span class="btn-text">Snippets</span>
                     </button>
                     <button class="toolbar-btn" id="clearBtn" title="Clear All">
                         <i class="fas fa-eraser"></i>
@@ -99,10 +118,15 @@
                 </div>
 
                 <div class="toolbar-group">
-                    <button class="toolbar-btn" id="findBtn" title="Find (Ctrl+F)">
-                        <i class="fas fa-search"></i>
-                        <span class="btn-text">Find</span>
-                    </button>
+                    <div class="font-size-control">
+                        <button class="toolbar-btn" id="fontSizeDown" title="Decrease Font Size">
+                            <i class="fas fa-minus"></i>
+                        </button>
+                        <span class="font-size-display" id="fontSizeDisplay">14px</span>
+                        <button class="toolbar-btn" id="fontSizeUp" title="Increase Font Size">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -118,6 +142,11 @@
             <textarea class="code-editor" id="codeEditor" 
                      placeholder="Start writing your code here..."
                      spellcheck="false"></textarea>
+
+            <!-- Minimap (Optional) -->
+            <div class="editor-minimap" id="editorMinimap">
+                <div class="minimap-content" id="minimapContent"></div>
+            </div>
         </div>
 
         <!-- Editor Footer -->
@@ -128,6 +157,7 @@
                         <i class="fas fa-i-cursor"></i>
                         <span id="cursorLine">1</span>:<span id="cursorColumn">1</span>
                     </span>
+                    <span class="position-item" id="selectionInfo">No selection</span>
                 </div>
                 <div class="editor-mode">
                     <span class="mode-indicator" id="editorMode">JavaScript</span>
@@ -136,16 +166,19 @@
             </div>
             <div class="footer-right">
                 <div class="footer-actions">
+                    <button class="btn btn-secondary" id="minimizeBtn">
+                        <i class="fas fa-window-minimize"></i>
+                    </button>
                     <button class="btn btn-primary" id="saveBtn">
                         <i class="fas fa-save"></i>
-                        Save & Close
+                        Save Changes
                     </button>
                 </div>
             </div>
         </div>
 
-        <!-- Find Panel -->
-        <div class="find-panel" id="findPanel">
+        <!-- Find & Replace Panel -->
+        <div class="find-replace-panel" id="findReplacePanel">
             <div class="find-section">
                 <input type="text" id="findInput" placeholder="Find..." class="find-input">
                 <button class="btn btn-secondary" id="findPrevBtn" title="Find Previous">
@@ -155,10 +188,58 @@
                     <i class="fas fa-chevron-down"></i>
                 </button>
                 <span class="find-results" id="findResults">0 results</span>
-                <button class="close-find" id="closeFindPanel">
+            </div>
+            <div class="replace-section">
+                <input type="text" id="replaceInput" placeholder="Replace with..." class="replace-input">
+                <button class="btn btn-secondary" id="replaceBtn" title="Replace">
+                    Replace
+                </button>
+                <button class="btn btn-secondary" id="replaceAllBtn" title="Replace All">
+                    Replace All
+                </button>
+            </div>
+            <div class="find-options">
+                <label class="option-checkbox">
+                    <input type="checkbox" id="caseSensitive"> Case sensitive
+                </label>
+                <label class="option-checkbox">
+                    <input type="checkbox" id="wholeWord"> Whole word
+                </label>
+                <label class="option-checkbox">
+                    <input type="checkbox" id="regexSearch"> Regex
+                </label>
+            </div>
+            <button class="close-find" id="closeFindPanel">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <!-- Snippets Modal -->
+        <div class="snippets-modal" id="snippetsModal">
+            <div class="snippets-header">
+                <h3>
+                    <i class="fas fa-magic"></i>
+                    Code Snippets
+                </h3>
+                <div class="snippets-search">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="snippetsSearch" placeholder="Search snippets...">
+                </div>
+                <button class="close-snippets" id="closeSnippets">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
+            <div class="snippets-content" id="snippetsContent">
+                <!-- Snippets will be loaded here -->
+            </div>
+        </div>
+
+        <!-- Status Bar Notifications -->
+        <div class="status-notification" id="statusNotification">
+            <span class="notification-message" id="notificationMessage"></span>
+            <button class="notification-close" id="notificationClose">
+                <i class="fas fa-times"></i>
+            </button>
         </div>
     </div>
 
