@@ -200,7 +200,7 @@
                                             Command Code
                                         </h4>
                                         <div class="section-actions">
-                                            <button type="button" class="btn btn-secondary btn-small" id="openEditor">
+                                            <button type="button" class="btn btn-secondary btn-small" id="openFullEditor">
                                                 <i class="fas fa-expand"></i> Full Editor
                                             </button>
                                             <button type="button" class="btn btn-secondary btn-small" id="clearCodeBtn">
@@ -266,7 +266,7 @@
                                                     Answer Handler Code
                                                 </h4>
                                                 <div class="section-actions">
-                                                    <button type="button" class="btn btn-secondary btn-small" id="openAnswerEditor">
+                                                    <button type="button" class="btn btn-secondary btn-small" id="openAnswerFullEditor">
                                                         <i class="fas fa-expand"></i> Full Editor
                                                     </button>
                                                 </div>
@@ -362,70 +362,6 @@
         </div>
     </div>
 
-    <!-- Full Screen Code Editor Modal -->
-    <div id="codeEditorModal" class="modal">
-        <div class="modal-content large-modal">
-            <div class="modal-header">
-                <h3>Code Editor</h3>
-                <button class="modal-close">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="editor-toolbar">
-                    <div class="toolbar-group">
-                        <button class="btn-icon" id="undoBtn" title="Undo">
-                            <i class="fas fa-undo"></i>
-                        </button>
-                        <button class="btn-icon" id="redoBtn" title="Redo">
-                            <i class="fas fa-redo"></i>
-                        </button>
-                        <button class="btn-icon" id="selectAllBtn" title="Select All">
-                            <i class="fas fa-expand-arrows-alt"></i>
-                        </button>
-                    </div>
-                    <div class="toolbar-group">
-                        <button class="btn-icon" id="cutBtn" title="Cut">
-                            <i class="fas fa-cut"></i>
-                        </button>
-                        <button class="btn-icon" id="copyBtn" title="Copy">
-                            <i class="fas fa-copy"></i>
-                        </button>
-                        <button class="btn-icon" id="pasteBtn" title="Paste">
-                            <i class="fas fa-paste"></i>
-                        </button>
-                    </div>
-                    <div class="toolbar-group">
-                        <button class="btn-icon" id="clearBtn" title="Clear All">
-                            <i class="fas fa-eraser"></i>
-                        </button>
-                        <button class="btn-icon" id="formatBtn" title="Format Code">
-                            <i class="fas fa-indent"></i>
-                        </button>
-                        <button class="btn-icon" id="snippetsBtn" title="Insert Snippet">
-                            <i class="fas fa-magic"></i>
-                        </button>
-                    </div>
-                </div>
-                <textarea id="advancedCodeEditor" class="advanced-editor" 
-                         placeholder="Write your code here..."></textarea>
-                <div class="editor-info">
-                    <span id="lineCount">Lines: 1</span>
-                    <span id="charCount">Chars: 0</span>
-                    <span id="wordCount">Words: 0</span>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" id="cancelEdit">
-                    <i class="fas fa-times"></i>
-                    <span>Cancel</span>
-                </button>
-                <button class="btn btn-primary" id="saveCode">
-                    <i class="fas fa-save"></i>
-                    <span>Save Code</span>
-                </button>
-            </div>
-        </div>
-    </div>
-
     <!-- Templates Modal -->
     <div id="templatesModal" class="modal">
         <div class="modal-content large-modal">
@@ -483,7 +419,6 @@
     </div>
 
     <script src="js/common.js"></script>
-    <script src="js/full-editor.js"></script>
     <script src="js/command-editor.js"></script>
 </body>
 </html>
