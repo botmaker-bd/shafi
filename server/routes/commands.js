@@ -1,4 +1,4 @@
-// server/routes/commands.js - COMPLETE FIXED VERSION
+// server/routes/commands.js - OPTIMIZED AND CLEANED VERSION
 const express = require('express');
 const supabase = require('../config/supabase');
 const botManager = require('../core/bot-manager');
@@ -303,13 +303,96 @@ router.delete('/:commandId', async (req, res) => {
     }
 });
 
-// Test command execution
+// ✅ OPTIMIZED: Temporary command test (MERGED BOTH TEST ENDPOINTS)
+router.post('/test/temp', async (req, res) => {
+    try {
+        const { code, botToken, testInput, waitForAnswer = false, answerHandler = '' } = req.body;
+
+        console.log('🧪 Testing temporary command');
+
+        if (!botToken || !code) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Bot token and code are required' 
+            });
+        }
+
+        // Get admin chat ID
+        const { data: adminSettings, error: adminError } = await supabase
+            .from('admin_settings')
+            .select('admin_chat_id')
+            .single();
+
+        if (adminError || !adminSettings?.admin_chat_id) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Admin chat ID not set. Please set admin settings first.' 
+            });
+        }
+
+        // Get bot instance
+        const bot = botManager.getBotInstance(botToken);
+        if (!bot) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Bot is not active. Please check if bot is properly initialized.' 
+            });
+        }
+
+        // Create temporary command
+        const tempCommand = {
+            id: 'temp_test_command_' + Date.now(),
+            command_patterns: testInput || '/test',
+            code: code,
+            bot_token: botToken,
+            is_active: true,
+            wait_for_answer: waitForAnswer,
+            answer_handler: answerHandler
+        };
+
+        // Create test message
+        const testMessage = {
+            chat: { id: adminSettings.admin_chat_id },
+            from: {
+                id: adminSettings.admin_chat_id,
+                first_name: 'Test User',
+                username: 'testuser',
+                language_code: 'en'
+            },
+            message_id: Math.floor(Math.random() * 1000000),
+            text: testInput || '/test',
+            date: Math.floor(Date.now() / 1000)
+        };
+
+        console.log(`🧪 Testing temporary command with chat ID: ${adminSettings.admin_chat_id}`);
+
+        // Execute command
+        const result = await botManager.executeCommand(bot, tempCommand, testMessage, testInput);
+
+        res.json({
+            success: true,
+            message: 'Command executed successfully! Check your Telegram bot for the message.',
+            testInput: testInput,
+            chatId: adminSettings.admin_chat_id,
+            result: result
+        });
+
+    } catch (error) {
+        console.error('❌ Test temp command error:', error);
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to test command: ' + error.message
+        });
+    }
+});
+
+// Test existing command by ID
 router.post('/:commandId/test', async (req, res) => {
     try {
         const { commandId } = req.params;
         const { botToken, testInput } = req.body;
 
-        console.log('🔄 Testing command:', { commandId, botToken: botToken?.substring(0, 10) + '...' });
+        console.log('🔄 Testing command by ID:', { commandId, botToken: botToken?.substring(0, 10) + '...' });
 
         if (!botToken) {
             return res.status(400).json({ 
@@ -368,7 +451,7 @@ router.post('/:commandId/test', async (req, res) => {
             date: Math.floor(Date.now() / 1000)
         };
 
-        console.log(`🧪 Testing command with REAL chat ID: ${adminSettings.admin_chat_id}`);
+        console.log(`🧪 Testing command with chat ID: ${adminSettings.admin_chat_id}`);
 
         // Execute command
         const result = await botManager.executeCommand(bot, command, testMessage, testInput);
@@ -390,89 +473,7 @@ router.post('/:commandId/test', async (req, res) => {
     }
 });
 
-// ✅ FIXED: Temporary command test
-router.post('/test/temp', async (req, res) => {
-    try {
-        const { code, botToken, testInput } = req.body;
-
-        console.log('🧪 Testing temporary command');
-
-        if (!botToken || !code) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'Bot token and code are required' 
-            });
-        }
-
-        // Get admin chat ID
-        const { data: adminSettings, error: adminError } = await supabase
-            .from('admin_settings')
-            .select('admin_chat_id')
-            .single();
-
-        if (adminError || !adminSettings?.admin_chat_id) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'Admin chat ID not set. Please set admin settings first.' 
-            });
-        }
-
-        // Get bot instance
-        const bot = botManager.getBotInstance(botToken);
-        if (!bot) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'Bot is not active. Please check if bot is properly initialized.' 
-            });
-        }
-
-        // Create temporary command
-        const tempCommand = {
-            id: 'temp_test_command_' + Date.now(),
-            command_patterns: '/test',
-            code: code,
-            bot_token: botToken,
-            is_active: true,
-            wait_for_answer: false
-        };
-
-        // Create test message
-        const testMessage = {
-            chat: { id: adminSettings.admin_chat_id },
-            from: {
-                id: adminSettings.admin_chat_id,
-                first_name: 'Test User',
-                username: 'testuser',
-                language_code: 'en'
-            },
-            message_id: Math.floor(Math.random() * 1000000),
-            text: testInput || '/test',
-            date: Math.floor(Date.now() / 1000)
-        };
-
-        console.log(`🧪 Testing temporary command with chat ID: ${adminSettings.admin_chat_id}`);
-
-        // Execute command
-        const result = await botManager.executeCommand(bot, tempCommand, testMessage, testInput);
-
-        res.json({
-            success: true,
-            message: 'Command executed successfully! Check your Telegram bot for the message.',
-            testInput: testInput,
-            chatId: adminSettings.admin_chat_id,
-            result: result
-        });
-
-    } catch (error) {
-        console.error('❌ Test temp command error:', error);
-        res.status(500).json({ 
-            success: false,
-            error: 'Failed to test command: ' + error.message
-        });
-    }
-});
-
-// ✅ NEW: Test Python execution directly
+// Test Python execution directly
 router.post('/test/python', async (req, res) => {
     try {
         const { code } = req.body;
@@ -542,102 +543,6 @@ router.patch('/:commandId/toggle', async (req, res) => {
         res.status(500).json({ 
             success: false,
             error: 'Failed to toggle command status' 
-        });
-    }
-});
-
-// Get command templates
-router.get('/templates/categories', async (req, res) => {
-    try {
-        const templates = {
-            python: [
-                {
-                    id: 'python_simple_calc',
-                    name: 'Simple Calculator',
-                    patterns: '/calc,calculate',
-                    code: `// Simple Python calculation
-try {
-    const result = runPython("(20 + 30) * 2");
-    Bot.sendMessage("🔢 Result: " + result);
-} catch (error) {
-    Bot.sendMessage("❌ Error: " + error.message);
-}`
-                },
-                {
-                    id: 'python_math',
-                    name: 'Math Operations',
-                    patterns: '/math',
-                    code: `// Python math operations
-try {
-    const output = runPython(\`
-x = 15
-y = 10
-addition = x + y
-subtraction = x - y
-multiplication = x * y
-division = x / y
-
-result = f"""📊 Math Results:
-➕ Addition: {x} + {y} = {addition}
-➖ Subtraction: {x} - {y} = {subtraction}
-✖️ Multiplication: {x} * {y} = {multiplication}
-➗ Division: {x} / {y} = {division}"""
-
-print(result)
-\`);
-
-    Bot.sendMessage("🐍 Python Math:\\n\\\\n" + output);
-} catch (error) {
-    Bot.sendMessage("❌ Python Error: " + error.message);
-}`
-                },
-                {
-                    id: 'python_list',
-                    name: 'List Operations',
-                    patterns: '/list',
-                    code: `// Python list operations
-try {
-    const result = runPython(\`
-numbers = [1, 2, 3, 4, 5]
-squares = [x**2 for x in numbers]
-total = sum(numbers)
-
-output = f"Numbers: {numbers}\\\\nSquares: {squares}\\\\nTotal: {total}"
-print(output)
-\`);
-
-    Bot.sendMessage("📋 List Results:\\n\\\\n" + result);
-} catch (error) {
-    Bot.sendMessage("❌ Error: " + error.message);
-}`
-                }
-            ],
-            interactive: [
-                {
-                    id: 'ask_name',
-                    name: 'Ask User Name',
-                    patterns: '/ask,name',
-                    code: `// Ask user name with waitForAnswer
-try {
-    const name = await waitForAnswer("What's your name?");
-    Bot.sendMessage(\`Hello \${name}! Nice to meet you! 😊\`);
-} catch (error) {
-    Bot.sendMessage("Sorry, there was an error: " + error.message);
-}`
-                }
-            ]
-        };
-
-        res.json({
-            success: true,
-            templates: templates
-        });
-
-    } catch (error) {
-        console.error('❌ Get templates error:', error);
-        res.status(500).json({ 
-            success: false,
-            error: 'Failed to fetch templates' 
         });
     }
 });
