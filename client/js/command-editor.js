@@ -1,6 +1,6 @@
 /**
- * Enhanced Command Editor Class
- * Optimized and restructured version with improved functionality
+ * Enhanced Command Editor Class with Auto Snippets System
+ * Snippets will be automatically loaded from templates and applied
  */
 class CommandEditor {
     constructor() {
@@ -9,6 +9,7 @@ class CommandEditor {
         this.currentCommand = null;
         this.commands = [];
         this.templates = {};
+        this.snippets = [];
         this.originalCode = '';
         this.currentEditorType = null;
         this.isModified = false;
@@ -22,6 +23,7 @@ class CommandEditor {
         this.setupEventListeners();
         await this.loadCommands();
         await this.loadTemplates();
+        await this.loadSnippets(); // ✅ Auto load snippets
         this.setupCodeEditor();
         this.setupCommandsTags();
         
@@ -184,11 +186,11 @@ class CommandEditor {
             this.clearCommandCode();
         });
 
-        // ✅ FIXED: Snippet button - এখন টেমপ্লেট থেকে লোড হবে
+        // ✅ FIXED: Snippet button - Now auto applies from templates
         const insertSnippetBtn = document.getElementById('insertSnippetBtn');
         if (insertSnippetBtn) {
             insertSnippetBtn.addEventListener('click', () => {
-                this.showSnippetsFromTemplates();
+                this.showAutoSnippets();
             });
         }
 
@@ -334,6 +336,507 @@ class CommandEditor {
                 });
             }
         });
+    }
+
+    // ✅ NEW: Auto Load Snippets from Templates
+    async loadSnippets() {
+        console.log('🔄 Auto-loading snippets from templates...');
+        
+        try {
+            // Wait for templates to load first
+            if (Object.keys(this.templates).length === 0) {
+                console.log('⏳ Templates not loaded yet, waiting...');
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+
+            // Extract snippets from templates
+            this.snippets = this.extractSnippetsFromTemplates();
+            console.log(`✅ Auto-loaded ${this.snippets.length} snippets from templates`);
+            
+        } catch (error) {
+            console.error('❌ Failed to load snippets:', error);
+            // Fallback to default snippets
+            this.snippets = this.getDefaultSnippets();
+        }
+    }
+
+    // ✅ NEW: Extract code snippets from templates
+    extractSnippetsFromTemplates() {
+        const snippets = [];
+        
+        if (!this.templates || Object.keys(this.templates).length === 0) {
+            console.log('📭 No templates available for snippets extraction');
+            return this.getDefaultSnippets();
+        }
+
+        // Extract common code patterns from all templates
+        Object.values(this.templates).forEach(categoryTemplates => {
+            if (Array.isArray(categoryTemplates)) {
+                categoryTemplates.forEach(template => {
+                    if (template.code) {
+                        // Extract individual code blocks from template
+                        const templateSnippets = this.extractCodeBlocks(template.code, template.name);
+                        snippets.push(...templateSnippets);
+                    }
+                });
+            }
+        });
+
+        // Remove duplicates and ensure we have snippets
+        const uniqueSnippets = this.removeDuplicateSnippets(snippets);
+        
+        // If no snippets found, use defaults
+        if (uniqueSnippets.length === 0) {
+            return this.getDefaultSnippets();
+        }
+
+        console.log(`📦 Extracted ${uniqueSnippets.length} unique snippets from templates`);
+        return uniqueSnippets;
+    }
+
+    // ✅ NEW: Extract individual code blocks from template code
+    extractCodeBlocks(templateCode, templateName) {
+        const snippets = [];
+        const lines = templateCode.split('\n');
+        
+        lines.forEach((line, index) => {
+            const trimmedLine = line.trim();
+            
+            // Skip empty lines and comments
+            if (!trimmedLine || trimmedLine.startsWith('//') || trimmedLine.startsWith('/*')) {
+                return;
+            }
+
+            // Detect common code patterns
+            if (trimmedLine.startsWith('Api.sendMessage') || 
+                trimmedLine.includes('Api.sendMessage(') ||
+                trimmedLine.startsWith('const user = getUser()') ||
+                trimmedLine.includes('getUser()') ||
+                trimmedLine.startsWith('User.saveData') ||
+                trimmedLine.includes('User.saveData(') ||
+                trimmedLine.startsWith('HTTP.') ||
+                trimmedLine.includes('inline_keyboard') ||
+                trimmedLine.includes('reply_markup')) {
+                
+                // Create snippet for this line
+                const snippet = {
+                    name: this.generateSnippetName(trimmedLine, templateName),
+                    code: trimmedLine,
+                    description: `From ${templateName}: ${this.getSnippetDescription(trimmedLine)}`,
+                    category: this.detectSnippetCategory(trimmedLine),
+                    source: templateName
+                };
+                snippets.push(snippet);
+            }
+            
+            // Detect multi-line patterns
+            if (trimmedLine.startsWith('const') && trimmedLine.includes('=') && 
+                (trimmedLine.includes('Api.') || trimmedLine.includes('User.') || trimmedLine.includes('HTTP.'))) {
+                const snippet = {
+                    name: `Variable Setup - ${templateName}`,
+                    code: trimmedLine,
+                    description: `Variable declaration from ${templateName}`,
+                    category: 'variables',
+                    source: templateName
+                };
+                snippets.push(snippet);
+            }
+            
+            // Detect function calls
+            if ((trimmedLine.includes('(') && trimmedLine.includes(')')) && 
+                !trimmedLine.startsWith('//') && !trimmedLine.startsWith('/*')) {
+                const snippet = {
+                    name: `Function Call - ${templateName}`,
+                    code: trimmedLine,
+                    description: `Function call from ${templateName}`,
+                    category: 'functions',
+                    source: templateName
+                };
+                snippets.push(snippet);
+            }
+        });
+
+        return snippets;
+    }
+
+    // ✅ NEW: Generate meaningful snippet names
+    generateSnippetName(codeLine, templateName) {
+        if (codeLine.includes('Api.sendMessage')) {
+            if (codeLine.includes('`') && codeLine.includes('${')) {
+                return 'Send Formatted Message';
+            }
+            return 'Send Message';
+        } else if (codeLine.includes('getUser()')) {
+            return 'Get User Info';
+        } else if (codeLine.includes('User.saveData')) {
+            return 'Save User Data';
+        } else if (codeLine.includes('HTTP.')) {
+            if (codeLine.includes('.get(')) return 'HTTP GET Request';
+            if (codeLine.includes('.post(')) return 'HTTP POST Request';
+            return 'HTTP Request';
+        } else if (codeLine.includes('inline_keyboard')) {
+            return 'Inline Buttons';
+        } else if (codeLine.includes('reply_markup')) {
+            return 'Reply Markup';
+        } else {
+            return `Code from ${templateName}`;
+        }
+    }
+
+    // ✅ NEW: Get snippet description
+    getSnippetDescription(codeLine) {
+        if (codeLine.includes('Api.sendMessage')) {
+            if (codeLine.includes('`') && codeLine.includes('${')) {
+                return 'Send formatted message with variables';
+            }
+            return 'Send a message to user';
+        } else if (codeLine.includes('getUser()')) {
+            return 'Get current user information';
+        } else if (codeLine.includes('User.saveData')) {
+            return 'Save data for current user';
+        } else if (codeLine.includes('HTTP.')) {
+            return 'Make HTTP request to external API';
+        } else if (codeLine.includes('inline_keyboard')) {
+            return 'Create inline keyboard buttons';
+        } else if (codeLine.includes('reply_markup')) {
+            return 'Set reply markup for message';
+        } else {
+            return 'Useful code snippet from template';
+        }
+    }
+
+    // ✅ NEW: Detect snippet category
+    detectSnippetCategory(codeLine) {
+        if (codeLine.includes('Api.')) return 'api';
+        if (codeLine.includes('User.')) return 'user';
+        if (codeLine.includes('HTTP.')) return 'http';
+        if (codeLine.includes('Keyboard') || codeLine.includes('Button')) return 'ui';
+        if (codeLine.includes('const ') || codeLine.includes('let ') || codeLine.includes('var ')) return 'variables';
+        return 'general';
+    }
+
+    // ✅ NEW: Remove duplicate snippets
+    removeDuplicateSnippets(snippets) {
+        const unique = [];
+        const seen = new Set();
+        
+        snippets.forEach(snippet => {
+            const key = snippet.code.trim().toLowerCase();
+            if (!seen.has(key)) {
+                seen.add(key);
+                unique.push(snippet);
+            }
+        });
+        
+        return unique;
+    }
+
+    // ✅ NEW: Default fallback snippets
+    getDefaultSnippets() {
+        return [
+            {
+                name: 'Send Message',
+                code: 'Api.sendMessage("Hello world!");',
+                description: 'Send a simple text message to user',
+                category: 'api',
+                source: 'Default'
+            },
+            {
+                name: 'Get User Info',
+                code: 'const user = getUser();',
+                description: 'Get current user information',
+                category: 'user',
+                source: 'Default'
+            },
+            {
+                name: 'Send Formatted Message',
+                code: 'const user = getUser();\nApi.sendMessage(`Hello ${user.first_name}! Your ID: ${user.id}`);',
+                description: 'Send message with user information',
+                category: 'api',
+                source: 'Default'
+            },
+            {
+                name: 'Save User Data',
+                code: 'User.saveData("key", "value");',
+                description: 'Save data for current user',
+                category: 'user',
+                source: 'Default'
+            },
+            {
+                name: 'Inline Buttons',
+                code: 'const buttons = [\n  { text: "Button 1", callback_data: "btn1" },\n  { text: "Button 2", callback_data: "btn2" }\n];\nApi.sendMessage("Choose option:", { inline_keyboard: [buttons] });',
+                description: 'Send message with inline buttons',
+                category: 'ui',
+                source: 'Default'
+            },
+            {
+                name: 'HTTP GET Request',
+                code: 'const response = await HTTP.get("https://api.example.com/data");\nApi.sendMessage(`Data: ${response.data}`);',
+                description: 'Make HTTP GET request',
+                category: 'http',
+                source: 'Default'
+            },
+            {
+                name: 'Error Handling',
+                code: 'try {\n  // Your code here\n} catch (error) {\n  Api.sendMessage("Error: " + error.message);\n}',
+                description: 'Basic error handling structure',
+                category: 'general',
+                source: 'Default'
+            }
+        ];
+    }
+
+    // ✅ NEW: Auto Snippets System - Shows snippets extracted from templates
+    showAutoSnippets() {
+        if (this.snippets.length === 0) {
+            this.showError('No snippets available. Please check templates are loaded.');
+            return;
+        }
+
+        console.log(`🎯 Showing ${this.snippets.length} auto-loaded snippets`);
+
+        // Group snippets by category
+        const groupedSnippets = this.groupSnippetsByCategory(this.snippets);
+
+        // Create snippets modal HTML
+        const snippetsHTML = `
+            <div class="snippets-modal-overlay">
+                <div class="snippets-modal">
+                    <div class="snippets-header">
+                        <h3>✨ Auto Code Snippets</h3>
+                        <p class="snippets-subtitle">Extracted from your templates - Click to auto-insert</p>
+                        <button class="snippets-close">&times;</button>
+                    </div>
+                    <div class="snippets-body">
+                        ${this.createSnippetsCategoriesHTML(groupedSnippets)}
+                    </div>
+                    <div class="snippets-footer">
+                        <div class="snippets-stats">
+                            <span>📦 ${this.snippets.length} snippets loaded from templates</span>
+                        </div>
+                        <button class="btn btn-secondary" id="refreshSnippets">
+                            <i class="fas fa-sync"></i> Reload from Templates
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Remove existing snippets modal if any
+        const existingModal = document.querySelector('.snippets-modal-overlay');
+        if (existingModal) {
+            existingModal.remove();
+        }
+
+        // Create and show modal
+        const modalOverlay = document.createElement('div');
+        modalOverlay.className = 'snippets-modal-overlay';
+        modalOverlay.innerHTML = snippetsHTML;
+        document.body.appendChild(modalOverlay);
+
+        // Add event listeners
+        this.setupSnippetsModalEvents(modalOverlay);
+    }
+
+    // ✅ NEW: Group snippets by category
+    groupSnippetsByCategory(snippets) {
+        const grouped = {};
+        
+        snippets.forEach(snippet => {
+            const category = snippet.category || 'general';
+            if (!grouped[category]) {
+                grouped[category] = [];
+            }
+            grouped[category].push(snippet);
+        });
+        
+        return grouped;
+    }
+
+    // ✅ NEW: Create categories HTML for snippets
+    createSnippetsCategoriesHTML(groupedSnippets) {
+        let html = '';
+        
+        Object.entries(groupedSnippets).forEach(([category, snippets]) => {
+            const categoryName = this.formatCategoryName(category);
+            const categoryIcon = this.getCategoryIcon(category);
+            
+            html += `
+                <div class="snippets-category">
+                    <div class="category-header">
+                        <i class="${categoryIcon}"></i>
+                        <h4>${categoryName}</h4>
+                        <span class="snippet-count">${snippets.length}</span>
+                    </div>
+                    <div class="snippets-grid">
+                        ${snippets.map(snippet => this.createSnippetCard(snippet)).join('')}
+                    </div>
+                </div>
+            `;
+        });
+        
+        return html;
+    }
+
+    // ✅ NEW: Create individual snippet card
+    createSnippetCard(snippet) {
+        return `
+            <div class="snippet-card" data-snippet='${JSON.stringify(snippet)}'>
+                <div class="snippet-header">
+                    <h5>${snippet.name}</h5>
+                    <button class="btn-insert-auto" title="Auto-insert snippet">
+                        <i class="fas fa-bolt"></i> Insert
+                    </button>
+                </div>
+                <p class="snippet-desc">${snippet.description}</p>
+                <pre class="snippet-code">${this.escapeHtml(snippet.code)}</pre>
+                <div class="snippet-footer">
+                    <span class="snippet-source">🔗 From: ${snippet.source}</span>
+                </div>
+            </div>
+        `;
+    }
+
+    // ✅ NEW: Setup snippets modal events
+    setupSnippetsModalEvents(modalOverlay) {
+        // Close button
+        modalOverlay.querySelector('.snippets-close').addEventListener('click', () => {
+            modalOverlay.remove();
+        });
+
+        // Close on overlay click
+        modalOverlay.addEventListener('click', (e) => {
+            if (e.target === modalOverlay) {
+                modalOverlay.remove();
+            }
+        });
+
+        // Auto-insert snippet functionality
+        modalOverlay.querySelectorAll('.btn-insert-auto').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const snippetCard = e.target.closest('.snippet-card');
+                const snippetData = snippetCard.dataset.snippet;
+                
+                try {
+                    const snippet = JSON.parse(snippetData);
+                    this.autoInsertSnippet(snippet);
+                    modalOverlay.remove();
+                } catch (error) {
+                    this.showError('Failed to parse snippet data');
+                }
+            });
+        });
+
+        // Refresh snippets button
+        const refreshBtn = modalOverlay.querySelector('#refreshSnippets');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', async () => {
+                refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Reloading...';
+                await this.loadSnippets();
+                modalOverlay.remove();
+                this.showAutoSnippets(); // Refresh the modal
+            });
+        }
+
+        // ESC key to close
+        const handleEsc = (e) => {
+            if (e.key === 'Escape') {
+                modalOverlay.remove();
+                document.removeEventListener('keydown', handleEsc);
+            }
+        };
+        document.addEventListener('keydown', handleEsc);
+    }
+
+    // ✅ NEW: Auto insert snippet with smart positioning
+    autoInsertSnippet(snippet) {
+        const commandCodeEl = document.getElementById('commandCode');
+        if (!commandCodeEl) {
+            this.showError('Code editor not found');
+            return;
+        }
+
+        const currentCode = commandCodeEl.value;
+        const cursorPos = commandCodeEl.selectionStart;
+        
+        // Smart insertion based on current context
+        const newCode = this.insertSnippetSmartly(currentCode, cursorPos, snippet.code);
+        
+        commandCodeEl.value = newCode.code;
+        
+        // Set cursor position after inserted code
+        commandCodeEl.setSelectionRange(newCode.cursorPos, newCode.cursorPos);
+        
+        // Focus back to editor
+        commandCodeEl.focus();
+        
+        this.setModified(true);
+        this.updateCodeStats();
+        
+        this.showSuccess(`✨ "${snippet.name}" snippet inserted automatically!`);
+    }
+
+    // ✅ NEW: Smart snippet insertion
+    insertSnippetSmartly(currentCode, cursorPos, snippetCode) {
+        const lines = currentCode.split('\n');
+        const currentLineIndex = this.getCurrentLineIndex(lines, cursorPos);
+        const currentLine = lines[currentLineIndex] || '';
+        
+        // If current line is empty or comment, replace it
+        if (currentLine.trim() === '' || currentLine.trim().startsWith('//')) {
+            lines[currentLineIndex] = snippetCode;
+            const newCode = lines.join('\n');
+            const newCursorPos = this.getPositionAfterInsertion(newCode, currentLineIndex, snippetCode);
+            return { code: newCode, cursorPos: newCursorPos };
+        }
+        
+        // If current line has code, insert after current line
+        const insertIndex = currentLineIndex + 1;
+        lines.splice(insertIndex, 0, snippetCode);
+        const newCode = lines.join('\n');
+        const newCursorPos = this.getPositionAfterInsertion(newCode, insertIndex, snippetCode);
+        
+        return { code: newCode, cursorPos: newCursorPos };
+    }
+
+    // ✅ NEW: Helper methods for smart insertion
+    getCurrentLineIndex(lines, cursorPos) {
+        let currentPos = 0;
+        for (let i = 0; i < lines.length; i++) {
+            currentPos += lines[i].length + 1; // +1 for newline
+            if (currentPos >= cursorPos) {
+                return i;
+            }
+        }
+        return lines.length - 1;
+    }
+
+    getPositionAfterInsertion(code, lineIndex, insertedCode) {
+        const lines = code.split('\n');
+        let position = 0;
+        
+        for (let i = 0; i <= lineIndex; i++) {
+            position += lines[i].length;
+            if (i < lines.length - 1) {
+                position += 1; // newline character
+            }
+        }
+        
+        return position;
+    }
+
+    // ✅ NEW: Category icons for snippets
+    getCategoryIcon(category) {
+        const icons = {
+            'api': 'fas fa-code',
+            'user': 'fas fa-user',
+            'http': 'fas fa-globe',
+            'ui': 'fas fa-th-large',
+            'general': 'fas fa-cube',
+            'variables': 'fas fa-tag',
+            'functions': 'fas fa-cogs'
+        };
+        return icons[category] || 'fas fa-code';
     }
 
     // ✅ FIXED: Core Functionality - Improved command loading
@@ -1095,414 +1598,6 @@ class CommandEditor {
         } else {
             this.showError('Please select a command first');
         }
-    }
-
-    // ✅ FIXED: Snippets functionality - এখন টেমপ্লেট থেকে লোড হবে
-    async showSnippetsFromTemplates() {
-        try {
-            // Ensure templates are loaded
-            if (Object.keys(this.templates).length === 0) {
-                await this.loadTemplates();
-            }
-
-            // Collect all templates as snippets
-            const allSnippets = [];
-            Object.values(this.templates).forEach(categoryTemplates => {
-                if (Array.isArray(categoryTemplates)) {
-                    categoryTemplates.forEach(template => {
-                        if (template.code) {
-                            allSnippets.push({
-                                name: template.name,
-                                code: template.code,
-                                description: template.description || 'No description available',
-                                category: template.category || 'General'
-                            });
-                        }
-                    });
-                }
-            });
-
-            // If no templates found, use fallback snippets
-            if (allSnippets.length === 0) {
-                console.log('📝 No templates found, using fallback snippets');
-                this.showSnippetsFallback();
-                return;
-            }
-
-            console.log(`📝 Found ${allSnippets.length} snippets from templates`);
-
-            // Create snippets modal
-            this.createSnippetsModal(allSnippets);
-
-        } catch (error) {
-            console.error('❌ Error loading snippets from templates:', error);
-            // Fallback to basic snippets
-            this.showSnippetsFallback();
-        }
-    }
-
-    // Fallback snippets if templates fail to load
-    showSnippetsFallback() {
-        const fallbackSnippets = [
-            {
-                name: 'Send Message',
-                code: 'Api.sendMessage("Hello world!");',
-                description: 'Send a simple text message',
-                category: 'Basic'
-            },
-            {
-                name: 'Get User Info',
-                code: 'const user = getUser();\nApi.sendMessage(`Hello ${user.first_name}! Your ID: ${user.id}`);',
-                description: 'Get user information and send greeting',
-                category: 'User'
-            },
-            {
-                name: 'Send Button',
-                code: 'const buttons = [\n  { text: "Button 1", callback_data: "btn1" },\n  { text: "Button 2", callback_data: "btn2" }\n];\nApi.sendMessage("Choose an option:", { inline_keyboard: [buttons] });',
-                description: 'Send message with inline buttons',
-                category: 'Buttons'
-            },
-            {
-                name: 'Save User Data',
-                code: 'const user = getUser();\nUser.saveData("last_command", "/start");\nApi.sendMessage("Your data has been saved!");',
-                description: 'Save user data to database',
-                category: 'Data'
-            },
-            {
-                name: 'HTTP Request',
-                code: 'try {\n  const response = await HTTP.get("https://api.example.com/data");\n  Api.sendMessage(`Data: ${response.data}`);\n} catch (error) {\n  Api.sendMessage("Error fetching data");\n}',
-                description: 'Make HTTP GET request',
-                category: 'HTTP'
-            }
-        ];
-
-        this.createSnippetsModal(fallbackSnippets);
-    }
-
-    createSnippetsModal(snippets) {
-        // Remove existing snippets modal if any
-        const existingModal = document.querySelector('.snippets-modal-overlay');
-        if (existingModal) {
-            existingModal.remove();
-        }
-
-        // Group snippets by category
-        const snippetsByCategory = {};
-        snippets.forEach(snippet => {
-            const category = snippet.category || 'General';
-            if (!snippetsByCategory[category]) {
-                snippetsByCategory[category] = [];
-            }
-            snippetsByCategory[category].push(snippet);
-        });
-
-        // Create modal HTML
-        const snippetsHTML = `
-            <div class="snippets-modal">
-                <div class="snippets-header">
-                    <h3>Code Snippets</h3>
-                    <span class="snippets-count">${snippets.length} snippets available</span>
-                    <button class="snippets-close">&times;</button>
-                </div>
-                <div class="snippets-body">
-                    <div class="snippets-categories">
-                        ${Object.entries(snippetsByCategory).map(([category, categorySnippets]) => `
-                            <div class="snippets-category">
-                                <h4 class="category-title">${category} (${categorySnippets.length})</h4>
-                                <div class="snippets-grid">
-                                    ${categorySnippets.map(snippet => `
-                                        <div class="snippet-card" data-code="${this.escapeHtml(snippet.code)}">
-                                            <div class="snippet-header">
-                                                <h5>${snippet.name}</h5>
-                                                <button class="btn-insert" title="Insert snippet">
-                                                    <i class="fas fa-code"></i> Insert
-                                                </button>
-                                            </div>
-                                            <p class="snippet-desc">${snippet.description}</p>
-                                            <pre class="snippet-code">${this.escapeHtml(snippet.code)}</pre>
-                                        </div>
-                                    `).join('')}
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-                <div class="snippets-footer">
-                    <button class="btn btn-secondary" id="closeSnippets">Close</button>
-                </div>
-            </div>
-        `;
-
-        // Create and show modal
-        const modalOverlay = document.createElement('div');
-        modalOverlay.className = 'snippets-modal-overlay';
-        modalOverlay.innerHTML = snippetsHTML;
-        document.body.appendChild(modalOverlay);
-
-        // Add CSS for snippets modal
-        this.addSnippetsModalStyles();
-
-        // Add event listeners
-        modalOverlay.querySelector('.snippets-close').addEventListener('click', () => {
-            modalOverlay.remove();
-        });
-
-        modalOverlay.querySelector('#closeSnippets').addEventListener('click', () => {
-            modalOverlay.remove();
-        });
-
-        modalOverlay.addEventListener('click', (e) => {
-            if (e.target === modalOverlay) {
-                modalOverlay.remove();
-            }
-        });
-
-        // Insert snippet functionality
-        modalOverlay.querySelectorAll('.btn-insert').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const snippetCard = e.target.closest('.snippet-card');
-                const code = snippetCard.dataset.code;
-                this.insertSnippet(code);
-                modalOverlay.remove();
-            });
-        });
-
-        // ESC key to close
-        const handleEsc = (e) => {
-            if (e.key === 'Escape') {
-                modalOverlay.remove();
-                document.removeEventListener('keydown', handleEsc);
-            }
-        };
-        document.addEventListener('keydown', handleEsc);
-    }
-
-    addSnippetsModalStyles() {
-        if (document.getElementById('snippets-modal-styles')) return;
-
-        const styles = `
-            <style id="snippets-modal-styles">
-                .snippets-modal-overlay {
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100%;
-                    background: rgba(0, 0, 0, 0.7);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    z-index: 10000;
-                    padding: 2rem;
-                    backdrop-filter: blur(4px);
-                }
-
-                .snippets-modal {
-                    background: var(--bg-primary);
-                    border-radius: var(--radius-xl);
-                    box-shadow: var(--shadow-xl);
-                    max-width: 900px;
-                    width: 100%;
-                    max-height: 80vh;
-                    display: flex;
-                    flex-direction: column;
-                    border: 1px solid var(--border-color);
-                }
-
-                .snippets-header {
-                    padding: 1.5rem;
-                    border-bottom: 1px solid var(--border-color);
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    background: var(--bg-tertiary);
-                    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-                }
-
-                .snippets-header h3 {
-                    margin: 0;
-                    color: var(--text-primary);
-                    font-size: 1.25rem;
-                }
-
-                .snippets-count {
-                    color: var(--text-muted);
-                    font-size: 0.875rem;
-                }
-
-                .snippets-close {
-                    background: none;
-                    border: none;
-                    font-size: 1.5rem;
-                    cursor: pointer;
-                    color: var(--text-muted);
-                    width: 32px;
-                    height: 32px;
-                    border-radius: 50%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    transition: var(--transition);
-                }
-
-                .snippets-close:hover {
-                    background: var(--bg-secondary);
-                    color: var(--error-color);
-                }
-
-                .snippets-body {
-                    flex: 1;
-                    overflow-y: auto;
-                    padding: 1.5rem;
-                }
-
-                .snippets-categories {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 2rem;
-                }
-
-                .category-title {
-                    margin: 0 0 1rem 0;
-                    color: var(--text-primary);
-                    font-size: 1.1rem;
-                    font-weight: 600;
-                    padding-bottom: 0.5rem;
-                    border-bottom: 2px solid var(--primary-color);
-                }
-
-                .snippets-grid {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-                    gap: 1rem;
-                }
-
-                .snippet-card {
-                    border: 1px solid var(--border-color);
-                    border-radius: var(--radius-lg);
-                    padding: 1.25rem;
-                    background: var(--bg-primary);
-                    transition: var(--transition);
-                    display: flex;
-                    flex-direction: column;
-                    gap: 0.75rem;
-                }
-
-                .snippet-card:hover {
-                    border-color: var(--primary-color);
-                    box-shadow: var(--shadow-md);
-                    transform: translateY(-2px);
-                }
-
-                .snippet-header {
-                    display: flex;
-                    align-items: flex-start;
-                    justify-content: space-between;
-                    gap: 1rem;
-                }
-
-                .snippet-header h5 {
-                    margin: 0;
-                    color: var(--text-primary);
-                    font-size: 1rem;
-                    font-weight: 600;
-                    flex: 1;
-                }
-
-                .btn-insert {
-                    background: var(--primary-color);
-                    color: white;
-                    border: none;
-                    padding: 0.5rem 0.75rem;
-                    border-radius: var(--radius-md);
-                    font-size: 0.75rem;
-                    cursor: pointer;
-                    transition: var(--transition);
-                    display: flex;
-                    align-items: center;
-                    gap: 0.375rem;
-                    white-space: nowrap;
-                }
-
-                .btn-insert:hover {
-                    background: var(--primary-dark);
-                    transform: translateY(-1px);
-                }
-
-                .snippet-desc {
-                    color: var(--text-secondary);
-                    font-size: 0.875rem;
-                    line-height: 1.4;
-                    margin: 0;
-                }
-
-                .snippet-code {
-                    background: var(--bg-secondary);
-                    border: 1px solid var(--border-light);
-                    border-radius: var(--radius-md);
-                    padding: 0.75rem;
-                    font-family: 'Courier New', monospace;
-                    font-size: 0.75rem;
-                    color: var(--text-primary);
-                    overflow-x: auto;
-                    margin: 0;
-                    max-height: 120px;
-                    overflow-y: auto;
-                }
-
-                .snippets-footer {
-                    padding: 1.25rem 1.5rem;
-                    border-top: 1px solid var(--border-color);
-                    background: var(--bg-tertiary);
-                    border-radius: 0 0 var(--radius-xl) var(--radius-xl);
-                    display: flex;
-                    justify-content: flex-end;
-                }
-
-                @media (max-width: 768px) {
-                    .snippets-modal-overlay {
-                        padding: 1rem;
-                    }
-                    
-                    .snippets-grid {
-                        grid-template-columns: 1fr;
-                    }
-                    
-                    .snippets-modal {
-                        max-height: 90vh;
-                    }
-                }
-            </style>
-        `;
-
-        document.head.insertAdjacentHTML('beforeend', styles);
-    }
-
-    insertSnippet(code) {
-        const commandCodeEl = document.getElementById('commandCode');
-        if (!commandCodeEl) return;
-
-        const currentCode = commandCodeEl.value;
-        const cursorPos = commandCodeEl.selectionStart;
-        
-        // Insert code at cursor position
-        const newCode = currentCode.substring(0, cursorPos) + 
-                       '\n' + code + '\n' + 
-                       currentCode.substring(cursorPos);
-        
-        commandCodeEl.value = newCode;
-        
-        // Set cursor position after inserted code
-        const newCursorPos = cursorPos + code.length + 2;
-        commandCodeEl.setSelectionRange(newCursorPos, newCursorPos);
-        
-        // Focus back to editor
-        commandCodeEl.focus();
-        
-        this.setModified(true);
-        this.updateCodeStats();
-        
-        this.showSuccess('Snippet inserted successfully!');
     }
 
     // ✅ FIXED: Code Editor Functionality - Updated for better modal
