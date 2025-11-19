@@ -108,19 +108,23 @@ class CommandEditor {
         });
 
         // Test actions
-        const testButtons = ['testCommandBtn', 'testFooterBtn', 'runTestBtn'];
+        const testButtons = ['testCommandBtn', 'testFooterBtn'];
         testButtons.forEach(btnId => {
             const btn = document.getElementById(btnId);
             if (btn) {
                 btn.addEventListener('click', () => {
-                    if (btnId === 'runTestBtn') {
-                        this.runCustomTest();
-                    } else {
-                        this.testCommand();
-                    }
+                    this.testCommand();
                 });
             }
         });
+
+        // ✅ FIXED: Separate run test button
+        const runTestBtn = document.getElementById('runTestBtn');
+        if (runTestBtn) {
+            runTestBtn.addEventListener('click', () => {
+                this.runCustomTest();
+            });
+        }
 
         // Toggle actions
         const toggleButtons = ['toggleCommandBtn', 'activateFooterBtn'];
@@ -171,11 +175,6 @@ class CommandEditor {
             });
         }
 
-        // Code formatting
-        document.getElementById('formatCode').addEventListener('click', () => {
-            this.formatCode();
-        });
-
         // Clear buttons
         document.getElementById('clearPatternsBtn').addEventListener('click', () => {
             this.clearCommandPatterns();
@@ -184,6 +183,14 @@ class CommandEditor {
         document.getElementById('clearCodeBtn').addEventListener('click', () => {
             this.clearCommandCode();
         });
+
+        // ✅ FIXED: Snippet button
+        const insertSnippetBtn = document.getElementById('insertSnippetBtn');
+        if (insertSnippetBtn) {
+            insertSnippetBtn.addEventListener('click', () => {
+                this.showSnippets();
+            });
+        }
 
         // Templates
         document.getElementById('showTemplates').addEventListener('click', () => {
@@ -262,12 +269,15 @@ class CommandEditor {
 
     setupSearchEvents() {
         let searchTimeout;
-        document.getElementById('commandSearch').addEventListener('input', (e) => {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                this.filterCommands(e.target.value);
-            }, 300);
-        });
+        const searchInput = document.getElementById('commandSearch');
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    this.filterCommands(e.target.value);
+                }, 300);
+            });
+        }
     }
 
     setupCodeEditor() {
@@ -328,28 +338,43 @@ class CommandEditor {
 
     // ✅ FIXED: Core Functionality - Improved command loading
     async loadCommands() {
-        if (!this.currentBot) return;
+        if (!this.currentBot) {
+            console.log('❌ No current bot found');
+            return;
+        }
 
         this.showLoading(true);
 
         try {
             const token = localStorage.getItem('token');
+            console.log(`🔄 Loading commands for bot: ${this.currentBot.token}`);
+            
             const response = await fetch(`/api/commands/bot/${this.currentBot.token}`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
             });
 
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
             const data = await response.json();
+            console.log('📦 Commands API response:', data);
 
             if (data.success) {
                 this.commands = data.commands || [];
+                console.log(`✅ Loaded ${this.commands.length} commands`);
                 this.displayCommands();
             } else {
-                this.showError('Failed to load commands');
+                throw new Error(data.error || 'Failed to load commands');
             }
         } catch (error) {
-            this.showError('Network error while loading commands');
+            console.error('❌ Load commands error:', error);
+            this.showError('Failed to load commands: ' + error.message);
+            // Fallback with empty commands
+            this.commands = [];
+            this.displayCommands();
         } finally {
             this.showLoading(false);
         }
@@ -434,15 +459,7 @@ class CommandEditor {
         // Update UI selection
         document.querySelectorAll('.command-item').forEach(item => {
             item.classList.remove('active');
-        });// ❌ ভুল - command-group class নেই HTML এ
-// document.querySelectorAll('.command-group').forEach(group => {
-    // group.classList.remove('active');
-// });
-
-// // ✅ সঠিক - command-item class ব্যবহার করুন
-// document.querySelectorAll('.command-item').forEach(item => {
-    // item.classList.remove('active');
-// });
+        });
         
         setTimeout(() => {
             const moreCommandsInput = document.getElementById('moreCommands');
@@ -459,13 +476,20 @@ class CommandEditor {
 
         try {
             const token = localStorage.getItem('token');
+            console.log(`🔄 Loading command: ${commandId}`);
+            
             const response = await fetch(`/api/commands/${commandId}`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
             });
 
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
             const data = await response.json();
+            console.log('📦 Command API response:', data);
 
             if (data.success) {
                 this.currentCommand = data.command;
@@ -473,26 +497,23 @@ class CommandEditor {
                 this.populateCommandForm();
                 
                 // Update UI selection
-                // // ❌ ভুল - command-group class নেই HTML এ
-// document.querySelectorAll('.command-group').forEach(group => {
-    // group.classList.remove('active');
-// });
-
-// ✅ সঠিক - command-item class ব্যবহার করুন
-document.querySelectorAll('.command-item').forEach(item => {
-    item.classList.remove('active');
-});
+                document.querySelectorAll('.command-item').forEach(item => {
+                    item.classList.remove('active');
+                });
                 
-                const selectedGroup = document.querySelector(`[data-command-id="${commandId}"]`);
-                if (selectedGroup) {
-                    selectedGroup.classList.add('active');
-                    selectedGroup.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                const selectedItem = document.querySelector(`[data-command-id="${commandId}"]`);
+                if (selectedItem) {
+                    selectedItem.classList.add('active');
+                    selectedItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 }
+                
+                console.log(`✅ Command ${commandId} loaded successfully`);
             } else {
-                this.showError('Failed to load command');
+                throw new Error(data.error || 'Failed to load command');
             }
         } catch (error) {
-            this.showError('Network error while loading command');
+            console.error('❌ Load command error:', error);
+            this.showError('Failed to load command: ' + error.message);
         } finally {
             this.showLoading(false);
         }
@@ -712,112 +733,116 @@ document.querySelectorAll('.command-item').forEach(item => {
 
     // Save Command with Validation
     async saveCommand() {
-    if (!this.currentCommand || !this.currentBot) {
-        this.showError('No command selected or bot not loaded');
-        return false;
-    }
-
-    const commands = this.getCommandsFromTags();
-    
-    if (commands.length === 0) {
-        this.showError('Please add at least one command pattern');
-        const moreCommandsInput = document.getElementById('moreCommands');
-        if (moreCommandsInput) moreCommandsInput.focus();
-        return false;
-    }
-
-    const commandCodeEl = document.getElementById('commandCode');
-    const commandCode = commandCodeEl ? commandCodeEl.value.trim() : '';
-
-    if (!commandCode) {
-        this.showError('Command code is required');
-        if (commandCodeEl) commandCodeEl.focus();
-        return false;
-    }
-
-    const waitForAnswerEl = document.getElementById('waitForAnswer');
-    const answerHandlerEl = document.getElementById('answerHandler');
-    
-    const waitForAnswer = waitForAnswerEl ? waitForAnswerEl.checked : false;
-    const answerHandler = waitForAnswer && answerHandlerEl ? answerHandlerEl.value.trim() : '';
-
-    // ✅ NEW: Client-side validation
-    if (waitForAnswer && !answerHandler) {
-        this.showError('Answer handler code is required when "Wait for Answer" is enabled');
-        if (answerHandlerEl) {
-            answerHandlerEl.focus();
-            // Show the answer handler section if hidden
-            const answerSection = document.getElementById('answerHandlerSection');
-            if (answerSection) answerSection.style.display = 'block';
-        }
-        return false;
-    }
-
-    const formData = {
-        commandPatterns: commands.join(','),
-        code: commandCode,
-        waitForAnswer: waitForAnswer,
-        answerHandler: answerHandler,
-        botToken: this.currentBot.token
-    };
-
-    this.showLoading(true);
-
-    try {
-        const token = localStorage.getItem('token');
-        let response;
-        let url;
-        let method;
-
-        if (this.currentCommand.id === 'new') {
-            url = '/api/commands';
-            method = 'POST';
-        } else {
-            url = `/api/commands/${this.currentCommand.id}`;
-            method = 'PUT';
-        }
-
-        response = await fetch(url, {
-            method: method,
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(formData)
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-            this.showSuccess('Command saved successfully!');
-            
-            await this.loadCommands();
-            
-            if (data.command) {
-                this.currentCommand = data.command;
-                this.populateCommandForm();
-                
-                // Auto-select the saved command
-                setTimeout(() => {
-                    const commandGroup = document.querySelector(`[data-command-id="${this.currentCommand.id}"]`);
-                    if (commandGroup) {
-                        commandGroup.click();
-                    }
-                }, 500);
-            }
-            
-            return true;
-        } else {
-            this.showError(data.error || 'Failed to save command');
+        if (!this.currentCommand || !this.currentBot) {
+            this.showError('No command selected or bot not loaded');
             return false;
         }
-    } catch (error) {
-        this.showError('Network error while saving command');
-        return false;
-    } finally {
-        this.showLoading(false);
+
+        const commands = this.getCommandsFromTags();
+        
+        if (commands.length === 0) {
+            this.showError('Please add at least one command pattern');
+            const moreCommandsInput = document.getElementById('moreCommands');
+            if (moreCommandsInput) moreCommandsInput.focus();
+            return false;
+        }
+
+        const commandCodeEl = document.getElementById('commandCode');
+        const commandCode = commandCodeEl ? commandCodeEl.value.trim() : '';
+
+        if (!commandCode) {
+            this.showError('Command code is required');
+            if (commandCodeEl) commandCodeEl.focus();
+            return false;
+        }
+
+        const waitForAnswerEl = document.getElementById('waitForAnswer');
+        const answerHandlerEl = document.getElementById('answerHandler');
+        
+        const waitForAnswer = waitForAnswerEl ? waitForAnswerEl.checked : false;
+        const answerHandler = waitForAnswer && answerHandlerEl ? answerHandlerEl.value.trim() : '';
+
+        // ✅ NEW: Client-side validation
+        if (waitForAnswer && !answerHandler) {
+            this.showError('Answer handler code is required when "Wait for Answer" is enabled');
+            if (answerHandlerEl) {
+                answerHandlerEl.focus();
+                // Show the answer handler section if hidden
+                const answerSection = document.getElementById('answerHandlerSection');
+                if (answerSection) answerSection.style.display = 'block';
+            }
+            return false;
+        }
+
+        const formData = {
+            commandPatterns: commands.join(','),
+            code: commandCode,
+            waitForAnswer: waitForAnswer,
+            answerHandler: answerHandler,
+            botToken: this.currentBot.token
+        };
+
+        this.showLoading(true);
+
+        try {
+            const token = localStorage.getItem('token');
+            let response;
+            let url;
+            let method;
+
+            if (this.currentCommand.id === 'new') {
+                url = '/api/commands';
+                method = 'POST';
+            } else {
+                url = `/api/commands/${this.currentCommand.id}`;
+                method = 'PUT';
+            }
+
+            console.log(`🔄 Saving command: ${method} ${url}`, formData);
+            
+            response = await fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const data = await response.json();
+            console.log('📦 Save command response:', data);
+
+            if (response.ok) {
+                this.showSuccess('Command saved successfully!');
+                
+                await this.loadCommands();
+                
+                if (data.command) {
+                    this.currentCommand = data.command;
+                    this.populateCommandForm();
+                    
+                    // Auto-select the saved command
+                    setTimeout(() => {
+                        const commandItem = document.querySelector(`[data-command-id="${this.currentCommand.id}"]`);
+                        if (commandItem) {
+                            commandItem.click();
+                        }
+                    }, 500);
+                }
+                
+                this.setModified(false);
+                return true;
+            } else {
+                throw new Error(data.error || 'Failed to save command');
+            }
+        } catch (error) {
+            console.error('❌ Save command error:', error);
+            this.showError('Failed to save command: ' + error.message);
+            return false;
+        } finally {
+            this.showLoading(false);
+        }
     }
-}
 
     async toggleCommand() {
         if (!this.currentCommand || this.currentCommand.id === 'new') {
@@ -848,10 +873,12 @@ document.querySelectorAll('.command-item').forEach(item => {
                 await this.loadCommands();
                 this.showSuccess(`Command ${newStatus ? 'activated' : 'deactivated'} successfully!`);
             } else {
-                this.showError('Failed to toggle command status');
+                const data = await response.json();
+                throw new Error(data.error || 'Failed to toggle command status');
             }
         } catch (error) {
-            this.showError('Network error while toggling command');
+            console.error('❌ Toggle command error:', error);
+            this.showError('Failed to toggle command: ' + error.message);
         } finally {
             this.showLoading(false);
         }
@@ -883,10 +910,11 @@ document.querySelectorAll('.command-item').forEach(item => {
                 await this.loadCommands();
             } else {
                 const data = await response.json();
-                this.showError(data.error || 'Failed to delete command');
+                throw new Error(data.error || 'Failed to delete command');
             }
         } catch (error) {
-            this.showError('Network error while deleting command');
+            console.error('❌ Delete command error:', error);
+            this.showError('Failed to delete command: ' + error.message);
         } finally {
             this.showLoading(false);
         }
@@ -968,6 +996,7 @@ document.querySelectorAll('.command-item').forEach(item => {
                 `);
             }
         } catch (error) {
+            console.error('❌ Test command error:', error);
             this.showTestError(`
                 <h4>❌ Network Error</h4>
                 <p>Failed to connect to server: ${error.message}</p>
@@ -1052,6 +1081,7 @@ document.querySelectorAll('.command-item').forEach(item => {
                 `);
             }
         } catch (error) {
+            console.error('❌ Run custom test error:', error);
             this.showTestError(`
                 <h4>❌ Network Error</h4>
                 <p>Failed to connect to server: ${error.message}</p>
@@ -1065,6 +1095,130 @@ document.querySelectorAll('.command-item').forEach(item => {
         } else {
             this.showError('Please select a command first');
         }
+    }
+
+    // ✅ NEW: Snippets functionality
+    showSnippets() {
+        const snippets = [
+            {
+                name: 'Send Message',
+                code: 'Api.sendMessage("Hello world!");',
+                description: 'Send a simple text message'
+            },
+            {
+                name: 'Get User Info',
+                code: 'const user = getUser();\nApi.sendMessage(`Hello ${user.first_name}! Your ID: ${user.id}`);',
+                description: 'Get user information and send greeting'
+            },
+            {
+                name: 'Send Button',
+                code: 'const buttons = [\n  { text: "Button 1", callback_data: "btn1" },\n  { text: "Button 2", callback_data: "btn2" }\n];\nApi.sendMessage("Choose an option:", { inline_keyboard: [buttons] });',
+                description: 'Send message with inline buttons'
+            },
+            {
+                name: 'Save User Data',
+                code: 'const user = getUser();\nUser.saveData("last_command", "/start");\nApi.sendMessage("Your data has been saved!");',
+                description: 'Save user data to database'
+            },
+            {
+                name: 'HTTP Request',
+                code: 'try {\n  const response = await HTTP.get("https://api.example.com/data");\n  Api.sendMessage(`Data: ${response.data}`);\n} catch (error) {\n  Api.sendMessage("Error fetching data");\n}',
+                description: 'Make HTTP GET request'
+            }
+        ];
+
+        // Create snippets modal HTML
+        const snippetsHTML = `
+            <div class="snippets-modal">
+                <div class="snippets-header">
+                    <h3>Code Snippets</h3>
+                    <button class="snippets-close">&times;</button>
+                </div>
+                <div class="snippets-body">
+                    <div class="snippets-grid">
+                        ${snippets.map(snippet => `
+                            <div class="snippet-card" data-code="${this.escapeHtml(snippet.code)}">
+                                <div class="snippet-header">
+                                    <h4>${snippet.name}</h4>
+                                    <button class="btn-insert">Insert</button>
+                                </div>
+                                <p class="snippet-desc">${snippet.description}</p>
+                                <pre class="snippet-code">${this.escapeHtml(snippet.code)}</pre>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Remove existing snippets modal if any
+        const existingModal = document.querySelector('.snippets-modal-overlay');
+        if (existingModal) {
+            existingModal.remove();
+        }
+
+        // Create and show modal
+        const modalOverlay = document.createElement('div');
+        modalOverlay.className = 'snippets-modal-overlay';
+        modalOverlay.innerHTML = snippetsHTML;
+        document.body.appendChild(modalOverlay);
+
+        // Add event listeners
+        modalOverlay.querySelector('.snippets-close').addEventListener('click', () => {
+            modalOverlay.remove();
+        });
+
+        modalOverlay.addEventListener('click', (e) => {
+            if (e.target === modalOverlay) {
+                modalOverlay.remove();
+            }
+        });
+
+        // Insert snippet functionality
+        modalOverlay.querySelectorAll('.btn-insert').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const snippetCard = e.target.closest('.snippet-card');
+                const code = snippetCard.dataset.code;
+                this.insertSnippet(code);
+                modalOverlay.remove();
+            });
+        });
+
+        // ESC key to close
+        const handleEsc = (e) => {
+            if (e.key === 'Escape') {
+                modalOverlay.remove();
+                document.removeEventListener('keydown', handleEsc);
+            }
+        };
+        document.addEventListener('keydown', handleEsc);
+    }
+
+    insertSnippet(code) {
+        const commandCodeEl = document.getElementById('commandCode');
+        if (!commandCodeEl) return;
+
+        const currentCode = commandCodeEl.value;
+        const cursorPos = commandCodeEl.selectionStart;
+        
+        // Insert code at cursor position
+        const newCode = currentCode.substring(0, cursorPos) + 
+                       '\n' + code + '\n' + 
+                       currentCode.substring(cursorPos);
+        
+        commandCodeEl.value = newCode;
+        
+        // Set cursor position after inserted code
+        const newCursorPos = cursorPos + code.length + 2;
+        commandCodeEl.setSelectionRange(newCursorPos, newCursorPos);
+        
+        // Focus back to editor
+        commandCodeEl.focus();
+        
+        this.setModified(true);
+        this.updateCodeStats();
+        
+        this.showSuccess('Snippet inserted successfully!');
     }
 
     // ✅ FIXED: Code Editor Functionality - Updated for better modal
@@ -1258,25 +1412,31 @@ document.querySelectorAll('.command-item').forEach(item => {
 
         try {
             const token = localStorage.getItem('token');
+            console.log(`🔄 Loading bot info: ${botId}`);
+            
             const response = await fetch(`/api/bots/${botId}`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
             });
 
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
             const data = await response.json();
+            console.log('📦 Bot API response:', data);
 
             if (data.success) {
                 this.currentBot = data.bot;
                 this.updateBotInfo();
+                console.log(`✅ Bot loaded: ${this.currentBot.name}`);
             } else {
-                this.showError('Bot not found');
-                setTimeout(() => {
-                    window.location.href = 'bot-management.html';
-                }, 2000);
+                throw new Error(data.error || 'Bot not found');
             }
         } catch (error) {
-            this.showError('Failed to load bot info');
+            console.error('❌ Load bot info error:', error);
+            this.showError('Failed to load bot info: ' + error.message);
             setTimeout(() => {
                 window.location.href = 'bot-management.html';
             }, 2000);
@@ -1721,6 +1881,12 @@ document.querySelectorAll('.command-item').forEach(item => {
         }
     }
 
+    logout() {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = 'login.html';
+    }
+
     // UI Helper Methods
     showLoading(show) {
         const overlay = document.getElementById('loadingOverlay');
@@ -1748,19 +1914,26 @@ document.querySelectorAll('.command-item').forEach(item => {
             const notification = document.createElement('div');
             notification.style.cssText = `
                 position: fixed;
-                top: '20px',
-                right: '20px',
-                padding: '1rem 1.5rem',
-                borderRadius: '0.5rem',
-                background: ${type === 'error' ? '#ef4444' : type === 'success' ? '#10b981' : '#3b82f6'},
-                color: 'white',
-                zIndex: '10000',
-                maxWidth: '400px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem'
+                top: 20px;
+                right: 20px;
+                padding: 1rem 1.5rem;
+                border-radius: 0.5rem;
+                background: ${type === 'error' ? '#ef4444' : type === 'success' ? '#10b981' : '#3b82f6'};
+                color: white;
+                z-index: 10000;
+                max-width: 400px;
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
             `;
-            notification.textContent = message;
+            
+            const icon = type === 'error' ? '❌' : type === 'success' ? '✅' : 'ℹ️';
+            notification.innerHTML = `
+                <span>${icon}</span>
+                <span>${message}</span>
+            `;
+            
             document.body.appendChild(notification);
             
             setTimeout(() => {
