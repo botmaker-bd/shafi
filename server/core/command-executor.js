@@ -145,7 +145,7 @@ const runPythonSync = (pythonCode) => {
                 });
             };
 
-            // ✅ FIXED: ENHANCED USER OBJECT WITH AUTO STRING CONVERSION
+            // ✅ FIXED: ENHANCED USER OBJECT - AUTO JSON STRING CONVERSION
             const createUserObject = () => {
                 const userData = {
                     id: userId,
@@ -155,18 +155,20 @@ const runPythonSync = (pythonCode) => {
                     language_code: context.language_code || '',
                     chat_id: chatId,
                     
-                    // ✅ AUTO string conversion - no need to call toString()
+                    // ✅ AUTO JSON string conversion - user লিখলেই JSON string হবে
                     [Symbol.toPrimitive](hint) {
                         if (hint === 'string' || hint === 'default') {
-                            if (this.first_name && this.last_name) {
-                                return `${this.first_name} ${this.last_name}`;
-                            } else if (this.first_name) {
-                                return this.first_name;
-                            } else if (this.username) {
-                                return `@${this.username}`;
-                            } else {
-                                return `User${this.id}`;
-                            }
+                            return JSON.stringify({
+                                id: this.id,
+                                username: this.username,
+                                first_name: this.first_name,
+                                last_name: this.last_name,
+                                language_code: this.language_code,
+                                chat_id: this.chat_id,
+                                full_name: this.first_name && this.last_name ? 
+                                    `${this.first_name} ${this.last_name}` : this.first_name,
+                                display_name: this.first_name || (this.username ? `@${this.username}` : `User${this.id}`)
+                            }, null, 2);
                         }
                         return null;
                     },
@@ -200,7 +202,15 @@ const runPythonSync = (pythonCode) => {
                     
                     // ✅ String representation property
                     get string() {
-                        return this[Symbol.toPrimitive]('string');
+                        if (this.first_name && this.last_name) {
+                            return `${this.first_name} ${this.last_name}`;
+                        } else if (this.first_name) {
+                            return this.first_name;
+                        } else if (this.username) {
+                            return `@${this.username}`;
+                        } else {
+                            return `User${this.id}`;
+                        }
                     },
                     
                     // ✅ Full info property
@@ -212,6 +222,84 @@ const runPythonSync = (pythonCode) => {
                 };
                 
                 return userData;
+            };
+
+            // ✅ FIXED: ENHANCED CHAT OBJECT - AUTO JSON STRING CONVERSION
+            const createChatObject = () => {
+                const chatData = {
+                    id: chatId,
+                    type: msg.chat.type || 'private',
+                    title: msg.chat.title || '',
+                    username: msg.chat.username || '',
+                    first_name: msg.chat.first_name || '',
+                    last_name: msg.chat.last_name || '',
+                    
+                    // ✅ AUTO JSON string conversion - chat লিখলেই JSON string হবে
+                    [Symbol.toPrimitive](hint) {
+                        if (hint === 'string' || hint === 'default') {
+                            return JSON.stringify({
+                                id: this.id,
+                                type: this.type,
+                                title: this.title,
+                                username: this.username,
+                                first_name: this.first_name,
+                                last_name: this.last_name,
+                                is_private: this.type === 'private',
+                                is_group: this.type === 'group',
+                                is_channel: this.type === 'channel'
+                            }, null, 2);
+                        }
+                        return null;
+                    },
+                    
+                    // ✅ JSON representation
+                    toJSON() {
+                        return {
+                            id: this.id,
+                            type: this.type,
+                            title: this.title,
+                            username: this.username,
+                            first_name: this.first_name,
+                            last_name: this.last_name
+                        };
+                    },
+                    
+                    // ✅ Full JSON object property
+                    get jsonobject() {
+                        return {
+                            id: this.id,
+                            type: this.type,
+                            title: this.title,
+                            username: this.username,
+                            first_name: this.first_name,
+                            last_name: this.last_name,
+                            is_private: this.type === 'private',
+                            is_group: this.type === 'group',
+                            is_channel: this.type === 'channel',
+                            display_name: this.title || this.first_name || `Chat${this.id}`
+                        };
+                    },
+                    
+                    // ✅ String representation property
+                    get string() {
+                        return this.title || this.first_name || `Chat${this.id}`;
+                    },
+                    
+                    // ✅ Type check properties
+                    get is_private() {
+                        return this.type === 'private';
+                    },
+                    
+                    get is_group() {
+                        return this.type === 'group';
+                    },
+                    
+                    get is_channel() {
+                        return this.type === 'channel';
+                    }
+                };
+                
+                return chatData;
             };
 
             // Create execution environment
@@ -234,6 +322,10 @@ const runPythonSync = (pythonCode) => {
                 
                 // === USER INFORMATION ===
                 getUser: createUserObject,
+                
+                // === CHAT INFORMATION ===
+                getChat: createChatObject,
+                chat: createChatObject(),
                 
                 // === MESSAGE & PARAMS ===
                 msg: msg,
@@ -371,6 +463,7 @@ const runPythonSync = (pythonCode) => {
                     return botInstance.sendDocument(chatId, doc, options);
                 },
                 getUser: createUserObject,
+                getChat: createChatObject,
                 wait: (ms) => executionEnv.wait(ms),
                 runPython: (code) => executionEnv.runPython(code),
                 waitForAnswer: waitForAnswer,
@@ -385,10 +478,11 @@ const runPythonSync = (pythonCode) => {
 
             // ✅ FIXED: Create ASYNC execution function with proper await handling
             const executionFunction = new Function(
-                'getUser', 'sendMessage', 'bot', 'Api', 'Bot', 'params', 'message', 'User', 'BotData', 'wait', 'runPython', 'waitForAnswer', 'ask',
+                'getUser', 'getChat', 'chat', 'sendMessage', 'bot', 'Api', 'Bot', 'params', 'message', 'User', 'BotData', 'wait', 'runPython', 'waitForAnswer', 'ask',
                 `return (async function() {
                     try {
                         var user = getUser();
+                        var chat = getChat();
                         console.log('✅ Execution started for user:', user.first_name);
                         console.log('📝 User input:', message);
                         console.log('📋 Parameters:', params);
@@ -419,6 +513,8 @@ const runPythonSync = (pythonCode) => {
             console.log('🚀 Executing command...');
             const result = await executionFunction(
                 finalContext.getUser,
+                finalContext.getChat,
+                finalContext.chat,
                 finalContext.sendMessage,
                 finalContext.bot,
                 finalContext.Api,
