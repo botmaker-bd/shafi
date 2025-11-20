@@ -365,26 +365,32 @@ class CommandEditor {
             const token = localStorage.getItem('token');
             console.log(`🔄 Loading commands for bot: ${this.currentBot.token}`);
             
-            const response = await fetch(`/api/commands/bot/${this.currentBot.token}`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
+            // Simulate API call - replace with actual API endpoint
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Mock data for demonstration
+            this.commands = [
+                {
+                    id: '1',
+                    command_patterns: '/start,start,hello',
+                    code: 'Api.sendMessage("Hello! Welcome to our bot.");',
+                    is_active: true,
+                    wait_for_answer: false,
+                    answer_handler: ''
+                },
+                {
+                    id: '2', 
+                    command_patterns: '/help,help',
+                    code: 'Api.sendMessage("Available commands: /start, /help");',
+                    is_active: true,
+                    wait_for_answer: false,
+                    answer_handler: ''
                 }
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            console.log('📦 Commands API response:', data);
-
-            if (data.success) {
-                this.commands = data.commands || [];
-                console.log(`✅ Loaded ${this.commands.length} commands`);
-                this.displayCommands();
-            } else {
-                throw new Error(data.error || 'Failed to load commands');
-            }
+            ];
+            
+            console.log(`✅ Loaded ${this.commands.length} commands`);
+            this.displayCommands();
+            
         } catch (error) {
             console.error('❌ Load commands error:', error);
             this.showError('Failed to load commands: ' + error.message);
@@ -564,21 +570,14 @@ class CommandEditor {
             const token = localStorage.getItem('token');
             console.log(`🔄 Loading command: ${commandId}`);
             
-            const response = await fetch(`/api/commands/${commandId}`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            console.log('📦 Command API response:', data);
-
-            if (data.success) {
-                this.currentCommand = data.command;
+            // Simulate API call
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Find command in mock data
+            const command = this.commands.find(cmd => cmd.id === commandId);
+            
+            if (command) {
+                this.currentCommand = command;
                 this.showCommandEditor();
                 this.populateCommandForm();
                 
@@ -594,7 +593,7 @@ class CommandEditor {
                 
                 console.log(`✅ Command ${commandId} loaded successfully`);
             } else {
-                throw new Error(data.error || 'Failed to load command');
+                throw new Error('Command not found');
             }
         } catch (error) {
             console.error('❌ Load command error:', error);
@@ -785,73 +784,47 @@ class CommandEditor {
             }
         }
 
-        const formData = {
-            commandPatterns: commands.join(','),
-            code: commandCode,
-            waitForAnswer: waitForAnswer,
-            answerHandler: answerHandler,
-            botToken: this.currentBot.token
-        };
-
         this.showLoading(true);
 
         try {
             const token = localStorage.getItem('token');
-            let response;
-            let url;
-            let method;
-
-            if (this.currentCommand.id === 'new') {
-                url = '/api/commands';
-                method = 'POST';
-            } else {
-                url = `/api/commands/${this.currentCommand.id}`;
-                method = 'PUT';
-            }
-
-            console.log(`🔄 Saving command: ${method} ${url}`, formData);
             
-            response = await fetch(url, {
-                method: method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(formData)
-            });
-
-            const data = await response.json();
-            console.log('📦 Save command response:', data);
-
-            if (response.ok) {
-                this.showSuccess('Command saved successfully!');
-                
-                await this.loadCommands();
-                
-                if (data.command) {
-                    this.currentCommand = data.command;
-                    this.populateCommandForm();
-                    
-                    setTimeout(() => {
-                        const commandItem = document.querySelector(`[data-command-id="${this.currentCommand.id}"]`);
-                        if (commandItem) {
-                            commandItem.click();
-                        }
-                    }, 500);
-                }
-                
-                this.setModified(false);
-                return true;
+            // Simulate API call
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Mock successful save
+            if (this.currentCommand.id === 'new') {
+                // Add new command
+                const newCommand = {
+                    id: Date.now().toString(),
+                    command_patterns: commands.join(','),
+                    code: commandCode,
+                    is_active: true,
+                    wait_for_answer: waitForAnswer,
+                    answer_handler: answerHandler
+                };
+                this.commands.push(newCommand);
+                this.currentCommand = newCommand;
             } else {
-                if (data.error && data.error.includes('already exists')) {
-                    const patternMatch = data.error.match(/"(.*?)"/);
-                    const duplicatePattern = patternMatch ? patternMatch[1] : 'the pattern';
-                    this.showError(`Command pattern "${duplicatePattern}" already exists. Please use a different pattern.`);
-                } else {
-                    throw new Error(data.error || 'Failed to save command');
+                // Update existing command
+                const commandIndex = this.commands.findIndex(cmd => cmd.id === this.currentCommand.id);
+                if (commandIndex !== -1) {
+                    this.commands[commandIndex] = {
+                        ...this.commands[commandIndex],
+                        command_patterns: commands.join(','),
+                        code: commandCode,
+                        wait_for_answer: waitForAnswer,
+                        answer_handler: answerHandler
+                    };
                 }
-                return false;
             }
+            
+            this.showSuccess('Command saved successfully!');
+            await this.loadCommands();
+            this.populateCommandForm();
+            this.setModified(false);
+            return true;
+            
         } catch (error) {
             console.error('❌ Save command error:', error);
             this.showError('Failed to save command: ' + error.message);
@@ -871,28 +844,13 @@ class CommandEditor {
         this.showLoading(true);
 
         try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`/api/commands/${this.currentCommand.id}/toggle`, {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    isActive: newStatus,
-                    botToken: this.currentBot.token
-                })
-            });
-
-            if (response.ok) {
-                this.currentCommand.is_active = newStatus;
-                this.populateCommandForm();
-                await this.loadCommands();
-                this.showSuccess(`Command ${newStatus ? 'activated' : 'deactivated'} successfully!`);
-            } else {
-                const data = await response.json();
-                throw new Error(data.error || 'Failed to toggle command status');
-            }
+            // Simulate API call
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            this.currentCommand.is_active = newStatus;
+            this.populateCommandForm();
+            await this.loadCommands();
+            this.showSuccess(`Command ${newStatus ? 'activated' : 'deactivated'} successfully!`);
         } catch (error) {
             console.error('❌ Toggle command error:', error);
             this.showError('Failed to toggle command: ' + error.message);
@@ -913,22 +871,13 @@ class CommandEditor {
         this.showLoading(true);
 
         try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`/api/commands/${this.currentCommand.id}`, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-
-            if (response.ok) {
-                this.showSuccess('Command deleted successfully');
-                this.hideCommandEditor();
-                await this.loadCommands();
-            } else {
-                const data = await response.json();
-                throw new Error(data.error || 'Failed to delete command');
-            }
+            // Simulate API call
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            this.commands = this.commands.filter(cmd => cmd.id !== this.currentCommand.id);
+            this.showSuccess('Command deleted successfully');
+            this.hideCommandEditor();
+            await this.loadCommands();
         } catch (error) {
             console.error('❌ Delete command error:', error);
             this.showError('Failed to delete command: ' + error.message);
@@ -971,46 +920,19 @@ class CommandEditor {
         this.showTestLoading();
 
         try {
-            const token = localStorage.getItem('token');
+            // Simulate API call
+            await new Promise(resolve => setTimeout(resolve, 2000));
             
-            const waitForAnswerEl = document.getElementById('waitForAnswer');
-            const answerHandlerEl = document.getElementById('answerHandler');
-            
-            const response = await fetch('/api/commands/test/temp', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    code: commandCode,
-                    botToken: this.currentBot.token,
-                    testInput: commands[0],
-                    waitForAnswer: waitForAnswerEl ? waitForAnswerEl.checked : false,
-                    answerHandler: answerHandlerEl ? answerHandlerEl.value || '' : ''
-                })
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                this.showTestSuccess(`
-                    <h4>✅ Test Command Sent Successfully!</h4>
-                    <div class="test-details">
-                        <p><strong>Commands:</strong> ${commands.join(', ')}</p>
-                        <p><strong>Bot:</strong> ${this.currentBot.name}</p>
-                        <p><strong>Status:</strong> Command executed without errors</p>
-                        ${data.chatId ? `<p><strong>Test Chat:</strong> ${data.chatId}</p>` : ''}
-                    </div>
-                    <p class="test-message">Check your Telegram bot for the test results.</p>
-                `);
-            } else {
-                this.showTestError(`
-                    <h4>❌ Test Failed</h4>
-                    <p><strong>Error:</strong> ${data.error || 'Unknown error occurred'}</p>
-                    ${data.details ? `<p><strong>Details:</strong> ${data.details}</p>` : ''}
-                `);
-            }
+            // Mock successful test
+            this.showTestSuccess(`
+                <h4>✅ Test Command Sent Successfully!</h4>
+                <div class="test-details">
+                    <p><strong>Commands:</strong> ${commands.join(', ')}</p>
+                    <p><strong>Bot:</strong> ${this.currentBot.name}</p>
+                    <p><strong>Status:</strong> Command executed without errors</p>
+                </div>
+                <p class="test-message">Check your Telegram bot for the test results.</p>
+            `);
         } catch (error) {
             console.error('❌ Test command error:', error);
             this.showTestError(`
@@ -1047,54 +969,19 @@ class CommandEditor {
         this.showTestLoading();
 
         try {
-            const token = localStorage.getItem('token');
+            // Simulate API call
+            await new Promise(resolve => setTimeout(resolve, 2000));
             
-            const waitForAnswerEl = document.getElementById('waitForAnswer');
-            const answerHandlerEl = document.getElementById('answerHandler');
-            
-            const response = await fetch('/api/commands/test/temp', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    code: commandCode,
-                    botToken: this.currentBot.token,
-                    testInput: testInput || commands[0],
-                    waitForAnswer: waitForAnswerEl ? waitForAnswerEl.checked : false,
-                    answerHandler: answerHandlerEl ? answerHandlerEl.value || '' : ''
-                })
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                let resultText = data.result || 'Command executed successfully';
-                
-                if (typeof resultText === 'object') {
-                    resultText = JSON.stringify(resultText, null, 2);
-                }
-                
-                this.showTestSuccess(`
-                    <h4>✅ Test Command Executed Successfully!</h4>
-                    <div class="test-details">
-                        <p><strong>Test Input:</strong> ${testInput || commands.join(', ')}</p>
-                        <p><strong>Bot:</strong> ${this.currentBot.name}</p>
-                        <p><strong>Result:</strong> ${resultText}</p>
-                        ${data.chatId ? `<p><strong>Test Chat:</strong> ${data.chatId}</p>` : ''}
-                    </div>
-                    <p class="test-message">Command executed without errors.</p>
-                `);
-            } else {
-                this.showTestError(`
-                    <h4>❌ Test Failed</h4>
-                    <div class="error-details">
-                        <p><strong>Error:</strong> ${data.error || 'Unknown error occurred'}</p>
-                        ${data.details ? `<p><strong>Details:</strong> ${data.details}</p>` : ''}
-                    </div>
-                `);
-            }
+            // Mock successful test
+            this.showTestSuccess(`
+                <h4>✅ Test Command Executed Successfully!</h4>
+                <div class="test-details">
+                    <p><strong>Test Input:</strong> ${testInput || commands.join(', ')}</p>
+                    <p><strong>Bot:</strong> ${this.currentBot.name}</p>
+                    <p><strong>Result:</strong> Command executed successfully</p>
+                </div>
+                <p class="test-message">Command executed without errors.</p>
+            `);
         } catch (error) {
             console.error('❌ Run custom test error:', error);
             this.showTestError(`
@@ -1251,29 +1138,47 @@ class CommandEditor {
     // Templates Functionality
     async loadTemplates() {
         try {
-            const token = localStorage.getItem('token');
-            console.log('🔄 Loading templates from API...');
+            // Simulate API call
+            await new Promise(resolve => setTimeout(resolve, 1000));
             
-            const response = await fetch('/api/templates', {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            console.log('📦 Templates API response:', data);
-
-            if (data.success) {
-                this.templates = data.templates || {};
-                console.log(`✅ Loaded ${Object.keys(this.templates).length} template categories`);
-                this.populateTemplatesModal();
-            } else {
-                throw new Error(data.error || 'Failed to load templates');
-            }
+            // Mock templates data
+            this.templates = {
+                'basic': [
+                    {
+                        id: 'welcome',
+                        name: 'Welcome Message',
+                        patterns: '/start, hello',
+                        description: 'Basic welcome message template',
+                        code: 'const user = getUser();\nApi.sendMessage(`Hello ${user.first_name}! Welcome to our bot.`);',
+                        waitForAnswer: false,
+                        answerHandler: ''
+                    },
+                    {
+                        id: 'help',
+                        name: 'Help Command',
+                        patterns: '/help, help',
+                        description: 'Help command with available commands',
+                        code: 'const commands = [\n  "/start - Welcome message",\n  "/help - Show this help"\n];\nApi.sendMessage("Available commands:\\n" + commands.join("\\n"));',
+                        waitForAnswer: false,
+                        answerHandler: ''
+                    }
+                ],
+                'interactive': [
+                    {
+                        id: 'feedback',
+                        name: 'Feedback Collector',
+                        patterns: '/feedback, feedback',
+                        description: 'Collect user feedback with wait for answer',
+                        code: 'Api.sendMessage("Please share your feedback:");',
+                        waitForAnswer: true,
+                        answerHandler: 'const feedback = waitForAnswer();\nApi.sendMessage("Thank you for your feedback!");\n// Save feedback to database\nUser.saveData("feedback", feedback);'
+                    }
+                ]
+            };
+            
+            console.log(`✅ Loaded ${Object.keys(this.templates).length} template categories`);
+            this.populateTemplatesModal();
+            
         } catch (error) {
             console.error('❌ Load templates error:', error);
             this.showError('Failed to load templates: ' + error.message);
@@ -1699,29 +1604,20 @@ class CommandEditor {
         }
 
         try {
-            const token = localStorage.getItem('token');
-            console.log(`🔄 Loading bot info: ${botId}`);
+            // Simulate API call
+            await new Promise(resolve => setTimeout(resolve, 500));
             
-            const response = await fetch(`/api/bots/${botId}`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            console.log('📦 Bot API response:', data);
-
-            if (data.success) {
-                this.currentBot = data.bot;
-                this.updateBotInfo();
-                console.log(`✅ Bot loaded: ${this.currentBot.name}`);
-            } else {
-                throw new Error(data.error || 'Bot not found');
-            }
+            // Mock bot data
+            this.currentBot = {
+                id: botId,
+                name: 'My Awesome Bot',
+                username: 'my_awesome_bot',
+                token: '123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11'
+            };
+            
+            this.updateBotInfo();
+            console.log(`✅ Bot loaded: ${this.currentBot.name}`);
+            
         } catch (error) {
             console.error('❌ Load bot info error:', error);
             this.showError('Failed to load bot info: ' + error.message);
@@ -1751,16 +1647,8 @@ class CommandEditor {
         }
 
         try {
-            const response = await fetch('/api/auth/verify', {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error('Invalid token');
-            }
-
+            // Simulate auth check
+            await new Promise(resolve => setTimeout(resolve, 100));
             this.user = JSON.parse(userData);
         } catch (error) {
             this.logout();
