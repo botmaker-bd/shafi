@@ -67,11 +67,11 @@
         <div class="page-header">
             <div class="header-content">
                 <h1 id="botName">Command Editor</h1>
-                <p id="botUsername">Manage commands for your bot</p>
+                <p id="botUsername">Create and manage your bot commands easily</p>
             </div>
             <div class="header-actions">
                 <button class="btn btn-secondary" id="backToBots">
-                    <i class="fas fa-arrow-left"></i> Back to Bots
+                    <i class="fas fa-arrow-left"></i> Back
                 </button>
                 <button class="btn btn-primary" id="quickTest">
                     <i class="fas fa-bolt"></i> Quick Test
@@ -84,13 +84,10 @@
                 <!-- Sidebar -->
                 <div class="commands-sidebar">
                     <div class="sidebar-header">
-                        <h3>Commands</h3>
+                        <h3>My Commands</h3>
                         <div class="sidebar-actions">
                             <button id="addCommandBtn" class="btn btn-primary btn-small">
-                                <i class="fas fa-plus"></i> New Command
-                            </button>
-                            <button id="refreshCommandsBtn" class="btn btn-secondary btn-small">
-                                <i class="fas fa-sync-alt"></i> Refresh
+                                <i class="fas fa-plus"></i> New
                             </button>
                         </div>
                     </div>
@@ -108,27 +105,34 @@
                             <div class="empty-icon">
                                 <i class="fas fa-code"></i>
                             </div>
-                            <h3>No Commands</h3>
-                            <!-- <p>Create your first command to get started</p> -->
-                            <!-- <button class="btn btn-primary" id="addFirstCommand"> -->
-                                <!-- <i class="fas fa-plus"></i> Create First Command -->
-                            <!-- </button> -->
+                            <h3>No Commands Yet</h3>
+                            <p>Create your first command to get started</p>
+                            <button class="btn btn-primary" id="addFirstCommand">
+                                <i class="fas fa-plus"></i> Create First Command
+                            </button>
                         </div>
                     </div>
                 </div>
 
                 <!-- Main Editor -->
                 <div class="editor-main">
-                    <!-- No Command Selected -->
-                    <div id="noCommandSelected" class="empty-state">
-                        <div class="empty-icon">
-                            <i class="fas fa-edit"></i>
+                    <!-- Welcome Screen -->
+                    <div id="noCommandSelected" class="welcome-screen">
+                        <div class="welcome-content">
+                            <div class="welcome-icon">
+                                <i class="fas fa-edit"></i>
+                            </div>
+                            <h2>Welcome to Command Editor</h2>
+                            <p>Select a command from the list or create a new one to start editing</p>
+                            <div class="welcome-actions">
+                                <button class="btn btn-primary btn-large" id="createFirstCommand">
+                                    <i class="fas fa-plus"></i> Create New Command
+                                </button>
+                                <button class="btn btn-secondary btn-large" id="showTemplates">
+                                    <i class="fas fa-layer-group"></i> Browse Templates
+                                </button>
+                            </div>
                         </div>
-                        <h3>No Command Selected</h3>
-                        <p>Select a command from the list or create a new one to start editing</p>
-                        <button class="btn btn-primary" id="createFirstCommand">
-                            <i class="fas fa-plus"></i> Create New Command
-                        </button>
                     </div>
 
                     <!-- Command Editor -->
@@ -136,11 +140,11 @@
                         <div class="editor-header">
                             <div class="editor-title-section">
                                 <div class="command-title">
-                                    <h3 id="currentCommandName">Command Editor</h3>
-                                </div>
-                                <div class="command-status-info">
-                                    <span class="command-status status-active" id="commandStatus">Active</span>
-                                    <span class="command-id" id="commandId">ID: new</span>
+                                    <h3 id="currentCommandName">New Command</h3>
+                                    <div class="command-status-info">
+                                        <span class="command-status status-active" id="commandStatus">Active</span>
+                                        <span class="command-id" id="commandId">ID: new</span>
+                                    </div>
                                 </div>
                             </div>
                             <div class="editor-actions">
@@ -160,157 +164,122 @@
                         </div>
 
                         <div class="editor-body">
-                            <form id="commandForm">
-                                <!-- Command Patterns -->
-                                <div class="form-section">
-                                    <div class="form-section-header">
-                                        <h4 class="form-section-title">Command Patterns</h4>
-                                        <div class="section-actions">
-                                            <button type="button" class="btn btn-secondary btn-small" id="showTemplates">
-                                                <i class="fas fa-layer-group"></i> Templates
-                                            </button>
-                                            <button type="button" class="btn btn-secondary btn-small" id="clearPatternsBtn">
-                                                <i class="fas fa-eraser"></i> Clear
-                                            </button>
-                                        </div>
+                            <!-- Command Patterns -->
+                            <div class="form-section">
+                                <div class="form-section-header">
+                                    <h4 class="form-section-title">
+                                        <i class="fas fa-terminal"></i>
+                                        Command Triggers
+                                    </h4>
+                                    <div class="section-actions">
+                                        <button type="button" class="btn btn-secondary btn-small" id="clearPatternsBtn">
+                                            <i class="fas fa-eraser"></i> Clear
+                                        </button>
                                     </div>
+                                </div>
+                                <div class="form-group">
+                                    <div class="commands-input-container">
+                                        <div id="commandsTags" class="commands-tags">
+                                            <!-- Command tags will be added here -->
+                                        </div>
+                                        <input type="text" id="moreCommands" 
+                                               placeholder="Type command (e.g., /start) and press Enter...">
+                                    </div>
+                                    <div class="form-help">
+                                        Add multiple command patterns. Users can use any of these to trigger the command.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Code Editor Section -->
+                            <div class="form-section">
+                                <div class="form-section-header">
+                                    <h4 class="form-section-title">
+                                        <i class="fas fa-code"></i>
+                                        Command Code
+                                    </h4>
+                                    <div class="section-actions">
+                                        <button type="button" class="btn btn-secondary btn-small" id="openEditor">
+                                            <i class="fas fa-expand"></i> Full Screen
+                                        </button>
+                                        <button type="button" class="btn btn-secondary btn-small" id="insertSnippetBtn">
+                                            <i class="fas fa-magic"></i> Snippets
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <div class="code-editor-container">
+                                        <div class="code-editor-header">
+                                            <h5 class="code-editor-title">What happens when command is triggered</h5>
+                                        </div>
+                                        <textarea id="commandCode" class="code-editor-textarea"
+                                                  placeholder="Write your command code here..."></textarea>
+                                    </div>
+                                    <div class="form-help">
+                                        <strong>Tip:</strong> Use bot.sendMessage() to send responses, User.saveData() to store data.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Quick Actions -->
+                            <div class="quick-actions">
+                                <h4>Quick Actions</h4>
+                                <div class="action-buttons">
+                                    <button class="action-btn" data-action="send-message">
+                                        <i class="fas fa-comment"></i>
+                                        <span>Send Message</span>
+                                    </button>
+                                    <button class="action-btn" data-action="user-info">
+                                        <i class="fas fa-user"></i>
+                                        <span>Get User Info</span>
+                                    </button>
+                                    <button class="action-btn" data-action="buttons">
+                                        <i class="fas fa-th"></i>
+                                        <span>Add Buttons</span>
+                                    </button>
+                                    <button class="action-btn" data-action="wait-answer">
+                                        <i class="fas fa-clock"></i>
+                                        <span>Wait for Answer</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Test Section -->
+                            <div class="form-section">
+                                <div class="form-section-header">
+                                    <h4 class="form-section-title">
+                                        <i class="fas fa-vial"></i>
+                                        Test Your Command
+                                    </h4>
+                                </div>
+                                <div class="test-section">
                                     <div class="form-group">
-                                        <div class="commands-input-container">
-                                            <div id="commandsTags" class="commands-tags">
-                                                <!-- Command tags will be added here -->
-                                            </div>
-                                            <input type="text" id="moreCommands" 
-                                                   placeholder="Type command pattern and press Enter...">
+                                        <div class="test-input-group">
+                                            <input type="text" id="testInput" 
+                                                   placeholder="Type a command to test (e.g., /start)...">
+                                            <button type="button" id="runTestBtn" class="btn btn-warning">
+                                                <i class="fas fa-play"></i> Run Test
+                                            </button>
                                         </div>
                                         <div class="form-help">
-                                            Add multiple command patterns separated by commas. All patterns will execute the same code.
-                                            Example: /start, start, hello
+                                            Test how your command will work before saving.
                                         </div>
                                     </div>
                                 </div>
-
-                                <!-- Code Editor Section -->
-                                <div class="form-section">
-                                    <div class="form-section-header">
-                                        <h4 class="form-section-title">Command Code</h4>
-                                        <div class="section-actions">
-                                            <button type="button" class="btn btn-secondary btn-small" id="openEditor">
-                                                <i class="fas fa-edit"></i> Full Editor
-                                            </button>
-                                            <button type="button" id="testFooterBtn" class="btn btn-secondary btn-small">
-                                                <i class="fas fa-play"></i> Run
-                                            </button>
-                                            <button type="button" class="btn btn-secondary btn-small" id="clearCodeBtn">
-                                                <i class="fas fa-eraser"></i> Clear
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div class="form-group">
-                                        <div class="code-editor-container">
-                                            <div class="code-editor-header">
-                                                <h5 class="code-editor-title">Command Execution Code</h5>
-                                                <div class="code-editor-actions">
-                                                    <button type="button" class="btn btn-secondary btn-small" id="insertSnippetBtn">
-                                                        <i class="fas fa-code"></i> Snippets
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            <textarea id="commandCode" class="code-editor-textarea"
-                                                      placeholder="Write your command code here..."></textarea>
-                                        </div>
-                                        <div class="form-help">
-                                            <strong>Available Functions:</strong> bot.sendMessage(), User.saveData(), waitForAnswer(), HTTP.get(), etc.
-                                        </div>
-                                    </div>
-                                </div>
-
-
-                                <!-- Advanced Options -->
-                                <div class="form-section">
-                                    <div class="advanced-options-toggle" id="advancedOptionsToggle">
-                                        <div class="toggle-text">
-                                            <span class="toggle-title">Advanced Options</span>
-                                            <span class="toggle-description">Additional settings for command behavior</span>
-                                        </div>
-                                        <i class="fas fa-chevron-down" id="advancedOptionsIcon"></i>
-                                    </div>
-                                    
-                                    <div id="advancedOptionsContent" class="advanced-options-content">
-                                        <!-- Wait for Answer Toggle -->
-                                        <div class="toggle-group">
-                                            <label class="toggle-label">
-                                                <div class="toggle-text">
-                                                    <span class="toggle-title">Wait for Answer</span>
-                                                    <span class="toggle-description">Enable to wait for user response after command execution</span>
-                                                </div>
-                                                <div class="toggle-switch">
-                                                    <input type="checkbox" id="waitForAnswer">
-                                                    <span class="toggle-slider"></span>
-                                                </div>
-                                            </label>
-                                        </div>
-                                        
-                                        
-
-                                        <!-- Answer Handler Section -->
-                                        <div id="answerHandlerSection" class="form-group" style="display: none;">
-                                            <div class="form-section-header">
-                                                <h4 class="form-section-title">Answer Handler Code</h4>
-                                                <div class="section-actions">
-                                                    <button type="button" class="btn btn-secondary btn-small" id="openAnswerEditor">
-                                                        <i class="fas fa-edit"></i> Full Editor
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            <div class="code-editor-container">
-                                                <div class="code-editor-header">
-                                                    <h5 class="code-editor-title">Answer Handler</h5>
-                                                </div>
-                                                <textarea id="answerHandler" class="code-editor-textarea"
-                                                          placeholder="Code to handle user's answer..."></textarea>
-                                            </div>
-                                            <div class="form-help">
-                                                This code will execute when user responds. Use waitForAnswer() to get user's response.
-                                            </div>
-                                        </div>
-                                                                        <!-- Test Section -->
-                                <div class="form-section">
-                                    <h4 class="form-section-title">Test Command</h4>
-                                    <div class="test-section">
-                                        <div class="form-group">
-                                            <div class="test-input-group">
-                                                <input type="text" id="testInput" 
-                                                       placeholder="Enter test input to simulate user message...">
-                                                <button type="button" id="runTestBtn" class="btn btn-warning">
-                                                    <i class="fas fa-play"></i> Run Test
-                                                </button>
-                                            </div>
-                                            <div class="form-help">
-                                                Enter test input to simulate how users will trigger this command.
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                    </div>
-                                </div>
-                            </form>
+                            </div>
                         </div>
 
                         <div class="editor-footer">
                             <div class="footer-info">
                                 <span id="lastSaved">Not saved yet</span>
-                                <span id="codeStats">Lines: 0, Chars: 0</span>
+                                <span id="codeStats">Ready to code</span>
                             </div>
                             <div class="footer-actions">
                                 <button id="saveFooterBtn" class="btn btn-primary">
                                     <i class="fas fa-save"></i> Save Command
                                 </button>
                                 <button id="testFooterBtn" class="btn btn-success">
-                                    <i class="fas fa-bolt"></i> Test Command
-                                </button>
-                                <button id="activateFooterBtn" class="btn btn-warning">
-                                    <i class="fas fa-power-off"></i> Activate
+                                    <i class="fas fa-bolt"></i> Test Now
                                 </button>
                             </div>
                         </div>
@@ -328,7 +297,7 @@
         </div>
     </div>
 
-    <!-- Test Command Modal -->
+    <!-- Test Results Modal -->
     <div id="testCommandModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -344,8 +313,7 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" id="closeTestCommand">Close</button>
-                <button class="btn btn-primary" id="viewLogs">View Logs</button>
+                <button class="btn btn-primary" id="closeTestCommand">Close</button>
             </div>
         </div>
     </div>
@@ -360,33 +328,11 @@
             <div class="modal-body">
                 <div class="editor-toolbar">
                     <div class="toolbar-group">
-                        <button class="btn-icon" id="undoBtn" title="Undo">
-                            <i class="fas fa-undo"></i>
-                        </button>
-                        <button class="btn-icon" id="redoBtn" title="Redo">
-                            <i class="fas fa-redo"></i>
-                        </button>
-                        <button class="btn-icon" id="selectAllBtn" title="Select All">
-                            <i class="fas fa-expand-arrows-alt"></i>
-                        </button>
-                    </div>
-                    <div class="toolbar-group">
-                        <button class="btn-icon" id="cutBtn" title="Cut">
-                            <i class="fas fa-cut"></i>
-                        </button>
-                        <button class="btn-icon" id="copyBtn" title="Copy">
-                            <i class="fas fa-copy"></i>
-                        </button>
-                        <button class="btn-icon" id="pasteBtn" title="Paste">
-                            <i class="fas fa-paste"></i>
-                        </button>
-                    </div>
-                    <div class="toolbar-group">
-                        <button class="btn-icon" id="clearBtn" title="Clear All">
-                            <i class="fas fa-eraser"></i>
-                        </button>
                         <button class="btn-icon" id="formatBtn" title="Format Code">
-                            <i class="fas fa-indent"></i>
+                            <i class="fas fa-indent"></i> Format
+                        </button>
+                        <button class="btn-icon" id="clearBtn" title="Clear All">
+                            <i class="fas fa-eraser"></i> Clear
                         </button>
                     </div>
                 </div>
@@ -395,7 +341,6 @@
                 <div class="editor-info">
                     <span id="lineCount">Lines: 1</span>
                     <span id="charCount">Chars: 0</span>
-                    <span id="wordCount">Words: 0</span>
                 </div>
             </div>
             <div class="modal-footer">
@@ -411,32 +356,28 @@
         </div>
     </div>
 
-    <!-- Templates Modal -->
-    <div id="templatesModal" class="modal">
+    <!-- Snippets Modal -->
+    <div id="snippetsModal" class="modal">
         <div class="modal-content large-modal">
             <div class="modal-header">
-                <h3>Code Templates</h3>
+                <h3>Code Snippets</h3>
                 <button class="modal-close">&times;</button>
             </div>
             <div class="modal-body">
-                <div class="templates-categories">
-                    <div class="category-tabs-container">
-                        <div class="category-tabs">
-                            <!-- Categories will be dynamically loaded -->
+                <div class="snippets-container">
+                    <div class="snippets-search-container">
+                        <div class="search-box">
+                            <i class="fas fa-search search-icon"></i>
+                            <input type="text" id="snippetsSearch" placeholder="Search snippets...">
                         </div>
                     </div>
-                    
-                    <div class="templates-content">
-                        <!-- Templates will be dynamically loaded here -->
-                        <div class="loading-state">
-                            <div class="spinner"></div>
-                            <p>Loading templates...</p>
-                        </div>
+                    <div class="snippets-grid" id="snippetsGrid">
+                        <!-- Snippets will be loaded here -->
                     </div>
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" id="closeTemplates">Close</button>
+                <button class="btn btn-secondary" id="closeSnippets">Close</button>
             </div>
         </div>
     </div>
