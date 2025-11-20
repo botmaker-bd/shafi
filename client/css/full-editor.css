@@ -1,0 +1,866 @@
+/* ===== FULL SCREEN CODE EDITOR STYLES ===== */
+:root {
+    /* Light Theme */
+    --editor-bg: #1e1e1e;
+    --editor-text: #d4d4d4;
+    --editor-border: #333;
+    --editor-accent: #007acc;
+    --editor-secondary: #569cd6;
+    --editor-comment: #6a9955;
+    --editor-string: #ce9178;
+    --editor-number: #b5cea8;
+    --editor-keyword: #569cd6;
+    --editor-function: #dcdcaa;
+    --editor-variable: #9cdcfe;
+    
+    /* UI Colors */
+    --header-bg: #2d2d30;
+    --toolbar-bg: #333337;
+    --footer-bg: #007acc;
+    --line-numbers: #858585;
+    --line-highlight: #2a2d2e;
+    --selection-bg: #264f78;
+    
+    /* Sizes */
+    --header-height: 60px;
+    --toolbar-height: 50px;
+    --footer-height: 40px;
+}
+
+[data-theme="light"] {
+    --editor-bg: #ffffff;
+    --editor-text: #333333;
+    --editor-border: #cccccc;
+    --editor-accent: #0078d4;
+    --editor-secondary: #af00db;
+    --editor-comment: #008000;
+    --editor-string: #a31515;
+    --editor-number: #098658;
+    --editor-keyword: #0000ff;
+    --editor-function: #795e26;
+    --editor-variable: #001080;
+    
+    --header-bg: #f3f3f3;
+    --toolbar-bg: #f8f8f8;
+    --footer-bg: #0078d4;
+    --line-numbers: #237893;
+    --line-highlight: #f0f0f0;
+    --selection-bg: #add6ff;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: var(--editor-bg);
+    color: var(--editor-text);
+    overflow: hidden;
+    height: 100vh;
+}
+
+/* Full Editor Container */
+.full-editor-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background: var(--editor-bg);
+}
+
+/* Editor Header */
+.editor-header {
+    height: var(--header-height);
+    background: var(--header-bg);
+    border-bottom: 1px solid var(--editor-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    flex-shrink: 0;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.editor-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--editor-text);
+}
+
+.editor-title i {
+    color: var(--editor-accent);
+}
+
+.file-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.file-name {
+    font-weight: 500;
+    color: var(--editor-text);
+}
+
+.file-type {
+    background: var(--editor-accent);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.editor-stats {
+    display: flex;
+    gap: 15px;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 14px;
+    color: var(--editor-text);
+    opacity: 0.8;
+}
+
+.stat-item i {
+    font-size: 12px;
+}
+
+.header-actions {
+    display: flex;
+    gap: 10px;
+}
+
+/* Editor Toolbar */
+.editor-toolbar {
+    height: var(--toolbar-height);
+    background: var(--toolbar-bg);
+    border-bottom: 1px solid var(--editor-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    flex-shrink: 0;
+}
+
+.toolbar-section {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding-right: 15px;
+    border-right: 1px solid var(--editor-border);
+}
+
+.toolbar-group:last-child {
+    border-right: none;
+}
+
+.toolbar-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--editor-text);
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+}
+
+.toolbar-btn:hover {
+    background: var(--editor-accent);
+    color: white;
+    border-color: var(--editor-accent);
+}
+
+.toolbar-btn:active {
+    transform: translateY(1px);
+}
+
+.toolbar-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.toolbar-btn:disabled:hover {
+    background: transparent;
+    color: var(--editor-text);
+    border-color: transparent;
+}
+
+.font-size-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.font-size-display {
+    font-size: 12px;
+    color: var(--editor-text);
+    min-width: 40px;
+    text-align: center;
+}
+
+/* Main Editor Area */
+.editor-main {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    position: relative;
+}
+
+.line-numbers {
+    background: var(--header-bg);
+    color: var(--line-numbers);
+    font-family: 'Fira Code', monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    padding: 15px 10px;
+    text-align: right;
+    user-select: none;
+    min-width: 60px;
+    border-right: 1px solid var(--editor-border);
+    overflow-y: auto;
+}
+
+.line-numbers span {
+    display: block;
+    min-height: 21px;
+}
+
+.code-editor {
+    flex: 1;
+    background: var(--editor-bg);
+    color: var(--editor-text);
+    border: none;
+    outline: none;
+    resize: none;
+    font-family: 'Fira Code', monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    padding: 15px;
+    tab-size: 4;
+    white-space: pre;
+    overflow: auto;
+}
+
+.code-editor::selection {
+    background: var(--selection-bg);
+}
+
+.editor-minimap {
+    width: 200px;
+    background: var(--header-bg);
+    border-left: 1px solid var(--editor-border);
+    overflow: hidden;
+    position: relative;
+}
+
+.minimap-content {
+    transform: scale(0.1);
+    transform-origin: top left;
+    width: 1000%;
+    height: 1000%;
+    pointer-events: none;
+}
+
+/* Editor Footer */
+.editor-footer {
+    height: var(--footer-height);
+    background: var(--footer-bg);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    flex-shrink: 0;
+    font-size: 14px;
+}
+
+.footer-left {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.cursor-position {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.position-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.editor-mode {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.mode-indicator {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.encoding {
+    opacity: 0.8;
+    font-size: 12px;
+}
+
+.footer-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Find & Replace Panel */
+.find-replace-panel {
+    position: absolute;
+    top: calc(var(--header-height) + var(--toolbar-height));
+    right: 20px;
+    background: var(--header-bg);
+    border: 1px solid var(--editor-border);
+    border-radius: 6px;
+    padding: 15px;
+    width: 400px;
+    z-index: 1000;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    display: none;
+}
+
+.find-replace-panel.show {
+    display: block;
+    animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.find-section, .replace-section {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.find-input, .replace-input {
+    flex: 1;
+    background: var(--editor-bg);
+    border: 1px solid var(--editor-border);
+    color: var(--editor-text);
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.find-input:focus, .replace-input:focus {
+    outline: none;
+    border-color: var(--editor-accent);
+}
+
+.find-results {
+    font-size: 12px;
+    color: var(--editor-text);
+    opacity: 0.7;
+}
+
+.find-options {
+    display: flex;
+    gap: 15px;
+    margin-top: 10px;
+}
+
+.option-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    color: var(--editor-text);
+    cursor: pointer;
+}
+
+.option-checkbox input {
+    margin: 0;
+}
+
+.close-find {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: none;
+    border: none;
+    color: var(--editor-text);
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 4px;
+}
+
+.close-find:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Snippets Modal */
+.snippets-modal {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--header-bg);
+    border: 1px solid var(--editor-border);
+    border-radius: 8px;
+    width: 90%;
+    max-width: 800px;
+    height: 80%;
+    z-index: 1001;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    display: none;
+    flex-direction: column;
+}
+
+.snippets-modal.show {
+    display: flex;
+    animation: modalAppear 0.3s ease;
+}
+
+@keyframes modalAppear {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -48%);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%);
+    }
+}
+
+.snippets-header {
+    padding: 20px;
+    border-bottom: 1px solid var(--editor-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.snippets-header h3 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--editor-text);
+}
+
+.snippets-search {
+    flex: 1;
+    position: relative;
+    max-width: 300px;
+}
+
+.snippets-search i {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--editor-text);
+    opacity: 0.7;
+}
+
+.snippets-search input {
+    width: 100%;
+    background: var(--editor-bg);
+    border: 1px solid var(--editor-border);
+    color: var(--editor-text);
+    padding: 10px 10px 10px 35px;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+.snippets-search input:focus {
+    outline: none;
+    border-color: var(--editor-accent);
+}
+
+.close-snippets {
+    background: none;
+    border: none;
+    color: var(--editor-text);
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 4px;
+    font-size: 16px;
+}
+
+.close-snippets:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.snippets-content {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 15px;
+}
+
+.snippet-item {
+    background: var(--editor-bg);
+    border: 1px solid var(--editor-border);
+    border-radius: 6px;
+    padding: 15px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.snippet-item:hover {
+    border-color: var(--editor-accent);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.snippet-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.snippet-title {
+    font-weight: 600;
+    color: var(--editor-text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.snippet-title i {
+    color: var(--editor-accent);
+}
+
+.snippet-language {
+    background: var(--editor-accent);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 500;
+}
+
+.snippet-description {
+    color: var(--editor-text);
+    opacity: 0.8;
+    font-size: 13px;
+    line-height: 1.4;
+    margin-bottom: 10px;
+}
+
+.snippet-code {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+    padding: 10px;
+    font-family: 'Fira Code', monospace;
+    font-size: 12px;
+    color: var(--editor-string);
+    overflow-x: auto;
+    white-space: pre;
+}
+
+/* Status Notifications */
+.status-notification {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--editor-accent);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    z-index: 1002;
+    display: none;
+}
+
+.status-notification.show {
+    display: flex;
+    animation: notificationSlide 0.3s ease;
+}
+
+@keyframes notificationSlide {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+.notification-close {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+}
+
+.notification-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* Buttons */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn-primary {
+    background: var(--editor-accent);
+    color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: #106ebe;
+    transform: translateY(-1px);
+}
+
+.btn-secondary {
+    background: transparent;
+    color: var(--editor-text);
+    border: 1px solid var(--editor-border);
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--editor-accent);
+}
+
+.btn-icon {
+    padding: 8px;
+    background: transparent;
+    color: var(--editor-text);
+    border: 1px solid transparent;
+}
+
+.btn-icon:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--editor-border);
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .editor-toolbar {
+        flex-direction: column;
+        height: auto;
+        padding: 10px 20px;
+        gap: 10px;
+    }
+    
+    .toolbar-section {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    .snippets-content {
+        grid-template-columns: 1fr;
+    }
+    
+    .find-replace-panel {
+        width: 350px;
+    }
+}
+
+@media (max-width: 768px) {
+    .editor-header {
+        flex-direction: column;
+        height: auto;
+        padding: 15px 20px;
+        gap: 10px;
+    }
+    
+    .header-left, .header-right {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    .editor-stats {
+        display: none;
+    }
+    
+    .editor-footer {
+        flex-direction: column;
+        height: auto;
+        padding: 10px 20px;
+        gap: 10px;
+    }
+    
+    .footer-left, .footer-right {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    .find-replace-panel {
+        width: 300px;
+        right: 10px;
+    }
+    
+    .snippets-modal {
+        width: 95%;
+        height: 90%;
+    }
+}
+
+@media (max-width: 480px) {
+    .toolbar-section {
+        flex-direction: column;
+        gap: 5px;
+    }
+    
+    .toolbar-group {
+        border-right: none;
+        padding-right: 0;
+        justify-content: center;
+    }
+    
+    .btn-text {
+        display: none;
+    }
+    
+    .find-replace-panel {
+        width: calc(100% - 40px);
+        right: 20px;
+    }
+    
+    .find-section, .replace-section {
+        flex-direction: column;
+    }
+    
+    .find-options {
+        flex-direction: column;
+        gap: 5px;
+    }
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--header-bg);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--editor-border);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--editor-accent);
+}
+
+/* Code Syntax Highlighting (Basic) */
+.code-editor {
+    /* These will be applied via JavaScript for syntax highlighting */
+}
+
+/* Selection Styling */
+.code-editor::selection {
+    background: var(--selection-bg);
+}
+
+/* Focus Styling */
+.code-editor:focus {
+    outline: none;
+}
+
+/* Placeholder Styling */
+.code-editor::placeholder {
+    color: var(--line-numbers);
+    opacity: 0.6;
+}
+
+/* Print Styles */
+@media print {
+    .editor-toolbar,
+    .editor-footer,
+    .find-replace-panel,
+    .snippets-modal {
+        display: none !important;
+    }
+    
+    .editor-header {
+        background: white !important;
+        color: black !important;
+        border-bottom: 1px solid #ccc;
+    }
+    
+    .code-editor {
+        background: white !important;
+        color: black !important;
+    }
+    
+    .line-numbers {
+        background: #f5f5f5 !important;
+        color: #666 !important;
+    }
+}
