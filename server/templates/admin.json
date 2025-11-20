@@ -1,0 +1,20 @@
+[
+    {
+        "id": "user_count",
+        "name": "User Count",
+        "patterns": "/stats, statistics, count",
+        "description": "Show bot usage statistics",
+        "code": "// Get usage data\nconst totalUsage = User.getData('total_usage') || 0;\nconst userCount = User.getData('user_count') || 1;\n\n// Update stats\nUser.saveData('total_usage', totalUsage + 1);\n\nconst statsText = `📊 *Bot Statistics*\\n\\n` +\n`👥 Total Users: ${userCount}\\n` +\n`📨 Total Commands: ${totalUsage + 1}\\n` +\n`🕒 Last Update: ${new Date().toLocaleString()}\\n\\n` +\n`⚡ Bot Status: Online\\n` +\n`🔧 Version: 2.0.0`;\n\nApi.sendMessage(statsText, { parse_mode: 'Markdown' });",
+        "waitForAnswer": false,
+        "answerHandler": ""
+    },
+    {
+        "id": "broadcast_message",
+        "name": "Broadcast Message",
+        "patterns": "/broadcast, announce, notify",
+        "description": "Send message to all users (admin feature)",
+        "code": "// Check if user is admin (you can modify this logic)\nconst user = getUser();\nconst isAdmin = user.id === 2014318584; // Replace with your admin ID\n\nif (!isAdmin) {\n    return Api.sendMessage(\"❌ Admin access required for broadcasting.\");\n}\n\nApi.sendMessage(\"📢 *Broadcast System*\\n\\nPlease enter the message you want to broadcast to all users:\");\nUser.saveData('broadcast_mode', 'true');",
+        "waitForAnswer": true,
+        "answerHandler": "if (User.getData('broadcast_mode') === 'true') {\n    const broadcastMessage = params;\n    \n    // In real implementation, you would send to all users\n    // For now, just show a preview\n    Api.sendMessage(`📢 *Broadcast Preview*\\n\\n${broadcastMessage}\\n\\n✅ This message would be sent to all users.`);\n    \n    User.saveData('broadcast_mode', 'false');\n}"
+    }
+]
