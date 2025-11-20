@@ -228,7 +228,7 @@ class FullEditor {
     }
 
     formatCodeText(code) {
-        // Simple code formatter - can be enhanced with a proper formatter library
+        // Simple code formatter
         const lines = code.split('\n');
         let formattedLines = [];
         let indentLevel = 0;
