@@ -213,22 +213,6 @@ class CommandEditor {
             });
         }
 
-        // Full editor buttons
-        const openFullEditor = document.getElementById('openFullEditor');
-        const openAnswerFullEditor = document.getElementById('openAnswerFullEditor');
-        
-        if (openFullEditor) {
-            openFullEditor.addEventListener('click', () => {
-                this.openFullScreenEditor('main');
-            });
-        }
-        
-        if (openAnswerFullEditor) {
-            openAnswerFullEditor.addEventListener('click', () => {
-                this.openFullScreenEditor('answer');
-            });
-        }
-
         // Templates
         const showTemplatesBtn = document.getElementById('showTemplates');
         if (showTemplatesBtn) {
@@ -1127,35 +1111,6 @@ class CommandEditor {
             this.showError('Please select a command first');
         }
     }
-
-    // Full Screen Editor Integration
-    // command-editor.js-তে এই ফাংশন যোগ করুন
-openFullScreenEditor(code = '', type = 'main') {
-    const editorWindow = window.open('full-editor.html', 'fullEditor', 
-        'width=1200,height=800,resizable=yes,scrollbars=yes');
-    
-    // Editor লোড হওয়ার পর code সেট করুন
-    const checkEditor = setInterval(() => {
-        if (editorWindow && editorWindow.fullEditor) {
-            clearInterval(checkEditor);
-            editorWindow.fullEditor.setCode(code);
-            editorWindow.fullEditor.setFileName(type === 'main' ? 'command.js' : 'answer-handler.js');
-        }
-    }, 100);
-    
-    // Code save/update হ্যান্ডেল করুন
-    window.addEventListener('message', (event) => {
-        if (event.data.type === 'CODE_SAVED' || event.data.type === 'CODE_UPDATED') {
-            if (type === 'main') {
-                document.getElementById('commandCode').value = event.data.code;
-            } else {
-                document.getElementById('answerHandler').value = event.data.code;
-            }
-            this.setModified(true);
-            this.updateCodeStats();
-        }
-    });
-}
 
     // Snippets Functionality
     showSnippetsModal() {
