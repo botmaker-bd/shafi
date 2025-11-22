@@ -1,0 +1,20 @@
+[
+    {
+        "id": "feedback_system",
+        "name": "Feedback System",
+        "patterns": "/feedback, review, rate",
+        "description": "Collect user feedback with rating",
+        "code": "Api.sendMessage(`📝 *Feedback System*\\n\\nPlease share your feedback about our bot. How was your experience?`);\nUser.saveData('waiting_feedback', 'true');",
+        "waitForAnswer": true,
+        "answerHandler": "const feedback = params;\nconst user = getUser();\n\n// Save feedback to database (simulated)\nUser.saveData('user_feedback', feedback);\nUser.saveData('feedback_time', new Date().toISOString());\n\nApi.sendMessage(`✅ Thank you for your feedback, ${user.first_name}!\\n\\nWe appreciate your input: \"${feedback}\"`);\n\n// Reset state\nUser.saveData('waiting_feedback', 'false');"
+    },
+    {
+        "id": "name_asker",
+        "name": "Name Asker",
+        "patterns": "/name, myname, whoami",
+        "description": "Ask user for their name and remember it",
+        "code": "const userName = User.getData('user_name');\n\nif (userName) {\n    Api.sendMessage(`👋 Hello ${userName}! I remember you. Your name is saved.`);\n} else {\n    Api.sendMessage(`🤔 What's your name?`);\n    User.saveData('asking_name', 'true');\n}",
+        "waitForAnswer": true,
+        "answerHandler": "if (User.getData('asking_name') === 'true') {\n    const userName = params;\n    \n    if (userName.length < 2) {\n        Api.sendMessage(\"Please enter a valid name (at least 2 characters):\");\n        return;\n    }\n    \n    User.saveData('user_name', userName);\n    User.saveData('asking_name', 'false');\n    \n    Api.sendMessage(`✅ Nice to meet you, ${userName}! I'll remember your name.`);\n}"
+    }
+]
