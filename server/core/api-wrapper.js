@@ -1,3 +1,4 @@
+// server/core/api-wrapper.js - COMPLETELY FIXED VERSION
 class ApiWrapper {
     constructor(bot, context) {
         this.bot = bot;
@@ -28,12 +29,12 @@ class ApiWrapper {
             'exportChatInviteLink', 'createChatInviteLink', 'editChatInviteLink',
             'revokeChatInviteLink', 'approveChatJoinRequest', 'declineChatJoinRequest',
             'setChatAdministratorCustomTitle', 'banChatMember', 'unbanChatMember',
-            'restrictChatMember', 'promoteChatMember', 'setChatAdministratorCustomTitle',
+            'restrictChatMember', 'promoteChatMember',
             'banChatSenderChat', 'unbanChatSenderChat', 'setChatStickerSet',
             'deleteChatStickerSet',
 
             // === CHAT MANAGEMENT ===
-            'getChatMenuButton', 'setChatMenuButton', 'getChatMember',
+            'getChatMenuButton', 'setChatMenuButton',
             'leaveChat', 'pinChatMessage', 'unpinChatMessage', 'unpinAllChatMessages',
 
             // === STICKER METHODS ===
@@ -69,17 +70,23 @@ class ApiWrapper {
             'getFile', 'downloadFile'
         ];
 
-        // Bind all methods to this instance
+        // Bind all methods to this instance with FIXED chatId handling
         allMethods.forEach(method => {
             if (this.bot[method]) {
                 this[method] = async (...args) => {
                     try {
-                        // Auto-fill chatId for methods that need it
-                        if (this.needsChatId(method) && (args.length === 0 || typeof args[0] !== 'object')) {
-                            args.unshift(this.context.chatId);
+                        // ✅ FIXED: Smart chatId handling
+                        let finalArgs = [...args];
+                        
+                        if (this.needsChatId(method)) {
+                            // If first arg is NOT a number (chatId), then auto-add current chatId
+                            if (finalArgs.length === 0 || typeof finalArgs[0] !== 'number') {
+                                finalArgs.unshift(this.context.chatId);
+                            }
+                            // If first arg IS a number (chatId), use it directly
                         }
                         
-                        const result = await this.bot[method](...args);
+                        const result = await this.bot[method](...finalArgs);
                         console.log(`✅ API ${method} executed successfully`);
                         return result;
                     } catch (error) {
@@ -96,6 +103,7 @@ class ApiWrapper {
         this.setupEnhancedMethods();
     }
 
+    // ✅ FIXED: needsChatId method
     needsChatId(method) {
         const chatIdMethods = [
             'sendMessage', 'sendPhoto', 'sendDocument', 'sendVideo', 'sendAudio',
@@ -107,7 +115,7 @@ class ApiWrapper {
             'setChatPhoto', 'deleteChatPhoto', 'setChatPermissions', 'banChatMember',
             'unbanChatMember', 'restrictChatMember', 'promoteChatMember', 'setChatStickerSet',
             'deleteChatStickerSet', 'createForumTopic', 'editForumTopic', 'closeForumTopic',
-            'reopenForumTopic', 'deleteForumTopic'
+            'reopenForumTopic', 'deleteForumTopic', 'sendSticker'
         ];
         return chatIdMethods.includes(method);
     }
@@ -228,7 +236,7 @@ class ApiWrapper {
         // Utility methods
         this.wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-        // ✅ FIXED: Wait for answer with timeout - SIMPLIFIED VERSION
+        // ✅ FIXED: Wait for answer with timeout - IMPROVED VERSION
         this.waitForAnswer = (question, options = {}) => {
             return new Promise(async (resolve, reject) => {
                 // Validate context
