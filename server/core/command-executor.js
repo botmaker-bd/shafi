@@ -1,4 +1,4 @@
-// server/core/command-executor.js - COMPLETELY FIXED WITH ASYNC/AWAIT
+// server/core/command-executor.js - COMPLETELY FIXED
 async function executeCommandCode(botInstance, code, context) {
     return new Promise(async (resolve, reject) => {
         try {
@@ -11,11 +11,9 @@ async function executeCommandCode(botInstance, code, context) {
             }
             if (!resolvedBotToken) {
                 console.error('❌ CRITICAL: botToken is undefined! Using fallback...');
-                // Try to extract from botInstance if possible
                 try {
                     const botInfo = await botInstance.getMe();
                     resolvedBotToken = botInfo.token || 'fallback_token';
-                    console.log(`🔧 Using fallback token: ${resolvedBotToken.substring(0, 10)}...`);
                 } catch (e) {
                     resolvedBotToken = 'fallback_token';
                 }
@@ -37,117 +35,14 @@ async function executeCommandCode(botInstance, code, context) {
                 language_code: context.language_code || '',
                 botToken: resolvedBotToken,
                 userInput: userInput,
-                nextCommandHandlers: nextCommandHandlers || new Map(),
-                User: context.User || {},
-                Bot: context.Bot || {}
+                nextCommandHandlers: nextCommandHandlers || new Map()
             };
             
             // Create ApiWrapper instance
             const apiWrapperInstance = new ApiWrapper(botInstance, apiContext);
             
-            // Parse parameters
-            const parseParams = (input) => {
-                if (!input) return [];
-                const parts = input.split(' ').slice(1);
-                return parts.filter(param => param.trim() !== '');
-            };
-
-            const params = parseParams(userInput);
-            const message = userInput;
-
-// ✅ FIXED: PYTHON RUNNER
-const pythonRunner = require('./python-runner');
-
-// ✅ FIXED: BETTER PYTHON FUNCTION
-const runPythonSync = (pythonCode) => {
-    try {
-        console.log('🐍 Running Python code...');
-        
-        if (!pythonCode || pythonCode.trim() === '') {
-            throw new Error('Python code is empty');
-        }
-        
-        const result = pythonRunner.runPythonCodeSync(pythonCode);
-        console.log('✅ Python execution completed');
-        return result;
-        
-    } catch (error) {
-        console.error('❌ Python execution failed:', error);
-        
-        // Return clean error message
-        let errorMessage = error.message;
-        if (errorMessage.includes('IndentationError')) {
-            errorMessage = 'Python indentation error';
-        } else if (errorMessage.includes('SyntaxError')) {
-            errorMessage = 'Python syntax error';
-        } else if (errorMessage.includes('NameError')) {
-            errorMessage = 'Python variable error';
-        }
-        
-        throw new Error(`Python Error: ${errorMessage}`);
-    }
-};
-
-            // ✅ FIXED: PROPER ASYNC WAIT FOR ANSWER
-            const waitForAnswer = async (question, options = {}) => {
-                return new Promise((resolve, reject) => {
-                    try {
-                        console.log(`⏳ Setting up waitForAnswer for user ${userId}, bot: ${resolvedBotToken.substring(0, 10)}...`);
-                        
-                        // Create unique key for this waiting answer
-                        const waitKey = `${resolvedBotToken}_${userId}`;
-                        
-                        console.log(`🔑 Wait key created: ${waitKey}`);
-                        console.log(`📊 nextCommandHandlers available: ${!!nextCommandHandlers}`);
-                        
-                        // First send the question
-                        botInstance.sendMessage(chatId, question, options)
-                            .then(() => {
-                                // Store the resolver in nextCommandHandlers
-                                if (nextCommandHandlers) {
-                                    nextCommandHandlers.set(waitKey, {
-                                        resolve: resolve,
-                                        reject: reject,
-                                        timestamp: Date.now(),
-                                        botToken: resolvedBotToken,
-                                        userId: userId,
-                                        question: question
-                                    });
-                                    
-                                    console.log(`✅ WaitForAnswer handler stored for ${waitKey}`);
-                                    console.log(`📋 Total handlers: ${nextCommandHandlers.size}`);
-                                    
-                                    // Set timeout to clean up (5 minutes)
-                                    setTimeout(() => {
-                                        if (nextCommandHandlers && nextCommandHandlers.has(waitKey)) {
-                                            const handler = nextCommandHandlers.get(waitKey);
-                                            if (handler && handler.reject) {
-                                                handler.reject(new Error('Wait for answer timeout (5 minutes)'));
-                                            }
-                                            nextCommandHandlers.delete(waitKey);
-                                            console.log(`⏰ WaitForAnswer timeout for ${waitKey}`);
-                                        }
-                                    }, 5 * 60 * 1000);
-                                    
-                                } else {
-                                    reject(new Error('nextCommandHandlers not available'));
-                                }
-                            })
-                            .catch(sendError => {
-                                console.error('❌ Failed to send waitForAnswer question:', sendError);
-                                reject(new Error('Failed to send question: ' + sendError.message));
-                            });
-                            
-                    } catch (error) {
-                        console.error('❌ WaitForAnswer setup error:', error);
-                        reject(new Error('WaitForAnswer setup failed: ' + error.message));
-                    }
-                });
-            };
-
-            // ✅ REAL AUTOMATIC: USE TELEGRAM'S ORIGINAL OBJECTS
+            // ✅ FIXED: Create unique variable names to avoid conflicts
             const createUserObject = () => {
-                // ✅ Directly use Telegram's original user object with all fields
                 const userObj = msg.from ? Object.assign({}, msg.from) : {
                     id: userId,
                     first_name: first_name || '',
@@ -155,127 +50,101 @@ const runPythonSync = (pythonCode) => {
                     language_code: context.language_code || ''
                 };
                 
-                // ✅ Add chat_id for convenience
                 userObj.chat_id = chatId;
-                
-                // ✅ AUTO JSON conversion - NO MANUAL STRUCTURE
-                userObj[Symbol.toPrimitive] = function(hint) {
-                    if (hint === 'string' || hint === 'default') {
-                        return JSON.stringify(this, null, 2);
-                    }
-                    return null;
-                };
-                
-                // ✅ Add useful helper properties
-                Object.defineProperty(userObj, 'string', {
-                    get: function() {
-                        if (this.first_name && this.last_name) {
-                            return `${this.first_name} ${this.last_name}`;
-                        } else if (this.first_name) {
-                            return this.first_name;
-                        } else if (this.username) {
-                            return `@${this.username}`;
-                        } else {
-                            return `User${this.id}`;
-                        }
-                    }
-                });
-                
-                Object.defineProperty(userObj, 'jsonobject', {
-                    get: function() {
-                        return Object.assign({}, this);
-                    }
-                });
-                
                 return userObj;
             };
 
-            // ✅ REAL AUTOMATIC: USE TELEGRAM'S ORIGINAL CHAT OBJECT
             const createChatObject = () => {
-                // ✅ Directly use Telegram's original chat object with all fields
                 const chatObj = msg.chat ? Object.assign({}, msg.chat) : {
                     id: chatId,
                     type: 'private'
                 };
-                
-                // ✅ AUTO JSON conversion - NO MANUAL STRUCTURE
-                chatObj[Symbol.toPrimitive] = function(hint) {
-                    if (hint === 'string' || hint === 'default') {
-                        return JSON.stringify(this, null, 2);
-                    }
-                    return null;
-                };
-                
-                // ✅ Add useful helper properties
-                Object.defineProperty(chatObj, 'string', {
-                    get: function() {
-                        return this.title || this.first_name || `Chat${this.id}`;
-                    }
-                });
-                
-                Object.defineProperty(chatObj, 'jsonobject', {
-                    get: function() {
-                        return Object.assign({}, this);
-                    }
-                });
-                
-                Object.defineProperty(chatObj, 'is_private', {
-                    get: function() {
-                        return this.type === 'private';
-                    }
-                });
-                
-                Object.defineProperty(chatObj, 'is_group', {
-                    get: function() {
-                        return this.type === 'group' || this.type === 'supergroup';
-                    }
-                });
-                
-                Object.defineProperty(chatObj, 'is_channel', {
-                    get: function() {
-                        return this.type === 'channel';
-                    }
-                });
-                
                 return chatObj;
             };
 
-            // Create execution environment
+            // ✅ FIXED: Python runner
+            const pythonRunner = require('./python-runner');
+            const runPythonSync = (pythonCode) => {
+                try {
+                    return pythonRunner.runPythonCodeSync(pythonCode);
+                } catch (error) {
+                    throw new Error(`Python Error: ${error.message}`);
+                }
+            };
+
+            // ✅ FIXED: Wait for answer function
+            const waitForAnswer = async (question, options = {}) => {
+                return new Promise((resolve, reject) => {
+                    try {
+                        const waitKey = `${resolvedBotToken}_${userId}`;
+                        console.log(`⏳ Setting up waitForAnswer for user ${userId}`);
+                        
+                        // Send question first
+                        botInstance.sendMessage(chatId, question, options)
+                            .then(() => {
+                                if (nextCommandHandlers) {
+                                    nextCommandHandlers.set(waitKey, {
+                                        resolve: resolve,
+                                        reject: reject,
+                                        timestamp: Date.now()
+                                    });
+                                    
+                                    // Timeout cleanup
+                                    setTimeout(() => {
+                                        if (nextCommandHandlers.has(waitKey)) {
+                                            const handler = nextCommandHandlers.get(waitKey);
+                                            if (handler && handler.reject) {
+                                                handler.reject(new Error('Wait for answer timeout (5 minutes)'));
+                                            }
+                                            nextCommandHandlers.delete(waitKey);
+                                        }
+                                    }, 5 * 60 * 1000);
+                                }
+                            })
+                            .catch(sendError => {
+                                reject(new Error('Failed to send question: ' + sendError.message));
+                            });
+                    } catch (error) {
+                        reject(new Error('WaitForAnswer setup failed: ' + error.message));
+                    }
+                });
+            };
+
+            // ✅ FIXED: Create execution environment with UNIQUE variable names
             const executionEnv = {
-                // === BOT INSTANCES ===
+                // === BOT INSTANCES (All supported) ===
                 bot: apiWrapperInstance,
                 Api: apiWrapperInstance,
                 
-                // ✅ FIXED: Bot object with ASYNC methods
+                // ✅ FIXED: Bot object with all methods
                 Bot: {
                     ...apiWrapperInstance,
                     runPython: (pythonCode) => runPythonSync(pythonCode),
                     waitForAnswer: waitForAnswer,
-                    ask: waitForAnswer,
-                    // ✅ ADD async sendMessage that returns promise
-                    sendMessage: (text, options) => {
-                        return botInstance.sendMessage(chatId, text, options);
-                    }
+                    ask: waitForAnswer
                 },
                 
-                // === USER INFORMATION ===
+                // === USER INFORMATION (Multiple access methods) ===
                 getUser: createUserObject,
+                getCurrentUser: createUserObject, // Alternative method
+                userData: createUserObject(), // Direct object
                 
                 // === CHAT INFORMATION ===
                 getChat: createChatObject,
-                chat: createChatObject(),
+                chatData: createChatObject(),
+                getCurrentChat: createChatObject,
                 
                 // === MESSAGE & PARAMS ===
                 msg: msg,
                 chatId: chatId,
                 userId: userId,
                 userInput: userInput,
-                params: params,
-                message: message,
+                params: userInput ? userInput.split(' ').slice(1).filter(p => p.trim() !== '') : [],
+                message: userInput,
                 botToken: resolvedBotToken,
                 
                 // === DATA STORAGE ===
-                User: context.User || {
+                User: {
                     saveData: async (key, value) => {
                         try {
                             const supabase = require('../config/supabase');
@@ -324,7 +193,7 @@ const runPythonSync = (pythonCode) => {
                     }
                 },
                 
-                BotData: context.Bot || {
+                BotData: {
                     saveData: async (key, value) => {
                         try {
                             const supabase = require('../config/supabase');
@@ -380,7 +249,7 @@ const runPythonSync = (pythonCode) => {
                 ask: waitForAnswer
             };
 
-            // Direct function shortcuts
+            // ✅ FIXED: Direct function shortcuts (NO VARIABLE CONFLICTS)
             const directFunctions = {
                 sendMessage: (text, options) => {
                     return botInstance.sendMessage(chatId, text, options);
@@ -400,37 +269,39 @@ const runPythonSync = (pythonCode) => {
                 sendDocument: (doc, options) => {
                     return botInstance.sendDocument(chatId, doc, options);
                 },
-                getUser: createUserObject,
-                getChat: createChatObject,
-                wait: (ms) => executionEnv.wait(ms),
-                runPython: (code) => executionEnv.runPython(code),
-                waitForAnswer: waitForAnswer,
-                ask: waitForAnswer
+                getCurrentUser: createUserObject,
+                getCurrentChat: createChatObject,
+                delay: (ms) => executionEnv.wait(ms),
+                executePython: (code) => executionEnv.runPython(code)
             };
 
-            // Merge all functions
+            // ✅ FIXED: Merge all functions with unique names
             const finalContext = {
                 ...executionEnv,
-                ...directFunctions
+                ...directFunctions,
+                // ✅ ADD unique user variable that won't conflict
+                currentUser: createUserObject(),
+                currentChat: createChatObject()
             };
 
-            // ✅ FIXED: Create ASYNC execution function with proper await handling
+            // ✅ FIXED: Create ASYNC execution function with PROPER variable handling
             const executionFunction = new Function(
-                'getUser', 'getChat', 'chat', 'sendMessage', 'bot', 'Api', 'Bot', 'params', 'message', 'User', 'BotData', 'wait', 'runPython', 'waitForAnswer', 'ask',
+                // ✅ UNIQUE parameter names to avoid conflicts
+                'getUser', 'getCurrentUser', 'userData', 'currentUser', 
+                'getChat', 'getCurrentChat', 'chatData', 'currentChat',
+                'sendMessage', 'send', 'reply', 'bot', 'Api', 'Bot', 
+                'params', 'message', 'User', 'BotData', 'wait', 'delay',
+                'runPython', 'executePython', 'waitForAnswer', 'ask',
                 `return (async function() {
                     try {
+                        // ✅ User can use ANY of these without conflicts
                         var user = getUser();
-                        var chat = getChat();
-                        console.log('✅ Execution started for user:', user.first_name);
-                        console.log('📝 User input:', message);
-                        console.log('📋 Parameters:', params);
-                        console.log('🤖 Bot.runPython available:', typeof Bot.runPython);
-                        console.log('🐍 runPython available:', typeof runPython);
-                        console.log('⏳ waitForAnswer available:', typeof waitForAnswer);
-                        console.log('❓ ask available:', typeof ask);
-                        console.log('🔑 botToken available:', typeof botToken);
+                        var currentUser = getCurrentUser();
+                        var userInfo = userData;
                         
-                        // User's code starts here - WITH ASYNC/AWAIT SUPPORT
+                        console.log('✅ Execution started for user:', user.first_name);
+                        
+                        // User's code starts here - NO VARIABLE CONFLICTS
                         ${code}
                         // User's code ends here
                         
@@ -451,9 +322,16 @@ const runPythonSync = (pythonCode) => {
             console.log('🚀 Executing command...');
             const result = await executionFunction(
                 finalContext.getUser,
+                finalContext.getCurrentUser,
+                finalContext.userData,
+                finalContext.currentUser,
                 finalContext.getChat,
-                finalContext.chat,
+                finalContext.getCurrentChat,
+                finalContext.chatData,
+                finalContext.currentChat,
                 finalContext.sendMessage,
+                finalContext.send,
+                finalContext.reply,
                 finalContext.bot,
                 finalContext.Api,
                 finalContext.Bot,
@@ -462,7 +340,9 @@ const runPythonSync = (pythonCode) => {
                 finalContext.User,
                 finalContext.BotData,
                 finalContext.wait,
+                finalContext.delay,
                 finalContext.runPython,
+                finalContext.executePython,
                 finalContext.waitForAnswer,
                 finalContext.ask
             );
