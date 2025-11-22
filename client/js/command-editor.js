@@ -65,22 +65,16 @@ class CommandEditor {
     }
 
     setupNavigationEvents() {
-        const backToBots = document.getElementById('backToBots');
-        if (backToBots) {
-            backToBots.addEventListener('click', () => {
-                if (this.isModified && !confirm('You have unsaved changes. Are you sure you want to leave?')) {
-                    return;
-                }
-                window.location.href = 'bot-management.html';
-            });
-        }
+        document.getElementById('backToBots').addEventListener('click', () => {
+            if (this.isModified && !confirm('You have unsaved changes. Are you sure you want to leave?')) {
+                return;
+            }
+            window.location.href = 'bot-management.html';
+        });
 
-        const quickTest = document.getElementById('quickTest');
-        if (quickTest) {
-            quickTest.addEventListener('click', () => {
-                this.quickTest();
-            });
-        }
+        document.getElementById('quickTest').addEventListener('click', () => {
+            this.quickTest();
+        });
     }
 
     setupCommandEvents() {
@@ -95,12 +89,9 @@ class CommandEditor {
             }
         });
 
-        const refreshBtn = document.getElementById('refreshCommandsBtn');
-        if (refreshBtn) {
-            refreshBtn.addEventListener('click', () => {
-                this.loadCommands();
-            });
-        }
+        document.getElementById('refreshCommandsBtn').addEventListener('click', () => {
+            this.loadCommands();
+        });
     }
 
     setupFormEvents() {
@@ -145,12 +136,9 @@ class CommandEditor {
         });
 
         // Delete action
-        const deleteBtn = document.getElementById('deleteCommandBtn');
-        if (deleteBtn) {
-            deleteBtn.addEventListener('click', () => {
-                this.deleteCommand();
-            });
-        }
+        document.getElementById('deleteCommandBtn').addEventListener('click', () => {
+            this.deleteCommand();
+        });
 
         // Form input changes
         const formInputs = ['commandCode', 'answerHandler', 'moreCommands'];
@@ -188,19 +176,13 @@ class CommandEditor {
         }
 
         // Clear buttons
-        const clearPatternsBtn = document.getElementById('clearPatternsBtn');
-        if (clearPatternsBtn) {
-            clearPatternsBtn.addEventListener('click', () => {
-                this.clearCommandPatterns();
-            });
-        }
+        document.getElementById('clearPatternsBtn').addEventListener('click', () => {
+            this.clearCommandPatterns();
+        });
 
-        const clearCodeBtn = document.getElementById('clearCodeBtn');
-        if (clearCodeBtn) {
-            clearCodeBtn.addEventListener('click', () => {
-                this.clearCommandCode();
-            });
-        }
+        document.getElementById('clearCodeBtn').addEventListener('click', () => {
+            this.clearCommandCode();
+        });
 
         // ✅ FIXED: Snippet button - এখন টেমপ্লেট থেকে লোড হবে
         const insertSnippetBtn = document.getElementById('insertSnippetBtn');
@@ -211,27 +193,18 @@ class CommandEditor {
         }
 
         // Templates
-        const showTemplatesBtn = document.getElementById('showTemplates');
-        if (showTemplatesBtn) {
-            showTemplatesBtn.addEventListener('click', () => {
-                this.showTemplates();
-            });
-        }
+        document.getElementById('showTemplates').addEventListener('click', () => {
+            this.showTemplates();
+        });
 
         // ✅ FIXED: Full editor buttons
-        const openEditorBtn = document.getElementById('openEditor');
-        if (openEditorBtn) {
-            openEditorBtn.addEventListener('click', () => {
-                this.openCodeEditor('main');
-            });
-        }
+        document.getElementById('openEditor').addEventListener('click', () => {
+            this.openCodeEditor('main');
+        });
 
-        const openAnswerEditorBtn = document.getElementById('openAnswerEditor');
-        if (openAnswerEditorBtn) {
-            openAnswerEditorBtn.addEventListener('click', () => {
-                this.openCodeEditor('answer');
-            });
-        }
+        document.getElementById('openAnswerEditor').addEventListener('click', () => {
+            this.openCodeEditor('answer');
+        });
     }
 
     setupModalEvents() {
@@ -328,8 +301,6 @@ class CommandEditor {
 
     setupToolbarButtons() {
         const editor = document.getElementById('advancedCodeEditor');
-        if (!editor) return;
-
         const toolbarButtons = {
             'undoBtn': () => document.execCommand('undo'),
             'redoBtn': () => document.execCommand('redo'),
@@ -467,86 +438,36 @@ class CommandEditor {
         }
     }
 
-addNewCommand() {
-    if (this.isModified && !confirm('You have unsaved changes. Create new command?')) {
-        return;
-    }
-
-    // ✅ FIXED: Use unique default pattern
-    let defaultPattern = '/mycommand';
-    let counter = 1;
-    
-    // Find a unique pattern
-    while (this.commands.some(cmd => 
-        cmd.command_patterns.split(',').map(p => p.trim()).includes(defaultPattern)
-    )) {
-        defaultPattern = `/mycommand${counter}`;
-        counter++;
-    }
-
-    this.currentCommand = {
-        id: 'new',
-        command_patterns: defaultPattern,
-        code: '// Write your command code here\nApi.sendMessage(`Hello ${user.first_name}! Welcome to our bot.`);',
-        is_active: true,
-        wait_for_answer: false,
-        answer_handler: ''
-    };
-
-    this.showCommandEditor();
-    this.populateCommandForm();
-    this.setModified(false);
-    
-    // Update UI selection
-    document.querySelectorAll('.command-item').forEach(item => {
-        item.classList.remove('active');
-    });
-    
-    setTimeout(() => {
-        const moreCommandsInput = document.getElementById('moreCommands');
-        if (moreCommandsInput) {
-            moreCommandsInput.focus();
-            moreCommandsInput.select();
+    addNewCommand() {
+        if (this.isModified && !confirm('You have unsaved changes. Create new command?')) {
+            return;
         }
-    }, 100);
-}
 
-// Utility function to check for duplicate patterns
+        this.currentCommand = {
+            id: 'new',
+            command_patterns: '/start',
+            code: '// Write your command code here\nconst user = getUser();\nApi.sendMessage(`Hello ${user.first_name}! Welcome to our bot.`);',
+            is_active: true,
+            wait_for_answer: false,
+            answer_handler: ''
+        };
 
-// Update command tags with visual warnings
-addCommandTag(command) {
-    if (!command || this.commandExistsInTags(command)) return;
-
-    const commandsTags = document.getElementById('commandsTags');
-    if (!commandsTags) return;
-
-    // Check for duplicates
-    const isDuplicate = this.commands.some(cmd => 
-        cmd.id !== this.currentCommand?.id && 
-        cmd.command_patterns.split(',').map(p => p.trim()).includes(command)
-    );
-
-    const tag = document.createElement('div');
-    tag.className = `command-tag ${isDuplicate ? 'duplicate' : ''}`;
-    tag.innerHTML = `
-        <span class="tag-text">${this.escapeHtml(command)}</span>
-        ${isDuplicate ? '<span class="duplicate-warning" title="This pattern already exists in another command">⚠️</span>' : ''}
-        <button type="button" class="remove-tag">
-            <i class="fas fa-times"></i>
-        </button>
-    `;
-    
-    tag.querySelector('.remove-tag').addEventListener('click', () => {
-        tag.remove();
-        this.setModified(true);
-    });
-    
-    commandsTags.appendChild(tag);
-    
-    if (isDuplicate) {
-        this.showError(`Warning: Pattern "${command}" already exists in another command`);
+        this.showCommandEditor();
+        this.populateCommandForm();
+        this.setModified(false);
+        
+        // Update UI selection
+        document.querySelectorAll('.command-item').forEach(item => {
+            item.classList.remove('active');
+        });
+        
+        setTimeout(() => {
+            const moreCommandsInput = document.getElementById('moreCommands');
+            if (moreCommandsInput) {
+                moreCommandsInput.focus();
+            }
+        }, 100);
     }
-}
 
     async selectCommand(commandId) {
         if (this.currentCommand?.id === commandId) return;
@@ -669,42 +590,71 @@ addCommandTag(command) {
     }
 
     // Command Tags Management
-// Command Tags Management - IMPROVED
-setupCommandsTags() {
-    const moreCommandsInput = document.getElementById('moreCommands');
-    const commandsTags = document.getElementById('commandsTags');
+    setupCommandsTags() {
+        const moreCommandsInput = document.getElementById('moreCommands');
+        const commandsTags = document.getElementById('commandsTags');
 
-    if (!moreCommandsInput || !commandsTags) return;
+        if (!moreCommandsInput || !commandsTags) return;
 
-    moreCommandsInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ',') {
-            e.preventDefault();
+        moreCommandsInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ',') {
+                e.preventDefault();
+                const command = moreCommandsInput.value.trim();
+                if (command) {
+                    this.addCommandTag(command);
+                    moreCommandsInput.value = '';
+                    this.setModified(true);
+                }
+            }
+        });
+
+        moreCommandsInput.addEventListener('blur', () => {
             const command = moreCommandsInput.value.trim();
             if (command) {
-                // ✅ FIXED: Check for duplicates before adding
-                if (this.commandExistsInTags(command)) {
-                    this.showError(`Pattern "${command}" is already added`);
-                    return;
-                }
-                
-                // ✅ FIXED: Check if pattern exists in other commands
-                const existingCommand = this.commands.find(cmd => 
-                    cmd.id !== this.currentCommand?.id && 
-                    cmd.command_patterns.split(',').map(p => p.trim()).includes(command)
-                );
-                
-                if (existingCommand) {
-                    this.showError(`Pattern "${command}" already exists in another command`);
-                    return;
-                }
-                
                 this.addCommandTag(command);
                 moreCommandsInput.value = '';
                 this.setModified(true);
             }
-        }
-    });
+        });
 
+        moreCommandsInput.addEventListener('paste', (e) => {
+            e.preventDefault();
+            const pastedText = e.clipboardData.getData('text');
+            const commands = pastedText.split(',').map(cmd => cmd.trim()).filter(cmd => cmd);
+            
+            commands.forEach(command => {
+                if (command && !this.commandExistsInTags(command)) {
+                    this.addCommandTag(command);
+                }
+            });
+            
+            moreCommandsInput.value = '';
+            this.setModified(true);
+        });
+    }
+
+    addCommandTag(command) {
+        if (!command || this.commandExistsInTags(command)) return;
+
+        const commandsTags = document.getElementById('commandsTags');
+        if (!commandsTags) return;
+
+        const tag = document.createElement('div');
+        tag.className = 'command-tag';
+        tag.innerHTML = `
+            <span class="tag-text">${this.escapeHtml(command)}</span>
+            <button type="button" class="remove-tag">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        
+        tag.querySelector('.remove-tag').addEventListener('click', () => {
+            tag.remove();
+            this.setModified(true);
+        });
+        
+        commandsTags.appendChild(tag);
+    }
 
     commandExistsInTags(command) {
         const tags = Array.from(document.querySelectorAll('.command-tag .tag-text'));
@@ -782,167 +732,117 @@ setupCommandsTags() {
     }
 
     // Save Command with Validation
-    async saveCommand() {// Save Command with Validation - FIXED DUPLICATE CHECK
-async saveCommand() {
-    if (!this.currentCommand || !this.currentBot) {
-        this.showError('No command selected or bot not loaded');
-        return false;
-    }
-
-    const commands = this.getCommandsFromTags();
-    
-    if (commands.length === 0) {
-        this.showError('Please add at least one command pattern');
-        const moreCommandsInput = document.getElementById('moreCommands');
-        if (moreCommandsInput) moreCommandsInput.focus();
-        return false;
-    }
-
-    const commandCodeEl = document.getElementById('commandCode');
-    const commandCode = commandCodeEl ? commandCodeEl.value.trim() : '';
-
-    if (!commandCode) {
-        this.showError('Command code is required');
-        if (commandCodeEl) commandCodeEl.focus();
-        return false;
-    }
-
-    const waitForAnswerEl = document.getElementById('waitForAnswer');
-    const answerHandlerEl = document.getElementById('answerHandler');
-    
-    const waitForAnswer = waitForAnswerEl ? waitForAnswerEl.checked : false;
-    const answerHandler = waitForAnswer && answerHandlerEl ? answerHandlerEl.value.trim() : '';
-
-    // ✅ NEW: Client-side validation
-    if (waitForAnswer && !answerHandler) {
-        this.showError('Answer handler code is required when "Wait for Answer" is enabled');
-        if (answerHandlerEl) {
-            answerHandlerEl.focus();
-            // Show the answer handler section if hidden
-            const answerSection = document.getElementById('answerHandlerSection');
-            if (answerSection) answerSection.style.display = 'block';
-        }
-        return false;
-    }
-
-    // ✅ FIXED: Client-side duplicate check before sending to server
-    if (this.currentCommand.id === 'new') {
-        // For new commands, check if any pattern already exists in current bot
-        const duplicatePatterns = [];
-        
-        for (const pattern of commands) {
-            const existingCommand = this.commands.find(cmd => 
-                cmd.command_patterns.split(',').map(p => p.trim()).includes(pattern)
-            );
-            
-            if (existingCommand) {
-                duplicatePatterns.push(pattern);
-            }
-        }
-        
-        if (duplicatePatterns.length > 0) {
-            this.showError(`Command pattern "${duplicatePatterns[0]}" already exists in another command. Please use a different pattern.`);
+    async saveCommand() {
+        if (!this.currentCommand || !this.currentBot) {
+            this.showError('No command selected or bot not loaded');
             return false;
         }
-    } else {
-        // For existing commands, check duplicates excluding current command
-        const duplicatePatterns = [];
+
+        const commands = this.getCommandsFromTags();
         
-        for (const pattern of commands) {
-            const existingCommand = this.commands.find(cmd => 
-                cmd.id !== this.currentCommand.id && 
-                cmd.command_patterns.split(',').map(p => p.trim()).includes(pattern)
-            );
-            
-            if (existingCommand) {
-                duplicatePatterns.push(pattern);
-            }
-        }
-        
-        if (duplicatePatterns.length > 0) {
-            this.showError(`Command pattern "${duplicatePatterns[0]}" already exists in another command. Please use a different pattern.`);
+        if (commands.length === 0) {
+            this.showError('Please add at least one command pattern');
+            const moreCommandsInput = document.getElementById('moreCommands');
+            if (moreCommandsInput) moreCommandsInput.focus();
             return false;
         }
-    }
 
-    const formData = {
-        commandPatterns: commands.join(','),
-        code: commandCode,
-        waitForAnswer: waitForAnswer,
-        answerHandler: answerHandler,
-        botToken: this.currentBot.token
-    };
+        const commandCodeEl = document.getElementById('commandCode');
+        const commandCode = commandCodeEl ? commandCodeEl.value.trim() : '';
 
-    this.showLoading(true);
-
-    try {
-        const token = localStorage.getItem('token');
-        let response;
-        let url;
-        let method;
-
-        if (this.currentCommand.id === 'new') {
-            url = '/api/commands';
-            method = 'POST';
-        } else {
-            url = `/api/commands/${this.currentCommand.id}`;
-            method = 'PUT';
+        if (!commandCode) {
+            this.showError('Command code is required');
+            if (commandCodeEl) commandCodeEl.focus();
+            return false;
         }
 
-        console.log(`🔄 Saving command: ${method} ${url}`, formData);
+        const waitForAnswerEl = document.getElementById('waitForAnswer');
+        const answerHandlerEl = document.getElementById('answerHandler');
         
-        response = await fetch(url, {
-            method: method,
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(formData)
-        });
+        const waitForAnswer = waitForAnswerEl ? waitForAnswerEl.checked : false;
+        const answerHandler = waitForAnswer && answerHandlerEl ? answerHandlerEl.value.trim() : '';
 
-        const data = await response.json();
-        console.log('📦 Save command response:', data);
+        // ✅ NEW: Client-side validation
+        if (waitForAnswer && !answerHandler) {
+            this.showError('Answer handler code is required when "Wait for Answer" is enabled');
+            if (answerHandlerEl) {
+                answerHandlerEl.focus();
+                // Show the answer handler section if hidden
+                const answerSection = document.getElementById('answerHandlerSection');
+                if (answerSection) answerSection.style.display = 'block';
+            }
+            return false;
+        }
 
-        if (response.ok) {
-            this.showSuccess('Command saved successfully!');
+        const formData = {
+            commandPatterns: commands.join(','),
+            code: commandCode,
+            waitForAnswer: waitForAnswer,
+            answerHandler: answerHandler,
+            botToken: this.currentBot.token
+        };
+
+        this.showLoading(true);
+
+        try {
+            const token = localStorage.getItem('token');
+            let response;
+            let url;
+            let method;
+
+            if (this.currentCommand.id === 'new') {
+                url = '/api/commands';
+                method = 'POST';
+            } else {
+                url = `/api/commands/${this.currentCommand.id}`;
+                method = 'PUT';
+            }
+
+            console.log(`🔄 Saving command: ${method} ${url}`, formData);
             
-            await this.loadCommands();
-            
-            if (data.command) {
-                this.currentCommand = data.command;
-                this.populateCommandForm();
+            response = await fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const data = await response.json();
+            console.log('📦 Save command response:', data);
+
+            if (response.ok) {
+                this.showSuccess('Command saved successfully!');
                 
-                // Auto-select the saved command
-                setTimeout(() => {
-                    const commandItem = document.querySelector(`[data-command-id="${this.currentCommand.id}"]`);
-                    if (commandItem) {
-                        commandItem.click();
-                    }
-                }, 500);
-            }
-            
-            this.setModified(false);
-            return true;
-        } else {
-            // ✅ FIXED: Better error handling for duplicate patterns
-            if (data.error && data.error.includes('already exists')) {
-                // Extract the duplicate pattern from error message
-                const patternMatch = data.error.match(/"(.*?)"/);
-                const duplicatePattern = patternMatch ? patternMatch[1] : 'the pattern';
-                this.showError(`Command pattern "${duplicatePattern}" already exists. Please use a different pattern.`);
+                await this.loadCommands();
+                
+                if (data.command) {
+                    this.currentCommand = data.command;
+                    this.populateCommandForm();
+                    
+                    // Auto-select the saved command
+                    setTimeout(() => {
+                        const commandItem = document.querySelector(`[data-command-id="${this.currentCommand.id}"]`);
+                        if (commandItem) {
+                            commandItem.click();
+                        }
+                    }, 500);
+                }
+                
+                this.setModified(false);
+                return true;
             } else {
                 throw new Error(data.error || 'Failed to save command');
             }
+        } catch (error) {
+            console.error('❌ Save command error:', error);
+            this.showError('Failed to save command: ' + error.message);
             return false;
+        } finally {
+            this.showLoading(false);
         }
-    } catch (error) {
-        console.error('❌ Save command error:', error);
-        this.showError('Failed to save command: ' + error.message);
-        return false;
-    } finally {
-        this.showLoading(false);
     }
-}
 
     async toggleCommand() {
         if (!this.currentCommand || this.currentCommand.id === 'new') {
@@ -1215,7 +1115,7 @@ async saveCommand() {
                                 name: template.name,
                                 code: template.code,
                                 description: template.description || 'No description available',
-                                category: 'Templates'
+                                category: template.category || 'General'
                             });
                         }
                     });
@@ -1261,6 +1161,18 @@ async saveCommand() {
                 code: 'const buttons = [\n  { text: "Button 1", callback_data: "btn1" },\n  { text: "Button 2", callback_data: "btn2" }\n];\nApi.sendMessage("Choose an option:", { inline_keyboard: [buttons] });',
                 description: 'Send message with inline buttons',
                 category: 'Buttons'
+            },
+            {
+                name: 'Save User Data',
+                code: 'const user = getUser();\nUser.saveData("last_command", "/start");\nApi.sendMessage("Your data has been saved!");',
+                description: 'Save user data to database',
+                category: 'Data'
+            },
+            {
+                name: 'HTTP Request',
+                code: 'try {\n  const response = await HTTP.get("https://api.example.com/data");\n  Api.sendMessage(`Data: ${response.data}`);\n} catch (error) {\n  Api.sendMessage("Error fetching data");\n}',
+                description: 'Make HTTP GET request',
+                category: 'HTTP'
             }
         ];
 
@@ -1274,39 +1186,49 @@ async saveCommand() {
             existingModal.remove();
         }
 
-        // Create modal HTML - COMPACT AND BEAUTIFUL DESIGN
+        // Group snippets by category
+        const snippetsByCategory = {};
+        snippets.forEach(snippet => {
+            const category = snippet.category || 'General';
+            if (!snippetsByCategory[category]) {
+                snippetsByCategory[category] = [];
+            }
+            snippetsByCategory[category].push(snippet);
+        });
+
+        // Create modal HTML
         const snippetsHTML = `
             <div class="snippets-modal">
                 <div class="snippets-header">
-                    <h3><i class="fas fa-code"></i> Code Snippets</h3>
-                    <div class="snippets-controls">
-                        <span class="snippets-count">${snippets.length} snippets</span>
-                        <button class="snippets-close">&times;</button>
-                    </div>
+                    <h3>Code Snippets</h3>
+                    <span class="snippets-count">${snippets.length} snippets available</span>
+                    <button class="snippets-close">&times;</button>
                 </div>
                 <div class="snippets-body">
-                    <div class="snippets-search">
-                        <i class="fas fa-search"></i>
-                        <input type="text" id="snippetsSearch" placeholder="Search snippets...">
-                    </div>
-                    <div class="snippets-list">
-                        ${snippets.map((snippet, index) => `
-                            <div class="snippet-item" data-index="${index}">
-                                <div class="snippet-info">
-                                    <h5 class="snippet-title">${snippet.name}</h5>
-                                    <p class="snippet-desc">${snippet.description}</p>
+                    <div class="snippets-categories">
+                        ${Object.entries(snippetsByCategory).map(([category, categorySnippets]) => `
+                            <div class="snippets-category">
+                                <h4 class="category-title">${category} (${categorySnippets.length})</h4>
+                                <div class="snippets-grid">
+                                    ${categorySnippets.map(snippet => `
+                                        <div class="snippet-card" data-code="${this.escapeHtml(snippet.code)}">
+                                            <div class="snippet-header">
+                                                <h5>${snippet.name}</h5>
+                                                <button class="btn-insert" title="Insert snippet">
+                                                    <i class="fas fa-code"></i> Insert
+                                                </button>
+                                            </div>
+                                            <p class="snippet-desc">${snippet.description}</p>
+                                            <pre class="snippet-code">${this.escapeHtml(snippet.code)}</pre>
+                                        </div>
+                                    `).join('')}
                                 </div>
-                                <button class="snippet-insert-btn" data-code="${this.escapeHtml(snippet.code)}" title="Insert snippet">
-                                    <i class="fas fa-plus"></i>
-                                </button>
                             </div>
                         `).join('')}
                     </div>
                 </div>
                 <div class="snippets-footer">
-                    <button class="btn btn-secondary btn-small" id="closeSnippets">
-                        <i class="fas fa-times"></i> Close
-                    </button>
+                    <button class="btn btn-secondary" id="closeSnippets">Close</button>
                 </div>
             </div>
         `;
@@ -1336,32 +1258,14 @@ async saveCommand() {
         });
 
         // Insert snippet functionality
-        modalOverlay.querySelectorAll('.snippet-insert-btn').forEach(btn => {
+        modalOverlay.querySelectorAll('.btn-insert').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                const code = e.target.closest('.snippet-insert-btn').dataset.code;
+                const snippetCard = e.target.closest('.snippet-card');
+                const code = snippetCard.dataset.code;
                 this.insertSnippet(code);
                 modalOverlay.remove();
             });
         });
-
-        // Search functionality
-        const searchInput = modalOverlay.querySelector('#snippetsSearch');
-        if (searchInput) {
-            searchInput.addEventListener('input', (e) => {
-                const searchTerm = e.target.value.toLowerCase();
-                const snippetItems = modalOverlay.querySelectorAll('.snippet-item');
-                
-                snippetItems.forEach(item => {
-                    const title = item.querySelector('.snippet-title').textContent.toLowerCase();
-                    const desc = item.querySelector('.snippet-desc').textContent.toLowerCase();
-                    const matches = title.includes(searchTerm) || desc.includes(searchTerm);
-                    item.style.display = matches ? 'flex' : 'none';
-                });
-            });
-            
-            // Focus on search input
-            setTimeout(() => searchInput.focus(), 100);
-        }
 
         // ESC key to close
         const handleEsc = (e) => {
@@ -1384,65 +1288,52 @@ async saveCommand() {
                     left: 0;
                     width: 100%;
                     height: 100%;
-                    background: rgba(0, 0, 0, 0.6);
+                    background: rgba(0, 0, 0, 0.7);
                     display: flex;
                     align-items: center;
                     justify-content: center;
                     z-index: 10000;
-                    padding: 1rem;
-                    backdrop-filter: blur(5px);
+                    padding: 2rem;
+                    backdrop-filter: blur(4px);
                 }
 
                 .snippets-modal {
                     background: var(--bg-primary);
                     border-radius: var(--radius-xl);
                     box-shadow: var(--shadow-xl);
+                    max-width: 900px;
                     width: 100%;
-                    max-width: 500px;
-                    max-height: 70vh;
+                    max-height: 80vh;
                     display: flex;
                     flex-direction: column;
                     border: 1px solid var(--border-color);
-                    overflow: hidden;
                 }
 
                 .snippets-header {
-                    padding: 1.25rem 1.5rem;
+                    padding: 1.5rem;
                     border-bottom: 1px solid var(--border-color);
                     display: flex;
                     align-items: center;
                     justify-content: space-between;
                     background: var(--bg-tertiary);
+                    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
                 }
 
                 .snippets-header h3 {
                     margin: 0;
                     color: var(--text-primary);
-                    font-size: 1.1rem;
-                    font-weight: 600;
-                    display: flex;
-                    align-items: center;
-                    gap: 0.5rem;
-                }
-
-                .snippets-controls {
-                    display: flex;
-                    align-items: center;
-                    gap: 1rem;
+                    font-size: 1.25rem;
                 }
 
                 .snippets-count {
                     color: var(--text-muted);
-                    font-size: 0.8rem;
-                    background: var(--bg-secondary);
-                    padding: 0.25rem 0.5rem;
-                    border-radius: var(--radius-sm);
+                    font-size: 0.875rem;
                 }
 
                 .snippets-close {
                     background: none;
                     border: none;
-                    font-size: 1.25rem;
+                    font-size: 1.5rem;
                     cursor: pointer;
                     color: var(--text-muted);
                     width: 32px;
@@ -1455,179 +1346,130 @@ async saveCommand() {
                 }
 
                 .snippets-close:hover {
-                    background: var(--error-color);
-                    color: white;
+                    background: var(--bg-secondary);
+                    color: var(--error-color);
                 }
 
                 .snippets-body {
                     flex: 1;
-                    overflow: hidden;
+                    overflow-y: auto;
+                    padding: 1.5rem;
+                }
+
+                .snippets-categories {
                     display: flex;
                     flex-direction: column;
+                    gap: 2rem;
                 }
 
-                .snippets-search {
-                    padding: 1rem 1.5rem;
-                    border-bottom: 1px solid var(--border-light);
-                    background: var(--bg-secondary);
-                    position: relative;
+                .category-title {
+                    margin: 0 0 1rem 0;
+                    color: var(--text-primary);
+                    font-size: 1.1rem;
+                    font-weight: 600;
+                    padding-bottom: 0.5rem;
+                    border-bottom: 2px solid var(--primary-color);
                 }
 
-                .snippets-search i {
-                    position: absolute;
-                    left: 2rem;
-                    top: 50%;
-                    transform: translateY(-50%);
-                    color: var(--text-muted);
+                .snippets-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+                    gap: 1rem;
                 }
 
-                .snippets-search input {
-                    width: 100%;
-                    padding: 0.75rem 1rem 0.75rem 2.5rem;
+                .snippet-card {
                     border: 1px solid var(--border-color);
                     border-radius: var(--radius-lg);
+                    padding: 1.25rem;
                     background: var(--bg-primary);
-                    color: var(--text-primary);
-                    font-size: 0.9rem;
                     transition: var(--transition);
-                }
-
-                .snippets-search input:focus {
-                    outline: none;
-                    border-color: var(--primary-color);
-                    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-                }
-
-                .snippets-list {
-                    flex: 1;
-                    overflow-y: auto;
-                    padding: 1rem 0;
-                }
-
-                .snippet-item {
                     display: flex;
-                    align-items: center;
+                    flex-direction: column;
+                    gap: 0.75rem;
+                }
+
+                .snippet-card:hover {
+                    border-color: var(--primary-color);
+                    box-shadow: var(--shadow-md);
+                    transform: translateY(-2px);
+                }
+
+                .snippet-header {
+                    display: flex;
+                    align-items: flex-start;
+                    justify-content: space-between;
                     gap: 1rem;
-                    padding: 1rem 1.5rem;
-                    border-bottom: 1px solid var(--border-light);
-                    transition: var(--transition);
-                    cursor: pointer;
                 }
 
-                .snippet-item:hover {
-                    background: var(--bg-tertiary);
-                }
-
-                .snippet-item:last-child {
-                    border-bottom: none;
-                }
-
-                .snippet-info {
-                    flex: 1;
-                    min-width: 0;
-                }
-
-                .snippet-title {
-                    margin: 0 0 0.375rem 0;
-                    color: var(--text-primary);
-                    font-size: 0.95rem;
-                    font-weight: 600;
-                    line-height: 1.3;
-                }
-
-                .snippet-desc {
+                .snippet-header h5 {
                     margin: 0;
-                    color: var(--text-secondary);
-                    font-size: 0.8rem;
-                    line-height: 1.4;
-                    display: -webkit-box;
-                    -webkit-line-clamp: 2;
-                    -webkit-box-orient: vertical;
-                    overflow: hidden;
+                    color: var(--text-primary);
+                    font-size: 1rem;
+                    font-weight: 600;
+                    flex: 1;
                 }
 
-                .snippet-insert-btn {
+                .btn-insert {
                     background: var(--primary-color);
                     color: white;
                     border: none;
-                    width: 36px;
-                    height: 36px;
+                    padding: 0.5rem 0.75rem;
                     border-radius: var(--radius-md);
+                    font-size: 0.75rem;
                     cursor: pointer;
                     transition: var(--transition);
                     display: flex;
                     align-items: center;
-                    justify-content: center;
-                    flex-shrink: 0;
-                    font-size: 0.9rem;
+                    gap: 0.375rem;
+                    white-space: nowrap;
                 }
 
-                .snippet-insert-btn:hover {
+                .btn-insert:hover {
                     background: var(--primary-dark);
-                    transform: scale(1.05);
+                    transform: translateY(-1px);
+                }
+
+                .snippet-desc {
+                    color: var(--text-secondary);
+                    font-size: 0.875rem;
+                    line-height: 1.4;
+                    margin: 0;
+                }
+
+                .snippet-code {
+                    background: var(--bg-secondary);
+                    border: 1px solid var(--border-light);
+                    border-radius: var(--radius-md);
+                    padding: 0.75rem;
+                    font-family: 'Courier New', monospace;
+                    font-size: 0.75rem;
+                    color: var(--text-primary);
+                    overflow-x: auto;
+                    margin: 0;
+                    max-height: 120px;
+                    overflow-y: auto;
                 }
 
                 .snippets-footer {
-                    padding: 1rem 1.5rem;
+                    padding: 1.25rem 1.5rem;
                     border-top: 1px solid var(--border-color);
                     background: var(--bg-tertiary);
+                    border-radius: 0 0 var(--radius-xl) var(--radius-xl);
                     display: flex;
                     justify-content: flex-end;
                 }
 
-                /* Scrollbar styling */
-                .snippets-list::-webkit-scrollbar {
-                    width: 6px;
-                }
-
-                .snippets-list::-webkit-scrollbar-track {
-                    background: var(--bg-secondary);
-                }
-
-                .snippets-list::-webkit-scrollbar-thumb {
-                    background: var(--border-color);
-                    border-radius: 3px;
-                }
-
-                .snippets-list::-webkit-scrollbar-thumb:hover {
-                    background: var(--text-muted);
-                }
-
                 @media (max-width: 768px) {
                     .snippets-modal-overlay {
-                        padding: 0.5rem;
-                    }
-                    
-                    .snippets-modal {
-                        max-height: 85vh;
-                        max-width: 95vw;
-                    }
-                    
-                    .snippet-item {
-                        padding: 0.875rem 1rem;
-                    }
-                    
-                    .snippets-header,
-                    .snippets-search {
                         padding: 1rem;
                     }
-                }
-
-                @media (max-width: 480px) {
+                    
+                    .snippets-grid {
+                        grid-template-columns: 1fr;
+                    }
+                    
                     .snippets-modal {
                         max-height: 90vh;
-                    }
-                    
-                    .snippet-item {
-                        flex-direction: column;
-                        align-items: stretch;
-                        gap: 0.75rem;
-                    }
-                    
-                    .snippet-insert-btn {
-                        align-self: flex-end;
-                        width: 100%;
-                        max-width: 120px;
                     }
                 }
             </style>
@@ -1643,7 +1485,7 @@ async saveCommand() {
         const currentCode = commandCodeEl.value;
         const cursorPos = commandCodeEl.selectionStart;
         
-        // Insert code at cursor position with proper formatting
+        // Insert code at cursor position
         const newCode = currentCode.substring(0, cursorPos) + 
                        '\n' + code + '\n' + 
                        currentCode.substring(cursorPos);
