@@ -486,8 +486,7 @@
     padding: 1rem;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-
+    font-family: 'Courier New', bold;
     font-size: 14px;
     line-height: 1.5;
     background: var(--bg-primary);
