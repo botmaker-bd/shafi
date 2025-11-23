@@ -42,41 +42,21 @@ async function executeCommandCode(botInstance, code, context) {
             
             const apiWrapperInstance = new ApiWrapper(botInstance, apiContext);
             
-            // ✅ ULTIMATE SMART HANDLER - BOTH AWAIT AND SYNC
-            const createUltimateHandler = (asyncFn, functionName = 'unknown') => {
-                return (...args) => {
-                    const promise = asyncFn(...args);
-                    
-                    // Create a smart promise that works with both await and direct usage
-                    const smartPromise = promise.then(result => {
-                        return result;
-                    }).catch(error => {
+            // ✅ SIMPLE PROMISE RESOLVER - NO PROXY COMPLICATIONS
+            const createSimpleHandler = (asyncFn, functionName = 'unknown') => {
+                return async (...args) => {
+                    try {
+                        return await asyncFn(...args);
+                    } catch (error) {
                         console.error(`❌ ${functionName} error:`, error);
                         return null;
-                    });
-                    
-                    // Add magic methods for direct usage
-                    const handler = {
-                        get(target, prop) {
-                            if (prop === 'then') return target.then.bind(target);
-                            if (prop === 'catch') return target.catch.bind(target);
-                            if (prop === 'finally') return target.finally.bind(target);
-                            if (prop === 'valueOf') return () => target;
-                            if (prop === 'toString') return () => {
-                                // When used in string context, wait and return the value
-                                return target.then(val => String(val || '')).catch(() => '');
-                            };
-                            return undefined;
-                        }
-                    };
-                    
-                    return new Proxy(smartPromise, handler);
+                    }
                 };
             };
 
-            // ✅ USER DATA METHODS
+            // ✅ USER DATA METHODS - ALL ASYNC
             const userDataMethods = {
-                getData: createUltimateHandler(async (key) => {
+                getData: createSimpleHandler(async (key) => {
                     try {
                         return await apiWrapperInstance.User.getData(key);
                     } catch (error) {
@@ -84,7 +64,7 @@ async function executeCommandCode(botInstance, code, context) {
                     }
                 }, 'User.getData'),
                 
-                saveData: createUltimateHandler(async (key, value) => {
+                saveData: createSimpleHandler(async (key, value) => {
                     try {
                         await apiWrapperInstance.User.saveData(key, value);
                         return value;
@@ -93,7 +73,7 @@ async function executeCommandCode(botInstance, code, context) {
                     }
                 }, 'User.saveData'),
                 
-                deleteData: createUltimateHandler(async (key) => {
+                deleteData: createSimpleHandler(async (key) => {
                     try {
                         await apiWrapperInstance.User.deleteData(key);
                         return true;
@@ -102,7 +82,7 @@ async function executeCommandCode(botInstance, code, context) {
                     }
                 }, 'User.deleteData'),
                 
-                increment: createUltimateHandler(async (key, amount = 1) => {
+                increment: createSimpleHandler(async (key, amount = 1) => {
                     try {
                         const current = await apiWrapperInstance.User.getData(key);
                         const newValue = (parseInt(current) || 0) + amount;
@@ -116,7 +96,7 @@ async function executeCommandCode(botInstance, code, context) {
             
             // ✅ BOT DATA METHODS
             const botDataMethods = {
-                getData: createUltimateHandler(async (key) => {
+                getData: createSimpleHandler(async (key) => {
                     try {
                         const { data, error } = await supabase.from('universal_data')
                             .select('data_value')
@@ -136,7 +116,7 @@ async function executeCommandCode(botInstance, code, context) {
                     }
                 }, 'BotData.getData'),
                 
-                saveData: createUltimateHandler(async (key, value) => {
+                saveData: createSimpleHandler(async (key, value) => {
                     try {
                         const { error } = await supabase.from('universal_data').upsert({
                             data_type: 'bot_data',
@@ -155,7 +135,7 @@ async function executeCommandCode(botInstance, code, context) {
                     }
                 }, 'BotData.saveData'),
                 
-                deleteData: createUltimateHandler(async (key) => {
+                deleteData: createSimpleHandler(async (key) => {
                     try {
                         const { error } = await supabase.from('universal_data')
                             .delete()
@@ -173,7 +153,7 @@ async function executeCommandCode(botInstance, code, context) {
             
             // ✅ BOT METHODS
             const createBotMethod = (methodName) => {
-                return createUltimateHandler(async (...args) => {
+                return createSimpleHandler(async (...args) => {
                     if (!apiWrapperInstance[methodName]) {
                         throw new Error(`Method ${methodName} not available`);
                     }
@@ -198,7 +178,7 @@ async function executeCommandCode(botInstance, code, context) {
             });
             
             // ✅ METADATA METHODS
-            const metadataFunc = createUltimateHandler(async (target = 'message') => {
+            const metadataFunc = createSimpleHandler(async (target = 'message') => {
                 try {
                     return await apiWrapperInstance.metadata(target);
                 } catch (error) {
@@ -212,12 +192,12 @@ async function executeCommandCode(botInstance, code, context) {
             botMethods.METADATA = metadataFunc;
             
             // ✅ UTILITY FUNCTIONS
-            const waitFunction = createUltimateHandler(async (seconds) => {
+            const waitFunction = createSimpleHandler(async (seconds) => {
                 const ms = seconds * 1000;
                 return new Promise(resolve => setTimeout(() => resolve(`Waited ${seconds} seconds`), ms));
             }, 'wait');
             
-            const runPythonFunc = createUltimateHandler(async (code) => {
+            const runPythonFunc = createSimpleHandler(async (code) => {
                 try {
                     return await pythonRunner.runPythonCode(code);
                 } catch (error) {
@@ -225,7 +205,7 @@ async function executeCommandCode(botInstance, code, context) {
                 }
             }, 'runPython');
             
-            const waitForAnswerFunc = createUltimateHandler(async (question, options = {}) => {
+            const waitForAnswerFunc = createSimpleHandler(async (question, options = {}) => {
                 return new Promise((resolve, reject) => {
                     try {
                         const waitKey = `${resolvedBotToken}_${userId}`;
@@ -316,13 +296,13 @@ async function executeCommandCode(botInstance, code, context) {
             const BotData = { ...botDataMethods };
             
             // ✅ DIRECT MESSAGE FUNCTIONS
-            const sendMessageFunc = createUltimateHandler(async (text, options = {}) => {
+            const sendMessageFunc = createSimpleHandler(async (text, options = {}) => {
                 return await botInstance.sendMessage(chatId, text, options);
             }, 'sendMessage');
             
             const sendFunc = sendMessageFunc;
             
-            const replyFunc = createUltimateHandler(async (text, options = {}) => {
+            const replyFunc = createSimpleHandler(async (text, options = {}) => {
                 return await botInstance.sendMessage(chatId, text, {
                     reply_to_message_id: msg.message_id,
                     ...options
@@ -377,22 +357,13 @@ async function executeCommandCode(botInstance, code, context) {
                 reply: replyFunc
             };
             
-            // ✅ SPECIAL EXECUTION FUNCTION FOR MIXED USAGE
+            // ✅ SIMPLE EXECUTION FUNCTION
             const executionFunction = new Function(
                 'env',
                 `
                 return (async function() {
-                    const {
-                        User, Bot, bot, API, Api, BotData,
-                        msg, chatId, userId, userInput, params, message, botToken,
-                        wait, delay, sleep, runPython, executePython, waitForAnswer, ask,
-                        metadata, metaData, Metadata, METADATA,
-                        userData, chatData, currentUser, currentChat, context, ctx,
-                        sendMessage, send, reply
-                    } = env;
-                    
                     try {
-                        console.log('🚀 Command execution started for user:', currentUser.first_name);
+                        console.log('🚀 Command execution started for user:', env.currentUser.first_name);
                         
                         // 🎯 USER CODE EXECUTION
                         ${code}
