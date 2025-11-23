@@ -1,4 +1,4 @@
-// server/core/command-executor.js - FINAL FIXED VERSION
+// server/core/command-executor.js - COMPLETELY FIXED VERSION
 async function executeCommandCode(botInstance, code, context) {
     return new Promise(async (resolve, reject) => {
         try {
@@ -134,7 +134,7 @@ async function executeCommandCode(botInstance, code, context) {
                     } catch (error) {
                         return null;
                     }
-                }, 'Bot.getData'),
+                }, 'BotData.getData'),
                 
                 saveData: createUltimateHandler(async (key, value) => {
                     try {
@@ -153,7 +153,7 @@ async function executeCommandCode(botInstance, code, context) {
                     } catch (error) {
                         return null;
                     }
-                }, 'Bot.saveData'),
+                }, 'BotData.saveData'),
                 
                 deleteData: createUltimateHandler(async (key) => {
                     try {
@@ -168,7 +168,7 @@ async function executeCommandCode(botInstance, code, context) {
                     } catch (error) {
                         return false;
                     }
-                }, 'Bot.deleteData')
+                }, 'BotData.deleteData')
             };
             
             // ✅ BOT METHODS
@@ -294,6 +294,12 @@ async function executeCommandCode(botInstance, code, context) {
             
             const Bot = {
                 ...botMethods,
+                
+                // ✅ ADDED: Bot data methods for convenience
+                saveData: botDataMethods.saveData,
+                getData: botDataMethods.getData,
+                deleteData: botDataMethods.deleteData,
+                
                 wait: waitFunction,
                 delay: waitFunction,
                 sleep: waitFunction,
@@ -307,7 +313,7 @@ async function executeCommandCode(botInstance, code, context) {
                 getContext: () => contextObject
             };
             
-            const Bot = { ...botDataMethods };
+            const BotData = { ...botDataMethods };
             
             // ✅ DIRECT MESSAGE FUNCTIONS
             const sendMessageFunc = createUltimateHandler(async (text, options = {}) => {
@@ -331,6 +337,7 @@ async function executeCommandCode(botInstance, code, context) {
                 bot: Bot,
                 API: Bot,
                 Api: Bot,
+                BotData,
                 
                 // Context data
                 msg,
@@ -376,7 +383,7 @@ async function executeCommandCode(botInstance, code, context) {
                 `
                 return (async function() {
                     const {
-                        User, Bot, bot, API, Api,
+                        User, Bot, bot, API, Api, BotData,
                         msg, chatId, userId, userInput, params, message, botToken,
                         wait, delay, sleep, runPython, executePython, waitForAnswer, ask,
                         metadata, metaData, Metadata, METADATA,
@@ -386,17 +393,6 @@ async function executeCommandCode(botInstance, code, context) {
                     
                     try {
                         console.log('🚀 Command execution started for user:', currentUser.first_name);
-                        
-                        // 🎯 SPECIAL: Auto-resolve promises in string context
-                        const originalSendMessage = Bot.sendMessage;
-                        Bot.sendMessage = async function(text, options) {
-                            if (typeof text === 'string') {
-                                // Auto-resolve any promises in the text
-                                const resolvedText = await Promise.resolve(text);
-                                return originalSendMessage(resolvedText, options);
-                            }
-                            return originalSendMessage(text, options);
-                        };
                         
                         // 🎯 USER CODE EXECUTION
                         ${code}
