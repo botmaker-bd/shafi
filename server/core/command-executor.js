@@ -1,4 +1,4 @@
-// server/core/command-executor.js - COMPLETELY FIXED VERSION
+// server/core/command-executor.js - COMPLETELY FIXED JSON ERROR
 async function executeCommandCode(botInstance, code, context) {
     return new Promise(async (resolve, reject) => {
         try {
@@ -145,7 +145,7 @@ async function executeCommandCode(botInstance, code, context) {
                 };
             };
 
-            // ✅ FIXED: DATA STORAGE FUNCTIONS
+            // ✅ FIXED: DATA STORAGE FUNCTIONS - JSON PARSE ERROR FIXED
             const userDataFunctions = {
                 saveData: async (key, value) => {
                     try {
@@ -175,8 +175,22 @@ async function executeCommandCode(botInstance, code, context) {
                             .eq('user_id', userId.toString())
                             .eq('data_key', key)
                             .single();
-                        return data ? JSON.parse(data.data_value) : null;
+
+                        if (!data || !data.data_value) return null;
+
+                        // ✅ FIXED: Handle both JSON and string values safely
+                        try {
+                            return JSON.parse(data.data_value);
+                        } catch (parseError) {
+                            // If not valid JSON, return as string
+                            console.log(`⚠️ Data is not JSON, returning as string: ${data.data_value.substring(0, 50)}...`);
+                            return data.data_value;
+                        }
                     } catch (error) {
+                        // If no data found, return null instead of throwing error
+                        if (error.code === 'PGRST116') {
+                            return null;
+                        }
                         console.error('❌ Get data error:', error);
                         return null;
                     }
@@ -238,8 +252,22 @@ async function executeCommandCode(botInstance, code, context) {
                             .eq('bot_token', resolvedBotToken)
                             .eq('data_key', key)
                             .single();
-                        return data ? JSON.parse(data.data_value) : null;
+
+                        if (!data || !data.data_value) return null;
+
+                        // ✅ FIXED: Handle both JSON and string values safely
+                        try {
+                            return JSON.parse(data.data_value);
+                        } catch (parseError) {
+                            // If not valid JSON, return as string
+                            console.log(`⚠️ Bot data is not JSON, returning as string: ${data.data_value.substring(0, 50)}...`);
+                            return data.data_value;
+                        }
                     } catch (error) {
+                        // If no data found, return null instead of throwing error
+                        if (error.code === 'PGRST116') {
+                            return null;
+                        }
                         console.error('❌ Get bot data error:', error);
                         return null;
                     }
@@ -464,6 +492,8 @@ async function executeCommandCode(botInstance, code, context) {
                                 errorMsg += "Telegram API issue. Check bot permissions.";
                             } else if (error.message.includes('Python Error')) {
                                 errorMsg += "Python code has errors.";
+                            } else if (error.message.includes('JSON')) {
+                                errorMsg += "Data format error. Try again.";
                             } else {
                                 errorMsg += error.message.substring(0, 100);
                             }
