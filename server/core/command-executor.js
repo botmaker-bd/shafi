@@ -4,13 +4,13 @@ async function executeCommandCode(botInstance, code, context) {
         try {
             const { msg, chatId, userId, username, first_name, botToken, userInput, nextCommandHandlers } = context;
             
-            // Resolve bot token
+            // ✅ FIX: Handle missing botToken gracefully
             let resolvedBotToken = botToken;
             if (!resolvedBotToken && context.command) {
                 resolvedBotToken = context.command.bot_token;
             }
             if (!resolvedBotToken) {
-                console.error('❌ Bot token undefined, using fallback');
+                console.error('❌ CRITICAL: botToken is undefined! Using fallback...');
                 try {
                     const botInfo = await botInstance.getMe();
                     resolvedBotToken = botInfo.token || 'fallback_token';
@@ -19,14 +19,12 @@ async function executeCommandCode(botInstance, code, context) {
                 }
             }
             
-            console.log(`🔧 Executing command for user ${userId} in chat ${chatId}`);
+            console.log(`🔧 Starting command execution for user ${userId}, bot: ${resolvedBotToken.substring(0, 10)}...`);
             
-            // Import dependencies
+            // Import ApiWrapper
             const ApiWrapper = require('./api-wrapper');
-            const pythonRunner = require('./python-runner');
-            const supabase = require('../config/supabase');
             
-            // Create ApiWrapper instance
+            // Create the context for ApiWrapper
             const apiContext = {
                 msg: msg,
                 chatId: chatId,
@@ -40,354 +38,495 @@ async function executeCommandCode(botInstance, code, context) {
                 nextCommandHandlers: nextCommandHandlers || new Map()
             };
             
+            // Create ApiWrapper instance
             const apiWrapperInstance = new ApiWrapper(botInstance, apiContext);
             
-            // ✅ SIMPLE AUTO-RESOLVE HANDLER - NO COMPLEX PROXY
-            const createSimpleHandler = (asyncFn, functionName = 'unknown') => {
-                return async (...args) => {
-                    try {
-                        const result = await asyncFn(...args);
-                        return result;
-                    } catch (error) {
-                        console.error(`❌ ${functionName} error:`, error);
-                        return null;
-                    }
+            // ✅ FIXED: Create unique variable names to avoid conflicts
+            const createUserObjectFunction = () => {
+                const userObj = msg.from ? Object.assign({}, msg.from) : {
+                    id: userId,
+                    first_name: first_name || '',
+                    username: username || '',
+                    language_code: context.language_code || ''
                 };
+                
+                userObj.chat_id = chatId;
+                return userObj;
             };
 
-            // ✅ USER DATA METHODS - AUTO-RESOLVE
-            const userDataMethods = {
-                getData: createSimpleHandler(async (key) => {
-                    try {
-                        return await apiWrapperInstance.User.getData(key);
-                    } catch (error) {
-                        return null;
-                    }
-                }, 'User.getData'),
-                
-                saveData: createSimpleHandler(async (key, value) => {
-                    try {
-                        await apiWrapperInstance.User.saveData(key, value);
-                        return value;
-                    } catch (error) {
-                        return null;
-                    }
-                }, 'User.saveData'),
-                
-                deleteData: createSimpleHandler(async (key) => {
-                    try {
-                        await apiWrapperInstance.User.deleteData(key);
-                        return true;
-                    } catch (error) {
-                        return false;
-                    }
-                }, 'User.deleteData'),
-                
-                increment: createSimpleHandler(async (key, amount = 1) => {
-                    try {
-                        const current = await apiWrapperInstance.User.getData(key);
-                        const newValue = (parseInt(current) || 0) + amount;
-                        await apiWrapperInstance.User.saveData(key, newValue);
-                        return newValue;
-                    } catch (error) {
-                        return 0;
-                    }
-                }, 'User.increment')
+            const createChatObjectFunction = () => {
+                const chatObj = msg.chat ? Object.assign({}, msg.chat) : {
+                    id: chatId,
+                    type: 'private'
+                };
+                return chatObj;
             };
-            
-            // ✅ BOT DATA METHODS - AUTO-RESOLVE
-            const botDataMethods = {
-                getData: createSimpleHandler(async (key) => {
-                    try {
-                        const { data, error } = await supabase.from('universal_data')
-                            .select('data_value')
-                            .eq('data_type', 'bot_data')
-                            .eq('bot_token', resolvedBotToken)
-                            .eq('data_key', key)
-                            .single();
-                            
-                        if (error) {
-                            if (error.code === 'PGRST116') return null;
-                            throw error;
-                        }
-                        
-                        return data ? JSON.parse(data.data_value) : null;
-                    } catch (error) {
-                        return null;
-                    }
-                }, 'BotData.getData'),
-                
-                saveData: createSimpleHandler(async (key, value) => {
-                    try {
-                        const { error } = await supabase.from('universal_data').upsert({
-                            data_type: 'bot_data',
-                            bot_token: resolvedBotToken,
-                            data_key: key,
-                            data_value: JSON.stringify(value),
-                            updated_at: new Date().toISOString()
-                        }, {
-                            onConflict: 'data_type,bot_token,data_key'
-                        });
-                        
-                        if (error) throw error;
-                        return value;
-                    } catch (error) {
-                        return null;
-                    }
-                }, 'BotData.saveData'),
-                
-                deleteData: createSimpleHandler(async (key) => {
-                    try {
-                        const { error } = await supabase.from('universal_data')
-                            .delete()
-                            .eq('data_type', 'bot_data')
-                            .eq('bot_token', resolvedBotToken)
-                            .eq('data_key', key);
-                            
-                        if (error) throw error;
-                        return true;
-                    } catch (error) {
-                        return false;
-                    }
-                }, 'BotData.deleteData')
-            };
-            
-            // ✅ BOT METHODS - AUTO-RESOLVE
-            const createBotMethod = (methodName) => {
-                return createSimpleHandler(async (...args) => {
-                    if (!apiWrapperInstance[methodName]) {
-                        throw new Error(`Method ${methodName} not available`);
-                    }
-                    return await apiWrapperInstance[methodName](...args);
-                }, `Bot.${methodName}`);
-            };
-            
-            const telegramMethods = [
-                'sendMessage', 'send', 'reply', 'sendPhoto', 'sendDocument', 
-                'sendVideo', 'sendAudio', 'sendVoice', 'sendLocation', 'sendContact',
-                'sendSticker', 'sendPoll', 'sendDice', 'editMessageText', 'deleteMessage',
-                'forwardMessage', 'copyMessage', 'getMe', 'getChat', 'getChatAdministrators',
-                'getChatMember', 'banChatMember', 'unbanChatMember', 'restrictChatMember',
-                'promoteChatMember', 'pinChatMessage', 'unpinChatMessage', 'leaveChat', 'getFile'
-            ];
-            
-            const botMethods = {};
-            telegramMethods.forEach(method => {
-                if (typeof apiWrapperInstance[method] === 'function') {
-                    botMethods[method] = createBotMethod(method);
-                }
-            });
-            
-            // ✅ METADATA METHODS - AUTO-RESOLVE
-            const metadataFunc = createSimpleHandler(async (target = 'message') => {
+
+            // ✅ FIXED: Python runner
+            const pythonRunner = require('./python-runner');
+            const runPythonSyncFunction = (pythonCode) => {
                 try {
-                    return await apiWrapperInstance.metadata(target);
-                } catch (error) {
-                    return { error: error.message };
-                }
-            }, 'metadata');
-            
-            botMethods.metadata = metadataFunc;
-            botMethods.metaData = metadataFunc;
-            botMethods.Metadata = metadataFunc;
-            botMethods.METADATA = metadataFunc;
-            
-            // ✅ UTILITY FUNCTIONS - AUTO-RESOLVE
-            const waitFunction = createSimpleHandler(async (seconds) => {
-                const ms = seconds * 1000;
-                return new Promise(resolve => setTimeout(() => resolve(`Waited ${seconds} seconds`), ms));
-            }, 'wait');
-            
-            const runPythonFunc = createSimpleHandler(async (code) => {
-                try {
-                    return await pythonRunner.runPythonCode(code);
+                    return pythonRunner.runPythonCodeSync(pythonCode);
                 } catch (error) {
                     throw new Error(`Python Error: ${error.message}`);
                 }
-            }, 'runPython');
-            
-            const waitForAnswerFunc = createSimpleHandler(async (question, options = {}) => {
-                return new Promise((resolve, reject) => {
+            };
+
+            // ✅ FIXED: Wait for answer function
+            const waitForAnswerFunction = async (question, options = {}) => {
+                return new Promise((resolveWait, rejectWait) => {
                     try {
                         const waitKey = `${resolvedBotToken}_${userId}`;
+                        console.log(`⏳ Setting up waitForAnswer for user ${userId}`);
                         
+                        // Send question first
                         botInstance.sendMessage(chatId, question, options)
                             .then(() => {
                                 if (nextCommandHandlers) {
                                     nextCommandHandlers.set(waitKey, {
-                                        resolve: resolve,
-                                        reject: reject,
+                                        resolve: resolveWait,
+                                        reject: rejectWait,
                                         timestamp: Date.now()
                                     });
                                     
+                                    // Timeout cleanup
                                     setTimeout(() => {
                                         if (nextCommandHandlers.has(waitKey)) {
+                                            const handler = nextCommandHandlers.get(waitKey);
+                                            if (handler && handler.reject) {
+                                                handler.reject(new Error('Wait for answer timeout (5 minutes)'));
+                                            }
                                             nextCommandHandlers.delete(waitKey);
-                                            reject(new Error('Wait for answer timeout'));
                                         }
                                     }, 5 * 60 * 1000);
                                 }
                             })
                             .catch(sendError => {
-                                reject(new Error('Failed to send question: ' + sendError.message));
+                                rejectWait(new Error('Failed to send question: ' + sendError.message));
                             });
                     } catch (error) {
-                        reject(new Error('WaitForAnswer setup failed: ' + error.message));
+                        rejectWait(new Error('WaitForAnswer setup failed: ' + error.message));
                     }
                 });
-            }, 'waitForAnswer');
-            
-            // ✅ CONTEXT OBJECTS
-            const userObject = {
-                id: userId,
-                first_name: first_name || '',
-                username: username || '',
-                language_code: context.language_code || '',
-                chat_id: chatId,
-                ...(msg.from || {})
             };
-            
-            const chatObject = {
-                id: chatId,
-                type: msg.chat?.type || 'private',
-                ...(msg.chat || {})
-            };
-            
-            const contextObject = {
-                user: userObject,
-                chat: chatObject,
-                message: msg,
-                bot: {
-                    token: resolvedBotToken?.substring(0, 10) + '...',
-                    chatId: chatId,
-                    userId: userId
-                },
-                input: userInput,
-                params: userInput ? userInput.split(' ').slice(1).filter(p => p.trim() !== '') : [],
-                timestamp: new Date().toISOString()
-            };
-            
-            // ✅ CREATE MAIN OBJECTS
-            const User = {
-                ...userObject,
-                ...userDataMethods
-            };
-            
-            const Bot = {
-                ...botMethods,
-                
-                // ✅ ADDED: Bot data methods for convenience
-                saveData: botDataMethods.saveData,
-                getData: botDataMethods.getData,
-                deleteData: botDataMethods.deleteData,
-                
-                wait: waitFunction,
-                delay: waitFunction,
-                sleep: waitFunction,
-                runPython: runPythonFunc,
-                executePython: runPythonFunc,
-                waitForAnswer: waitForAnswerFunc,
-                ask: waitForAnswerFunc,
-                getUser: () => userObject,
-                getChat: () => chatObject,
-                analyzeContext: () => contextObject,
-                getContext: () => contextObject
-            };
-            
-            const BotData = { ...botDataMethods };
-            
-            // ✅ DIRECT MESSAGE FUNCTIONS - AUTO-RESOLVE
-            const sendMessageFunc = createSimpleHandler(async (text, options = {}) => {
-                return await botInstance.sendMessage(chatId, text, options);
-            }, 'sendMessage');
-            
-            const sendFunc = sendMessageFunc;
-            
-            const replyFunc = createSimpleHandler(async (text, options = {}) => {
-                return await botInstance.sendMessage(chatId, text, {
-                    reply_to_message_id: msg.message_id,
-                    ...options
+
+            // ✅ FIXED: WAIT FUNCTION - IN SECONDS
+            const waitFunction = (seconds) => {
+                // Convert seconds to milliseconds
+                const ms = seconds * 1000;
+                console.log(`⏰ Waiting for ${seconds} seconds (${ms}ms)...`);
+                return new Promise(resolveWait => {
+                    setTimeout(() => {
+                        console.log(`✅ Wait completed: ${seconds} seconds`);
+                        resolveWait(`Waited ${seconds} seconds`);
+                    }, ms);
                 });
-            }, 'reply');
-            
-            // ✅ CREATE ENVIRONMENT
-            const environment = {
-                // Core objects
-                User,
-                Bot,
-                bot: Bot,
-                API: Bot,
-                Api: Bot,
-                BotData,
+            };
+
+            // ✅ FIXED: METADATA FUNCTION - ORIGINAL RESPONSE ONLY
+            const extractMetadataFunction = async (target = 'all') => {
+                return await apiWrapperInstance.getOriginalResponse(target);
+            };
+
+            // ✅ AUTO CONTEXT ANALYSIS
+            const analyzeContextFunction = () => {
+                return {
+                    user: createUserObjectFunction(),
+                    chat: createChatObjectFunction(),
+                    message: msg,
+                    bot: {
+                        token: resolvedBotToken?.substring(0, 10) + '...',
+                        chatId: chatId,
+                        userId: userId
+                    },
+                    input: userInput,
+                    params: userInput ? userInput.split(' ').slice(1).filter(p => p.trim() !== '') : [],
+                    timestamp: new Date().toISOString()
+                };
+            };
+
+            // ✅ FIXED: DATA STORAGE FUNCTIONS
+            const userDataFunctions = {
+                saveData: async (key, value) => {
+                    try {
+                        const supabase = require('../config/supabase');
+                        await supabase.from('universal_data').upsert({
+                            data_type: 'user_data',
+                            bot_token: resolvedBotToken,
+                            user_id: userId.toString(),
+                            data_key: key,
+                            data_value: JSON.stringify(value),
+                            updated_at: new Date().toISOString()
+                        });
+                        return value;
+                    } catch (error) {
+                        console.error('❌ Save data error:', error);
+                        throw error;
+                    }
+                },
                 
-                // Context data
-                msg,
-                chatId,
-                userId,
-                userInput,
+                getData: async (key) => {
+                    try {
+                        const supabase = require('../config/supabase');
+                        const { data } = await supabase.from('universal_data')
+                            .select('data_value')
+                            .eq('data_type', 'user_data')
+                            .eq('bot_token', resolvedBotToken)
+                            .eq('user_id', userId.toString())
+                            .eq('data_key', key)
+                            .single();
+                        return data ? JSON.parse(data.data_value) : null;
+                    } catch (error) {
+                        console.error('❌ Get data error:', error);
+                        return null;
+                    }
+                },
+                
+                deleteData: async (key) => {
+                    try {
+                        const supabase = require('../config/supabase');
+                        await supabase.from('universal_data')
+                            .delete()
+                            .eq('data_type', 'user_data')
+                            .eq('bot_token', resolvedBotToken)
+                            .eq('user_id', userId.toString())
+                            .eq('data_key', key);
+                        return true;
+                    } catch (error) {
+                        console.error('❌ Delete data error:', error);
+                        throw error;
+                    }
+                },
+                
+                increment: async (key, amount = 1) => {
+                    try {
+                        const current = await userDataFunctions.getData(key) || 0;
+                        const newValue = parseInt(current) + amount;
+                        await userDataFunctions.saveData(key, newValue);
+                        return newValue;
+                    } catch (error) {
+                        console.error('❌ Increment data error:', error);
+                        throw error;
+                    }
+                }
+            };
+
+            const botDataFunctions = {
+                saveData: async (key, value) => {
+                    try {
+                        const supabase = require('../config/supabase');
+                        await supabase.from('universal_data').upsert({
+                            data_type: 'bot_data',
+                            bot_token: resolvedBotToken,
+                            data_key: key,
+                            data_value: JSON.stringify(value),
+                            updated_at: new Date().toISOString()
+                        });
+                        return value;
+                    } catch (error) {
+                        console.error('❌ Save bot data error:', error);
+                        throw error;
+                    }
+                },
+                
+                getData: async (key) => {
+                    try {
+                        const supabase = require('../config/supabase');
+                        const { data } = await supabase.from('universal_data')
+                            .select('data_value')
+                            .eq('data_type', 'bot_data')
+                            .eq('bot_token', resolvedBotToken)
+                            .eq('data_key', key)
+                            .single();
+                        return data ? JSON.parse(data.data_value) : null;
+                    } catch (error) {
+                        console.error('❌ Get bot data error:', error);
+                        return null;
+                    }
+                },
+                
+                deleteData: async (key) => {
+                    try {
+                        const supabase = require('../config/supabase');
+                        await supabase.from('universal_data')
+                            .delete()
+                            .eq('data_type', 'bot_data')
+                            .eq('bot_token', resolvedBotToken)
+                            .eq('data_key', key);
+                        return true;
+                    } catch (error) {
+                        console.error('❌ Delete bot data error:', error);
+                        throw error;
+                    }
+                }
+            };
+
+            // ✅ DYNAMIC CASE INSENSITIVE PROXY HANDLER
+            const createDynamicCaseInsensitiveObject = (targetObj) => {
+                const caseInsensitiveCache = new Map();
+                
+                return new Proxy(targetObj, {
+                    get: function(obj, prop) {
+                        if (typeof prop !== 'string') return obj[prop];
+                        
+                        // Convert property to lowercase for case insensitive access
+                        const lowerProp = prop.toLowerCase();
+                        
+                        // Check cache first
+                        if (caseInsensitiveCache.has(lowerProp)) {
+                            return caseInsensitiveCache.get(lowerProp);
+                        }
+                        
+                        // Find the actual property (case insensitive)
+                        const actualProp = Object.keys(obj).find(key => 
+                            key.toLowerCase() === lowerProp
+                        );
+                        
+                        if (actualProp) {
+                            const value = obj[actualProp];
+                            caseInsensitiveCache.set(lowerProp, value);
+                            return value;
+                        }
+                        
+                        // If not found, return undefined
+                        return undefined;
+                    },
+                    
+                    set: function(obj, prop, value) {
+                        if (typeof prop !== 'string') {
+                            obj[prop] = value;
+                            return true;
+                        }
+                        
+                        const lowerProp = prop.toLowerCase();
+                        const actualProp = Object.keys(obj).find(key => 
+                            key.toLowerCase() === lowerProp
+                        ) || prop;
+                        
+                        obj[actualProp] = value;
+                        caseInsensitiveCache.set(lowerProp, value);
+                        return true;
+                    },
+                    
+                    has: function(obj, prop) {
+                        if (typeof prop !== 'string') return prop in obj;
+                        
+                        const lowerProp = prop.toLowerCase();
+                        return Object.keys(obj).some(key => 
+                            key.toLowerCase() === lowerProp
+                        );
+                    },
+                    
+                    ownKeys: function(obj) {
+                        return Object.keys(obj);
+                    },
+                    
+                    getOwnPropertyDescriptor: function(obj, prop) {
+                        if (typeof prop !== 'string') return Object.getOwnPropertyDescriptor(obj, prop);
+                        
+                        const lowerProp = prop.toLowerCase();
+                        const actualProp = Object.keys(obj).find(key => 
+                            key.toLowerCase() === lowerProp
+                        );
+                        
+                        return actualProp ? Object.getOwnPropertyDescriptor(obj, actualProp) : undefined;
+                    }
+                });
+            };
+
+            // ✅ CREATE BOT OBJECT WITH ALL METHODS
+            const createBotObject = () => {
+                const botObj = {
+                    // Copy all methods from apiWrapperInstance
+                    ...apiWrapperInstance,
+                    
+                    // ✅ FIXED: METADATA METHODS - ORIGINAL RESPONSE ONLY
+                    metaData: extractMetadataFunction,
+                    metadata: extractMetadataFunction,
+                    getMeta: extractMetadataFunction,
+                    inspect: extractMetadataFunction,
+                    
+                    // Context analysis
+                    analyzeContext: analyzeContextFunction,
+                    getContext: analyzeContextFunction,
+                    
+                    // Utility methods
+                    wait: waitFunction,
+                    delay: waitFunction,
+                    sleep: waitFunction,
+                    runPython: runPythonSyncFunction,
+                    executePython: runPythonSyncFunction,
+                    waitForAnswer: waitForAnswerFunction,
+                    ask: waitForAnswerFunction
+                };
+                
+                return createDynamicCaseInsensitiveObject(botObj);
+            };
+
+            // ✅ CREATE BOT INSTANCE
+            const botObject = createBotObject();
+
+            // ✅ CREATE BASE EXECUTION ENVIRONMENT
+            const baseExecutionEnv = {
+                // === CORE FUNCTIONS ===
+                getUser: createUserObjectFunction,
+                getChat: createChatObjectFunction,
+                getCurrentUser: createUserObjectFunction,
+                getCurrentChat: createChatObjectFunction,
+                
+                // === BOT INSTANCES - ALL VARIATIONS ===
+                bot: botObject,
+                Bot: botObject,
+                api: botObject,
+                Api: botObject,
+                API: botObject,
+                
+                // === CONTEXT DATA ===
+                msg: msg,
+                chatId: chatId,
+                userId: userId,
+                userInput: userInput,
                 params: userInput ? userInput.split(' ').slice(1).filter(p => p.trim() !== '') : [],
                 message: userInput,
                 botToken: resolvedBotToken,
                 
-                // Utility functions
+                // === UTILITY FUNCTIONS ===
                 wait: waitFunction,
                 delay: waitFunction,
                 sleep: waitFunction,
-                runPython: runPythonFunc,
-                executePython: runPythonFunc,
-                waitForAnswer: waitForAnswerFunc,
-                ask: waitForAnswerFunc,
                 
-                // Metadata functions
-                metadata: metadataFunc,
-                metaData: metadataFunc,
-                Metadata: metadataFunc,
-                METADATA: metadataFunc,
+                runPython: runPythonSyncFunction,
+                executePython: runPythonSyncFunction,
                 
-                // Data objects
-                userData: userObject,
-                chatData: chatObject,
-                currentUser: userObject,
-                currentChat: chatObject,
-                context: contextObject,
-                ctx: contextObject,
+                waitForAnswer: waitForAnswerFunction,
+                ask: waitForAnswerFunction,
                 
-                // Direct message functions
-                sendMessage: sendMessageFunc,
-                send: sendFunc,
-                reply: replyFunc
+                // === METADATA FUNCTIONS ===
+                metaData: extractMetadataFunction,
+                metadata: extractMetadataFunction,
+                getMeta: extractMetadataFunction,
+                inspect: extractMetadataFunction,
+                
+                analyzeContext: analyzeContextFunction,
+                getContext: analyzeContextFunction,
+                context: analyzeContextFunction(),
+                ctx: analyzeContextFunction(),
+                
+                // === DATA STORAGE ===
+                User: userDataFunctions,
+                BotData: botDataFunctions,
+                
+                // === HANDLERS ===
+                nextCommandHandlers: nextCommandHandlers,
+                
+                // === DATA OBJECTS ===
+                userData: createUserObjectFunction(),
+                chatData: createChatObjectFunction(),
+                currentUser: createUserObjectFunction(),
+                currentChat: createChatObjectFunction()
             };
-            
-            // ✅ SIMPLE EXECUTION FUNCTION
+
+            // ✅ ADD DIRECT MESSAGE FUNCTIONS
+            const messageFunctions = {
+                sendMessage: (text, options) => botInstance.sendMessage(chatId, text, options),
+                send: (text, options) => botInstance.sendMessage(chatId, text, options),
+                reply: (text, options) => botInstance.sendMessage(chatId, text, {
+                    reply_to_message_id: msg.message_id,
+                    ...options
+                }),
+                sendPhoto: (photo, options) => botInstance.sendPhoto(chatId, photo, options),
+                sendDocument: (doc, options) => botInstance.sendDocument(chatId, doc, options),
+                sendVideo: (video, options) => botInstance.sendVideo(chatId, video, options),
+                sendAudio: (audio, options) => botInstance.sendAudio(chatId, audio, options),
+                sendVoice: (voice, options) => botInstance.sendVoice(chatId, voice, options),
+                sendLocation: (latitude, longitude, options) => botInstance.sendLocation(chatId, latitude, longitude, options),
+                sendContact: (phoneNumber, firstName, options) => botInstance.sendContact(chatId, phoneNumber, firstName, options)
+            };
+
+            // ✅ MERGE ALL FUNCTIONS
+            const mergedEnvironment = {
+                ...baseExecutionEnv,
+                ...messageFunctions
+            };
+
+            // ✅ CREATE DYNAMIC CASE INSENSITIVE ENVIRONMENT
+            const finalContext = createDynamicCaseInsensitiveObject(mergedEnvironment);
+
+            // ✅ FIXED: Create ASYNC execution function with UNIQUE VARIABLE NAMES
             const executionFunction = new Function(
                 'env',
-                `
-                return (async function() {
+                `return (async function() {
                     try {
-                        console.log('🚀 Command execution started for user:', env.currentUser.first_name);
+                        // ✅ EXTRACT ALL VARIABLES FROM ENVIRONMENT WITH UNIQUE NAMES
+                        var BotInstance = env.bot;
+                        var botInstance = env.bot;
+                        var ApiInstance = env.api;
+                        var apiInstance = env.api;
+                        var APIInstance = env.api;
                         
-                        // 🎯 USER CODE EXECUTION
+                        var getUserFunc = env.getuser;
+                        var getCurrentUserFunc = env.getcurrentuser;
+                        var userDataObj = env.userdata;
+                        var currentUserObj = env.currentuser;
+                        
+                        var getChatFunc = env.getchat;
+                        var getCurrentChatFunc = env.getcurrentchat;
+                        var chatDataObj = env.chatdata;
+                        var currentChatObj = env.currentchat;
+                        
+                        var sendMessageFunc = env.sendmessage;
+                        var sendFunc = env.send;
+                        var replyFunc = env.reply;
+                        var sendPhotoFunc = env.sendphoto;
+                        var sendDocumentFunc = env.senddocument;
+                        
+                        var paramsArray = env.params;
+                        var messageText = env.message;
+                        var UserStorage = env.user;
+                        var BotDataStorage = env.botdata;
+                        
+                        var waitFunc = env.wait;
+                        var delayFunc = env.delay;
+                        var sleepFunc = env.sleep;
+                        
+                        var runPythonFunc = env.runpython;
+                        var executePythonFunc = env.executepython;
+                        var waitForAnswerFunc = env.waitforanswer;
+                        var askFunc = env.ask;
+                        
+                        var metaDataFunc = env.metadata;
+                        var inspectFunc = env.inspect;
+                        var getMetaFunc = env.getmeta;
+                        
+                        var analyzeContextFunc = env.analyzecontext;
+                        var getContextFunc = env.getcontext;
+                        var contextObj = env.context;
+                        var ctxObj = env.ctx;
+                        
+                        console.log('✅ Execution started for user:', currentUserObj.first_name);
+                        
+                        // User's code starts here
                         ${code}
+                        // User's code ends here
                         
-                        return "✅ Command completed successfully";
+                        return "Command completed successfully";
                     } catch (error) {
                         console.error('❌ Execution error:', error);
                         try {
-                            await env.Bot.sendMessage("❌ Error: " + error.message);
-                        } catch (sendError) {
-                            console.error('Failed to send error message:', sendError);
+                            await env.sendMessage("❌ Error: " + error.message);
+                        } catch (e) {
+                            console.error('Failed to send error message:', e);
                         }
                         throw error;
                     }
-                })();
-                `
+                })();`
             );
-            
+
             // Execute the command
-            console.log('🚀 Executing user code...');
-            const result = await executionFunction(environment);
+            console.log('🚀 Executing command...');
+            const result = await executionFunction(finalContext);
             
-            console.log('✅ Command execution completed successfully');
+            console.log('✅ Command execution completed');
             resolve(result);
 
         } catch (error) {
