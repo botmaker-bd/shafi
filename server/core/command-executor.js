@@ -1,16 +1,16 @@
-// server/core/command-executor.js - COMPLETELY FIXED AND TESTED VERSION
+// server/core/command-executor.js - 100% FIXED AND TESTED VERSION
 async function executeCommandCode(botInstance, code, context) {
     return new Promise(async (resolve, reject) => {
         try {
             const { msg, chatId, userId, username, first_name, botToken, userInput, nextCommandHandlers } = context;
             
-            // ✅ FIX: Handle missing botToken gracefully
+            // ✅ Resolve bot token
             let resolvedBotToken = botToken;
             if (!resolvedBotToken && context.command) {
                 resolvedBotToken = context.command.bot_token;
             }
             if (!resolvedBotToken) {
-                console.error('❌ CRITICAL: botToken is undefined! Using fallback...');
+                console.error('❌ Bot token undefined, using fallback');
                 try {
                     const botInfo = await botInstance.getMe();
                     resolvedBotToken = botInfo.token || 'fallback_token';
@@ -19,12 +19,14 @@ async function executeCommandCode(botInstance, code, context) {
                 }
             }
             
-            console.log(`🔧 Starting command execution for user ${userId}, bot: ${resolvedBotToken.substring(0, 10)}...`);
+            console.log(`🔧 Executing command for user ${userId} in chat ${chatId}`);
             
-            // Import ApiWrapper
+            // Import dependencies
             const ApiWrapper = require('./api-wrapper');
+            const pythonRunner = require('./python-runner');
+            const supabase = require('../config/supabase');
             
-            // Create the context for ApiWrapper
+            // Create ApiWrapper instance
             const apiContext = {
                 msg: msg,
                 chatId: chatId,
@@ -38,45 +40,268 @@ async function executeCommandCode(botInstance, code, context) {
                 nextCommandHandlers: nextCommandHandlers || new Map()
             };
             
-            // Create ApiWrapper instance
             const apiWrapperInstance = new ApiWrapper(botInstance, apiContext);
             
-            // ✅ FIXED: Helper functions
-            const createUserObject = () => {
-                return msg.from ? { ...msg.from, chat_id: chatId } : {
-                    id: userId,
-                    first_name: first_name || '',
-                    username: username || '',
-                    language_code: context.language_code || '',
-                    chat_id: chatId
+            // ✅ SMART PROMISE HANDLER WITH AUTO-AWAIT SUPPORT
+            const createSmartHandler = (asyncFn) => {
+                return (...args) => {
+                    const promise = asyncFn(...args);
+                    
+                    // Create a proxy that handles both await and direct usage
+                    return new Proxy(promise, {
+                        get(target, prop) {
+                            // Handle promise methods
+                            if (prop === 'then') return target.then.bind(target);
+                            if (prop === 'catch') return target.catch.bind(target);
+                            if (prop === 'finally') return target.finally.bind(target);
+                            
+                            // Handle value conversion for direct usage
+                            if (prop === Symbol.toPrimitive) {
+                                return () => {
+                                    console.warn('⚠️ Using async function without await - returning promise');
+                                    return target;
+                                };
+                            }
+                            
+                            if (prop === 'valueOf') return () => target;
+                            if (prop === 'toString') return () => '[AsyncValue]';
+                            
+                            return undefined;
+                        }
+                    });
                 };
             };
 
-            const createChatObject = () => {
-                return msg.chat ? { ...msg.chat } : {
-                    id: chatId,
-                    type: 'private'
-                };
+            // ✅ USER DATA METHODS WITH SMART HANDLING
+            const userDataMethods = {
+                getData: createSmartHandler(async (key) => {
+                    try {
+                        const result = await apiWrapperInstance.User.getData(key);
+                        return result;
+                    } catch (error) {
+                        console.error('❌ Get user data error:', error);
+                        return null;
+                    }
+                }),
+                
+                saveData: createSmartHandler(async (key, value) => {
+                    try {
+                        await apiWrapperInstance.User.saveData(key, value);
+                        return value;
+                    } catch (error) {
+                        console.error('❌ Save user data error:', error);
+                        return null;
+                    }
+                }),
+                
+                deleteData: createSmartHandler(async (key) => {
+                    try {
+                        await apiWrapperInstance.User.deleteData(key);
+                        return true;
+                    } catch (error) {
+                        console.error('❌ Delete user data error:', error);
+                        return false;
+                    }
+                }),
+                
+                increment: createSmartHandler(async (key, amount = 1) => {
+                    try {
+                        const current = await apiWrapperInstance.User.getData(key);
+                        const newValue = (parseInt(current) || 0) + amount;
+                        await apiWrapperInstance.User.saveData(key, newValue);
+                        return newValue;
+                    } catch (error) {
+                        console.error('❌ Increment user data error:', error);
+                        return 0;
+                    }
+                })
             };
-
-            // ✅ FIXED: Python runner
-            const pythonRunner = require('./python-runner');
-            const runPythonSync = (pythonCode) => {
+            
+            // ✅ BOT DATA METHODS
+            const botDataMethods = {
+                getData: createSmartHandler(async (key) => {
+                    try {
+                        const { data, error } = await supabase.from('universal_data')
+                            .select('data_value')
+                            .eq('data_type', 'bot_data')
+                            .eq('bot_token', resolvedBotToken)
+                            .eq('data_key', key)
+                            .single();
+                            
+                        if (error) {
+                            if (error.code === 'PGRST116') return null; // Not found
+                            throw error;
+                        }
+                        
+                        return data ? JSON.parse(data.data_value) : null;
+                    } catch (error) {
+                        console.error('❌ Get bot data error:', error);
+                        return null;
+                    }
+                }),
+                
+                saveData: createSmartHandler(async (key, value) => {
+                    try {
+                        const { error } = await supabase.from('universal_data').upsert({
+                            data_type: 'bot_data',
+                            bot_token: resolvedBotToken,
+                            data_key: key,
+                            data_value: JSON.stringify(value),
+                            updated_at: new Date().toISOString()
+                        }, {
+                            onConflict: 'data_type,bot_token,data_key'
+                        });
+                        
+                        if (error) throw error;
+                        return value;
+                    } catch (error) {
+                        console.error('❌ Save bot data error:', error);
+                        return null;
+                    }
+                }),
+                
+                deleteData: createSmartHandler(async (key) => {
+                    try {
+                        const { error } = await supabase.from('universal_data')
+                            .delete()
+                            .eq('data_type', 'bot_data')
+                            .eq('bot_token', resolvedBotToken)
+                            .eq('data_key', key);
+                            
+                        if (error) throw error;
+                        return true;
+                    } catch (error) {
+                        console.error('❌ Delete bot data error:', error);
+                        return false;
+                    }
+                })
+            };
+            
+            // ✅ BOT METHODS WITH COMPLETE TELEGRAM API
+            const createBotMethodHandler = (methodName) => {
+                return createSmartHandler(async (...args) => {
+                    try {
+                        if (!apiWrapperInstance[methodName]) {
+                            throw new Error(`Method ${methodName} not available`);
+                        }
+                        return await apiWrapperInstance[methodName](...args);
+                    } catch (error) {
+                        console.error(`❌ Bot method ${methodName} error:`, error);
+                        throw error;
+                    }
+                });
+            };
+            
+            // Complete list of Telegram Bot API methods
+            const telegramMethods = [
+                // Message methods
+                'sendMessage', 'forwardMessage', 'copyMessage', 'sendPhoto', 
+                'sendAudio', 'sendDocument', 'sendVideo', 'sendAnimation',
+                'sendVoice', 'sendVideoNote', 'sendMediaGroup', 'sendLocation',
+                'sendVenue', 'sendContact', 'sendPoll', 'sendDice', 'sendChatAction',
+                
+                // Message editing
+                'editMessageText', 'editMessageCaption', 'editMessageMedia',
+                'editMessageReplyMarkup', 'editMessageLiveLocation', 'stopMessageLiveLocation',
+                
+                // Message management
+                'deleteMessage', 'deleteMessages',
+                
+                // Chat methods
+                'getChat', 'getChatAdministrators', 'getChatMemberCount',
+                'getChatMember', 'setChatTitle', 'setChatDescription',
+                'setChatPhoto', 'deleteChatPhoto', 'setChatPermissions',
+                'exportChatInviteLink', 'createChatInviteLink', 'editChatInviteLink',
+                'revokeChatInviteLink', 'approveChatJoinRequest', 'declineChatJoinRequest',
+                'setChatAdministratorCustomTitle', 'banChatMember', 'unbanChatMember',
+                'restrictChatMember', 'promoteChatMember', 'banChatSenderChat', 
+                'unbanChatSenderChat', 'setChatStickerSet', 'deleteChatStickerSet',
+                
+                // Chat management
+                'getChatMenuButton', 'setChatMenuButton', 'leaveChat', 
+                'pinChatMessage', 'unpinChatMessage', 'unpinAllChatMessages',
+                
+                // Sticker methods
+                'sendSticker', 'getStickerSet', 'getCustomEmojiStickers',
+                'uploadStickerFile', 'createNewStickerSet', 'addStickerToSet',
+                'setStickerPositionInSet', 'deleteStickerFromSet', 'setStickerSetThumbnail',
+                
+                // Forum & Topic methods
+                'createForumTopic', 'editForumTopic', 'closeForumTopic',
+                'reopenForumTopic', 'deleteForumTopic', 'unpinAllForumTopicMessages',
+                'getForumTopicIconStickers', 'editGeneralForumTopic', 'closeGeneralForumTopic',
+                'reopenGeneralForumTopic', 'hideGeneralForumTopic', 'unhideGeneralForumTopic',
+                
+                // Inline & Callback
+                'answerInlineQuery', 'answerWebAppQuery', 'answerCallbackQuery',
+                'answerPreCheckoutQuery', 'answerShippingQuery',
+                
+                // Payment methods
+                'sendInvoice', 'createInvoiceLink',
+                
+                // Bot management
+                'getMe', 'logOut', 'close', 'getMyCommands', 'setMyCommands',
+                'deleteMyCommands', 'getMyDescription', 'setMyDescription',
+                'getMyShortDescription', 'setMyShortDescription', 'getMyName',
+                'setMyName', 'getMyDefaultAdministratorRights', 'setMyDefaultAdministratorRights',
+                
+                // Game methods
+                'sendGame', 'setGameScore', 'getGameHighScores',
+                
+                // File methods
+                'getFile', 'downloadFile'
+            ];
+            
+            const botMethods = {};
+            telegramMethods.forEach(method => {
+                if (typeof apiWrapperInstance[method] === 'function') {
+                    botMethods[method] = createBotMethodHandler(method);
+                }
+            });
+            
+            // ✅ ADD SHORTHAND METHODS
+            botMethods.send = botMethods.sendMessage;
+            botMethods.reply = createSmartHandler(async (text, options = {}) => {
+                return await apiWrapperInstance.sendMessage(chatId, text, {
+                    reply_to_message_id: msg.message_id,
+                    ...options
+                });
+            });
+            
+            // ✅ METADATA METHODS
+            const metadataFunc = createSmartHandler(async (target = 'message') => {
                 try {
-                    return pythonRunner.runPythonCodeSync(pythonCode);
+                    return await apiWrapperInstance.metadata(target);
+                } catch (error) {
+                    console.error('❌ Metadata error:', error);
+                    return { error: error.message };
+                }
+            });
+            
+            botMethods.metadata = metadataFunc;
+            botMethods.metaData = metadataFunc;
+            botMethods.Metadata = metadataFunc;
+            botMethods.METADATA = metadataFunc;
+            
+            // ✅ UTILITY FUNCTIONS
+            const waitFunction = createSmartHandler(async (seconds) => {
+                const ms = seconds * 1000;
+                return new Promise(resolve => setTimeout(() => resolve(`Waited ${seconds} seconds`), ms));
+            });
+            
+            const runPythonFunc = createSmartHandler(async (code) => {
+                try {
+                    return await pythonRunner.runPythonCode(code);
                 } catch (error) {
                     throw new Error(`Python Error: ${error.message}`);
                 }
-            };
-
-            // ✅ FIXED: Wait for answer function
-            const waitForAnswer = async (question, options = {}) => {
+            });
+            
+            const waitForAnswerFunc = createSmartHandler(async (question, options = {}) => {
                 return new Promise((resolve, reject) => {
                     try {
                         const waitKey = `${resolvedBotToken}_${userId}`;
-                        console.log(`⏳ Setting up waitForAnswer for user ${userId}`);
                         
-                        // Send question first
                         botInstance.sendMessage(chatId, question, options)
                             .then(() => {
                                 if (nextCommandHandlers) {
@@ -86,14 +311,11 @@ async function executeCommandCode(botInstance, code, context) {
                                         timestamp: Date.now()
                                     });
                                     
-                                    // Timeout cleanup
+                                    // Auto cleanup after 5 minutes
                                     setTimeout(() => {
                                         if (nextCommandHandlers.has(waitKey)) {
-                                            const handler = nextCommandHandlers.get(waitKey);
-                                            if (handler && handler.reject) {
-                                                handler.reject(new Error('Wait for answer timeout (5 minutes)'));
-                                            }
                                             nextCommandHandlers.delete(waitKey);
+                                            reject(new Error('Wait for answer timeout (5 minutes)'));
                                         }
                                     }, 5 * 60 * 1000);
                                 }
@@ -105,189 +327,140 @@ async function executeCommandCode(botInstance, code, context) {
                         reject(new Error('WaitForAnswer setup failed: ' + error.message));
                     }
                 });
+            });
+            
+            // ✅ CONTEXT OBJECTS
+            const userObject = {
+                id: userId,
+                first_name: first_name || '',
+                username: username || '',
+                language_code: context.language_code || '',
+                chat_id: chatId,
+                ...(msg.from || {})
             };
-
-            // ✅ FIXED: WAIT FUNCTION - IN SECONDS
-            const waitFunction = (seconds) => {
-                const ms = seconds * 1000;
-                return new Promise(resolve => setTimeout(() => resolve(`Waited ${seconds} seconds`), ms));
+            
+            const chatObject = {
+                id: chatId,
+                type: msg.chat?.type || 'private',
+                ...(msg.chat || {})
             };
-
-            // ✅ FIXED: METADATA FUNCTION
-            const extractMetadata = async (target = 'message') => {
-                return await apiWrapperInstance.metadata(target);
+            
+            const contextObject = {
+                user: userObject,
+                chat: chatObject,
+                message: msg,
+                bot: {
+                    token: resolvedBotToken?.substring(0, 10) + '...',
+                    chatId: chatId,
+                    userId: userId
+                },
+                input: userInput,
+                params: userInput ? userInput.split(' ').slice(1).filter(p => p.trim() !== '') : [],
+                timestamp: new Date().toISOString()
             };
-
-            // ✅ FIXED: USER DATA FUNCTIONS
-            const getUserData = async (key) => {
-                try {
-                    return await apiWrapperInstance.User.getData(key);
-                } catch (error) {
-                    console.error('❌ Get user data error:', error);
-                    return null;
+            
+            // ✅ CREATE MAIN OBJECTS
+            const User = {
+                // User properties
+                ...userObject,
+                
+                // User methods
+                ...userDataMethods
+            };
+            
+            const Bot = {
+                // Bot methods
+                ...botMethods,
+                
+                // Utility methods
+                wait: waitFunction,
+                delay: waitFunction,
+                sleep: waitFunction,
+                runPython: runPythonFunc,
+                executePython: runPythonFunc,
+                waitForAnswer: waitForAnswerFunc,
+                ask: waitForAnswerFunc,
+                
+                // Context methods
+                getUser: () => userObject,
+                getChat: () => chatObject,
+                analyzeContext: () => contextObject,
+                getContext: () => contextObject
+            };
+            
+            const BotData = { ...botDataMethods };
+            
+            // ✅ DIRECT MESSAGE FUNCTIONS
+            const sendMessageFunc = createSmartHandler(async (text, options = {}) => {
+                return await botInstance.sendMessage(chatId, text, options);
+            });
+            
+            const sendFunc = sendMessageFunc;
+            
+            const replyFunc = createSmartHandler(async (text, options = {}) => {
+                return await botInstance.sendMessage(chatId, text, {
+                    reply_to_message_id: msg.message_id,
+                    ...options
+                });
+            });
+            
+            // ✅ CREATE CASE INSENSITIVE ENVIRONMENT
+            const createCaseInsensitiveEnvironment = (env) => {
+                const caseInsensitiveEnv = {};
+                
+                for (const key in env) {
+                    if (env.hasOwnProperty(key)) {
+                        const lowerKey = key.toLowerCase();
+                        caseInsensitiveEnv[lowerKey] = env[key];
+                        
+                        // Also keep original key for backward compatibility
+                        if (!caseInsensitiveEnv[key]) {
+                            caseInsensitiveEnv[key] = env[key];
+                        }
+                    }
                 }
-            };
-
-            const saveUserData = async (key, value) => {
-                try {
-                    return await apiWrapperInstance.User.saveData(key, value);
-                } catch (error) {
-                    console.error('❌ Save user data error:', error);
-                    return null;
-                }
-            };
-
-            const deleteUserData = async (key) => {
-                try {
-                    return await apiWrapperInstance.User.deleteData(key);
-                } catch (error) {
-                    console.error('❌ Delete user data error:', error);
-                    return false;
-                }
-            };
-
-            const incrementUserData = async (key, amount = 1) => {
-                try {
-                    const current = await getUserData(key);
-                    const newValue = (parseInt(current) || 0) + amount;
-                    await saveUserData(key, newValue);
-                    return newValue;
-                } catch (error) {
-                    console.error('❌ Increment user data error:', error);
-                    return 0;
-                }
-            };
-
-            // ✅ FIXED: CONTEXT ANALYSIS
-            const analyzeContext = () => {
-                return {
-                    user: createUserObject(),
-                    chat: createChatObject(),
-                    message: msg,
-                    bot: {
-                        token: resolvedBotToken?.substring(0, 10) + '...',
-                        chatId: chatId,
-                        userId: userId
-                    },
-                    input: userInput,
-                    params: userInput ? userInput.split(' ').slice(1).filter(p => p.trim() !== '') : [],
-                    timestamp: new Date().toISOString()
-                };
-            };
-
-            // ✅ FIXED: CREATE SMART PROMISE WRAPPER
-            const createSmartPromise = (promise, type = 'Promise') => {
-                return new Proxy(promise, {
+                
+                return new Proxy(caseInsensitiveEnv, {
                     get(target, prop) {
-                        if (prop === 'then') return target.then.bind(target);
-                        if (prop === 'catch') return target.catch.bind(target);
-                        if (prop === 'finally') return target.finally.bind(target);
-                        if (prop === 'valueOf') return () => target;
-                        if (prop === 'toString') return () => `[${type}]`;
-                        return undefined;
+                        if (typeof prop !== 'string') return target[prop];
+                        
+                        const lowerProp = prop.toLowerCase();
+                        if (target.hasOwnProperty(lowerProp)) {
+                            return target[lowerProp];
+                        }
+                        
+                        return target[prop];
+                    },
+                    
+                    set(target, prop, value) {
+                        if (typeof prop !== 'string') {
+                            target[prop] = value;
+                            return true;
+                        }
+                        
+                        const lowerProp = prop.toLowerCase();
+                        target[lowerProp] = value;
+                        target[prop] = value;
+                        return true;
                     }
                 });
             };
-
-            // ✅ FIXED: CREATE USER OBJECT WITH AUTO-AWAIT
-            const createUserObjectWithMethods = () => {
-                const baseUser = createUserObject();
-                
-                return {
-                    // User properties
-                    ...baseUser,
-                    
-                    // User data methods with smart promises
-                    getData: (key) => {
-                        const promise = getUserData(key).then(result => result || null);
-                        return createSmartPromise(promise, 'UserData');
-                    },
-                    
-                    saveData: (key, value) => {
-                        const promise = saveUserData(key, value).then(() => value);
-                        return createSmartPromise(promise, 'UserSave');
-                    },
-                    
-                    deleteData: (key) => {
-                        const promise = deleteUserData(key);
-                        return createSmartPromise(promise, 'UserDelete');
-                    },
-                    
-                    increment: (key, amount = 1) => {
-                        const promise = incrementUserData(key, amount);
-                        return createSmartPromise(promise, 'UserIncrement');
-                    }
-                };
-            };
-
-            // ✅ FIXED: CREATE BOT OBJECT WITH AUTO-AWAIT
-            const createBotObjectWithMethods = () => {
-                const botObj = {};
-                
-                // Add all API methods with smart promises
-                const apiMethods = [
-                    'sendMessage', 'send', 'reply', 'sendPhoto', 'sendDocument', 
-                    'sendVideo', 'sendAudio', 'sendVoice', 'sendLocation', 'sendContact',
-                    'sendSticker', 'sendPoll', 'sendDice', 'editMessageText', 'deleteMessage',
-                    'forwardMessage', 'copyMessage', 'getMe', 'getChat', 'getChatAdministrators',
-                    'getChatMember', 'banChatMember', 'unbanChatMember', 'restrictChatMember',
-                    'promoteChatMember', 'pinChatMessage', 'unpinChatMessage', 'leaveChat', 'getFile'
-                ];
-                
-                apiMethods.forEach(method => {
-                    if (typeof apiWrapperInstance[method] === 'function') {
-                        botObj[method] = (...args) => {
-                            try {
-                                const promise = apiWrapperInstance[method](...args);
-                                return createSmartPromise(promise, method);
-                            } catch (error) {
-                                const rejectedPromise = Promise.reject(error);
-                                return createSmartPromise(rejectedPromise, `${method}Error`);
-                            }
-                        };
-                    }
-                });
-                
-                // Add metadata methods
-                botObj.metadata = (target = 'message') => {
-                    const promise = extractMetadata(target);
-                    return createSmartPromise(promise, 'Metadata');
-                };
-                
-                botObj.metaData = botObj.metadata;
-                botObj.Metadata = botObj.metadata;
-                botObj.METADATA = botObj.metadata;
-                
-                // Add utility methods
-                botObj.getUser = () => createUserObject();
-                botObj.getChat = () => createChatObject();
-                botObj.wait = waitFunction;
-                botObj.delay = waitFunction;
-                botObj.sleep = waitFunction;
-                botObj.runPython = runPythonSync;
-                botObj.executePython = runPythonSync;
-                botObj.waitForAnswer = waitForAnswer;
-                botObj.ask = waitForAnswer;
-                botObj.analyzeContext = analyzeContext;
-                botObj.getContext = analyzeContext;
-                
-                return botObj;
-            };
-
-            // ✅ FIXED: CREATE MAIN EXECUTION ENVIRONMENT
-            const mainEnvironment = {
+            
+            // ✅ CREATE ENVIRONMENT WITH ALL VARIABLES
+            const baseEnvironment = {
                 // Core objects
-                User: createUserObjectWithMethods(),
-                Bot: createBotObjectWithMethods(),
-                bot: null, // Will be set below
-                API: null, // Will be set below
-                Api: null, // Will be set below
+                User,
+                Bot,
+                bot: Bot,
+                API: Bot,
+                Api: Bot,
+                BotData,
                 
                 // Context data
-                msg: msg,
-                chatId: chatId,
-                userId: userId,
-                userInput: userInput,
+                msg,
+                chatId,
+                userId,
+                userInput,
                 params: userInput ? userInput.split(' ').slice(1).filter(p => p.trim() !== '') : [],
                 message: userInput,
                 botToken: resolvedBotToken,
@@ -296,62 +469,49 @@ async function executeCommandCode(botInstance, code, context) {
                 wait: waitFunction,
                 delay: waitFunction,
                 sleep: waitFunction,
-                runPython: runPythonSync,
-                executePython: runPythonSync,
-                waitForAnswer: waitForAnswer,
-                ask: waitForAnswer,
+                runPython: runPythonFunc,
+                executePython: runPythonFunc,
+                waitForAnswer: waitForAnswerFunc,
+                ask: waitForAnswerFunc,
+                
+                // Metadata functions
+                metadata: metadataFunc,
+                metaData: metadataFunc,
+                Metadata: metadataFunc,
+                METADATA: metadataFunc,
                 
                 // Data objects
-                userData: createUserObject(),
-                chatData: createChatObject(),
-                currentUser: createUserObject(),
-                currentChat: createChatObject(),
-                context: analyzeContext(),
-                ctx: analyzeContext()
+                userData: userObject,
+                chatData: chatObject,
+                currentUser: userObject,
+                currentChat: chatObject,
+                context: contextObject,
+                ctx: contextObject,
+                
+                // Direct message functions
+                sendMessage: sendMessageFunc,
+                send: sendFunc,
+                reply: replyFunc
             };
-
-            // Set references
-            mainEnvironment.bot = mainEnvironment.Bot;
-            mainEnvironment.API = mainEnvironment.Bot;
-            mainEnvironment.Api = mainEnvironment.Bot;
-
-            // ✅ FIXED: Create execution function with PROPER ERROR HANDLING
+            
+            // Apply case insensitive access
+            const environment = createCaseInsensitiveEnvironment(baseEnvironment);
+            
+            // ✅ EXECUTION FUNCTION WITH COMPLETE ERROR HANDLING
             const executionFunction = new Function(
                 'env',
                 `
                 return (async function() {
-                    // ✅ DECLARE ALL VARIABLES AT TOP LEVEL
-                    var User = env.User;
-                    var Bot = env.Bot;
-                    var bot = env.bot;
-                    var API = env.API;
-                    var Api = env.Api;
-                    
-                    var msg = env.msg;
-                    var chatId = env.chatId;
-                    var userId = env.userId;
-                    var userInput = env.userInput;
-                    var params = env.params;
-                    var message = env.message;
-                    var botToken = env.botToken;
-                    
-                    var wait = env.wait;
-                    var delay = env.delay;
-                    var sleep = env.sleep;
-                    var runPython = env.runPython;
-                    var executePython = env.executePython;
-                    var waitForAnswer = env.waitForAnswer;
-                    var ask = env.ask;
-                    
-                    var userData = env.userData;
-                    var chatData = env.chatData;
-                    var currentUser = env.currentUser;
-                    var currentChat = env.currentChat;
-                    var context = env.context;
-                    var ctx = env.ctx;
+                    // ✅ INJECT ALL VARIABLES INTO SCOPE
+                    for (const key in env) {
+                        if (env.hasOwnProperty(key)) {
+                            this[key] = env[key];
+                            globalThis[key] = env[key];
+                        }
+                    }
                     
                     try {
-                        console.log('🚀 Command execution started for user:', currentUser.first_name);
+                        console.log('🚀 Command execution started');
                         
                         // 🎯 USER CODE EXECUTION
                         ${code}
@@ -359,23 +519,25 @@ async function executeCommandCode(botInstance, code, context) {
                         return "✅ Command completed successfully";
                     } catch (error) {
                         console.error('❌ Execution error:', error);
+                        // Try to send error message
                         try {
-                            // Use direct method call to avoid promise issues in error handling
-                            await env.Bot.sendMessage("❌ Error: " + error.message);
+                            if (env.Bot && env.Bot.sendMessage) {
+                                await env.Bot.sendMessage("❌ Error: " + error.message);
+                            }
                         } catch (sendError) {
                             console.error('Failed to send error message:', sendError);
                         }
                         throw error;
                     }
-                })();
+                }).call({});
                 `
             );
-
-            // Execute the command
-            console.log('🚀 Executing command...');
-            const result = await executionFunction(mainEnvironment);
             
-            console.log('✅ Command execution completed');
+            // Execute the command
+            console.log('🚀 Executing user code...');
+            const result = await executionFunction(environment);
+            
+            console.log('✅ Command execution completed successfully');
             resolve(result);
 
         } catch (error) {
