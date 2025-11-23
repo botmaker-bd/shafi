@@ -1,12 +1,10 @@
-// server/core/api-wrapper.js - COMPLETELY FIXED AND ENHANCED VERSION
+// server/core/api-wrapper.js - COMPLETELY FIXED VERSION
 class ApiWrapper {
     constructor(bot, context) {
         this.bot = bot;
         this.context = context;
         this.setupAllMethods();
         this.setupMetadataMethods();
-        this.setupUserDataMethods();
-        this.setupBotDataMethods(); // ✅ NEW: BotData methods added
     }
 
     setupAllMethods() {
@@ -106,409 +104,113 @@ class ApiWrapper {
         this.setupEnhancedMethods();
     }
 
-    // ✅ FIXED: METADATA METHODS SETUP - ORIGINAL RESPONSE ONLY
+    // ✅ FIXED: METADATA METHODS SETUP
     setupMetadataMethods() {
-        // 🔍 METADATA METHODS - ORIGINAL RESPONSE ONLY
-        this.metadata = async (target = 'message') => {
-            return await this.getOriginalMetadata(target);
+        // Add metadata methods to ApiWrapper
+        this.setupMetadataShortcuts();
+    }
+
+    setupMetadataShortcuts() {
+        // 🔍 METADATA INSPECTION METHODS - ORIGINAL RESPONSE ONLY
+        this.metaData = async (target = 'all') => {
+            return await this.getOriginalResponse(target);
         };
 
-        this.metaData = async (target = 'message') => {
-            return await this.getOriginalMetadata(target);
+        this.metadata = async (target = 'all') => {
+            return await this.getOriginalResponse(target);
         };
 
-        this.Metadata = async (target = 'message') => {
-            return await this.getOriginalMetadata(target);
+        this.getMeta = async (target = 'all') => {
+            return await this.getOriginalResponse(target);
         };
 
-        this.METADATA = async (target = 'message') => {
-            return await this.getOriginalMetadata(target);
+        this.inspect = async (target = 'all') => {
+            return await this.getOriginalResponse(target);
         };
     }
 
-    // ✅ FIXED: USER DATA METHODS SETUP
-    setupUserDataMethods() {
-        // User data methods
-        this.User = {
-            getData: async (key) => {
-                return await this.getUserData(key);
-            },
-            
-            saveData: async (key, value) => {
-                return await this.saveUserData(key, value);
-            },
-            
-            deleteData: async (key) => {
-                return await this.deleteUserData(key);
-            },
-            
-            increment: async (key, amount = 1) => {
-                return await this.incrementUserData(key, amount);
-            }
-        };
-    }
-
-    // ✅ NEW: BOT DATA METHODS SETUP
-    setupBotDataMethods() {
-        // Bot data methods
-        this.BotData = {
-            getData: async (key) => {
-                return await this.getBotData(key);
-            },
-            
-            saveData: async (key, value) => {
-                return await this.saveBotData(key, value);
-            },
-            
-            deleteData: async (key) => {
-                return await this.deleteBotData(key);
-            }
-        };
-    }
-
-    // 🎯 GET ORIGINAL METADATA - RAW JSON RESPONSE ONLY
-    async getOriginalMetadata(target = 'message') {
+    // 🎯 GET ORIGINAL RESPONSE ONLY (JSON FORMAT)
+    async getOriginalResponse(target = 'all') {
         try {
-            let originalData;
+            let originalResponse;
 
             switch (target.toLowerCase()) {
-                case 'message':
-                case 'msg':
-                    originalData = this.context.msg || {};
+                case 'chat':
+                case 'channel':
+                case 'group':
+                    originalResponse = await this.bot.getChat(this.context.chatId);
                     break;
 
                 case 'user':
-                case 'from':
-                    originalData = this.context.msg?.from || {};
-                    break;
-
-                case 'chat':
-                    originalData = this.context.msg?.chat || {};
-                    break;
-
-                case 'update':
-                    originalData = {
-                        message: this.context.msg,
-                        chat: this.context.msg?.chat,
-                        from: this.context.msg?.from,
-                        context: {
-                            chatId: this.context.chatId,
-                            userId: this.context.userId,
-                            username: this.context.username,
-                            botToken: this.context.botToken?.substring(0, 10) + '...'
-                        }
-                    };
+                case 'userinfo':
+                    // For current user in context
+                    if (this.context.msg?.from) {
+                        originalResponse = this.context.msg.from;
+                    } else {
+                        // Try to get user info from chat member data
+                        originalResponse = await this.bot.getChatMember(this.context.chatId, this.context.userId);
+                    }
                     break;
 
                 case 'bot':
-                    try {
-                        originalData = await this.bot.getMe();
-                    } catch (error) {
-                        originalData = { error: error.message };
-                    }
+                case 'botinfo':
+                    originalResponse = await this.bot.getMe();
+                    break;
+
+                case 'update':
+                case 'context':
+                    originalResponse = this.context.msg || this.context;
+                    break;
+
+                case 'all':
+                case 'everything':
+                    const [chat, user, bot, update] = await Promise.all([
+                        this.bot.getChat(this.context.chatId).catch(() => null),
+                        this.bot.getChatMember(this.context.chatId, this.context.userId).catch(() => this.context.msg?.from),
+                        this.bot.getMe().catch(() => null),
+                        this.context.msg || this.context
+                    ]);
+                    originalResponse = { chat, user, bot, update };
                     break;
 
                 default:
-                    // If specific field requested
-                    if (this.context.msg && this.context.msg[target]) {
-                        originalData = this.context.msg[target];
+                    // If target is a specific ID
+                    if (typeof target === 'number' || target.startsWith('@')) {
+                        if (typeof target === 'number') {
+                            if (target > 0) {
+                                // Positive number - user ID
+                                originalResponse = await this.bot.getChatMember(this.context.chatId, target);
+                            } else {
+                                // Negative number - chat ID
+                                originalResponse = await this.bot.getChat(target);
+                            }
+                        } else {
+                            // Username
+                            originalResponse = { username: target.substring(1), note: 'Username resolution not implemented' };
+                        }
                     } else {
-                        originalData = {
-                            message: this.context.msg,
-                            chat: this.context.msg?.chat,
-                            from: this.context.msg?.from,
-                            context: this.context
-                        };
+                        originalResponse = await this.bot.getChat(this.context.chatId);
                     }
             }
 
-            // Return pure JSON response
+            // Return original response in JSON format
             return {
                 success: true,
-                type: 'metadata',
+                type: 'original_response',
                 target: target,
-                data: originalData,
+                data: originalResponse,
                 timestamp: new Date().toISOString()
             };
 
         } catch (error) {
-            console.error('❌ Metadata error:', error);
+            console.error('❌ Metadata inspection error:', error);
             return {
                 success: false,
-                error: error.message,
-                type: 'metadata',
+                type: 'original_response',
                 target: target,
+                error: error.message,
                 timestamp: new Date().toISOString()
             };
-        }
-    }
-
-    // ✅ FIXED: USER DATA METHODS WITH VALIDATION
-    async getUserData(key) {
-        try {
-            // ✅ INPUT VALIDATION
-            if (typeof key !== 'string' || key.trim() === '') {
-                throw new Error('User data key must be a non-empty string');
-            }
-
-            if (!this.context.botToken || !this.context.userId) {
-                throw new Error('Bot token or user ID not available');
-            }
-
-            const supabase = require('../config/supabase');
-            
-            const { data, error } = await supabase
-                .from('universal_data')
-                .select('data_value')
-                .eq('data_type', 'user_data')
-                .eq('bot_token', this.context.botToken)
-                .eq('user_id', this.context.userId.toString())
-                .eq('data_key', key)
-                .single();
-
-            if (error) {
-                if (error.code === 'PGRST116') {
-                    return null; // Not found - return null instead of throwing
-                }
-                console.error('❌ Database error in getUserData:', error);
-                throw new Error(`Database error: ${error.message}`);
-            }
-
-            if (data && data.data_value) {
-                try {
-                    return JSON.parse(data.data_value);
-                } catch (parseError) {
-                    console.warn('⚠️ Failed to parse user data as JSON, returning as string');
-                    return data.data_value;
-                }
-            }
-
-            return null;
-
-        } catch (error) {
-            console.error('❌ Get user data error:', error);
-            throw new Error(`Failed to get user data: ${error.message}`);
-        }
-    }
-
-    async saveUserData(key, value) {
-        try {
-            // ✅ INPUT VALIDATION
-            if (typeof key !== 'string' || key.trim() === '') {
-                throw new Error('User data key must be a non-empty string');
-            }
-            if (value === undefined || value === null) {
-                throw new Error('User data value cannot be null or undefined');
-            }
-
-            if (!this.context.botToken || !this.context.userId) {
-                throw new Error('Bot token or user ID not available');
-            }
-
-            const supabase = require('../config/supabase');
-            
-            const serializedValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
-            
-            const { error } = await supabase
-                .from('universal_data')
-                .upsert({
-                    data_type: 'user_data',
-                    bot_token: this.context.botToken,
-                    user_id: this.context.userId.toString(),
-                    data_key: key,
-                    data_value: serializedValue,
-                    updated_at: new Date().toISOString()
-                }, {
-                    onConflict: 'data_type,bot_token,user_id,data_key'
-                });
-
-            if (error) {
-                console.error('❌ Database error in saveUserData:', error);
-                throw new Error(`Database error: ${error.message}`);
-            }
-
-            return value;
-
-        } catch (error) {
-            console.error('❌ Save user data error:', error);
-            throw new Error(`Failed to save user data: ${error.message}`);
-        }
-    }
-
-    async deleteUserData(key) {
-        try {
-            // ✅ INPUT VALIDATION
-            if (typeof key !== 'string' || key.trim() === '') {
-                throw new Error('User data key must be a non-empty string');
-            }
-
-            if (!this.context.botToken || !this.context.userId) {
-                throw new Error('Bot token or user ID not available');
-            }
-
-            const supabase = require('../config/supabase');
-            
-            const { error } = await supabase
-                .from('universal_data')
-                .delete()
-                .eq('data_type', 'user_data')
-                .eq('bot_token', this.context.botToken)
-                .eq('user_id', this.context.userId.toString())
-                .eq('data_key', key);
-
-            if (error) {
-                console.error('❌ Database error in deleteUserData:', error);
-                throw new Error(`Database error: ${error.message}`);
-            }
-
-            return true;
-
-        } catch (error) {
-            console.error('❌ Delete user data error:', error);
-            throw new Error(`Failed to delete user data: ${error.message}`);
-        }
-    }
-
-    async incrementUserData(key, amount = 1) {
-        try {
-            // ✅ INPUT VALIDATION
-            if (typeof key !== 'string' || key.trim() === '') {
-                throw new Error('User data key must be a non-empty string');
-            }
-            if (typeof amount !== 'number' || isNaN(amount)) {
-                throw new Error('Increment amount must be a valid number');
-            }
-
-            const currentValue = await this.getUserData(key);
-            const newValue = (parseInt(currentValue) || 0) + amount;
-            await this.saveUserData(key, newValue);
-            return newValue;
-        } catch (error) {
-            console.error('❌ Increment user data error:', error);
-            throw new Error(`Failed to increment user data: ${error.message}`);
-        }
-    }
-
-    // ✅ NEW: BOT DATA METHODS
-    async getBotData(key) {
-        try {
-            // ✅ INPUT VALIDATION
-            if (typeof key !== 'string' || key.trim() === '') {
-                throw new Error('Bot data key must be a non-empty string');
-            }
-
-            if (!this.context.botToken) {
-                throw new Error('Bot token not available');
-            }
-
-            const supabase = require('../config/supabase');
-            
-            const { data, error } = await supabase
-                .from('universal_data')
-                .select('data_value')
-                .eq('data_type', 'bot_data')
-                .eq('bot_token', this.context.botToken)
-                .eq('data_key', key)
-                .single();
-
-            if (error) {
-                if (error.code === 'PGRST116') {
-                    return null; // Not found
-                }
-                console.error('❌ Database error in getBotData:', error);
-                throw new Error(`Database error: ${error.message}`);
-            }
-
-            if (data && data.data_value) {
-                try {
-                    return JSON.parse(data.data_value);
-                } catch (parseError) {
-                    console.warn('⚠️ Failed to parse bot data as JSON, returning as string');
-                    return data.data_value;
-                }
-            }
-
-            return null;
-
-        } catch (error) {
-            console.error('❌ Get bot data error:', error);
-            throw new Error(`Failed to get bot data: ${error.message}`);
-        }
-    }
-
-    async saveBotData(key, value) {
-        try {
-            // ✅ INPUT VALIDATION
-            if (typeof key !== 'string' || key.trim() === '') {
-                throw new Error('Bot data key must be a non-empty string');
-            }
-            if (value === undefined || value === null) {
-                throw new Error('Bot data value cannot be null or undefined');
-            }
-
-            if (!this.context.botToken) {
-                throw new Error('Bot token not available');
-            }
-
-            const supabase = require('../config/supabase');
-            
-            const serializedValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
-            
-            const { error } = await supabase
-                .from('universal_data')
-                .upsert({
-                    data_type: 'bot_data',
-                    bot_token: this.context.botToken,
-                    data_key: key,
-                    data_value: serializedValue,
-                    updated_at: new Date().toISOString()
-                }, {
-                    onConflict: 'data_type,bot_token,data_key'
-                });
-
-            if (error) {
-                console.error('❌ Database error in saveBotData:', error);
-                throw new Error(`Database error: ${error.message}`);
-            }
-
-            return value;
-
-        } catch (error) {
-            console.error('❌ Save bot data error:', error);
-            throw new Error(`Failed to save bot data: ${error.message}`);
-        }
-    }
-
-    async deleteBotData(key) {
-        try {
-            // ✅ INPUT VALIDATION
-            if (typeof key !== 'string' || key.trim() === '') {
-                throw new Error('Bot data key must be a non-empty string');
-            }
-
-            if (!this.context.botToken) {
-                throw new Error('Bot token not available');
-            }
-
-            const supabase = require('../config/supabase');
-            
-            const { error } = await supabase
-                .from('universal_data')
-                .delete()
-                .eq('data_type', 'bot_data')
-                .eq('bot_token', this.context.botToken)
-                .eq('data_key', key);
-
-            if (error) {
-                console.error('❌ Database error in deleteBotData:', error);
-                throw new Error(`Database error: ${error.message}`);
-            }
-
-            return true;
-
-        } catch (error) {
-            console.error('❌ Delete bot data error:', error);
-            throw new Error(`Failed to delete bot data: ${error.message}`);
         }
     }
 
@@ -603,7 +305,7 @@ class ApiWrapper {
             });
         };
 
-        this.sendVideo = (video, caption = '', options = {}) => {
+        this.sendVideoFile = (video, caption = '', options = {}) => {
             return this.sendVideo(this.context.chatId, video, {
                 caption: caption,
                 parse_mode: 'HTML',
@@ -645,7 +347,7 @@ class ApiWrapper {
         // Utility methods
         this.wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-        // ✅ IMPROVED: Wait for answer with better error handling
+        // ✅ FIXED: Wait for answer with timeout - IMPROVED VERSION
         this.waitForAnswer = (question, options = {}) => {
             return new Promise(async (resolve, reject) => {
                 // Validate context
@@ -672,14 +374,15 @@ class ApiWrapper {
 
                 // Clear existing handler
                 if (botManager.waitingAnswers && botManager.waitingAnswers.has(nextCommandKey)) {
-                    const oldHandler = botManager.waitingAnswers.get(nextCommandKey);
-                    if (oldHandler && oldHandler.timeoutId) {
-                        clearTimeout(oldHandler.timeoutId);
-                    }
                     botManager.waitingAnswers.delete(nextCommandKey);
                 }
 
-                let timeoutId = null;
+                const timeoutId = setTimeout(() => {
+                    if (botManager.waitingAnswers && botManager.waitingAnswers.has(nextCommandKey)) {
+                        botManager.waitingAnswers.delete(nextCommandKey);
+                    }
+                    reject(new Error(`Wait for answer timeout (${timeout/1000} seconds)`));
+                }, timeout);
 
                 try {
                     // Send question to user
@@ -698,29 +401,16 @@ class ApiWrapper {
                             botManager.waitingAnswers = new Map();
                         }
                         
-                        timeoutId = setTimeout(() => {
-                            if (botManager.waitingAnswers.has(nextCommandKey)) {
-                                botManager.waitingAnswers.delete(nextCommandKey);
-                            }
-                            innerReject(new Error(`Wait for answer timeout (${timeout/1000} seconds)`));
-                        }, timeout);
-
                         botManager.waitingAnswers.set(nextCommandKey, {
                             resolve: innerResolve,
                             reject: innerReject,
                             timeoutId: timeoutId,
-                            timestamp: Date.now(),
-                            question: question
+                            timestamp: Date.now()
                         });
                     });
 
                     // Wait for user's response
                     const userResponse = await waitingPromise;
-                    
-                    // Clean up timeout
-                    if (timeoutId) {
-                        clearTimeout(timeoutId);
-                    }
                     
                     console.log(`🎉 Received answer from user: "${userResponse}"`);
                     resolve({
@@ -732,13 +422,9 @@ class ApiWrapper {
                     
                 } catch (error) {
                     console.error(`❌ waitForAnswer failed:`, error);
+                    clearTimeout(timeoutId);
                     
-                    // Clean up timeout
-                    if (timeoutId) {
-                        clearTimeout(timeoutId);
-                    }
-                    
-                    // Cleanup from botManager
+                    // Cleanup
                     if (botManager.waitingAnswers && botManager.waitingAnswers.has(nextCommandKey)) {
                         botManager.waitingAnswers.delete(nextCommandKey);
                     }
@@ -767,8 +453,7 @@ class ApiWrapper {
                 const response = await axios({
                     method: 'GET',
                     url: fileUrl,
-                    responseType: 'stream',
-                    timeout: 30000 // 30 second timeout
+                    responseType: 'stream'
                 });
                 
                 response.data.pipe(fs.createWriteStream(downloadPath));
