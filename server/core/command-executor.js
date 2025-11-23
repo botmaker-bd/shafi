@@ -266,7 +266,7 @@ async function executeCommandCode(botInstance, code, context) {
                             const { data } = await supabase.from('universal_data')
                                 .select('data_value')
                                 .eq('data_type', 'bot_data')
-                                .eq('bot_token: resolvedBotToken)
+                                .eq('bot_token', resolvedBotToken)
                                 .eq('data_key', key)
                                 .single();
                             return data ? JSON.parse(data.data_value) : null;
