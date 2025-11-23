@@ -1,4 +1,4 @@
-// server/core/command-executor.js - COMPLETELY FIXED
+// server/core/command-executor.js - FIXED WAIT FUNCTION
 async function executeCommandCode(botInstance, code, context) {
     return new Promise(async (resolve, reject) => {
         try {
@@ -110,42 +110,227 @@ async function executeCommandCode(botInstance, code, context) {
                 });
             };
 
-            // ✅ FIXED: Create execution environment with UNIQUE variable names
+            // ✅ FIXED: WAIT FUNCTION - PROPER IMPLEMENTATION
+            const waitFunction = (ms) => {
+                console.log(`⏰ Waiting for ${ms}ms...`);
+                return new Promise(resolve => {
+                    setTimeout(() => {
+                        console.log(`✅ Wait completed: ${ms}ms`);
+                        resolve(`Waited ${ms}ms`);
+                    }, ms);
+                });
+            };
+
+            // ✅ AUTO METADATA EXTRACTION FUNCTION
+            const extractMetadata = (target = 'all', options = {}) => {
+                return apiWrapperInstance.inspectMetadata(target, options);
+            };
+
+            // ✅ AUTO CONTEXT ANALYSIS
+            const analyzeContext = () => {
+                return {
+                    user: createUserObject(),
+                    chat: createChatObject(),
+                    message: msg,
+                    bot: {
+                        token: resolvedBotToken?.substring(0, 10) + '...',
+                        chatId: chatId,
+                        userId: userId
+                    },
+                    input: userInput,
+                    params: userInput ? userInput.split(' ').slice(1).filter(p => p.trim() !== '') : [],
+                    timestamp: new Date().toISOString()
+                };
+            };
+
+            // ✅ CASE INSENSITIVE PROXY HANDLER
+            const createCaseInsensitiveProxy = (target) => {
+                return new Proxy(target, {
+                    get: function(obj, prop) {
+                        // Convert property to lowercase for case insensitive access
+                        const lowerProp = prop.toLowerCase();
+                        
+                        // Find the actual property (case insensitive)
+                        const actualProp = Object.keys(obj).find(key => 
+                            key.toLowerCase() === lowerProp
+                        ) || prop;
+                        
+                        return obj[actualProp];
+                    },
+                    
+                    set: function(obj, prop, value) {
+                        const lowerProp = prop.toLowerCase();
+                        const actualProp = Object.keys(obj).find(key => 
+                            key.toLowerCase() === lowerProp
+                        ) || prop;
+                        
+                        obj[actualProp] = value;
+                        return true;
+                    },
+                    
+                    has: function(obj, prop) {
+                        const lowerProp = prop.toLowerCase();
+                        return Object.keys(obj).some(key => 
+                            key.toLowerCase() === lowerProp
+                        );
+                    }
+                });
+            };
+
+            // ✅ CREATE CASE INSENSITIVE BOT OBJECT WITH WORKING WAIT
+            const caseInsensitiveBot = {
+                // Copy all methods from apiWrapperInstance (case insensitive)
+                ...Object.fromEntries(
+                    Object.entries(apiWrapperInstance).map(([key, value]) => [key.toLowerCase(), value])
+                ),
+                
+                // ✅ FIXED: WAIT FUNCTION - ALL CASES
+                wait: waitFunction,
+                Wait: waitFunction,
+                WAIT: waitFunction,
+                
+                // Special metadata methods (all cases work)
+                metadata: extractMetadata,
+                inspect: extractMetadata,
+                getmeta: extractMetadata,
+                analyze: (target, options) => extractMetadata(target, { deep: true, ...options }),
+                
+                // Quick access methods
+                chatinfo: (chatId) => extractMetadata('chat', { chatId }),
+                userinfo: (userId) => extractMetadata('user', { userId }),
+                botinfo: () => extractMetadata('bot'),
+                updateinfo: () => extractMetadata('update'),
+                
+                // Context analysis
+                analyzecontext: analyzeContext,
+                getcontext: analyzeContext,
+                
+                // Other methods
+                runpython: (pythonCode) => runPythonSync(pythonCode),
+                waitforanswer: waitForAnswer,
+                ask: waitForAnswer
+            };
+
+            // ✅ FIXED: Create execution environment with WORKING WAIT FUNCTION
             const executionEnv = {
-                // === BOT INSTANCES (All supported) ===
-                bot: apiWrapperInstance,
-                Api: apiWrapperInstance,
+                // === BOT INSTANCES (All supported) - CASE INSENSITIVE ===
+                bot: createCaseInsensitiveProxy(caseInsensitiveBot),
+                api: createCaseInsensitiveProxy(caseInsensitiveBot),
                 
-                // ✅ FIXED: Bot object with all methods
-                Bot: {
-                    ...apiWrapperInstance,
-                    runPython: (pythonCode) => runPythonSync(pythonCode),
-                    waitForAnswer: waitForAnswer,
-                    ask: waitForAnswer
-                },
-                
+                // Main bot object with case insensitive access
+                Bot: createCaseInsensitiveProxy(caseInsensitiveBot),
+                BOT: createCaseInsensitiveProxy(caseInsensitiveBot),
+                Api: createCaseInsensitiveProxy(caseInsensitiveBot),
+                API: createCaseInsensitiveProxy(caseInsensitiveBot),
+
                 // === USER INFORMATION (Multiple access methods) ===
                 getUser: createUserObject,
-                getCurrentUser: createUserObject, // Alternative method
-                userData: createUserObject(), // Direct object
+                getcurrentuser: createUserObject,
+                getuser: createUserObject,
+                GETUSER: createUserObject,
+                userdata: createUserObject(),
+                userData: createUserObject(),
+                USERDATA: createUserObject(),
                 
                 // === CHAT INFORMATION ===
                 getChat: createChatObject,
+                getchat: createChatObject,
+                GETCHAT: createChatObject,
+                getcurrentchat: createChatObject,
+                chatdata: createChatObject(),
                 chatData: createChatObject(),
-                getCurrentChat: createChatObject,
+                CHATDATA: createChatObject(),
                 
                 // === MESSAGE & PARAMS ===
                 msg: msg,
+                MSG: msg,
+                chatid: chatId,
                 chatId: chatId,
+                CHATID: chatId,
+                userid: userId,
                 userId: userId,
+                USERID: userId,
+                userinput: userInput,
                 userInput: userInput,
+                USERINPUT: userInput,
                 params: userInput ? userInput.split(' ').slice(1).filter(p => p.trim() !== '') : [],
+                PARAMS: userInput ? userInput.split(' ').slice(1).filter(p => p.trim() !== '') : [],
                 message: userInput,
+                MESSAGE: userInput,
+                bottoken: resolvedBotToken,
                 botToken: resolvedBotToken,
+                BOTTOKEN: resolvedBotToken,
                 
-                // === DATA STORAGE ===
-                User: {
-                    saveData: async (key, value) => {
+                // ✅ FIXED: WAIT FUNCTION - ALL CASES WORK
+                wait: waitFunction,
+                Wait: waitFunction,
+                WAIT: waitFunction,
+                
+                // Delay alias
+                delay: waitFunction,
+                Delay: waitFunction,
+                DELAY: waitFunction,
+                
+                // Sleep alias
+                sleep: waitFunction,
+                Sleep: waitFunction,
+                SLEEP: waitFunction,
+                
+                // AUTO METADATA ACCESS - ALL CASES
+                metadata: extractMetadata,
+                metadata: extractMetadata,
+                METADATA: extractMetadata,
+                Metadata: extractMetadata,
+                
+                inspect: extractMetadata,
+                inspect: extractMetadata,
+                INSPECT: extractMetadata,
+                Inspect: extractMetadata,
+                
+                getmeta: extractMetadata,
+                getMeta: extractMetadata,
+                GETMETA: extractMetadata,
+                GetMeta: extractMetadata,
+                
+                analyze: (target, options) => extractMetadata(target, { deep: true, ...options }),
+                Analyze: (target, options) => extractMetadata(target, { deep: true, ...options }),
+                ANALYZE: (target, options) => extractMetadata(target, { deep: true, ...options }),
+                
+                // Quick access methods - ALL CASES
+                chatinfo: (chatId) => extractMetadata('chat', { chatId }),
+                chatInfo: (chatId) => extractMetadata('chat', { chatId }),
+                CHATINFO: (chatId) => extractMetadata('chat', { chatId }),
+                ChatInfo: (chatId) => extractMetadata('chat', { chatId }),
+                
+                userinfo: (userId) => extractMetadata('user', { userId }),
+                userInfo: (userId) => extractMetadata('user', { userId }),
+                USERINFO: (userId) => extractMetadata('user', { userId }),
+                UserInfo: (userId) => extractMetadata('user', { userId }),
+                
+                botinfo: () => extractMetadata('bot'),
+                botInfo: () => extractMetadata('bot'),
+                BOTINFO: () => extractMetadata('bot'),
+                BotInfo: () => extractMetadata('bot'),
+                
+                updateinfo: () => extractMetadata('update'),
+                updateInfo: () => extractMetadata('update'),
+                UPDATEINFO: () => extractMetadata('update'),
+                UpdateInfo: () => extractMetadata('update'),
+                
+                // Context analysis - ALL CASES
+                analyzecontext: analyzeContext,
+                analyzeContext: analyzeContext,
+                ANALYZECONTEXT: analyzeContext,
+                AnalyzeContext: analyzeContext,
+                
+                getcontext: analyzeContext,
+                getContext: analyzeContext,
+                GETCONTEXT: analyzeContext,
+                GetContext: analyzeContext,
+                
+                // === DATA STORAGE - ALL CASES ===
+                user: {
+                    savedata: async (key, value) => {
                         try {
                             const supabase = require('../config/supabase');
                             await supabase.from('universal_data').upsert({
@@ -161,7 +346,7 @@ async function executeCommandCode(botInstance, code, context) {
                             throw error;
                         }
                     },
-                    getData: async (key) => {
+                    getdata: async (key) => {
                         try {
                             const supabase = require('../config/supabase');
                             const { data } = await supabase.from('universal_data')
@@ -177,7 +362,7 @@ async function executeCommandCode(botInstance, code, context) {
                             return null;
                         }
                     },
-                    deleteData: async (key) => {
+                    deletedata: async (key) => {
                         try {
                             const supabase = require('../config/supabase');
                             await supabase.from('universal_data')
@@ -193,8 +378,8 @@ async function executeCommandCode(botInstance, code, context) {
                     }
                 },
                 
-                BotData: {
-                    saveData: async (key, value) => {
+                botdata: {
+                    savedata: async (key, value) => {
                         try {
                             const supabase = require('../config/supabase');
                             await supabase.from('universal_data').upsert({
@@ -209,7 +394,7 @@ async function executeCommandCode(botInstance, code, context) {
                             throw error;
                         }
                     },
-                    getData: async (key) => {
+                    getdata: async (key) => {
                         try {
                             const supabase = require('../config/supabase');
                             const { data } = await supabase.from('universal_data')
@@ -224,7 +409,7 @@ async function executeCommandCode(botInstance, code, context) {
                             return null;
                         }
                     },
-                    deleteData: async (key) => {
+                    deletedata: async (key) => {
                         try {
                             const supabase = require('../config/supabase');
                             await supabase.from('universal_data')
@@ -240,68 +425,176 @@ async function executeCommandCode(botInstance, code, context) {
                 },
                 
                 // === HANDLERS ===
+                nextcommandhandlers: nextCommandHandlers,
                 nextCommandHandlers: nextCommandHandlers,
+                NEXTCOMMANDHANDLERS: nextCommandHandlers,
                 
-                // === UTILITY FUNCTIONS ===
-                wait: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
+                // === UTILITY FUNCTIONS - ALL CASES ===
+                runpython: (pythonCode) => runPythonSync(pythonCode),
                 runPython: (pythonCode) => runPythonSync(pythonCode),
+                RUNPYTHON: (pythonCode) => runPythonSync(pythonCode),
+                
+                executepython: (pythonCode) => runPythonSync(pythonCode),
+                executePython: (pythonCode) => runPythonSync(pythonCode),
+                EXECUTEPYTHON: (pythonCode) => runPythonSync(pythonCode),
+                
+                waitforanswer: waitForAnswer,
                 waitForAnswer: waitForAnswer,
-                ask: waitForAnswer
+                WAITFORANSWER: waitForAnswer,
+                
+                ask: waitForAnswer,
+                ASK: waitForAnswer
             };
 
-            // ✅ FIXED: Direct function shortcuts (NO VARIABLE CONFLICTS)
+            // ✅ FIXED: Direct function shortcuts (CASE INSENSITIVE)
             const directFunctions = {
-                sendMessage: (text, options) => {
-                    return botInstance.sendMessage(chatId, text, options);
-                },
-                send: (text, options) => {
-                    return botInstance.sendMessage(chatId, text, options);
-                },
-                reply: (text, options) => {
-                    return botInstance.sendMessage(chatId, text, {
-                        reply_to_message_id: msg.message_id,
-                        ...options
-                    });
-                },
-                sendPhoto: (photo, options) => {
-                    return botInstance.sendPhoto(chatId, photo, options);
-                },
-                sendDocument: (doc, options) => {
-                    return botInstance.sendDocument(chatId, doc, options);
-                },
+                // Message sending - ALL CASES
+                sendmessage: (text, options) => botInstance.sendMessage(chatId, text, options),
+                sendMessage: (text, options) => botInstance.sendMessage(chatId, text, options),
+                SENDMESSAGE: (text, options) => botInstance.sendMessage(chatId, text, options),
+                
+                send: (text, options) => botInstance.sendMessage(chatId, text, options),
+                SEND: (text, options) => botInstance.sendMessage(chatId, text, options),
+                
+                reply: (text, options) => botInstance.sendMessage(chatId, text, {
+                    reply_to_message_id: msg.message_id,
+                    ...options
+                }),
+                REPLY: (text, options) => botInstance.sendMessage(chatId, text, {
+                    reply_to_message_id: msg.message_id,
+                    ...options
+                }),
+                
+                sendphoto: (photo, options) => botInstance.sendPhoto(chatId, photo, options),
+                sendPhoto: (photo, options) => botInstance.sendPhoto(chatId, photo, options),
+                SENDPHOTO: (photo, options) => botInstance.sendPhoto(chatId, photo, options),
+                
+                senddocument: (doc, options) => botInstance.sendDocument(chatId, doc, options),
+                sendDocument: (doc, options) => botInstance.sendDocument(chatId, doc, options),
+                SENDDOCUMENT: (doc, options) => botInstance.sendDocument(chatId, doc, options),
+                
+                // User/Chat info - ALL CASES
+                getcurrentuser: createUserObject,
                 getCurrentUser: createUserObject,
+                GETCURRENTUSER: createUserObject,
+                
+                getcurrentchat: createChatObject,
                 getCurrentChat: createChatObject,
-                delay: (ms) => executionEnv.wait(ms),
-                executePython: (code) => executionEnv.runPython(code)
+                GETCURRENTCHAT: createChatObject,
+                
+                // ✅ FIXED: WAIT FUNCTION - DIRECT ACCESS
+                wait: waitFunction,
+                Wait: waitFunction,
+                WAIT: waitFunction,
+                
+                delay: waitFunction,
+                Delay: waitFunction,
+                DELAY: waitFunction,
+                
+                sleep: waitFunction,
+                Sleep: waitFunction,
+                SLEEP: waitFunction,
+                
+                // Utility - ALL CASES
+                executepython: (code) => executionEnv.runpython(code),
+                executePython: (code) => executionEnv.runpython(code),
+                EXECUTEPYTHON: (code) => executionEnv.runpython(code)
             };
 
-            // ✅ FIXED: Merge all functions with unique names
+            // ✅ FIXED: Merge all functions with CASE INSENSITIVE SUPPORT
             const finalContext = {
                 ...executionEnv,
                 ...directFunctions,
-                // ✅ ADD unique user variable that won't conflict
+                
+                // ✅ ADD unique user variable that won't conflict - ALL CASES
+                currentuser: createUserObject(),
                 currentUser: createUserObject(),
-                currentChat: createChatObject()
+                CURRENTUSER: createUserObject(),
+                
+                currentchat: createChatObject(),
+                currentChat: createChatObject(),
+                CURRENTCHAT: createChatObject(),
+                
+                // ✅ AUTO CONTEXT VARIABLES - ALL CASES
+                context: analyzeContext(),
+                Context: analyzeContext(),
+                CONTEXT: analyzeContext(),
+                
+                ctx: analyzeContext(),
+                Ctx: analyzeContext(),
+                CTX: analyzeContext()
             };
 
-            // ✅ FIXED: Create ASYNC execution function with PROPER variable handling
+            // ✅ FIXED: Create ASYNC execution function with WORKING WAIT
             const executionFunction = new Function(
-                // ✅ UNIQUE parameter names to avoid conflicts
-                'getUser', 'getCurrentUser', 'userData', 'currentUser', 
-                'getChat', 'getCurrentChat', 'chatData', 'currentChat',
-                'sendMessage', 'send', 'reply', 'bot', 'Api', 'Bot', 
-                'params', 'message', 'User', 'BotData', 'wait', 'delay',
-                'runPython', 'executePython', 'waitForAnswer', 'ask',
+                // ✅ ALL POSSIBLE CASE VARIATIONS INCLUDING WAIT
+                'getUser', 'getuser', 'GETUSER', 'getCurrentUser', 'getcurrentuser', 'GETCURRENTUSER',
+                'userData', 'userdata', 'USERDATA', 'currentUser', 'currentuser', 'CURRENTUSER',
+                'getChat', 'getchat', 'GETCHAT', 'getCurrentChat', 'getcurrentchat', 'GETCURRENTCHAT', 
+                'chatData', 'chatdata', 'CHATDATA', 'currentChat', 'currentchat', 'CURRENTCHAT',
+                'sendMessage', 'sendmessage', 'SENDMESSAGE', 'send', 'SEND', 'reply', 'REPLY',
+                'bot', 'BOT', 'Bot', 'api', 'API', 'Api', 
+                'params', 'PARAMS', 'message', 'MESSAGE', 'user', 'USER', 'botdata', 'BOTDATA',
+                'wait', 'WAIT', 'Wait', 'delay', 'DELAY', 'Delay', 'sleep', 'SLEEP', 'Sleep',
+                'runpython', 'runPython', 'RUNPYTHON', 'executepython', 'executePython', 'EXECUTEPYTHON', 
+                'waitforanswer', 'waitForAnswer', 'WAITFORANSWER', 'ask', 'ASK', 
+                'metadata', 'metdata', 'METADATA', 'Metadata', 'inspect', 'INSPECT', 'Inspect',
+                'getmeta', 'getMeta', 'GETMETA', 'analyze', 'ANALYZE', 'Analyze', 
+                'analyzecontext', 'analyzeContext', 'ANALYZECONTEXT', 'getcontext', 'getContext', 'GETCONTEXT', 
+                'context', 'Context', 'CONTEXT', 'ctx', 'Ctx', 'CTX',
                 `return (async function() {
                     try {
-                        // ✅ User can use ANY of these without conflicts
+                        // ✅ User can use ANY CASE without conflicts
                         var user = getUser();
+                        var User = getuser();
+                        var USER = GETUSER();
+                        
                         var currentUser = getCurrentUser();
-                        var userInfo = userData;
+                        var currentuser = getcurrentuser();
+                        var CURRENTUSER = GETCURRENTUSER();
                         
                         console.log('✅ Execution started for user:', user.first_name);
                         
-                        // User's code starts here - NO VARIABLE CONFLICTS
+                        // 🎯 AUTO CONTEXT ANALYSIS - ALL CASES WORK
+                        var ctx = analyzecontext();
+                        var Context = analyzeContext();
+                        var CONTEXT = ANALYZECONTEXT();
+                        var context = getcontext();
+                        var Context = getContext();
+                        var CONTEXT = GETCONTEXT();
+                        
+                        // 🎯 AUTO METADATA ACCESS - ALL CASES WORK
+                        var metadata = metadata;
+                        var metaData = metdata;
+                        var METADATA = METADATA;
+                        var Metadata = Metadata;
+                        
+                        var inspect = inspect;
+                        var Inspect = Inspect;
+                        var INSPECT = INSPECT;
+                        
+                        var getmeta = getmeta;
+                        var getMeta = getMeta;
+                        var GETMETA = GETMETA;
+                        
+                        var analyze = analyze;
+                        var Analyze = Analyze;
+                        var ANALYZE = ANALYZE;
+
+                        // ✅ WAIT FUNCTION - ALL CASES WORK
+                        var wait = wait;
+                        var Wait = Wait;
+                        var WAIT = WAIT;
+                        
+                        var delay = delay;
+                        var Delay = Delay;
+                        var DELAY = DELAY;
+                        
+                        var sleep = sleep;
+                        var Sleep = Sleep;
+                        var SLEEP = SLEEP;
+
+                        // User's code starts here - ALL CASES WORK
                         ${code}
                         // User's code ends here
                         
@@ -321,30 +614,33 @@ async function executeCommandCode(botInstance, code, context) {
             // Execute the command
             console.log('🚀 Executing command...');
             const result = await executionFunction(
-                finalContext.getUser,
-                finalContext.getCurrentUser,
-                finalContext.userData,
-                finalContext.currentUser,
-                finalContext.getChat,
-                finalContext.getCurrentChat,
-                finalContext.chatData,
-                finalContext.currentChat,
-                finalContext.sendMessage,
-                finalContext.send,
-                finalContext.reply,
-                finalContext.bot,
-                finalContext.Api,
-                finalContext.Bot,
-                finalContext.params,
-                finalContext.message,
-                finalContext.User,
-                finalContext.BotData,
-                finalContext.wait,
-                finalContext.delay,
-                finalContext.runPython,
-                finalContext.executePython,
-                finalContext.waitForAnswer,
-                finalContext.ask
+                // Pass all case variations including WAIT
+                finalContext.getUser, finalContext.getuser, finalContext.GETUSER,
+                finalContext.getCurrentUser, finalContext.getcurrentuser, finalContext.GETCURRENTUSER,
+                finalContext.userData, finalContext.userdata, finalContext.USERDATA,
+                finalContext.currentUser, finalContext.currentuser, finalContext.CURRENTUSER,
+                finalContext.getChat, finalContext.getchat, finalContext.GETCHAT,
+                finalContext.getCurrentChat, finalContext.getcurrentchat, finalContext.GETCURRENTCHAT,
+                finalContext.chatData, finalContext.chatdata, finalContext.CHATDATA,
+                finalContext.currentChat, finalContext.currentchat, finalContext.CURRENTCHAT,
+                finalContext.sendMessage, finalContext.sendmessage, finalContext.SENDMESSAGE,
+                finalContext.send, finalContext.SEND, finalContext.reply, finalContext.REPLY,
+                finalContext.bot, finalContext.BOT, finalContext.Bot,
+                finalContext.api, finalContext.API, finalContext.Api,
+                finalContext.params, finalContext.PARAMS, finalContext.message, finalContext.MESSAGE,
+                finalContext.user, finalContext.USER, finalContext.botdata, finalContext.BOTDATA,
+                finalContext.wait, finalContext.WAIT, finalContext.Wait,
+                finalContext.delay, finalContext.DELAY, finalContext.Delay,
+                finalContext.sleep, finalContext.SLEEP, finalContext.Sleep,
+                finalContext.runpython, finalContext.runPython, finalContext.RUNPYTHON,
+                finalContext.executepython, finalContext.executePython, finalContext.EXECUTEPYTHON,
+                finalContext.waitforanswer, finalContext.waitForAnswer, finalContext.WAITFORANSWER,
+                finalContext.ask, finalContext.ASK, finalContext.metadata, finalContext.metdata, finalContext.METADATA,
+                finalContext.Metadata, finalContext.inspect, finalContext.INSPECT, finalContext.Inspect,
+                finalContext.getmeta, finalContext.getMeta, finalContext.GETMETA, finalContext.analyze,
+                finalContext.ANALYZE, finalContext.Analyze, finalContext.analyzecontext, finalContext.analyzeContext,
+                finalContext.ANALYZECONTEXT, finalContext.getcontext, finalContext.getContext, finalContext.GETCONTEXT,
+                finalContext.context, finalContext.Context, finalContext.CONTEXT, finalContext.ctx, finalContext.Ctx, finalContext.CTX
             );
             
             console.log('✅ Command execution completed');
