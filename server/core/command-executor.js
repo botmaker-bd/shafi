@@ -1,4 +1,4 @@
-// server/core/command-executor.js - COMPLETELY FIXED JSON ERROR
+// server/core/command-executor.js - COMPLETELY FIXED VERSION
 async function executeCommandCode(botInstance, code, context) {
     return new Promise(async (resolve, reject) => {
         try {
@@ -145,19 +145,36 @@ async function executeCommandCode(botInstance, code, context) {
                 };
             };
 
-            // ✅ FIXED: DATA STORAGE FUNCTIONS - JSON PARSE ERROR FIXED
+            // ✅ FIXED: DATA STORAGE FUNCTIONS - COMPLETELY REWRITTEN
             const userDataFunctions = {
                 saveData: async (key, value) => {
                     try {
                         const supabase = require('../config/supabase');
-                        await supabase.from('universal_data').upsert({
-                            data_type: 'user_data',
-                            bot_token: resolvedBotToken,
-                            user_id: userId.toString(),
-                            data_key: key,
-                            data_value: JSON.stringify(value),
-                            updated_at: new Date().toISOString()
-                        });
+                        console.log(`💾 Saving user data: ${key} =`, value);
+                        
+                        const { data, error } = await supabase
+                            .from('universal_data')
+                            .upsert({
+                                data_type: 'user_data',
+                                bot_token: resolvedBotToken,
+                                user_id: userId.toString(),
+                                data_key: key,
+                                data_value: JSON.stringify(value),
+                                metadata: {
+                                    saved_at: new Date().toISOString(),
+                                    value_type: typeof value
+                                },
+                                updated_at: new Date().toISOString()
+                            }, {
+                                onConflict: 'data_type,bot_token,user_id,data_key'
+                            });
+
+                        if (error) {
+                            console.error('❌ Save data error:', error);
+                            throw new Error(`Failed to save data: ${error.message}`);
+                        }
+                        
+                        console.log(`✅ User data saved: ${key}`);
                         return value;
                     } catch (error) {
                         console.error('❌ Save data error:', error);
@@ -168,29 +185,41 @@ async function executeCommandCode(botInstance, code, context) {
                 getData: async (key) => {
                     try {
                         const supabase = require('../config/supabase');
-                        const { data } = await supabase.from('universal_data')
-                            .select('data_value')
+                        console.log(`🔍 Reading user data: ${key}`);
+                        
+                        const { data, error } = await supabase
+                            .from('universal_data')
+                            .select('data_value, metadata, updated_at')
                             .eq('data_type', 'user_data')
                             .eq('bot_token', resolvedBotToken)
                             .eq('user_id', userId.toString())
                             .eq('data_key', key)
                             .single();
 
-                        if (!data || !data.data_value) return null;
+                        if (error) {
+                            if (error.code === 'PGRST116') {
+                                console.log(`📭 No data found for key: ${key}`);
+                                return null;
+                            }
+                            console.error('❌ Get data error:', error);
+                            return null;
+                        }
+
+                        if (!data || !data.data_value) {
+                            console.log(`📭 Empty data for key: ${key}`);
+                            return null;
+                        }
 
                         // ✅ FIXED: Handle both JSON and string values safely
                         try {
-                            return JSON.parse(data.data_value);
+                            const parsedValue = JSON.parse(data.data_value);
+                            console.log(`✅ User data retrieved: ${key} =`, parsedValue);
+                            return parsedValue;
                         } catch (parseError) {
-                            // If not valid JSON, return as string
-                            console.log(`⚠️ Data is not JSON, returning as string: ${data.data_value.substring(0, 50)}...`);
+                            console.log(`⚠️ Data is not JSON, returning as string: ${data.data_value}`);
                             return data.data_value;
                         }
                     } catch (error) {
-                        // If no data found, return null instead of throwing error
-                        if (error.code === 'PGRST116') {
-                            return null;
-                        }
                         console.error('❌ Get data error:', error);
                         return null;
                     }
@@ -199,12 +228,22 @@ async function executeCommandCode(botInstance, code, context) {
                 deleteData: async (key) => {
                     try {
                         const supabase = require('../config/supabase');
-                        await supabase.from('universal_data')
+                        console.log(`🗑️ Deleting user data: ${key}`);
+                        
+                        const { error } = await supabase
+                            .from('universal_data')
                             .delete()
                             .eq('data_type', 'user_data')
                             .eq('bot_token', resolvedBotToken)
                             .eq('user_id', userId.toString())
                             .eq('data_key', key);
+
+                        if (error) {
+                            console.error('❌ Delete data error:', error);
+                            throw new Error(`Failed to delete data: ${error.message}`);
+                        }
+                        
+                        console.log(`✅ User data deleted: ${key}`);
                         return true;
                     } catch (error) {
                         console.error('❌ Delete data error:', error);
@@ -214,12 +253,75 @@ async function executeCommandCode(botInstance, code, context) {
                 
                 increment: async (key, amount = 1) => {
                     try {
+                        console.log(`➕ Incrementing user data: ${key} by ${amount}`);
                         const current = await userDataFunctions.getData(key) || 0;
-                        const newValue = parseInt(current) + amount;
+                        const newValue = parseInt(current) + parseInt(amount);
                         await userDataFunctions.saveData(key, newValue);
+                        console.log(`✅ User data incremented: ${key} = ${newValue}`);
                         return newValue;
                     } catch (error) {
                         console.error('❌ Increment data error:', error);
+                        throw error;
+                    }
+                },
+                
+                // ✅ NEW: Get all user data
+                getAllData: async () => {
+                    try {
+                        const supabase = require('../config/supabase');
+                        console.log(`📊 Getting all user data`);
+                        
+                        const { data, error } = await supabase
+                            .from('universal_data')
+                            .select('data_key, data_value, updated_at')
+                            .eq('data_type', 'user_data')
+                            .eq('bot_token', resolvedBotToken)
+                            .eq('user_id', userId.toString());
+
+                        if (error) {
+                            console.error('❌ Get all data error:', error);
+                            return {};
+                        }
+
+                        const result = {};
+                        for (const item of data || []) {
+                            try {
+                                result[item.data_key] = JSON.parse(item.data_value);
+                            } catch {
+                                result[item.data_key] = item.data_value;
+                            }
+                        }
+                        
+                        console.log(`✅ Retrieved ${Object.keys(result).length} user data entries`);
+                        return result;
+                    } catch (error) {
+                        console.error('❌ Get all data error:', error);
+                        return {};
+                    }
+                },
+                
+                // ✅ NEW: Clear all user data
+                clearAll: async () => {
+                    try {
+                        const supabase = require('../config/supabase');
+                        console.log(`🧹 Clearing all user data`);
+                        
+                        const { error } = await supabase
+                            .from('universal_data')
+                            .delete()
+                            .eq('data_type', 'user_data')
+                            .eq('bot_token', resolvedBotToken)
+                            .eq('user_id', userId.toString());
+
+                        if (error) {
+                            console.error('❌ Clear all data error:', error);
+                            throw new Error(`Failed to clear data: ${error.message}`);
+                        }
+                        
+                        console.log(`✅ All user data cleared`);
+                        return true;
+                    } catch (error) {
+                        console.error('❌ Clear all data error:', error);
                         throw error;
                     }
                 }
@@ -229,13 +331,30 @@ async function executeCommandCode(botInstance, code, context) {
                 saveData: async (key, value) => {
                     try {
                         const supabase = require('../config/supabase');
-                        await supabase.from('universal_data').upsert({
-                            data_type: 'bot_data',
-                            bot_token: resolvedBotToken,
-                            data_key: key,
-                            data_value: JSON.stringify(value),
-                            updated_at: new Date().toISOString()
-                        });
+                        console.log(`💾 Saving bot data: ${key} =`, value);
+                        
+                        const { data, error } = await supabase
+                            .from('universal_data')
+                            .upsert({
+                                data_type: 'bot_data',
+                                bot_token: resolvedBotToken,
+                                data_key: key,
+                                data_value: JSON.stringify(value),
+                                metadata: {
+                                    saved_at: new Date().toISOString(),
+                                    value_type: typeof value
+                                },
+                                updated_at: new Date().toISOString()
+                            }, {
+                                onConflict: 'data_type,bot_token,data_key'
+                            });
+
+                        if (error) {
+                            console.error('❌ Save bot data error:', error);
+                            throw new Error(`Failed to save bot data: ${error.message}`);
+                        }
+                        
+                        console.log(`✅ Bot data saved: ${key}`);
                         return value;
                     } catch (error) {
                         console.error('❌ Save bot data error:', error);
@@ -246,28 +365,40 @@ async function executeCommandCode(botInstance, code, context) {
                 getData: async (key) => {
                     try {
                         const supabase = require('../config/supabase');
-                        const { data } = await supabase.from('universal_data')
-                            .select('data_value')
+                        console.log(`🔍 Reading bot data: ${key}`);
+                        
+                        const { data, error } = await supabase
+                            .from('universal_data')
+                            .select('data_value, metadata, updated_at')
                             .eq('data_type', 'bot_data')
                             .eq('bot_token', resolvedBotToken)
                             .eq('data_key', key)
                             .single();
 
-                        if (!data || !data.data_value) return null;
+                        if (error) {
+                            if (error.code === 'PGRST116') {
+                                console.log(`📭 No bot data found for key: ${key}`);
+                                return null;
+                            }
+                            console.error('❌ Get bot data error:', error);
+                            return null;
+                        }
+
+                        if (!data || !data.data_value) {
+                            console.log(`📭 Empty bot data for key: ${key}`);
+                            return null;
+                        }
 
                         // ✅ FIXED: Handle both JSON and string values safely
                         try {
-                            return JSON.parse(data.data_value);
+                            const parsedValue = JSON.parse(data.data_value);
+                            console.log(`✅ Bot data retrieved: ${key} =`, parsedValue);
+                            return parsedValue;
                         } catch (parseError) {
-                            // If not valid JSON, return as string
-                            console.log(`⚠️ Bot data is not JSON, returning as string: ${data.data_value.substring(0, 50)}...`);
+                            console.log(`⚠️ Bot data is not JSON, returning as string: ${data.data_value}`);
                             return data.data_value;
                         }
                     } catch (error) {
-                        // If no data found, return null instead of throwing error
-                        if (error.code === 'PGRST116') {
-                            return null;
-                        }
                         console.error('❌ Get bot data error:', error);
                         return null;
                     }
@@ -276,11 +407,21 @@ async function executeCommandCode(botInstance, code, context) {
                 deleteData: async (key) => {
                     try {
                         const supabase = require('../config/supabase');
-                        await supabase.from('universal_data')
+                        console.log(`🗑️ Deleting bot data: ${key}`);
+                        
+                        const { error } = await supabase
+                            .from('universal_data')
                             .delete()
                             .eq('data_type', 'bot_data')
                             .eq('bot_token', resolvedBotToken)
                             .eq('data_key', key);
+
+                        if (error) {
+                            console.error('❌ Delete bot data error:', error);
+                            throw new Error(`Failed to delete bot data: ${error.message}`);
+                        }
+                        
+                        console.log(`✅ Bot data deleted: ${key}`);
                         return true;
                     } catch (error) {
                         console.error('❌ Delete bot data error:', error);
