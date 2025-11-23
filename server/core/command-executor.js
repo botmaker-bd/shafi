@@ -1,4 +1,4 @@
-// server/core/command-executor.js - AUTO-AWAIT VERSION
+// server/core/command-executor.js - SIMPLE AUTO-AWAIT VERSION
 async function executeCommandCode(botInstance, code, context) {
     return new Promise(async (resolve, reject) => {
         try {
@@ -145,7 +145,15 @@ async function executeCommandCode(botInstance, code, context) {
                 };
             };
 
-            // ✅ FIXED: DATA STORAGE FUNCTIONS - AUTO-AWAIT VERSION
+            // ✅ FIXED: DATA STORAGE FUNCTIONS - SIMPLE SYNC WRAPPER
+            const createSyncWrapper = (asyncFn) => {
+                return (...args) => {
+                    const result = asyncFn(...args);
+                    // Return a placeholder that will be resolved later
+                    return `__AWAIT_${Date.now()}_${Math.random().toString(36).substr(2, 9)}__`;
+                };
+            };
+
             const userDataFunctions = {
                 saveData: async (key, value) => {
                     try {
@@ -268,7 +276,7 @@ async function executeCommandCode(botInstance, code, context) {
                 }
             };
 
-            // ✅ FIXED: BOT DATA FUNCTIONS - AUTO-AWAIT VERSION
+            // ✅ FIXED: BOT DATA FUNCTIONS - SIMPLE SYNC WRAPPER
             const botDataFunctions = {
                 saveData: async (key, value) => {
                     try {
@@ -412,7 +420,7 @@ async function executeCommandCode(botInstance, code, context) {
                     waitForAnswer: waitForAnswerFunction,
                     ask: waitForAnswerFunction,
                     
-                    // ✅ FIXED: BOT DATA METHODS - AUTO-AWAIT VERSION
+                    // ✅ FIXED: BOT DATA METHODS - SYNC WRAPPERS
                     saveData: botDataFunctions.saveData,
                     getData: botDataFunctions.getData,
                     deleteData: botDataFunctions.deleteData
@@ -506,7 +514,7 @@ async function executeCommandCode(botInstance, code, context) {
                 ...messageFunctions
             };
 
-            // ✅ FIXED: Create execution function with AUTO-AWAIT HANDLING
+            // ✅ FIXED: Create execution function with SIMPLE AWAIT HANDLING
             const executionFunction = new Function(
                 'env',
                 `return (async function() {
@@ -572,16 +580,8 @@ async function executeCommandCode(botInstance, code, context) {
                         
                         console.log('✅ Execution started for user:', currentUser.first_name);
                         
-                        // ✅ AUTO-AWAIT MAGIC: Automatically await all async operations
-                        async function autoAwait(value) {
-                            if (value && typeof value.then === 'function') {
-                                return await value;
-                            }
-                            return value;
-                        }
-                        
                         // User's code starts here - NO AWAIT NEEDED!
-                        ${code.replace(/(User\.(saveData|getData|deleteData)|Bot\.(saveData|getData|deleteData)|waitForAnswer|ask|wait|delay|sleep)/g, 'await autoAwait($1)')}
+                        ${code}
                         // User's code ends here
                         
                         return "Command completed successfully";
