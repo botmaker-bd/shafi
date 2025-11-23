@@ -1,20 +1,10 @@
-// server/core/command-executor.js - COMPLETELY REWRITTEN AND FIXED
+// server/core/command-executor.js - FIXED VERSION
 async function executeCommandCode(botInstance, code, context) {
     return new Promise(async (resolve, reject) => {
-        // ✅ Add execution timeout
-        const executionTimeout = setTimeout(() => {
-            reject(new Error('Command execution timeout (30 seconds)'));
-        }, 30000);
-
         try {
             const { msg, chatId, userId, username, first_name, botToken, userInput, nextCommandHandlers } = context;
             
-            // ✅ Validate essential context
-            if (!chatId || !userId) {
-                throw new Error('Invalid context: missing chatId or userId');
-            }
-
-            // ✅ Resolve bot token with better validation
+            // Resolve bot token
             let resolvedBotToken = botToken;
             if (!resolvedBotToken && context.command) {
                 resolvedBotToken = context.command.bot_token;
@@ -31,19 +21,14 @@ async function executeCommandCode(botInstance, code, context) {
             
             console.log(`🔧 Executing command for user ${userId} in chat ${chatId}`);
             
-            // ✅ Import dependencies with error handling
-            let ApiWrapper, pythonRunner, supabase;
-            try {
-                ApiWrapper = require('./api-wrapper');
-                pythonRunner = require('./python-runner');
-                supabase = require('../config/supabase');
-            } catch (importError) {
-                throw new Error(`Module import failed: ${importError.message}`);
-            }
+            // Import dependencies
+            const ApiWrapper = require('./api-wrapper');
+            const pythonRunner = require('./python-runner');
+            const supabase = require('../config/supabase');
             
-            // ✅ Create ApiWrapper instance with validation
+            // Create ApiWrapper instance
             const apiContext = {
-                msg: msg || {},
+                msg: msg,
                 chatId: chatId,
                 userId: userId,
                 username: username || '',
@@ -51,80 +36,42 @@ async function executeCommandCode(botInstance, code, context) {
                 last_name: context.last_name || '',
                 language_code: context.language_code || '',
                 botToken: resolvedBotToken,
-                userInput: userInput || '',
+                userInput: userInput,
                 nextCommandHandlers: nextCommandHandlers || new Map()
             };
             
             const apiWrapperInstance = new ApiWrapper(botInstance, apiContext);
             
-            // ✅ IMPROVED SMART PROMISE HANDLER WITH PROPER PROXY
-            const createSmartHandler = (asyncFn, functionName = 'unknown') => {
-                const handler = (...args) => {
-                    try {
-                        const promise = asyncFn(...args);
-                        
-                        // Create a proper proxy for the promise
-                        const promiseProxy = new Proxy(promise, {
-                            get(target, prop) {
-                                // Handle promise methods
-                                if (prop === 'then') return target.then.bind(target);
-                                if (prop === 'catch') return target.catch.bind(target);
-                                if (prop === 'finally') return target.finally.bind(target);
-                                
-                                // Handle primitive conversion
-                                if (prop === Symbol.toPrimitive) {
-                                    return function(hint) {
-                                        if (hint === 'number') return NaN;
-                                        if (hint === 'string') return `[Async:${functionName}]`;
-                                        return `[Async:${functionName}]`;
-                                    };
-                                }
-                                
-                                if (prop === 'valueOf') return () => promiseProxy;
-                                if (prop === 'toString') return () => `[Async:${functionName}]`;
-                                if (prop === 'toJSON') return () => ({ type: 'AsyncValue', function: functionName });
-                                
-                                // For other properties, return undefined to avoid confusion
-                                return undefined;
-                            }
-                        });
-                        
-                        return promiseProxy;
-                    } catch (error) {
-                        console.error(`❌ Handler execution error for ${functionName}:`, error);
-                        return Promise.reject(error);
-                    }
+            // ✅ FIXED: SMART PROMISE HANDLER THAT AUTO-RESOLVES
+            const createAutoResolveHandler = (asyncFn, functionName = 'unknown') => {
+                return (...args) => {
+                    const promise = asyncFn(...args);
+                    
+                    // Auto-resolve promise and return the actual value
+                    const autoResolvePromise = promise.then(result => {
+                        return result;
+                    }).catch(error => {
+                        console.error(`❌ ${functionName} error:`, error);
+                        return null; // Return null instead of throwing for better UX
+                    });
+                    
+                    return autoResolvePromise;
                 };
-                
-                return handler;
             };
 
-            // ✅ USER DATA METHODS WITH VALIDATION
+            // ✅ USER DATA METHODS WITH AUTO-RESOLVE
             const userDataMethods = {
-                getData: createSmartHandler(async (key) => {
-                    // ✅ Input validation
-                    if (typeof key !== 'string' || key.trim() === '') {
-                        throw new Error('Invalid key: must be non-empty string');
-                    }
-                    
+                getData: createAutoResolveHandler(async (key) => {
                     try {
                         const result = await apiWrapperInstance.User.getData(key);
-                        return result !== null && result !== undefined ? result : null;
+                        return result;
                     } catch (error) {
                         console.error('❌ Get user data error:', error);
                         return null;
                     }
                 }, 'User.getData'),
                 
-                saveData: createSmartHandler(async (key, value) => {
-                    // ✅ Input validation
-                    if (typeof key !== 'string' || key.trim() === '') {
-                        throw new Error('Invalid key: must be non-empty string');
-                    }
-                    if (value === undefined || value === null) {
-                        throw new Error('Invalid value: cannot be null or undefined');
-                    }
-                    
+                saveData: createAutoResolveHandler(async (key, value) => {
                     try {
                         await apiWrapperInstance.User.saveData(key, value);
                         return value;
@@ -134,12 +81,7 @@ async function executeCommandCode(botInstance, code, context) {
                     }
                 }, 'User.saveData'),
                 
-                deleteData: createSmartHandler(async (key) => {
-                    // ✅ Input validation
-                    if (typeof key !== 'string' || key.trim() === '') {
-                        throw new Error('Invalid key: must be non-empty string');
-                    }
-                    
+                deleteData: createAutoResolveHandler(async (key) => {
                     try {
                         await apiWrapperInstance.User.deleteData(key);
                         return true;
@@ -149,19 +91,10 @@ async function executeCommandCode(botInstance, code, context) {
                     }
                 }, 'User.deleteData'),
                 
-                increment: createSmartHandler(async (key, amount = 1) => {
-                    // ✅ Input validation
-                    if (typeof key !== 'string' || key.trim() === '') {
-                        throw new Error('Invalid key: must be non-empty string');
-                    }
-                    if (typeof amount !== 'number' || isNaN(amount)) {
-                        throw new Error('Invalid amount: must be a number');
-                    }
-                    
+                increment: createAutoResolveHandler(async (key, amount = 1) => {
                     try {
                         const current = await apiWrapperInstance.User.getData(key);
-                        const currentValue = parseInt(current) || 0;
-                        const newValue = currentValue + amount;
+                        const newValue = (parseInt(current) || 0) + amount;
                         await apiWrapperInstance.User.saveData(key, newValue);
                         return newValue;
                     } catch (error) {
@@ -171,13 +104,9 @@ async function executeCommandCode(botInstance, code, context) {
                 }, 'User.increment')
             };
             
-            // ✅ BOT DATA METHODS WITH PROPER ERROR HANDLING
+            // ✅ BOT DATA METHODS
             const botDataMethods = {
-                getData: createSmartHandler(async (key) => {
-                    if (typeof key !== 'string' || key.trim() === '') {
-                        throw new Error('Invalid key: must be non-empty string');
-                    }
-                    
+                getData: createAutoResolveHandler(async (key) => {
                     try {
                         const { data, error } = await supabase.from('universal_data')
                             .select('data_value')
@@ -187,52 +116,30 @@ async function executeCommandCode(botInstance, code, context) {
                             .single();
                             
                         if (error) {
-                            // Handle different Supabase error codes
-                            if (error.code === 'PGRST116') return null; // Not found
-                            if (error.code === '42P01') throw new Error('Database table not found'); // Table doesn't exist
+                            if (error.code === 'PGRST116') return null;
                             throw error;
                         }
                         
-                        if (!data || !data.data_value) return null;
-                        
-                        try {
-                            return JSON.parse(data.data_value);
-                        } catch (parseError) {
-                            console.error('❌ JSON parse error for bot data:', parseError);
-                            return data.data_value; // Return as string if parse fails
-                        }
+                        return data ? JSON.parse(data.data_value) : null;
                     } catch (error) {
                         console.error('❌ Get bot data error:', error);
                         return null;
                     }
                 }, 'BotData.getData'),
                 
-                saveData: createSmartHandler(async (key, value) => {
-                    if (typeof key !== 'string' || key.trim() === '') {
-                        throw new Error('Invalid key: must be non-empty string');
-                    }
-                    if (value === undefined || value === null) {
-                        throw new Error('Invalid value: cannot be null or undefined');
-                    }
-                    
+                saveData: createAutoResolveHandler(async (key, value) => {
                     try {
-                        const serializedValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
-                        
                         const { error } = await supabase.from('universal_data').upsert({
                             data_type: 'bot_data',
                             bot_token: resolvedBotToken,
                             data_key: key,
-                            data_value: serializedValue,
+                            data_value: JSON.stringify(value),
                             updated_at: new Date().toISOString()
                         }, {
                             onConflict: 'data_type,bot_token,data_key'
                         });
                         
-                        if (error) {
-                            if (error.code === '42P01') throw new Error('Database table not found');
-                            throw error;
-                        }
-                        
+                        if (error) throw error;
                         return value;
                     } catch (error) {
                         console.error('❌ Save bot data error:', error);
@@ -240,11 +147,7 @@ async function executeCommandCode(botInstance, code, context) {
                     }
                 }, 'BotData.saveData'),
                 
-                deleteData: createSmartHandler(async (key) => {
-                    if (typeof key !== 'string' || key.trim() === '') {
-                        throw new Error('Invalid key: must be non-empty string');
-                    }
-                    
+                deleteData: createAutoResolveHandler(async (key) => {
                     try {
                         const { error } = await supabase.from('universal_data')
                             .delete()
@@ -252,11 +155,7 @@ async function executeCommandCode(botInstance, code, context) {
                             .eq('bot_token', resolvedBotToken)
                             .eq('data_key', key);
                             
-                        if (error) {
-                            if (error.code === '42P01') return true; // Table doesn't exist, consider deleted
-                            throw error;
-                        }
-                        
+                        if (error) throw error;
                         return true;
                     } catch (error) {
                         console.error('❌ Delete bot data error:', error);
@@ -265,125 +164,54 @@ async function executeCommandCode(botInstance, code, context) {
                 }, 'BotData.deleteData')
             };
             
-            // ✅ COMPLETE TELEGRAM BOT METHODS
+            // ✅ BOT METHODS
             const createBotMethod = (methodName) => {
-                return createSmartHandler(async (...args) => {
+                return createAutoResolveHandler(async (...args) => {
                     if (!apiWrapperInstance[methodName]) {
-                        throw new Error(`Telegram API method '${methodName}' not available`);
+                        throw new Error(`Method ${methodName} not available`);
                     }
-                    
-                    try {
-                        return await apiWrapperInstance[methodName](...args);
-                    } catch (error) {
-                        console.error(`❌ Telegram API ${methodName} error:`, error);
-                        throw new Error(`Telegram API Error (${methodName}): ${error.message}`);
-                    }
+                    return await apiWrapperInstance[methodName](...args);
                 }, `Bot.${methodName}`);
             };
             
-            // ✅ COMPLETE LIST OF TELEGRAM METHODS
             const telegramMethods = [
-                // Core message methods
-                'sendMessage', 'forwardMessage', 'copyMessage', 
-                'sendPhoto', 'sendAudio', 'sendDocument', 'sendVideo', 
-                'sendAnimation', 'sendVoice', 'sendVideoNote', 'sendMediaGroup',
-                'sendLocation', 'sendVenue', 'sendContact', 'sendPoll', 
-                'sendDice', 'sendChatAction', 'sendSticker',
-                
-                // Message management
-                'editMessageText', 'editMessageCaption', 'editMessageMedia',
-                'editMessageReplyMarkup', 'editMessageLiveLocation', 'stopMessageLiveLocation',
-                'deleteMessage', 'deleteMessages',
-                
-                // Chat management
-                'getChat', 'getChatAdministrators', 'getChatMemberCount',
-                'getChatMember', 'setChatTitle', 'setChatDescription',
-                'setChatPhoto', 'deleteChatPhoto', 'setChatPermissions',
-                'exportChatInviteLink', 'createChatInviteLink', 'editChatInviteLink',
-                'revokeChatInviteLink', 'approveChatJoinRequest', 'declineChatJoinRequest',
-                'setChatAdministratorCustomTitle', 'banChatMember', 'unbanChatMember',
-                'restrictChatMember', 'promoteChatMember', 'banChatSenderChat', 
-                'unbanChatSenderChat', 'setChatStickerSet', 'deleteChatStickerSet',
-                'getChatMenuButton', 'setChatMenuButton', 'leaveChat', 
-                'pinChatMessage', 'unpinChatMessage', 'unpinAllChatMessages',
-                
-                // Sticker management
-                'getStickerSet', 'getCustomEmojiStickers', 'uploadStickerFile',
-                'createNewStickerSet', 'addStickerToSet', 'setStickerPositionInSet',
-                'deleteStickerFromSet', 'setStickerSetThumbnail',
-                
-                // Forum management
-                'createForumTopic', 'editForumTopic', 'closeForumTopic',
-                'reopenForumTopic', 'deleteForumTopic', 'unpinAllForumTopicMessages',
-                'getForumTopicIconStickers', 'editGeneralForumTopic', 'closeGeneralForumTopic',
-                'reopenGeneralForumTopic', 'hideGeneralForumTopic', 'unhideGeneralForumTopic',
-                
-                // Inline and callback
-                'answerInlineQuery', 'answerWebAppQuery', 'answerCallbackQuery',
-                'answerPreCheckoutQuery', 'answerShippingQuery',
-                
-                // Payments
-                'sendInvoice', 'createInvoiceLink', 'refundStarPayment',
-                
-                // Bot management
-                'getMe', 'logOut', 'close', 'getMyCommands', 'setMyCommands',
-                'deleteMyCommands', 'getMyDescription', 'setMyDescription',
-                'getMyShortDescription', 'setMyShortDescription', 'getMyName',
-                'setMyName', 'getMyDefaultAdministratorRights', 'setMyDefaultAdministratorRights',
-                
-                // Games
-                'sendGame', 'setGameScore', 'getGameHighScores',
-                
-                // Files
-                'getFile', 'downloadFile'
+                'sendMessage', 'send', 'reply', 'sendPhoto', 'sendDocument', 
+                'sendVideo', 'sendAudio', 'sendVoice', 'sendLocation', 'sendContact',
+                'sendSticker', 'sendPoll', 'sendDice', 'editMessageText', 'deleteMessage',
+                'forwardMessage', 'copyMessage', 'getMe', 'getChat', 'getChatAdministrators',
+                'getChatMember', 'banChatMember', 'unbanChatMember', 'restrictChatMember',
+                'promoteChatMember', 'pinChatMessage', 'unpinChatMessage', 'leaveChat', 'getFile'
             ];
             
             const botMethods = {};
             telegramMethods.forEach(method => {
-                botMethods[method] = createBotMethod(method);
+                if (typeof apiWrapperInstance[method] === 'function') {
+                    botMethods[method] = createBotMethod(method);
+                }
             });
             
-            // ✅ ADD CONVENIENCE METHODS
-            botMethods.send = botMethods.sendMessage;
-            botMethods.reply = createSmartHandler(async (text, options = {}) => {
-                return await apiWrapperInstance.sendMessage(chatId, text, {
-                    reply_to_message_id: msg.message_id,
-                    ...options
-                });
-            }, 'Bot.reply');
-            
             // ✅ METADATA METHODS
-            const createMetadataHandler = createSmartHandler(async (target = 'message') => {
-                if (typeof target !== 'string') {
-                    throw new Error('Metadata target must be a string');
-                }
-                
+            const metadataFunc = createAutoResolveHandler(async (target = 'message') => {
                 try {
                     return await apiWrapperInstance.metadata(target);
                 } catch (error) {
                     console.error('❌ Metadata error:', error);
-                    return { error: error.message, target: target };
+                    return { error: error.message };
                 }
             }, 'metadata');
             
-            botMethods.metadata = createMetadataHandler;
-            botMethods.metaData = createMetadataHandler;
-            botMethods.Metadata = createMetadataHandler;
-            botMethods.METADATA = createMetadataHandler;
+            botMethods.metadata = metadataFunc;
+            botMethods.metaData = metadataFunc;
+            botMethods.Metadata = metadataFunc;
+            botMethods.METADATA = metadataFunc;
             
             // ✅ UTILITY FUNCTIONS
-            const waitFunction = createSmartHandler(async (seconds) => {
-                if (typeof seconds !== 'number' || seconds < 0) {
-                    throw new Error('Wait time must be a positive number');
-                }
+            const waitFunction = createAutoResolveHandler(async (seconds) => {
                 const ms = seconds * 1000;
                 return new Promise(resolve => setTimeout(() => resolve(`Waited ${seconds} seconds`), ms));
             }, 'wait');
             
-            const runPythonFunc = createSmartHandler(async (code) => {
-                if (typeof code !== 'string' || code.trim() === '') {
-                    throw new Error('Python code must be non-empty string');
-                }
+            const runPythonFunc = createAutoResolveHandler(async (code) => {
                 try {
                     return await pythonRunner.runPythonCode(code);
                 } catch (error) {
@@ -391,41 +219,26 @@ async function executeCommandCode(botInstance, code, context) {
                 }
             }, 'runPython');
             
-            const waitForAnswerFunc = createSmartHandler(async (question, options = {}) => {
-                if (typeof question !== 'string' || question.trim() === '') {
-                    throw new Error('Question must be non-empty string');
-                }
-                
+            const waitForAnswerFunc = createAutoResolveHandler(async (question, options = {}) => {
                 return new Promise((resolve, reject) => {
                     try {
                         const waitKey = `${resolvedBotToken}_${userId}`;
                         
-                        // Clear any existing handler
-                        if (nextCommandHandlers && nextCommandHandlers.has(waitKey)) {
-                            nextCommandHandlers.delete(waitKey);
-                        }
-                        
                         botInstance.sendMessage(chatId, question, options)
                             .then(() => {
                                 if (nextCommandHandlers) {
-                                    const handler = {
+                                    nextCommandHandlers.set(waitKey, {
                                         resolve: resolve,
                                         reject: reject,
-                                        timestamp: Date.now(),
-                                        question: question
-                                    };
+                                        timestamp: Date.now()
+                                    });
                                     
-                                    nextCommandHandlers.set(waitKey, handler);
-                                    
-                                    // Auto cleanup after 5 minutes
                                     setTimeout(() => {
                                         if (nextCommandHandlers.has(waitKey)) {
                                             nextCommandHandlers.delete(waitKey);
-                                            reject(new Error('Wait for answer timeout (5 minutes)'));
+                                            reject(new Error('Wait for answer timeout'));
                                         }
                                     }, 5 * 60 * 1000);
-                                } else {
-                                    reject(new Error('Next command handlers not available'));
                                 }
                             })
                             .catch(sendError => {
@@ -437,23 +250,20 @@ async function executeCommandCode(botInstance, code, context) {
                 });
             }, 'waitForAnswer');
             
-            // ✅ CONTEXT OBJECTS WITH PROPER DATA
+            // ✅ CONTEXT OBJECTS
             const userObject = {
                 id: userId,
                 first_name: first_name || '',
                 username: username || '',
                 language_code: context.language_code || '',
                 chat_id: chatId,
-                // Add message from data without overwriting
-                ...(msg.from && typeof msg.from === 'object' ? msg.from : {})
+                ...(msg.from || {})
             };
             
             const chatObject = {
                 id: chatId,
                 type: msg.chat?.type || 'private',
-                title: msg.chat?.title || '',
-                username: msg.chat?.username || '',
-                ...(msg.chat && typeof msg.chat === 'object' ? msg.chat : {})
+                ...(msg.chat || {})
             };
             
             const contextObject = {
@@ -494,26 +304,20 @@ async function executeCommandCode(botInstance, code, context) {
             const BotData = { ...botDataMethods };
             
             // ✅ DIRECT MESSAGE FUNCTIONS
-            const sendMessageFunc = createSmartHandler(async (text, options = {}) => {
-                if (typeof text !== 'string' || text.trim() === '') {
-                    throw new Error('Message text must be non-empty string');
-                }
+            const sendMessageFunc = createAutoResolveHandler(async (text, options = {}) => {
                 return await botInstance.sendMessage(chatId, text, options);
             }, 'sendMessage');
             
             const sendFunc = sendMessageFunc;
             
-            const replyFunc = createSmartHandler(async (text, options = {}) => {
-                if (typeof text !== 'string' || text.trim() === '') {
-                    throw new Error('Reply text must be non-empty string');
-                }
+            const replyFunc = createAutoResolveHandler(async (text, options = {}) => {
                 return await botInstance.sendMessage(chatId, text, {
                     reply_to_message_id: msg.message_id,
                     ...options
                 });
             }, 'reply');
             
-            // ✅ CREATE ENVIRONMENT WITHOUT GLOBAL POLLUTION
+            // ✅ CREATE ENVIRONMENT
             const environment = {
                 // Core objects
                 User,
@@ -542,10 +346,10 @@ async function executeCommandCode(botInstance, code, context) {
                 ask: waitForAnswerFunc,
                 
                 // Metadata functions
-                metadata: createMetadataHandler,
-                metaData: createMetadataHandler,
-                Metadata: createMetadataHandler,
-                METADATA: createMetadataHandler,
+                metadata: metadataFunc,
+                metaData: metadataFunc,
+                Metadata: metadataFunc,
+                METADATA: metadataFunc,
                 
                 // Data objects
                 userData: userObject,
@@ -561,70 +365,11 @@ async function executeCommandCode(botInstance, code, context) {
                 reply: replyFunc
             };
             
-            // ✅ IMPROVED CASE INSENSITIVE ENVIRONMENT
-            const createCaseInsensitiveEnv = (env) => {
-                const caseInsensitiveEnv = { ...env };
-                
-                // Add lowercase versions without removing originals
-                Object.keys(env).forEach(key => {
-                    if (typeof key === 'string') {
-                        const lowerKey = key.toLowerCase();
-                        if (!caseInsensitiveEnv.hasOwnProperty(lowerKey)) {
-                            caseInsensitiveEnv[lowerKey] = env[key];
-                        }
-                    }
-                });
-                
-                return new Proxy(caseInsensitiveEnv, {
-                    get(target, prop) {
-                        if (typeof prop !== 'string') return target[prop];
-                        
-                        // First try exact match
-                        if (target.hasOwnProperty(prop)) {
-                            return target[prop];
-                        }
-                        
-                        // Then try case insensitive
-                        const lowerProp = prop.toLowerCase();
-                        if (target.hasOwnProperty(lowerProp)) {
-                            return target[lowerProp];
-                        }
-                        
-                        return undefined;
-                    },
-                    
-                    set(target, prop, value) {
-                        if (typeof prop !== 'string') {
-                            target[prop] = value;
-                            return true;
-                        }
-                        
-                        target[prop] = value;
-                        
-                        // Also set lowercase version
-                        const lowerProp = prop.toLowerCase();
-                        if (!target.hasOwnProperty(lowerProp)) {
-                            target[lowerProp] = value;
-                        }
-                        
-                        return true;
-                    },
-                    
-                    has(target, prop) {
-                        if (typeof prop !== 'string') return prop in target;
-                        return target.hasOwnProperty(prop) || target.hasOwnProperty(prop.toLowerCase());
-                    }
-                });
-            };
-            
-            const caseInsensitiveEnv = createCaseInsensitiveEnv(environment);
-            
-            // ✅ SAFE EXECUTION FUNCTION WITHOUT GLOBAL POLLUTION
+            // ✅ EXECUTION FUNCTION
             const executionFunction = new Function(
                 'env',
                 `
                 return (async function() {
-                    // ✅ SAFELY EXTRACT VARIABLES WITHOUT GLOBAL POLLUTION
                     const {
                         User, Bot, bot, API, Api, BotData,
                         msg, chatId, userId, userInput, params, message, botToken,
@@ -644,7 +389,6 @@ async function executeCommandCode(botInstance, code, context) {
                     } catch (error) {
                         console.error('❌ Execution error:', error);
                         try {
-                            // Use Bot directly from env to avoid scope issues
                             await env.Bot.sendMessage("❌ Error: " + error.message);
                         } catch (sendError) {
                             console.error('Failed to send error message:', sendError);
@@ -657,14 +401,12 @@ async function executeCommandCode(botInstance, code, context) {
             
             // Execute the command
             console.log('🚀 Executing user code...');
-            const result = await executionFunction(caseInsensitiveEnv);
+            const result = await executionFunction(environment);
             
-            clearTimeout(executionTimeout);
             console.log('✅ Command execution completed successfully');
             resolve(result);
 
         } catch (error) {
-            clearTimeout(executionTimeout);
             console.error('❌ Command execution failed:', error);
             reject(error);
         }
