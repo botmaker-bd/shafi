@@ -112,7 +112,7 @@ class ApiWrapper {
 
     setupMetadataShortcuts() {
         // 🔍 METADATA INSPECTION METHODS
-        this.metaData = (target = 'all', options = {}) => {
+        this.metadata = (target = 'all', options = {}) => {
             return this.inspectMetadata(target, options);
         };
 
@@ -880,6 +880,19 @@ ${metadata.error ? `<b>Error:</b> <code>${metadata.error}</code>\n` : ''}
 <code>${metadata.timestamp}</code>
         `.trim();
     }
+
+    // ✅ FIXED: ADD MISSING METADATA ALIAS METHODS
+    metaData = (target = 'all', options = {}) => {
+        return this.metadata(target, options);
+    };
+
+    METADATA = (target = 'all', options = {}) => {
+        return this.metadata(target, options);
+    };
+
+    Metadata = (target = 'all', options = {}) => {
+        return this.metadata(target, options);
+    };
 }
 
 module.exports = ApiWrapper;
