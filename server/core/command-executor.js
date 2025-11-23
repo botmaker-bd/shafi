@@ -1,4 +1,4 @@
-// server/core/command-executor.js - AWAIT-FREE VERSION
+// server/core/command-executor.js - AUTO-AWAIT VERSION
 async function executeCommandCode(botInstance, code, context) {
     return new Promise(async (resolve, reject) => {
         try {
@@ -145,21 +145,17 @@ async function executeCommandCode(botInstance, code, context) {
                 };
             };
 
-            // ✅ FIXED: DATA STORAGE FUNCTIONS - SYNC VERSION WITHOUT AWAIT
+            // ✅ FIXED: DATA STORAGE FUNCTIONS - AUTO-AWAIT VERSION
             const userDataFunctions = {
-                saveData: (key, value) => {
+                saveData: async (key, value) => {
                     try {
                         const supabase = require('../config/supabase');
                         console.log(`💾 Saving user data: ${key} =`, value);
                         
-                        // Use upsert without onConflict for simpler operation
-                        supabase
+                        // First try to update, if fails then insert
+                        const { error: updateError } = await supabase
                             .from('universal_data')
-                            .upsert({
-                                data_type: 'user_data',
-                                bot_token: resolvedBotToken,
-                                user_id: userId.toString(),
-                                data_key: key,
+                            .update({
                                 data_value: JSON.stringify(value),
                                 metadata: {
                                     saved_at: new Date().toISOString(),
@@ -167,138 +163,122 @@ async function executeCommandCode(botInstance, code, context) {
                                 },
                                 updated_at: new Date().toISOString()
                             })
-                            .then(({ error }) => {
-                                if (error) {
-                                    console.error('❌ Save data error:', error);
-                                } else {
-                                    console.log(`✅ User data saved: ${key}`);
-                                }
-                            })
-                            .catch(e => console.error('❌ Save data catch error:', e));
+                            .eq('data_type', 'user_data')
+                            .eq('bot_token', resolvedBotToken)
+                            .eq('user_id', userId.toString())
+                            .eq('data_key', key);
 
+                        if (updateError) {
+                            // If update fails, try insert
+                            const { error: insertError } = await supabase
+                                .from('universal_data')
+                                .insert({
+                                    data_type: 'user_data',
+                                    bot_token: resolvedBotToken,
+                                    user_id: userId.toString(),
+                                    data_key: key,
+                                    data_value: JSON.stringify(value),
+                                    metadata: {
+                                        saved_at: new Date().toISOString(),
+                                        value_type: typeof value
+                                    },
+                                    updated_at: new Date().toISOString()
+                                });
+
+                            if (insertError) {
+                                console.error('❌ Save data error:', insertError);
+                                throw insertError;
+                            }
+                        }
+
+                        console.log(`✅ User data saved: ${key}`);
                         return value;
                     } catch (error) {
                         console.error('❌ Save data error:', error);
-                        return value;
+                        throw error;
                     }
                 },
                 
-                getData: (key) => {
+                getData: async (key) => {
                     try {
                         const supabase = require('../config/supabase');
                         console.log(`🔍 Reading user data: ${key}`);
                         
-                        // Create a simple sync-like interface
-                        let resultValue = null;
-                        let dataFound = false;
-                        
-                        supabase
+                        const { data, error } = await supabase
                             .from('universal_data')
                             .select('data_value, metadata, updated_at')
                             .eq('data_type', 'user_data')
                             .eq('bot_token', resolvedBotToken)
                             .eq('user_id', userId.toString())
                             .eq('data_key', key)
-                            .single()
-                            .then(({ data, error }) => {
-                                if (error) {
-                                    if (error.code === 'PGRST116') {
-                                        console.log(`📭 No data found for key: ${key}`);
-                                        resultValue = null;
-                                    } else {
-                                        console.error('❌ Get data error:', error);
-                                        resultValue = null;
-                                    }
-                                    return;
-                                }
+                            .single();
 
-                                if (!data || !data.data_value) {
-                                    console.log(`📭 Empty data for key: ${key}`);
-                                    resultValue = null;
-                                    return;
-                                }
+                        if (error) {
+                            if (error.code === 'PGRST116') {
+                                console.log(`📭 No data found for key: ${key}`);
+                                return null;
+                            }
+                            console.error('❌ Get data error:', error);
+                            return null;
+                        }
 
-                                try {
-                                    const parsedValue = JSON.parse(data.data_value);
-                                    console.log(`✅ User data retrieved: ${key} =`, parsedValue);
-                                    resultValue = parsedValue;
-                                } catch (parseError) {
-                                    console.log(`⚠️ Data is not JSON, returning as string: ${data.data_value}`);
-                                    resultValue = data.data_value;
-                                }
-                            })
-                            .catch(error => {
-                                console.error('❌ Get data catch error:', error);
-                                resultValue = null;
-                            });
+                        if (!data || !data.data_value) {
+                            console.log(`📭 Empty data for key: ${key}`);
+                            return null;
+                        }
 
-                        // Return a placeholder that will be replaced later
-                        return `UserData:${key}`;
+                        try {
+                            const parsedValue = JSON.parse(data.data_value);
+                            console.log(`✅ User data retrieved: ${key} =`, parsedValue);
+                            return parsedValue;
+                        } catch (parseError) {
+                            console.log(`⚠️ Data is not JSON, returning as string: ${data.data_value}`);
+                            return data.data_value;
+                        }
                     } catch (error) {
                         console.error('❌ Get data error:', error);
                         return null;
                     }
                 },
                 
-                deleteData: (key) => {
+                deleteData: async (key) => {
                     try {
                         const supabase = require('../config/supabase');
                         console.log(`🗑️ Deleting user data: ${key}`);
                         
-                        supabase
+                        const { error } = await supabase
                             .from('universal_data')
                             .delete()
                             .eq('data_type', 'user_data')
                             .eq('bot_token', resolvedBotToken)
                             .eq('user_id', userId.toString())
-                            .eq('data_key', key)
-                            .then(({ error }) => {
-                                if (error) {
-                                    console.error('❌ Delete data error:', error);
-                                } else {
-                                    console.log(`✅ User data deleted: ${key}`);
-                                }
-                            })
-                            .catch(e => console.error('❌ Delete data catch error:', e));
+                            .eq('data_key', key);
 
+                        if (error) {
+                            console.error('❌ Delete data error:', error);
+                            throw error;
+                        }
+                        
+                        console.log(`✅ User data deleted: ${key}`);
                         return true;
                     } catch (error) {
                         console.error('❌ Delete data error:', error);
-                        return false;
-                    }
-                },
-                
-                increment: (key, amount = 1) => {
-                    try {
-                        console.log(`➕ Incrementing user data: ${key} by ${amount}`);
-                        
-                        // Get current value first
-                        userDataFunctions.getData(key);
-                        userDataFunctions.saveData(key, amount);
-                        console.log(`✅ User data incremented: ${key} by ${amount}`);
-
-                        return `Incremented ${key} by ${amount}`;
-                    } catch (error) {
-                        console.error('❌ Increment data error:', error);
-                        return `Error incrementing ${key}`;
+                        throw error;
                     }
                 }
             };
 
-            // ✅ FIXED: BOT DATA FUNCTIONS - SYNC VERSION
+            // ✅ FIXED: BOT DATA FUNCTIONS - AUTO-AWAIT VERSION
             const botDataFunctions = {
-                saveData: (key, value) => {
+                saveData: async (key, value) => {
                     try {
                         const supabase = require('../config/supabase');
                         console.log(`💾 Saving bot data: ${key} =`, value);
                         
-                        // Use insert instead of upsert to avoid constraint issues
-                        supabase
+                        // First try to update, if fails then insert
+                        const { error: updateError } = await supabase
                             .from('universal_data')
-                            .insert({
-                                data_type: 'bot_data',
-                                bot_token: resolvedBotToken,
-                                data_key: key,
+                            .update({
                                 data_value: JSON.stringify(value),
                                 metadata: {
                                     saved_at: new Date().toISOString(),
@@ -306,59 +286,103 @@ async function executeCommandCode(botInstance, code, context) {
                                 },
                                 updated_at: new Date().toISOString()
                             })
-                            .then(({ error }) => {
-                                if (error) {
-                                    console.error('❌ Save bot data error:', error);
-                                } else {
-                                    console.log(`✅ Bot data saved: ${key}`);
-                                }
-                            })
-                            .catch(e => console.error('❌ Save bot data catch error:', e));
+                            .eq('data_type', 'bot_data')
+                            .eq('bot_token', resolvedBotToken)
+                            .eq('data_key', key);
 
+                        if (updateError) {
+                            // If update fails, try insert
+                            const { error: insertError } = await supabase
+                                .from('universal_data')
+                                .insert({
+                                    data_type: 'bot_data',
+                                    bot_token: resolvedBotToken,
+                                    data_key: key,
+                                    data_value: JSON.stringify(value),
+                                    metadata: {
+                                        saved_at: new Date().toISOString(),
+                                        value_type: typeof value
+                                    },
+                                    updated_at: new Date().toISOString()
+                                });
+
+                            if (insertError) {
+                                console.error('❌ Save bot data error:', insertError);
+                                throw insertError;
+                            }
+                        }
+
+                        console.log(`✅ Bot data saved: ${key}`);
                         return value;
                     } catch (error) {
                         console.error('❌ Save bot data error:', error);
-                        return value;
+                        throw error;
                     }
                 },
                 
-                getData: (key) => {
+                getData: async (key) => {
                     try {
                         const supabase = require('../config/supabase');
                         console.log(`🔍 Reading bot data: ${key}`);
                         
-                        // Return a simple string representation
-                        return `BotData:${key}`;
+                        const { data, error } = await supabase
+                            .from('universal_data')
+                            .select('data_value, metadata, updated_at')
+                            .eq('data_type', 'bot_data')
+                            .eq('bot_token', resolvedBotToken)
+                            .eq('data_key', key)
+                            .single();
+
+                        if (error) {
+                            if (error.code === 'PGRST116') {
+                                console.log(`📭 No bot data found for key: ${key}`);
+                                return null;
+                            }
+                            console.error('❌ Get bot data error:', error);
+                            return null;
+                        }
+
+                        if (!data || !data.data_value) {
+                            console.log(`📭 Empty bot data for key: ${key}`);
+                            return null;
+                        }
+
+                        try {
+                            const parsedValue = JSON.parse(data.data_value);
+                            console.log(`✅ Bot data retrieved: ${key} =`, parsedValue);
+                            return parsedValue;
+                        } catch (parseError) {
+                            console.log(`⚠️ Bot data is not JSON, returning as string: ${data.data_value}`);
+                            return data.data_value;
+                        }
                     } catch (error) {
                         console.error('❌ Get bot data error:', error);
                         return null;
                     }
                 },
                 
-                deleteData: (key) => {
+                deleteData: async (key) => {
                     try {
                         const supabase = require('../config/supabase');
                         console.log(`🗑️ Deleting bot data: ${key}`);
                         
-                        supabase
+                        const { error } = await supabase
                             .from('universal_data')
                             .delete()
                             .eq('data_type', 'bot_data')
                             .eq('bot_token', resolvedBotToken)
-                            .eq('data_key', key)
-                            .then(({ error }) => {
-                                if (error) {
-                                    console.error('❌ Delete bot data error:', error);
-                                } else {
-                                    console.log(`✅ Bot data deleted: ${key}`);
-                                }
-                            })
-                            .catch(e => console.error('❌ Delete bot data catch error:', e));
+                            .eq('data_key', key);
 
+                        if (error) {
+                            console.error('❌ Delete bot data error:', error);
+                            throw error;
+                        }
+                        
+                        console.log(`✅ Bot data deleted: ${key}`);
                         return true;
                     } catch (error) {
                         console.error('❌ Delete bot data error:', error);
-                        return false;
+                        throw error;
                     }
                 }
             };
@@ -388,7 +412,7 @@ async function executeCommandCode(botInstance, code, context) {
                     waitForAnswer: waitForAnswerFunction,
                     ask: waitForAnswerFunction,
                     
-                    // ✅ FIXED: BOT DATA METHODS - SYNC VERSION
+                    // ✅ FIXED: BOT DATA METHODS - AUTO-AWAIT VERSION
                     saveData: botDataFunctions.saveData,
                     getData: botDataFunctions.getData,
                     deleteData: botDataFunctions.deleteData
@@ -482,7 +506,7 @@ async function executeCommandCode(botInstance, code, context) {
                 ...messageFunctions
             };
 
-            // ✅ FIXED: Create execution function WITHOUT AWAIT REQUIREMENT
+            // ✅ FIXED: Create execution function with AUTO-AWAIT HANDLING
             const executionFunction = new Function(
                 'env',
                 `return (async function() {
@@ -548,8 +572,16 @@ async function executeCommandCode(botInstance, code, context) {
                         
                         console.log('✅ Execution started for user:', currentUser.first_name);
                         
-                        // User's code starts here
-                        ${code}
+                        // ✅ AUTO-AWAIT MAGIC: Automatically await all async operations
+                        async function autoAwait(value) {
+                            if (value && typeof value.then === 'function') {
+                                return await value;
+                            }
+                            return value;
+                        }
+                        
+                        // User's code starts here - NO AWAIT NEEDED!
+                        ${code.replace(/(User\.(saveData|getData|deleteData)|Bot\.(saveData|getData|deleteData)|waitForAnswer|ask|wait|delay|sleep)/g, 'await autoAwait($1)')}
                         // User's code ends here
                         
                         return "Command completed successfully";
