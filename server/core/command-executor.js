@@ -1,4 +1,4 @@
-// server/core/command-executor.js - DYNAMIC CASE INSENSITIVE
+// server/core/command-executor.js - FIXED METADATA METHODS
 async function executeCommandCode(botInstance, code, context) {
     return new Promise(async (resolve, reject) => {
         try {
@@ -123,9 +123,14 @@ async function executeCommandCode(botInstance, code, context) {
                 });
             };
 
-            // ✅ AUTO METADATA EXTRACTION FUNCTION
-            const extractMetadata = (target = 'all', options = {}) => {
-                return apiWrapperInstance.inspectMetadata(target, options);
+            // ✅ FIXED: METADATA EXTRACTION FUNCTIONS
+            const extractMetadata = async (target = 'all', options = {}) => {
+                try {
+                    return await apiWrapperInstance.inspectMetadata(target, options);
+                } catch (error) {
+                    console.error('❌ Metadata extraction error:', error);
+                    return { error: error.message };
+                }
             };
 
             // ✅ AUTO CONTEXT ANALYSIS
@@ -145,94 +150,58 @@ async function executeCommandCode(botInstance, code, context) {
                 };
             };
 
-            // ✅ DYNAMIC CASE INSENSITIVE PROXY HANDLER
-            const createDynamicCaseInsensitiveObject = (targetObj) => {
-                const caseInsensitiveCache = new Map();
+            // ✅ CREATE BOT OBJECT WITH ALL METADATA METHODS
+            const enhancedBot = {
+                // Copy all methods from apiWrapperInstance
+                ...apiWrapperInstance,
                 
-                return new Proxy(targetObj, {
-                    get: function(obj, prop) {
-                        if (typeof prop !== 'string') return obj[prop];
-                        
-                        // Convert property to lowercase for case insensitive access
-                        const lowerProp = prop.toLowerCase();
-                        
-                        // Check cache first
-                        if (caseInsensitiveCache.has(lowerProp)) {
-                            return caseInsensitiveCache.get(lowerProp);
-                        }
-                        
-                        // Find the actual property (case insensitive)
-                        const actualProp = Object.keys(obj).find(key => 
-                            key.toLowerCase() === lowerProp
-                        );
-                        
-                        if (actualProp) {
-                            const value = obj[actualProp];
-                            caseInsensitiveCache.set(lowerProp, value);
-                            return value;
-                        }
-                        
-                        // If not found, return undefined
-                        return undefined;
-                    },
-                    
-                    set: function(obj, prop, value) {
-                        if (typeof prop !== 'string') {
-                            obj[prop] = value;
-                            return true;
-                        }
-                        
-                        const lowerProp = prop.toLowerCase();
-                        const actualProp = Object.keys(obj).find(key => 
-                            key.toLowerCase() === lowerProp
-                        ) || prop;
-                        
-                        obj[actualProp] = value;
-                        caseInsensitiveCache.set(lowerProp, value);
-                        return true;
-                    },
-                    
-                    has: function(obj, prop) {
-                        if (typeof prop !== 'string') return prop in obj;
-                        
-                        const lowerProp = prop.toLowerCase();
-                        return Object.keys(obj).some(key => 
-                            key.toLowerCase() === lowerProp
-                        );
-                    },
-                    
-                    ownKeys: function(obj) {
-                        return Object.keys(obj);
-                    },
-                    
-                    getOwnPropertyDescriptor: function(obj, prop) {
-                        if (typeof prop !== 'string') return Object.getOwnPropertyDescriptor(obj, prop);
-                        
-                        const lowerProp = prop.toLowerCase();
-                        const actualProp = Object.keys(obj).find(key => 
-                            key.toLowerCase() === lowerProp
-                        );
-                        
-                        return actualProp ? Object.getOwnPropertyDescriptor(obj, actualProp) : undefined;
-                    }
-                });
+                // ✅ METADATA METHODS
+                metadata: extractMetadata,
+                metaData: extractMetadata,
+                inspect: extractMetadata,
+                getMeta: extractMetadata,
+                analyze: (target, options) => extractMetadata(target, { deep: true, ...options }),
+                
+                // Quick access methods
+                chatInfo: (chatId) => extractMetadata('chat', { chatId }),
+                userInfo: (userId) => extractMetadata('user', { userId }),
+                botInfo: () => extractMetadata('bot'),
+                updateInfo: () => extractMetadata('update'),
+                
+                // Context analysis
+                analyzeContext: analyzeContext,
+                getContext: analyzeContext,
+                
+                // Other methods
+                runPython: (pythonCode) => runPythonSync(pythonCode),
+                waitForAnswer: waitForAnswer,
+                ask: waitForAnswer,
+                wait: waitFunction,
+                delay: waitFunction,
+                sleep: waitFunction
             };
 
-            // ✅ CREATE BASE EXECUTION ENVIRONMENT
-            const baseExecutionEnv = {
-                // === CORE FUNCTIONS ===
-                getUser: createUserObject,
-                getChat: createChatObject,
-                getCurrentUser: createUserObject,
-                getCurrentChat: createChatObject,
-                
+            // ✅ FIXED: Create execution environment
+            const executionEnv = {
                 // === BOT INSTANCES ===
-                bot: apiWrapperInstance,
-                Bot: apiWrapperInstance,
-                api: apiWrapperInstance,
-                Api: apiWrapperInstance,
+                bot: enhancedBot,
+                Bot: enhancedBot,
+                Api: enhancedBot,
+                api: enhancedBot,
+
+                // === USER INFORMATION ===
+                getUser: createUserObject,
+                getCurrentUser: createUserObject,
+                userData: createUserObject(),
+                currentUser: createUserObject(),
                 
-                // === CONTEXT DATA ===
+                // === CHAT INFORMATION ===
+                getChat: createChatObject,
+                getCurrentChat: createChatObject,
+                chatData: createChatObject(),
+                currentChat: createChatObject(),
+                
+                // === MESSAGE & PARAMS ===
                 msg: msg,
                 chatId: chatId,
                 userId: userId,
@@ -241,30 +210,23 @@ async function executeCommandCode(botInstance, code, context) {
                 message: userInput,
                 botToken: resolvedBotToken,
                 
-                // === UTILITY FUNCTIONS ===
-                wait: waitFunction,
-                delay: waitFunction,
-                sleep: waitFunction,
-                
-                runPython: runPythonSync,
-                executePython: runPythonSync,
-                
-                waitForAnswer: waitForAnswer,
-                ask: waitForAnswer,
-                
-                // === METADATA FUNCTIONS ===
+                // ✅ METADATA FUNCTIONS
                 metadata: extractMetadata,
                 inspect: extractMetadata,
                 getMeta: extractMetadata,
                 analyze: (target, options) => extractMetadata(target, { deep: true, ...options }),
                 
+                // Quick access methods
                 chatInfo: (chatId) => extractMetadata('chat', { chatId }),
                 userInfo: (userId) => extractMetadata('user', { userId }),
                 botInfo: () => extractMetadata('bot'),
                 updateInfo: () => extractMetadata('update'),
                 
+                // Context analysis
                 analyzeContext: analyzeContext,
                 getContext: analyzeContext,
+                context: analyzeContext(),
+                ctx: analyzeContext(),
                 
                 // === DATA STORAGE ===
                 User: {
@@ -365,17 +327,18 @@ async function executeCommandCode(botInstance, code, context) {
                 // === HANDLERS ===
                 nextCommandHandlers: nextCommandHandlers,
                 
-                // === DATA OBJECTS ===
-                userData: createUserObject(),
-                chatData: createChatObject(),
-                currentUser: createUserObject(),
-                currentChat: createChatObject(),
-                context: analyzeContext(),
-                ctx: analyzeContext()
+                // === UTILITY FUNCTIONS ===
+                wait: waitFunction,
+                delay: waitFunction,
+                sleep: waitFunction,
+                runPython: (pythonCode) => runPythonSync(pythonCode),
+                executePython: (pythonCode) => runPythonSync(pythonCode),
+                waitForAnswer: waitForAnswer,
+                ask: waitForAnswer
             };
 
-            // ✅ ADD DIRECT MESSAGE FUNCTIONS
-            const messageFunctions = {
+            // ✅ FIXED: Direct function shortcuts
+            const directFunctions = {
                 sendMessage: (text, options) => botInstance.sendMessage(chatId, text, options),
                 send: (text, options) => botInstance.sendMessage(chatId, text, options),
                 reply: (text, options) => botInstance.sendMessage(chatId, text, {
@@ -384,82 +347,35 @@ async function executeCommandCode(botInstance, code, context) {
                 }),
                 sendPhoto: (photo, options) => botInstance.sendPhoto(chatId, photo, options),
                 sendDocument: (doc, options) => botInstance.sendDocument(chatId, doc, options),
-                sendVideo: (video, options) => botInstance.sendVideo(chatId, video, options),
-                sendAudio: (audio, options) => botInstance.sendAudio(chatId, audio, options),
-                sendVoice: (voice, options) => botInstance.sendVoice(chatId, voice, options),
-                sendLocation: (latitude, longitude, options) => botInstance.sendLocation(chatId, latitude, longitude, options),
-                sendContact: (phoneNumber, firstName, options) => botInstance.sendContact(chatId, phoneNumber, firstName, options)
+                getCurrentUser: createUserObject,
+                getCurrentChat: createChatObject
             };
 
-            // ✅ MERGE ALL FUNCTIONS
-            const mergedEnvironment = {
-                ...baseExecutionEnv,
-                ...messageFunctions
+            // ✅ FIXED: Merge all functions
+            const finalContext = {
+                ...executionEnv,
+                ...directFunctions
             };
 
-            // ✅ CREATE DYNAMIC CASE INSENSITIVE ENVIRONMENT
-            const finalContext = createDynamicCaseInsensitiveObject(mergedEnvironment);
-
-            // ✅ FIXED: Create ASYNC execution function with DYNAMIC CASE INSENSITIVE SUPPORT
+            // ✅ FIXED: Create ASYNC execution function
             const executionFunction = new Function(
-                // ✅ SINGLE PARAMETER - DYNAMIC CASE INSENSITIVE OBJECT
-                'env',
+                'getUser', 'getCurrentUser', 'userData', 'currentUser', 
+                'getChat', 'getCurrentChat', 'chatData', 'currentChat',
+                'sendMessage', 'send', 'reply', 'bot', 'Api', 'Bot', 
+                'params', 'message', 'User', 'BotData', 'wait', 'delay', 'sleep',
+                'runPython', 'executePython', 'waitForAnswer', 'ask',
+                'metadata', 'inspect', 'getMeta', 'analyze',
+                'chatInfo', 'userInfo', 'botInfo', 'updateInfo',
+                'analyzeContext', 'getContext', 'context', 'ctx',
                 `return (async function() {
                     try {
-                        // ✅ DYNAMIC CASE INSENSITIVE ACCESS - ALL PROPERTIES
-                        var getUser = env.getuser;
-                        var getCurrentUser = env.getcurrentuser;
-                        var userData = env.userdata;
-                        var currentUser = env.currentuser;
+                        // ✅ User can use all functions
+                        var user = getUser();
+                        var currentUser = getCurrentUser();
                         
-                        var getChat = env.getchat;
-                        var getCurrentChat = env.getcurrentchat;
-                        var chatData = env.chatdata;
-                        var currentChat = env.currentchat;
+                        console.log('✅ Execution started for user:', user.first_name);
                         
-                        var sendMessage = env.sendmessage;
-                        var send = env.send;
-                        var reply = env.reply;
-                        var sendPhoto = env.sendphoto;
-                        var sendDocument = env.senddocument;
-                        
-                        var bot = env.bot;
-                        var Bot = env.bot;
-                        var api = env.api;
-                        var Api = env.api;
-                        
-                        var params = env.params;
-                        var message = env.message;
-                        var User = env.user;
-                        var BotData = env.botdata;
-                        
-                        var wait = env.wait;
-                        var delay = env.delay;
-                        var sleep = env.sleep;
-                        
-                        var runPython = env.runpython;
-                        var executePython = env.executepython;
-                        var waitForAnswer = env.waitforanswer;
-                        var ask = env.ask;
-                        
-                        var metadata = env.metadata;
-                        var inspect = env.inspect;
-                        var getMeta = env.getmeta;
-                        var analyze = env.analyze;
-                        
-                        var chatInfo = env.chatinfo;
-                        var userInfo = env.userinfo;
-                        var botInfo = env.botinfo;
-                        var updateInfo = env.updateinfo;
-                        
-                        var analyzeContext = env.analyzecontext;
-                        var getContext = env.getcontext;
-                        var context = env.context;
-                        var ctx = env.ctx;
-                        
-                        console.log('✅ Execution started for user:', currentUser.first_name);
-                        
-                        // User's code starts here - ALL CASES WORK DYNAMICALLY
+                        // User's code starts here
                         ${code}
                         // User's code ends here
                         
@@ -467,7 +383,7 @@ async function executeCommandCode(botInstance, code, context) {
                     } catch (error) {
                         console.error('❌ Execution error:', error);
                         try {
-                            await env.sendMessage("❌ Error: " + error.message);
+                            await sendMessage("❌ Error: " + error.message);
                         } catch (e) {
                             console.error('Failed to send error message:', e);
                         }
@@ -478,7 +394,45 @@ async function executeCommandCode(botInstance, code, context) {
 
             // Execute the command
             console.log('🚀 Executing command...');
-            const result = await executionFunction(finalContext);
+            const result = await executionFunction(
+                finalContext.getUser,
+                finalContext.getCurrentUser,
+                finalContext.userData,
+                finalContext.currentUser,
+                finalContext.getChat,
+                finalContext.getCurrentChat,
+                finalContext.chatData,
+                finalContext.currentChat,
+                finalContext.sendMessage,
+                finalContext.send,
+                finalContext.reply,
+                finalContext.bot,
+                finalContext.Api,
+                finalContext.Bot,
+                finalContext.params,
+                finalContext.message,
+                finalContext.User,
+                finalContext.BotData,
+                finalContext.wait,
+                finalContext.delay,
+                finalContext.sleep,
+                finalContext.runPython,
+                finalContext.executePython,
+                finalContext.waitForAnswer,
+                finalContext.ask,
+                finalContext.metadata,
+                finalContext.inspect,
+                finalContext.getMeta,
+                finalContext.analyze,
+                finalContext.chatInfo,
+                finalContext.userInfo,
+                finalContext.botInfo,
+                finalContext.updateInfo,
+                finalContext.analyzeContext,
+                finalContext.getContext,
+                finalContext.context,
+                finalContext.ctx
+            );
             
             console.log('✅ Command execution completed');
             resolve(result);
