@@ -108,7 +108,7 @@ class CommandEditor {
         });
 
         // Test actions
-        const testButtons = ['testCommandBtn', 'testFooterBtn'];
+        const testButtons = ['testCommandBtn', 'fullEditorRunBtn', 'testFooterBtn'];
         testButtons.forEach(btnId => {
             const btn = document.getElementById(btnId);
             if (btn) {
