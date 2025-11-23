@@ -1,4 +1,4 @@
-// server/core/command-executor.js - FIXED API REFERENCE ERROR
+// server/core/command-executor.js - FIXED WITH METADATA & USER DATA
 async function executeCommandCode(botInstance, code, context) {
     return new Promise(async (resolve, reject) => {
         try {
@@ -123,9 +123,22 @@ async function executeCommandCode(botInstance, code, context) {
                 });
             };
 
-            // ✅ FIXED: METADATA FUNCTION - PROPERLY BOUND TO API WRAPPER
-            const extractMetadata = (target = 'all', options = {}) => {
-                return apiWrapperInstance.inspectMetadata(target, options);
+            // ✅ FIXED: METADATA FUNCTION - ORIGINAL RESPONSE ONLY
+            const extractMetadata = async (target = 'message') => {
+                return await apiWrapperInstance.metadata(target);
+            };
+
+            // ✅ FIXED: USER DATA FUNCTIONS
+            const getUserData = async (key) => {
+                return await apiWrapperInstance.User.getData(key);
+            };
+
+            const saveUserData = async (key, value) => {
+                return await apiWrapperInstance.User.saveData(key, value);
+            };
+
+            const deleteUserData = async (key) => {
+                return await apiWrapperInstance.User.deleteData(key);
             };
 
             // ✅ AUTO CONTEXT ANALYSIS
@@ -224,17 +237,24 @@ async function executeCommandCode(botInstance, code, context) {
                     // Copy all methods from apiWrapperInstance
                     ...apiWrapperInstance,
                     
-                    // ✅ FIXED: METADATA METHODS - PROPERLY BOUND
+                    // ✅ FIXED: METADATA METHODS - ORIGINAL RESPONSE ONLY
                     metadata: extractMetadata,
-                    inspect: extractMetadata,
-                    getMeta: extractMetadata,
-                    analyze: (target, options) => extractMetadata(target, { deep: true, ...options }),
+                    metaData: extractMetadata,
+                    Metadata: extractMetadata,
+                    METADATA: extractMetadata,
                     
-                    // Quick access methods
-                    chatInfo: (chatId) => extractMetadata('chat', { chatId }),
-                    userInfo: (userId) => extractMetadata('user', { userId }),
-                    botInfo: () => extractMetadata('bot'),
-                    updateInfo: () => extractMetadata('update'),
+                    // ✅ FIXED: USER DATA METHODS
+                    User: {
+                        getData: getUserData,
+                        saveData: saveUserData,
+                        deleteData: deleteUserData,
+                        increment: async (key, amount = 1) => {
+                            const current = await getUserData(key);
+                            const newValue = (parseInt(current) || 0) + amount;
+                            await saveUserData(key, newValue);
+                            return newValue;
+                        }
+                    },
                     
                     // Context analysis
                     analyzeContext: analyzeContext,
@@ -293,68 +313,24 @@ async function executeCommandCode(botInstance, code, context) {
                 
                 // === METADATA FUNCTIONS ===
                 metadata: extractMetadata,
-                inspect: extractMetadata,
-                getMeta: extractMetadata,
-                analyze: (target, options) => extractMetadata(target, { deep: true, ...options }),
+                metaData: extractMetadata,
+                Metadata: extractMetadata,
+                METADATA: extractMetadata,
                 
-                chatInfo: (chatId) => extractMetadata('chat', { chatId }),
-                userInfo: (userId) => extractMetadata('user', { userId }),
-                botInfo: () => extractMetadata('bot'),
-                updateInfo: () => extractMetadata('update'),
-                
-                analyzeContext: analyzeContext,
-                getContext: analyzeContext,
-                
-                // === DATA STORAGE ===
+                // === USER DATA FUNCTIONS ===
                 User: {
-                    saveData: async (key, value) => {
-                        try {
-                            const supabase = require('../config/supabase');
-                            await supabase.from('universal_data').upsert({
-                                data_type: 'user_data',
-                                bot_token: resolvedBotToken,
-                                user_id: userId.toString(),
-                                data_key: key,
-                                data_value: JSON.stringify(value),
-                                updated_at: new Date().toISOString()
-                            });
-                        } catch (error) {
-                            console.error('❌ Save data error:', error);
-                            throw error;
-                        }
-                    },
-                    getData: async (key) => {
-                        try {
-                            const supabase = require('../config/supabase');
-                            const { data } = await supabase.from('universal_data')
-                                .select('data_value')
-                                .eq('data_type', 'user_data')
-                                .eq('bot_token', resolvedBotToken)
-                                .eq('user_id', userId.toString())
-                                .eq('data_key', key)
-                                .single();
-                            return data ? JSON.parse(data.data_value) : null;
-                        } catch (error) {
-                            console.error('❌ Get data error:', error);
-                            return null;
-                        }
-                    },
-                    deleteData: async (key) => {
-                        try {
-                            const supabase = require('../config/supabase');
-                            await supabase.from('universal_data')
-                                .delete()
-                                .eq('data_type', 'user_data')
-                                .eq('bot_token', resolvedBotToken)
-                                .eq('user_id', userId.toString())
-                                .eq('data_key', key);
-                        } catch (error) {
-                            console.error('❌ Delete data error:', error);
-                            throw error;
-                        }
+                    getData: getUserData,
+                    saveData: saveUserData,
+                    deleteData: deleteUserData,
+                    increment: async (key, amount = 1) => {
+                        const current = await getUserData(key);
+                        const newValue = (parseInt(current) || 0) + amount;
+                        await saveUserData(key, newValue);
+                        return newValue;
                     }
                 },
                 
+                // === DATA STORAGE ===
                 BotData: {
                     saveData: async (key, value) => {
                         try {
@@ -482,14 +458,9 @@ async function executeCommandCode(botInstance, code, context) {
                         var ask = env.ask;
                         
                         var metadata = env.metadata;
-                        var inspect = env.inspect;
-                        var getMeta = env.getmeta;
-                        var analyze = env.analyze;
-                        
-                        var chatInfo = env.chatinfo;
-                        var userInfo = env.userinfo;
-                        var botInfo = env.botinfo;
-                        var updateInfo = env.updateinfo;
+                        var metaData = env.metadata;
+                        var Metadata = env.metadata;
+                        var METADATA = env.metadata;
                         
                         var analyzeContext = env.analyzecontext;
                         var getContext = env.getcontext;
@@ -502,7 +473,6 @@ async function executeCommandCode(botInstance, code, context) {
                         console.log('🔍 Testing metadata function...');
                         console.log('Bot.metadata type:', typeof Bot.metadata);
                         console.log('bot.metadata type:', typeof bot.metadata);
-                        console.log('Api.metadata type:', typeof Api.metadata);
                         console.log('metadata type:', typeof metadata);
                         
                         // User's code starts here
