@@ -1,4 +1,4 @@
-// server/core/command-executor.js - FIXED METADATA ISSUE
+// server/core/command-executor.js - FIXED API REFERENCE ERROR
 async function executeCommandCode(botInstance, code, context) {
     return new Promise(async (resolve, reject) => {
         try {
@@ -218,7 +218,7 @@ async function executeCommandCode(botInstance, code, context) {
                 });
             };
 
-            // ✅ CREATE BOT OBJECT WITH METADATA METHODS
+            // ✅ CREATE BOT OBJECT WITH ALL METHODS
             const createBotObject = () => {
                 const botObj = {
                     // Copy all methods from apiWrapperInstance
@@ -253,6 +253,9 @@ async function executeCommandCode(botInstance, code, context) {
                 return createDynamicCaseInsensitiveObject(botObj);
             };
 
+            // ✅ CREATE BOT INSTANCE
+            const botObject = createBotObject();
+
             // ✅ CREATE BASE EXECUTION ENVIRONMENT
             const baseExecutionEnv = {
                 // === CORE FUNCTIONS ===
@@ -261,11 +264,12 @@ async function executeCommandCode(botInstance, code, context) {
                 getCurrentUser: createUserObject,
                 getCurrentChat: createChatObject,
                 
-                // === BOT INSTANCES ===
-                bot: createBotObject(),
-                Bot: createBotObject(),
-                api: createBotObject(),
-                Api: createBotObject(),
+                // === BOT INSTANCES - ALL VARIATIONS ===
+                bot: botObject,
+                Bot: botObject,
+                api: botObject,
+                Api: botObject,
+                API: botObject,
                 
                 // === CONTEXT DATA ===
                 msg: msg,
@@ -435,24 +439,62 @@ async function executeCommandCode(botInstance, code, context) {
             // ✅ CREATE DYNAMIC CASE INSENSITIVE ENVIRONMENT
             const finalContext = createDynamicCaseInsensitiveObject(mergedEnvironment);
 
-            // ✅ FIXED: Create ASYNC execution function
+            // ✅ FIXED: Create ASYNC execution function with ALL VARIABLES
             const executionFunction = new Function(
                 'env',
                 `return (async function() {
                     try {
-                        // ✅ DYNAMIC CASE INSENSITIVE ACCESS
+                        // ✅ EXTRACT ALL VARIABLES FROM ENVIRONMENT
                         var Bot = env.bot;
                         var bot = env.bot;
+                        var Api = env.api;
+                        var api = env.api;
+                        var API = env.api;
+                        
                         var getUser = env.getuser;
                         var getCurrentUser = env.getcurrentuser;
                         var userData = env.userdata;
                         var currentUser = env.currentuser;
+                        
+                        var getChat = env.getchat;
+                        var getCurrentChat = env.getcurrentchat;
+                        var chatData = env.chatdata;
+                        var currentChat = env.currentchat;
+                        
                         var sendMessage = env.sendmessage;
                         var send = env.send;
+                        var reply = env.reply;
+                        var sendPhoto = env.sendphoto;
+                        var sendDocument = env.senddocument;
+                        
+                        var params = env.params;
+                        var message = env.message;
+                        var User = env.user;
+                        var BotData = env.botdata;
+                        
                         var wait = env.wait;
+                        var delay = env.delay;
+                        var sleep = env.sleep;
+                        
+                        var runPython = env.runpython;
+                        var executePython = env.executepython;
+                        var waitForAnswer = env.waitforanswer;
+                        var ask = env.ask;
+                        
                         var metadata = env.metadata;
+                        var inspect = env.inspect;
+                        var getMeta = env.getmeta;
+                        var analyze = env.analyze;
+                        
+                        var chatInfo = env.chatinfo;
+                        var userInfo = env.userinfo;
+                        var botInfo = env.botinfo;
+                        var updateInfo = env.updateinfo;
+                        
                         var analyzeContext = env.analyzecontext;
+                        var getContext = env.getcontext;
                         var context = env.context;
+                        var ctx = env.ctx;
                         
                         console.log('✅ Execution started for user:', currentUser.first_name);
                         
@@ -460,6 +502,7 @@ async function executeCommandCode(botInstance, code, context) {
                         console.log('🔍 Testing metadata function...');
                         console.log('Bot.metadata type:', typeof Bot.metadata);
                         console.log('bot.metadata type:', typeof bot.metadata);
+                        console.log('Api.metadata type:', typeof Api.metadata);
                         console.log('metadata type:', typeof metadata);
                         
                         // User's code starts here
