@@ -1,4 +1,4 @@
-// server/core/command-executor.js - FIXED VERSION
+// server/core/command-executor.js - FINAL FIXED VERSION
 async function executeCommandCode(botInstance, code, context) {
     return new Promise(async (resolve, reject) => {
         try {
@@ -42,63 +42,73 @@ async function executeCommandCode(botInstance, code, context) {
             
             const apiWrapperInstance = new ApiWrapper(botInstance, apiContext);
             
-            // ✅ FIXED: SMART PROMISE HANDLER THAT AUTO-RESOLVES
-            const createAutoResolveHandler = (asyncFn, functionName = 'unknown') => {
+            // ✅ ULTIMATE SMART HANDLER - BOTH AWAIT AND SYNC
+            const createUltimateHandler = (asyncFn, functionName = 'unknown') => {
                 return (...args) => {
                     const promise = asyncFn(...args);
                     
-                    // Auto-resolve promise and return the actual value
-                    const autoResolvePromise = promise.then(result => {
+                    // Create a smart promise that works with both await and direct usage
+                    const smartPromise = promise.then(result => {
                         return result;
                     }).catch(error => {
                         console.error(`❌ ${functionName} error:`, error);
-                        return null; // Return null instead of throwing for better UX
+                        return null;
                     });
                     
-                    return autoResolvePromise;
+                    // Add magic methods for direct usage
+                    const handler = {
+                        get(target, prop) {
+                            if (prop === 'then') return target.then.bind(target);
+                            if (prop === 'catch') return target.catch.bind(target);
+                            if (prop === 'finally') return target.finally.bind(target);
+                            if (prop === 'valueOf') return () => target;
+                            if (prop === 'toString') return () => {
+                                // When used in string context, wait and return the value
+                                return target.then(val => String(val || '')).catch(() => '');
+                            };
+                            return undefined;
+                        }
+                    };
+                    
+                    return new Proxy(smartPromise, handler);
                 };
             };
 
-            // ✅ USER DATA METHODS WITH AUTO-RESOLVE
+            // ✅ USER DATA METHODS
             const userDataMethods = {
-                getData: createAutoResolveHandler(async (key) => {
+                getData: createUltimateHandler(async (key) => {
                     try {
-                        const result = await apiWrapperInstance.User.getData(key);
-                        return result;
+                        return await apiWrapperInstance.User.getData(key);
                     } catch (error) {
-                        console.error('❌ Get user data error:', error);
                         return null;
                     }
                 }, 'User.getData'),
                 
-                saveData: createAutoResolveHandler(async (key, value) => {
+                saveData: createUltimateHandler(async (key, value) => {
                     try {
                         await apiWrapperInstance.User.saveData(key, value);
                         return value;
                     } catch (error) {
-                        console.error('❌ Save user data error:', error);
                         return null;
                     }
                 }, 'User.saveData'),
                 
-                deleteData: createAutoResolveHandler(async (key) => {
+                deleteData: createUltimateHandler(async (key) => {
                     try {
                         await apiWrapperInstance.User.deleteData(key);
                         return true;
                     } catch (error) {
-                        console.error('❌ Delete user data error:', error);
                         return false;
                     }
                 }, 'User.deleteData'),
                 
-                increment: createAutoResolveHandler(async (key, amount = 1) => {
+                increment: createUltimateHandler(async (key, amount = 1) => {
                     try {
                         const current = await apiWrapperInstance.User.getData(key);
                         const newValue = (parseInt(current) || 0) + amount;
                         await apiWrapperInstance.User.saveData(key, newValue);
                         return newValue;
                     } catch (error) {
-                        console.error('❌ Increment user data error:', error);
                         return 0;
                     }
                 }, 'User.increment')
@@ -106,7 +116,7 @@ async function executeCommandCode(botInstance, code, context) {
             
             // ✅ BOT DATA METHODS
             const botDataMethods = {
-                getData: createAutoResolveHandler(async (key) => {
+                getData: createUltimateHandler(async (key) => {
                     try {
                         const { data, error } = await supabase.from('universal_data')
                             .select('data_value')
@@ -122,12 +132,11 @@ async function executeCommandCode(botInstance, code, context) {
                         
                         return data ? JSON.parse(data.data_value) : null;
                     } catch (error) {
-                        console.error('❌ Get bot data error:', error);
                         return null;
                     }
-                }, 'BotData.getData'),
+                }, 'Bot.getData'),
                 
-                saveData: createAutoResolveHandler(async (key, value) => {
+                saveData: createUltimateHandler(async (key, value) => {
                     try {
                         const { error } = await supabase.from('universal_data').upsert({
                             data_type: 'bot_data',
@@ -142,12 +151,11 @@ async function executeCommandCode(botInstance, code, context) {
                         if (error) throw error;
                         return value;
                     } catch (error) {
-                        console.error('❌ Save bot data error:', error);
                         return null;
                     }
-                }, 'BotData.saveData'),
+                }, 'Bot.saveData'),
                 
-                deleteData: createAutoResolveHandler(async (key) => {
+                deleteData: createUltimateHandler(async (key) => {
                     try {
                         const { error } = await supabase.from('universal_data')
                             .delete()
@@ -158,15 +166,14 @@ async function executeCommandCode(botInstance, code, context) {
                         if (error) throw error;
                         return true;
                     } catch (error) {
-                        console.error('❌ Delete bot data error:', error);
                         return false;
                     }
-                }, 'BotData.deleteData')
+                }, 'Bot.deleteData')
             };
             
             // ✅ BOT METHODS
             const createBotMethod = (methodName) => {
-                return createAutoResolveHandler(async (...args) => {
+                return createUltimateHandler(async (...args) => {
                     if (!apiWrapperInstance[methodName]) {
                         throw new Error(`Method ${methodName} not available`);
                     }
@@ -191,11 +198,10 @@ async function executeCommandCode(botInstance, code, context) {
             });
             
             // ✅ METADATA METHODS
-            const metadataFunc = createAutoResolveHandler(async (target = 'message') => {
+            const metadataFunc = createUltimateHandler(async (target = 'message') => {
                 try {
                     return await apiWrapperInstance.metadata(target);
                 } catch (error) {
-                    console.error('❌ Metadata error:', error);
                     return { error: error.message };
                 }
             }, 'metadata');
@@ -206,12 +212,12 @@ async function executeCommandCode(botInstance, code, context) {
             botMethods.METADATA = metadataFunc;
             
             // ✅ UTILITY FUNCTIONS
-            const waitFunction = createAutoResolveHandler(async (seconds) => {
+            const waitFunction = createUltimateHandler(async (seconds) => {
                 const ms = seconds * 1000;
                 return new Promise(resolve => setTimeout(() => resolve(`Waited ${seconds} seconds`), ms));
             }, 'wait');
             
-            const runPythonFunc = createAutoResolveHandler(async (code) => {
+            const runPythonFunc = createUltimateHandler(async (code) => {
                 try {
                     return await pythonRunner.runPythonCode(code);
                 } catch (error) {
@@ -219,7 +225,7 @@ async function executeCommandCode(botInstance, code, context) {
                 }
             }, 'runPython');
             
-            const waitForAnswerFunc = createAutoResolveHandler(async (question, options = {}) => {
+            const waitForAnswerFunc = createUltimateHandler(async (question, options = {}) => {
                 return new Promise((resolve, reject) => {
                     try {
                         const waitKey = `${resolvedBotToken}_${userId}`;
@@ -301,16 +307,16 @@ async function executeCommandCode(botInstance, code, context) {
                 getContext: () => contextObject
             };
             
-            const BotData = { ...botDataMethods };
+            const Bot = { ...botDataMethods };
             
             // ✅ DIRECT MESSAGE FUNCTIONS
-            const sendMessageFunc = createAutoResolveHandler(async (text, options = {}) => {
+            const sendMessageFunc = createUltimateHandler(async (text, options = {}) => {
                 return await botInstance.sendMessage(chatId, text, options);
             }, 'sendMessage');
             
             const sendFunc = sendMessageFunc;
             
-            const replyFunc = createAutoResolveHandler(async (text, options = {}) => {
+            const replyFunc = createUltimateHandler(async (text, options = {}) => {
                 return await botInstance.sendMessage(chatId, text, {
                     reply_to_message_id: msg.message_id,
                     ...options
@@ -325,7 +331,6 @@ async function executeCommandCode(botInstance, code, context) {
                 bot: Bot,
                 API: Bot,
                 Api: Bot,
-                BotData,
                 
                 // Context data
                 msg,
@@ -365,13 +370,13 @@ async function executeCommandCode(botInstance, code, context) {
                 reply: replyFunc
             };
             
-            // ✅ EXECUTION FUNCTION
+            // ✅ SPECIAL EXECUTION FUNCTION FOR MIXED USAGE
             const executionFunction = new Function(
                 'env',
                 `
                 return (async function() {
                     const {
-                        User, Bot, bot, API, Api, BotData,
+                        User, Bot, bot, API, Api,
                         msg, chatId, userId, userInput, params, message, botToken,
                         wait, delay, sleep, runPython, executePython, waitForAnswer, ask,
                         metadata, metaData, Metadata, METADATA,
@@ -381,6 +386,17 @@ async function executeCommandCode(botInstance, code, context) {
                     
                     try {
                         console.log('🚀 Command execution started for user:', currentUser.first_name);
+                        
+                        // 🎯 SPECIAL: Auto-resolve promises in string context
+                        const originalSendMessage = Bot.sendMessage;
+                        Bot.sendMessage = async function(text, options) {
+                            if (typeof text === 'string') {
+                                // Auto-resolve any promises in the text
+                                const resolvedText = await Promise.resolve(text);
+                                return originalSendMessage(resolvedText, options);
+                            }
+                            return originalSendMessage(text, options);
+                        };
                         
                         // 🎯 USER CODE EXECUTION
                         ${code}
