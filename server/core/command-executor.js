@@ -1,4 +1,4 @@
-// server/core/command-executor.js - REAL VALUES VERSION
+// server/core/command-executor.js - MAGIC AUTO-AWAIT VERSION
 async function executeCommandCode(botInstance, code, context) {
     return new Promise(async (resolve, reject) => {
         try {
@@ -145,21 +145,17 @@ async function executeCommandCode(botInstance, code, context) {
                 };
             };
 
-            // ✅ FIXED: DATA STORAGE FUNCTIONS - IMMEDIATE VALUES
+            // ✅ FIXED: DATA STORAGE FUNCTIONS - MAGIC AWAIT VERSION
             const userDataFunctions = {
-                saveData: (key, value) => {
+                saveData: async (key, value) => {
                     try {
                         const supabase = require('../config/supabase');
                         console.log(`💾 Saving user data: ${key} =`, value);
                         
-                        // Use insert with onConflict for better handling
-                        supabase
+                        // First try to update, if fails then insert
+                        const { error: updateError } = await supabase
                             .from('universal_data')
-                            .upsert({
-                                data_type: 'user_data',
-                                bot_token: resolvedBotToken,
-                                user_id: userId.toString(),
-                                data_key: key,
+                            .update({
                                 data_value: JSON.stringify(value),
                                 metadata: {
                                     saved_at: new Date().toISOString(),
@@ -167,80 +163,122 @@ async function executeCommandCode(botInstance, code, context) {
                                 },
                                 updated_at: new Date().toISOString()
                             })
-                            .then(({ error }) => {
-                                if (error) {
-                                    console.error('❌ Save data error:', error);
-                                } else {
-                                    console.log(`✅ User data saved: ${key}`);
-                                }
-                            })
-                            .catch(e => console.error('❌ Save data catch error:', e));
+                            .eq('data_type', 'user_data')
+                            .eq('bot_token', resolvedBotToken)
+                            .eq('user_id', userId.toString())
+                            .eq('data_key', key);
 
-                        // Return the value immediately (not the promise)
+                        if (updateError) {
+                            // If update fails, try insert
+                            const { error: insertError } = await supabase
+                                .from('universal_data')
+                                .insert({
+                                    data_type: 'user_data',
+                                    bot_token: resolvedBotToken,
+                                    user_id: userId.toString(),
+                                    data_key: key,
+                                    data_value: JSON.stringify(value),
+                                    metadata: {
+                                        saved_at: new Date().toISOString(),
+                                        value_type: typeof value
+                                    },
+                                    updated_at: new Date().toISOString()
+                                });
+
+                            if (insertError) {
+                                console.error('❌ Save data error:', insertError);
+                                throw insertError;
+                            }
+                        }
+
+                        console.log(`✅ User data saved: ${key}`);
                         return value;
                     } catch (error) {
                         console.error('❌ Save data error:', error);
-                        return value;
+                        throw error;
                     }
                 },
                 
-                getData: (key) => {
+                getData: async (key) => {
                     try {
                         const supabase = require('../config/supabase');
                         console.log(`🔍 Reading user data: ${key}`);
                         
-                        // Return a simple placeholder that will be replaced with actual data
-                        // This avoids showing [object Promise]
-                        return `user_${key}`;
+                        const { data, error } = await supabase
+                            .from('universal_data')
+                            .select('data_value, metadata, updated_at')
+                            .eq('data_type', 'user_data')
+                            .eq('bot_token', resolvedBotToken)
+                            .eq('user_id', userId.toString())
+                            .eq('data_key', key)
+                            .single();
+
+                        if (error) {
+                            if (error.code === 'PGRST116') {
+                                console.log(`📭 No data found for key: ${key}`);
+                                return null;
+                            }
+                            console.error('❌ Get data error:', error);
+                            return null;
+                        }
+
+                        if (!data || !data.data_value) {
+                            console.log(`📭 Empty data for key: ${key}`);
+                            return null;
+                        }
+
+                        try {
+                            const parsedValue = JSON.parse(data.data_value);
+                            console.log(`✅ User data retrieved: ${key} =`, parsedValue);
+                            return parsedValue;
+                        } catch (parseError) {
+                            console.log(`⚠️ Data is not JSON, returning as string: ${data.data_value}`);
+                            return data.data_value;
+                        }
                     } catch (error) {
                         console.error('❌ Get data error:', error);
                         return null;
                     }
                 },
                 
-                deleteData: (key) => {
+                deleteData: async (key) => {
                     try {
                         const supabase = require('../config/supabase');
                         console.log(`🗑️ Deleting user data: ${key}`);
                         
-                        supabase
+                        const { error } = await supabase
                             .from('universal_data')
                             .delete()
                             .eq('data_type', 'user_data')
                             .eq('bot_token', resolvedBotToken)
                             .eq('user_id', userId.toString())
-                            .eq('data_key', key)
-                            .then(({ error }) => {
-                                if (error) {
-                                    console.error('❌ Delete data error:', error);
-                                } else {
-                                    console.log(`✅ User data deleted: ${key}`);
-                                }
-                            })
-                            .catch(e => console.error('❌ Delete data catch error:', e));
+                            .eq('data_key', key);
 
+                        if (error) {
+                            console.error('❌ Delete data error:', error);
+                            throw error;
+                        }
+                        
+                        console.log(`✅ User data deleted: ${key}`);
                         return true;
                     } catch (error) {
                         console.error('❌ Delete data error:', error);
-                        return false;
+                        throw error;
                     }
                 }
             };
 
-            // ✅ FIXED: BOT DATA FUNCTIONS - IMMEDIATE VALUES
+            // ✅ FIXED: BOT DATA FUNCTIONS - MAGIC AWAIT VERSION
             const botDataFunctions = {
-                saveData: (key, value) => {
+                saveData: async (key, value) => {
                     try {
                         const supabase = require('../config/supabase');
                         console.log(`💾 Saving bot data: ${key} =`, value);
                         
-                        // Use insert instead of upsert to avoid constraint issues
-                        supabase
+                        // First try to update, if fails then insert
+                        const { error: updateError } = await supabase
                             .from('universal_data')
-                            .insert({
-                                data_type: 'bot_data',
-                                bot_token: resolvedBotToken,
-                                data_key: key,
+                            .update({
                                 data_value: JSON.stringify(value),
                                 metadata: {
                                     saved_at: new Date().toISOString(),
@@ -248,61 +286,103 @@ async function executeCommandCode(botInstance, code, context) {
                                 },
                                 updated_at: new Date().toISOString()
                             })
-                            .then(({ error }) => {
-                                if (error) {
-                                    console.error('❌ Save bot data error:', error);
-                                } else {
-                                    console.log(`✅ Bot data saved: ${key}`);
-                                }
-                            })
-                            .catch(e => console.error('❌ Save bot data catch error:', e));
+                            .eq('data_type', 'bot_data')
+                            .eq('bot_token', resolvedBotToken)
+                            .eq('data_key', key);
 
-                        // Return the value immediately (not the promise)
+                        if (updateError) {
+                            // If update fails, try insert
+                            const { error: insertError } = await supabase
+                                .from('universal_data')
+                                .insert({
+                                    data_type: 'bot_data',
+                                    bot_token: resolvedBotToken,
+                                    data_key: key,
+                                    data_value: JSON.stringify(value),
+                                    metadata: {
+                                        saved_at: new Date().toISOString(),
+                                        value_type: typeof value
+                                    },
+                                    updated_at: new Date().toISOString()
+                                });
+
+                            if (insertError) {
+                                console.error('❌ Save bot data error:', insertError);
+                                throw insertError;
+                            }
+                        }
+
+                        console.log(`✅ Bot data saved: ${key}`);
                         return value;
                     } catch (error) {
                         console.error('❌ Save bot data error:', error);
-                        return value;
+                        throw error;
                     }
                 },
                 
-                getData: (key) => {
+                getData: async (key) => {
                     try {
                         const supabase = require('../config/supabase');
                         console.log(`🔍 Reading bot data: ${key}`);
                         
-                        // Return a simple placeholder that will be replaced with actual data
-                        // This avoids showing [object Promise]
-                        return `bot_${key}`;
+                        const { data, error } = await supabase
+                            .from('universal_data')
+                            .select('data_value, metadata, updated_at')
+                            .eq('data_type', 'bot_data')
+                            .eq('bot_token', resolvedBotToken)
+                            .eq('data_key', key)
+                            .single();
+
+                        if (error) {
+                            if (error.code === 'PGRST116') {
+                                console.log(`📭 No bot data found for key: ${key}`);
+                                return null;
+                            }
+                            console.error('❌ Get bot data error:', error);
+                            return null;
+                        }
+
+                        if (!data || !data.data_value) {
+                            console.log(`📭 Empty bot data for key: ${key}`);
+                            return null;
+                        }
+
+                        try {
+                            const parsedValue = JSON.parse(data.data_value);
+                            console.log(`✅ Bot data retrieved: ${key} =`, parsedValue);
+                            return parsedValue;
+                        } catch (parseError) {
+                            console.log(`⚠️ Bot data is not JSON, returning as string: ${data.data_value}`);
+                            return data.data_value;
+                        }
                     } catch (error) {
                         console.error('❌ Get bot data error:', error);
                         return null;
                     }
                 },
                 
-                deleteData: (key) => {
+                deleteData: async (key) => {
                     try {
                         const supabase = require('../config/supabase');
                         console.log(`🗑️ Deleting bot data: ${key}`);
                         
-                        supabase
+                        const { error } = await supabase
                             .from('universal_data')
                             .delete()
                             .eq('data_type', 'bot_data')
                             .eq('bot_token', resolvedBotToken)
-                            .eq('data_key', key)
-                            .then(({ error }) => {
-                                if (error) {
-                                    console.error('❌ Delete bot data error:', error);
-                                } else {
-                                    console.log(`✅ Bot data deleted: ${key}`);
-                                }
-                            })
-                            .catch(e => console.error('❌ Delete bot data catch error:', e));
+                            .eq('data_key', key);
 
+                        if (error) {
+                            console.error('❌ Delete bot data error:', error);
+                            throw error;
+                        }
+                        
+                        console.log(`✅ Bot data deleted: ${key}`);
                         return true;
                     } catch (error) {
                         console.error('❌ Delete bot data error:', error);
-                        return false;
+                        throw error;
                     }
                 }
             };
@@ -332,7 +412,7 @@ async function executeCommandCode(botInstance, code, context) {
                     waitForAnswer: waitForAnswerFunction,
                     ask: waitForAnswerFunction,
                     
-                    // ✅ FIXED: BOT DATA METHODS - IMMEDIATE VALUES
+                    // ✅ FIXED: BOT DATA METHODS - MAGIC AWAIT VERSION
                     saveData: botDataFunctions.saveData,
                     getData: botDataFunctions.getData,
                     deleteData: botDataFunctions.deleteData
@@ -426,7 +506,39 @@ async function executeCommandCode(botInstance, code, context) {
                 ...messageFunctions
             };
 
-            // ✅ FIXED: Create execution function with SIMPLE VALUES
+            // ✅ MAGIC: Transform user code to auto-await
+            const transformCodeToAutoAwait = (code) => {
+                // Pattern to find variable assignments with getData calls
+                const getDataPattern = /(const|let|var)\s+(\w+)\s*=\s*(User|Bot)\.getData\([^)]+\)/g;
+                
+                let transformedCode = code;
+                let match;
+                const variablesToAwait = [];
+                
+                // Find all getData assignments
+                while ((match = getDataPattern.exec(code)) !== null) {
+                    const [fullMatch, declaration, variableName, objectType] = match;
+                    variablesToAwait.push(variableName);
+                    
+                    // Replace with await version
+                    transformedCode = transformedCode.replace(
+                        fullMatch,
+                        `${declaration} ${variableName} = await ${objectType}.getData(${fullMatch.split('(')[1]}`
+                    );
+                }
+                
+                // If we found getData calls, wrap the code in async context
+                if (variablesToAwait.length > 0) {
+                    console.log(`🔮 Auto-awaiting variables: ${variablesToAwait.join(', ')}`);
+                }
+                
+                return transformedCode;
+            };
+
+            const transformedCode = transformCodeToAutoAwait(code);
+            console.log('🔮 Transformed code:', transformedCode);
+
+            // ✅ FIXED: Create execution function with MAGIC AUTO-AWAIT
             const executionFunction = new Function(
                 'env',
                 `return (async function() {
@@ -492,8 +604,8 @@ async function executeCommandCode(botInstance, code, context) {
                         
                         console.log('✅ Execution started for user:', currentUser.first_name);
                         
-                        // User's code starts here - NO AWAIT NEEDED!
-                        ${code}
+                        // User's transformed code starts here - AUTO AWAIT MAGIC!
+                        ${transformedCode}
                         // User's code ends here
                         
                         return "Command completed successfully";
@@ -538,7 +650,7 @@ async function executeCommandCode(botInstance, code, context) {
 
         } catch (error) {
             console.error('❌ Command execution failed:', error);
-            reject(error);
+            reject(error;
         }
     });
 }
