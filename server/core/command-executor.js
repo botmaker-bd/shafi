@@ -128,7 +128,7 @@ async function executeCommandCode(botInstance, code, context) {
                 return await apiWrapperInstance.metadata(target);
             };
 
-            // ✅ FIXED: USER DATA FUNCTIONS
+            // ✅ FIXED: USER DATA FUNCTIONS WITH AUTO-AWAIT SUPPORT
             const getUserData = async (key) => {
                 return await apiWrapperInstance.User.getData(key);
             };
@@ -139,6 +139,13 @@ async function executeCommandCode(botInstance, code, context) {
 
             const deleteUserData = async (key) => {
                 return await apiWrapperInstance.User.deleteData(key);
+            };
+
+            const incrementUserData = async (key, amount = 1) => {
+                const current = await getUserData(key);
+                const newValue = (parseInt(current) || 0) + amount;
+                await saveUserData(key, newValue);
+                return newValue;
             };
 
             // ✅ AUTO CONTEXT ANALYSIS
@@ -158,138 +165,198 @@ async function executeCommandCode(botInstance, code, context) {
                 };
             };
 
-            // ✅ DYNAMIC CASE INSENSITIVE PROXY HANDLER
-            const createDynamicCaseInsensitiveObject = (targetObj) => {
-                const caseInsensitiveCache = new Map();
-                
-                return new Proxy(targetObj, {
-                    get: function(obj, prop) {
-                        if (typeof prop !== 'string') return obj[prop];
+            // ✅ CREATE SMART USER OBJECT WITH AUTO-AWAIT
+            const createSmartUserObject = () => {
+                const userObj = {
+                    getData: (key) => {
+                        // Auto-handle both sync and async usage
+                        const resultPromise = getUserData(key);
                         
-                        // Convert property to lowercase for case insensitive access
-                        const lowerProp = prop.toLowerCase();
+                        // Create a proxy that handles both await and direct usage
+                        const handler = {
+                            get(target, prop) {
+                                if (prop === 'then') {
+                                    // If used with await, return the promise
+                                    return resultPromise.then.bind(resultPromise);
+                                }
+                                if (prop === 'valueOf') {
+                                    return () => resultPromise;
+                                }
+                                if (prop === 'toString') {
+                                    return () => '[UserData Promise]';
+                                }
+                                return undefined;
+                            }
+                        };
                         
-                        // Check cache first
-                        if (caseInsensitiveCache.has(lowerProp)) {
-                            return caseInsensitiveCache.get(lowerProp);
-                        }
-                        
-                        // Find the actual property (case insensitive)
-                        const actualProp = Object.keys(obj).find(key => 
-                            key.toLowerCase() === lowerProp
-                        );
-                        
-                        if (actualProp) {
-                            const value = obj[actualProp];
-                            caseInsensitiveCache.set(lowerProp, value);
-                            return value;
-                        }
-                        
-                        // If not found, return undefined
-                        return undefined;
+                        return new Proxy(resultPromise, handler);
                     },
                     
-                    set: function(obj, prop, value) {
-                        if (typeof prop !== 'string') {
-                            obj[prop] = value;
-                            return true;
-                        }
-                        
-                        const lowerProp = prop.toLowerCase();
-                        const actualProp = Object.keys(obj).find(key => 
-                            key.toLowerCase() === lowerProp
-                        ) || prop;
-                        
-                        obj[actualProp] = value;
-                        caseInsensitiveCache.set(lowerProp, value);
-                        return true;
+                    saveData: (key, value) => {
+                        const resultPromise = saveUserData(key, value);
+                        const handler = {
+                            get(target, prop) {
+                                if (prop === 'then') return resultPromise.then.bind(resultPromise);
+                                if (prop === 'valueOf') return () => resultPromise;
+                                if (prop === 'toString') return () => '[UserSave Promise]';
+                                return undefined;
+                            }
+                        };
+                        return new Proxy(resultPromise, handler);
                     },
                     
-                    has: function(obj, prop) {
-                        if (typeof prop !== 'string') return prop in obj;
-                        
-                        const lowerProp = prop.toLowerCase();
-                        return Object.keys(obj).some(key => 
-                            key.toLowerCase() === lowerProp
-                        );
+                    deleteData: (key) => {
+                        const resultPromise = deleteUserData(key);
+                        const handler = {
+                            get(target, prop) {
+                                if (prop === 'then') return resultPromise.then.bind(resultPromise);
+                                if (prop === 'valueOf') return () => resultPromise;
+                                if (prop === 'toString') return () => '[UserDelete Promise]';
+                                return undefined;
+                            }
+                        };
+                        return new Proxy(resultPromise, handler);
                     },
                     
-                    ownKeys: function(obj) {
-                        return Object.keys(obj);
-                    },
-                    
-                    getOwnPropertyDescriptor: function(obj, prop) {
-                        if (typeof prop !== 'string') return Object.getOwnPropertyDescriptor(obj, prop);
-                        
-                        const lowerProp = prop.toLowerCase();
-                        const actualProp = Object.keys(obj).find(key => 
-                            key.toLowerCase() === lowerProp
-                        );
-                        
-                        return actualProp ? Object.getOwnPropertyDescriptor(obj, actualProp) : undefined;
+                    increment: (key, amount = 1) => {
+                        const resultPromise = incrementUserData(key, amount);
+                        const handler = {
+                            get(target, prop) {
+                                if (prop === 'then') return resultPromise.then.bind(resultPromise);
+                                if (prop === 'valueOf') return () => resultPromise;
+                                if (prop === 'toString') return () => '[UserIncrement Promise]';
+                                return undefined;
+                            }
+                        };
+                        return new Proxy(resultPromise, handler);
                     }
-                });
+                };
+                
+                return userObj;
             };
 
-            // ✅ CREATE BOT OBJECT WITH ALL METHODS
-            const createBotObject = () => {
+            // ✅ CREATE SMART BOT OBJECT WITH AUTO-AWAIT
+            const createSmartBotObject = () => {
                 const botObj = {
-                    // Copy all methods from apiWrapperInstance
-                    ...apiWrapperInstance,
-                    
-                    // ✅ FIXED: METADATA METHODS - ORIGINAL RESPONSE ONLY
-                    metadata: extractMetadata,
-                    metaData: extractMetadata,
-                    Metadata: extractMetadata,
-                    METADATA: extractMetadata,
-                    
-                    // ✅ FIXED: USER DATA METHODS
-                    User: {
-                        getData: getUserData,
-                        saveData: saveUserData,
-                        deleteData: deleteUserData,
-                        increment: async (key, amount = 1) => {
-                            const current = await getUserData(key);
-                            const newValue = (parseInt(current) || 0) + amount;
-                            await saveUserData(key, newValue);
-                            return newValue;
-                        }
+                    // Copy all methods from apiWrapperInstance with auto-await support
+                    sendMessage: (text, options) => {
+                        const resultPromise = apiWrapperInstance.sendMessage(text, options);
+                        const handler = {
+                            get(target, prop) {
+                                if (prop === 'then') return resultPromise.then.bind(resultPromise);
+                                if (prop === 'valueOf') return () => resultPromise;
+                                if (prop === 'toString') return () => '[SendMessage Promise]';
+                                return undefined;
+                            }
+                        };
+                        return new Proxy(resultPromise, handler);
                     },
                     
-                    // Context analysis
-                    analyzeContext: analyzeContext,
-                    getContext: analyzeContext,
+                    send: (text, options) => {
+                        const resultPromise = apiWrapperInstance.send(text, options);
+                        const handler = {
+                            get(target, prop) {
+                                if (prop === 'then') return resultPromise.then.bind(resultPromise);
+                                if (prop === 'valueOf') return () => resultPromise;
+                                if (prop === 'toString') return () => '[Send Promise]';
+                                return undefined;
+                            }
+                        };
+                        return new Proxy(resultPromise, handler);
+                    },
                     
-                    // Utility methods
+                    reply: (text, options) => {
+                        const resultPromise = apiWrapperInstance.reply(text, options);
+                        const handler = {
+                            get(target, prop) {
+                                if (prop === 'then') return resultPromise.then.bind(resultPromise);
+                                if (prop === 'valueOf') return () => resultPromise;
+                                if (prop === 'toString') return () => '[Reply Promise]';
+                                return undefined;
+                            }
+                        };
+                        return new Proxy(resultPromise, handler);
+                    },
+                    
+                    // Metadata methods
+                    metadata: (target) => {
+                        const resultPromise = extractMetadata(target);
+                        const handler = {
+                            get(target, prop) {
+                                if (prop === 'then') return resultPromise.then.bind(resultPromise);
+                                if (prop === 'valueOf') return () => resultPromise;
+                                if (prop === 'toString') return () => '[Metadata Promise]';
+                                return undefined;
+                            }
+                        };
+                        return new Proxy(resultPromise, handler);
+                    },
+                    
+                    metaData: (target) => {
+                        const resultPromise = extractMetadata(target);
+                        const handler = {
+                            get(target, prop) {
+                                if (prop === 'then') return resultPromise.then.bind(resultPromise);
+                                if (prop === 'valueOf') return () => resultPromise;
+                                if (prop === 'toString') return () => '[MetaData Promise]';
+                                return undefined;
+                            }
+                        };
+                        return new Proxy(resultPromise, handler);
+                    },
+                    
+                    // Other methods with auto-await
+                    getUser: () => createUserObject(),
+                    getChat: () => createChatObject(),
                     wait: waitFunction,
                     delay: waitFunction,
                     sleep: waitFunction,
                     runPython: runPythonSync,
                     executePython: runPythonSync,
                     waitForAnswer: waitForAnswer,
-                    ask: waitForAnswer
+                    ask: waitForAnswer,
+                    analyzeContext: analyzeContext,
+                    getContext: analyzeContext
                 };
                 
-                return createDynamicCaseInsensitiveObject(botObj);
+                // Add all other API methods dynamically
+                const apiMethods = [
+                    'sendPhoto', 'sendDocument', 'sendVideo', 'sendAudio', 'sendVoice',
+                    'sendLocation', 'sendContact', 'sendSticker', 'sendPoll', 'sendDice',
+                    'editMessageText', 'deleteMessage', 'forwardMessage', 'copyMessage',
+                    'getMe', 'getChat', 'getChatAdministrators', 'getChatMember',
+                    'banChatMember', 'unbanChatMember', 'restrictChatMember', 'promoteChatMember',
+                    'pinChatMessage', 'unpinChatMessage', 'leaveChat', 'getFile'
+                ];
+                
+                apiMethods.forEach(method => {
+                    if (apiWrapperInstance[method]) {
+                        botObj[method] = (...args) => {
+                            const resultPromise = apiWrapperInstance[method](...args);
+                            const handler = {
+                                get(target, prop) {
+                                    if (prop === 'then') return resultPromise.then.bind(resultPromise);
+                                    if (prop === 'valueOf') return () => resultPromise;
+                                    if (prop === 'toString') return () => `[${method} Promise]`;
+                                    return undefined;
+                                }
+                            };
+                            return new Proxy(resultPromise, handler);
+                        };
+                    }
+                });
+                
+                return botObj;
             };
 
-            // ✅ CREATE BOT INSTANCE
-            const botObject = createBotObject();
-
-            // ✅ CREATE BASE EXECUTION ENVIRONMENT
-            const baseExecutionEnv = {
-                // === CORE FUNCTIONS ===
-                getUser: createUserObject,
-                getChat: createChatObject,
-                getCurrentUser: createUserObject,
-                getCurrentChat: createChatObject,
-                
-                // === BOT INSTANCES - ALL VARIATIONS ===
-                bot: botObject,
-                Bot: botObject,
-                api: botObject,
-                Api: botObject,
-                API: botObject,
+            // ✅ CREATE MAIN EXECUTION ENVIRONMENT
+            const mainEnvironment = {
+                // === SMART OBJECTS WITH AUTO-AWAIT ===
+                User: createSmartUserObject(),
+                Bot: createSmartBotObject(),
+                bot: createSmartBotObject(),
+                API: createSmartBotObject(),
+                Api: createSmartBotObject(),
                 
                 // === CONTEXT DATA ===
                 msg: msg,
@@ -304,81 +371,10 @@ async function executeCommandCode(botInstance, code, context) {
                 wait: waitFunction,
                 delay: waitFunction,
                 sleep: waitFunction,
-                
                 runPython: runPythonSync,
                 executePython: runPythonSync,
-                
                 waitForAnswer: waitForAnswer,
                 ask: waitForAnswer,
-                
-                // === METADATA FUNCTIONS ===
-                metadata: extractMetadata,
-                metaData: extractMetadata,
-                Metadata: extractMetadata,
-                METADATA: extractMetadata,
-                
-                // === USER DATA FUNCTIONS ===
-                User: {
-                    getData: getUserData,
-                    saveData: saveUserData,
-                    deleteData: deleteUserData,
-                    increment: async (key, amount = 1) => {
-                        const current = await getUserData(key);
-                        const newValue = (parseInt(current) || 0) + amount;
-                        await saveUserData(key, newValue);
-                        return newValue;
-                    }
-                },
-                
-                // === DATA STORAGE ===
-                BotData: {
-                    saveData: async (key, value) => {
-                        try {
-                            const supabase = require('../config/supabase');
-                            await supabase.from('universal_data').upsert({
-                                data_type: 'bot_data',
-                                bot_token: resolvedBotToken,
-                                data_key: key,
-                                data_value: JSON.stringify(value),
-                                updated_at: new Date().toISOString()
-                            });
-                        } catch (error) {
-                            console.error('❌ Save bot data error:', error);
-                            throw error;
-                        }
-                    },
-                    getData: async (key) => {
-                        try {
-                            const supabase = require('../config/supabase');
-                            const { data } = await supabase.from('universal_data')
-                                .select('data_value')
-                                .eq('data_type', 'bot_data')
-                                .eq('bot_token', resolvedBotToken)
-                                .eq('data_key', key)
-                                .single();
-                            return data ? JSON.parse(data.data_value) : null;
-                        } catch (error) {
-                            console.error('❌ Get bot data error:', error);
-                            return null;
-                        }
-                    },
-                    deleteData: async (key) => {
-                        try {
-                            const supabase = require('../config/supabase');
-                            await supabase.from('universal_data')
-                                .delete()
-                                .eq('data_type', 'bot_data')
-                                .eq('bot_token', resolvedBotToken)
-                                .eq('data_key', key);
-                        } catch (error) {
-                            console.error('❌ Delete bot data error:', error);
-                            throw error;
-                        }
-                    }
-                },
-                
-                // === HANDLERS ===
-                nextCommandHandlers: nextCommandHandlers,
                 
                 // === DATA OBJECTS ===
                 userData: createUserObject(),
@@ -389,93 +385,51 @@ async function executeCommandCode(botInstance, code, context) {
                 ctx: analyzeContext()
             };
 
-            // ✅ ADD DIRECT MESSAGE FUNCTIONS
-            const messageFunctions = {
-                sendMessage: (text, options) => botInstance.sendMessage(chatId, text, options),
-                send: (text, options) => botInstance.sendMessage(chatId, text, options),
-                reply: (text, options) => botInstance.sendMessage(chatId, text, {
-                    reply_to_message_id: msg.message_id,
-                    ...options
-                }),
-                sendPhoto: (photo, options) => botInstance.sendPhoto(chatId, photo, options),
-                sendDocument: (doc, options) => botInstance.sendDocument(chatId, doc, options),
-                sendVideo: (video, options) => botInstance.sendVideo(chatId, video, options),
-                sendAudio: (audio, options) => botInstance.sendAudio(chatId, audio, options),
-                sendVoice: (voice, options) => botInstance.sendVoice(chatId, voice, options),
-                sendLocation: (latitude, longitude, options) => botInstance.sendLocation(chatId, latitude, longitude, options),
-                sendContact: (phoneNumber, firstName, options) => botInstance.sendContact(chatId, phoneNumber, firstName, options)
-            };
-
-            // ✅ MERGE ALL FUNCTIONS
-            const mergedEnvironment = {
-                ...baseExecutionEnv,
-                ...messageFunctions
-            };
-
-            // ✅ CREATE DYNAMIC CASE INSENSITIVE ENVIRONMENT
-            const finalContext = createDynamicCaseInsensitiveObject(mergedEnvironment);
-
-            // ✅ FIXED: Create ASYNC execution function with UNIQUE VARIABLE NAMES
+            // ✅ FIXED: Create execution function with PROPER VARIABLE DECLARATIONS
             const executionFunction = new Function(
                 'env',
                 `return (async function() {
                     try {
-                        // ✅ UNIQUE VARIABLE NAMES TO AVOID DUPLICATE DECLARATION ERRORS
-                        var MainBot = env.bot;
-                        var MainApi = env.api;
-                        var MainUser = env.user;
+                        // ✅ DECLARE ALL MAIN VARIABLES AT TOP LEVEL
+                        var User = env.User;
+                        var Bot = env.Bot;
+                        var bot = env.bot;
+                        var API = env.API;
+                        var Api = env.Api;
                         
-                        var getUserFunc = env.getuser;
-                        var getCurrentUserFunc = env.getcurrentuser;
-                        var userDataObj = env.userdata;
-                        var currentUserObj = env.currentuser;
+                        var msg = env.msg;
+                        var chatId = env.chatId;
+                        var userId = env.userId;
+                        var userInput = env.userInput;
+                        var params = env.params;
+                        var message = env.message;
                         
-                        var getChatFunc = env.getchat;
-                        var getCurrentChatFunc = env.getcurrentchat;
-                        var chatDataObj = env.chatdata;
-                        var currentChatObj = env.currentchat;
+                        var wait = env.wait;
+                        var delay = env.delay;
+                        var sleep = env.sleep;
+                        var runPython = env.runPython;
+                        var executePython = env.executePython;
+                        var waitForAnswer = env.waitForAnswer;
+                        var ask = env.ask;
                         
-                        var sendMessageFunc = env.sendmessage;
-                        var sendFunc = env.send;
-                        var replyFunc = env.reply;
-                        var sendPhotoFunc = env.sendphoto;
-                        var sendDocumentFunc = env.senddocument;
+                        var userData = env.userData;
+                        var chatData = env.chatData;
+                        var currentUser = env.currentUser;
+                        var currentChat = env.currentChat;
+                        var context = env.context;
+                        var ctx = env.ctx;
                         
-                        var paramsArray = env.params;
-                        var messageText = env.message;
-                        var UserData = env.user;
-                        var BotDataStorage = env.botdata;
+                        console.log('🚀 Command execution started for user:', currentUser.first_name);
                         
-                        var waitFunc = env.wait;
-                        var delayFunc = env.delay;
-                        var sleepFunc = env.sleep;
-                        
-                        var runPythonFunc = env.runpython;
-                        var executePythonFunc = env.executepython;
-                        var waitForAnswerFunc = env.waitforanswer;
-                        var askFunc = env.ask;
-                        
-                        var metadataFunc = env.metadata;
-                        var metaDataFunc = env.metadata;
-                        var MetadataFunc = env.metadata;
-                        var METADATAFunc = env.metadata;
-                        
-                        var analyzeContextFunc = env.analyzecontext;
-                        var getContextFunc = env.getcontext;
-                        var contextObj = env.context;
-                        var ctxObj = env.ctx;
-                        
-                        console.log('✅ Execution started for user:', currentUserObj.first_name);
-                        
-                        // User's code starts here - NO VARIABLE DECLARATIONS NEEDED
+                        // 🎯 USER CODE EXECUTION - NO NEED FOR AWAIT IN MOST CASES
                         ${code}
-                        // User's code ends here
                         
-                        return "Command completed successfully";
+                        return "✅ Command completed successfully";
+                        
                     } catch (error) {
                         console.error('❌ Execution error:', error);
                         try {
-                            await env.sendMessage("❌ Error: " + error.message);
+                            await env.Bot.sendMessage("❌ Error: " + error.message);
                         } catch (e) {
                             console.error('Failed to send error message:', e);
                         }
@@ -486,7 +440,7 @@ async function executeCommandCode(botInstance, code, context) {
 
             // Execute the command
             console.log('🚀 Executing command...');
-            const result = await executionFunction(finalContext);
+            const result = await executionFunction(mainEnvironment);
             
             console.log('✅ Command execution completed');
             resolve(result);
