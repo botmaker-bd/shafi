@@ -1,4 +1,4 @@
-// server/core/command-executor.js - COMPLETELY FIXED
+// server/core/command-executor.js - FIXED API REFERENCE ERROR
 async function executeCommandCode(botInstance, code, context) {
     return new Promise(async (resolve, reject) => {
         try {
@@ -123,54 +123,97 @@ async function executeCommandCode(botInstance, code, context) {
                 });
             };
 
-            // ✅ FIXED: USER DATA STORAGE - SYNC VERSION
-            const userDataStorage = {
-                data: {},
-                
-                set: function(key, value) {
-                    this.data[key] = value;
-                    console.log(`💾 User data saved: ${key} = ${value}`);
-                    return value;
-                },
-                
-                get: function(key) {
-                    const value = this.data[key];
-                    console.log(`📖 User data read: ${key} = ${value}`);
-                    return value !== undefined ? value : null;
-                },
-                
-                delete: function(key) {
-                    delete this.data[key];
-                    console.log(`🗑️ User data deleted: ${key}`);
-                    return true;
-                },
-                
-                getAll: function() {
-                    return this.data;
-                },
-                
-                clear: function() {
-                    this.data = {};
-                    console.log('🧹 All user data cleared');
-                    return true;
-                }
+            // ✅ FIXED: METADATA FUNCTION - PROPERLY BOUND TO API WRAPPER
+            const extractMetadata = (target = 'all', options = {}) => {
+                return apiWrapperInstance.inspectMetadata(target, options);
             };
 
-            // ✅ CREATE CASE INSENSITIVE PROXY HANDLER
-            const createCaseInsensitiveProxy = (target) => {
-                return new Proxy(target, {
+            // ✅ AUTO CONTEXT ANALYSIS
+            const analyzeContext = () => {
+                return {
+                    user: createUserObject(),
+                    chat: createChatObject(),
+                    message: msg,
+                    bot: {
+                        token: resolvedBotToken?.substring(0, 10) + '...',
+                        chatId: chatId,
+                        userId: userId
+                    },
+                    input: userInput,
+                    params: userInput ? userInput.split(' ').slice(1).filter(p => p.trim() !== '') : [],
+                    timestamp: new Date().toISOString()
+                };
+            };
+
+            // ✅ DYNAMIC CASE INSENSITIVE PROXY HANDLER
+            const createDynamicCaseInsensitiveObject = (targetObj) => {
+                const caseInsensitiveCache = new Map();
+                
+                return new Proxy(targetObj, {
                     get: function(obj, prop) {
                         if (typeof prop !== 'string') return obj[prop];
                         
                         // Convert property to lowercase for case insensitive access
                         const lowerProp = prop.toLowerCase();
                         
+                        // Check cache first
+                        if (caseInsensitiveCache.has(lowerProp)) {
+                            return caseInsensitiveCache.get(lowerProp);
+                        }
+                        
                         // Find the actual property (case insensitive)
+                        const actualProp = Object.keys(obj).find(key => 
+                            key.toLowerCase() === lowerProp
+                        );
+                        
+                        if (actualProp) {
+                            const value = obj[actualProp];
+                            caseInsensitiveCache.set(lowerProp, value);
+                            return value;
+                        }
+                        
+                        // If not found, return undefined
+                        return undefined;
+                    },
+                    
+                    set: function(obj, prop, value) {
+                        if (typeof prop !== 'string') {
+                            obj[prop] = value;
+                            return true;
+                        }
+                        
+                        const lowerProp = prop.toLowerCase();
                         const actualProp = Object.keys(obj).find(key => 
                             key.toLowerCase() === lowerProp
                         ) || prop;
                         
-                        return obj[actualProp];
+                        obj[actualProp] = value;
+                        caseInsensitiveCache.set(lowerProp, value);
+                        return true;
+                    },
+                    
+                    has: function(obj, prop) {
+                        if (typeof prop !== 'string') return prop in obj;
+                        
+                        const lowerProp = prop.toLowerCase();
+                        return Object.keys(obj).some(key => 
+                            key.toLowerCase() === lowerProp
+                        );
+                    },
+                    
+                    ownKeys: function(obj) {
+                        return Object.keys(obj);
+                    },
+                    
+                    getOwnPropertyDescriptor: function(obj, prop) {
+                        if (typeof prop !== 'string') return Object.getOwnPropertyDescriptor(obj, prop);
+                        
+                        const lowerProp = prop.toLowerCase();
+                        const actualProp = Object.keys(obj).find(key => 
+                            key.toLowerCase() === lowerProp
+                        );
+                        
+                        return actualProp ? Object.getOwnPropertyDescriptor(obj, actualProp) : undefined;
                     }
                 });
             };
@@ -180,6 +223,22 @@ async function executeCommandCode(botInstance, code, context) {
                 const botObj = {
                     // Copy all methods from apiWrapperInstance
                     ...apiWrapperInstance,
+                    
+                    // ✅ FIXED: METADATA METHODS - PROPERLY BOUND
+                    metadata: extractMetadata,
+                    inspect: extractMetadata,
+                    getMeta: extractMetadata,
+                    analyze: (target, options) => extractMetadata(target, { deep: true, ...options }),
+                    
+                    // Quick access methods
+                    chatInfo: (chatId) => extractMetadata('chat', { chatId }),
+                    userInfo: (userId) => extractMetadata('user', { userId }),
+                    botInfo: () => extractMetadata('bot'),
+                    updateInfo: () => extractMetadata('update'),
+                    
+                    // Context analysis
+                    analyzeContext: analyzeContext,
+                    getContext: analyzeContext,
                     
                     // Utility methods
                     wait: waitFunction,
@@ -191,31 +250,28 @@ async function executeCommandCode(botInstance, code, context) {
                     ask: waitForAnswer
                 };
                 
-                return createCaseInsensitiveProxy(botObj);
+                return createDynamicCaseInsensitiveObject(botObj);
             };
+
+            // ✅ CREATE BOT INSTANCE
+            const botObject = createBotObject();
 
             // ✅ CREATE BASE EXECUTION ENVIRONMENT
             const baseExecutionEnv = {
-                // === BOT INSTANCES ===
-                bot: createBotObject(),
-                Bot: createBotObject(),
-                api: createBotObject(),
-                Api: createBotObject(),
-                API: createBotObject(),
-
-                // === USER INFORMATION ===
+                // === CORE FUNCTIONS ===
                 getUser: createUserObject,
-                getCurrentUser: createUserObject,
-                userData: createUserObject(),
-                currentUser: createUserObject(),
-                
-                // === CHAT INFORMATION ===
                 getChat: createChatObject,
+                getCurrentUser: createUserObject,
                 getCurrentChat: createChatObject,
-                chatData: createChatObject(),
-                currentChat: createChatObject(),
                 
-                // === MESSAGE & PARAMS ===
+                // === BOT INSTANCES - ALL VARIATIONS ===
+                bot: botObject,
+                Bot: botObject,
+                api: botObject,
+                Api: botObject,
+                API: botObject,
+                
+                // === CONTEXT DATA ===
                 msg: msg,
                 chatId: chatId,
                 userId: userId,
@@ -224,22 +280,78 @@ async function executeCommandCode(botInstance, code, context) {
                 message: userInput,
                 botToken: resolvedBotToken,
                 
-                // === DATA STORAGE - FIXED SYNC VERSION ===
+                // === UTILITY FUNCTIONS ===
+                wait: waitFunction,
+                delay: waitFunction,
+                sleep: waitFunction,
+                
+                runPython: runPythonSync,
+                executePython: runPythonSync,
+                
+                waitForAnswer: waitForAnswer,
+                ask: waitForAnswer,
+                
+                // === METADATA FUNCTIONS ===
+                metadata: extractMetadata,
+                inspect: extractMetadata,
+                getMeta: extractMetadata,
+                analyze: (target, options) => extractMetadata(target, { deep: true, ...options }),
+                
+                chatInfo: (chatId) => extractMetadata('chat', { chatId }),
+                userInfo: (userId) => extractMetadata('user', { userId }),
+                botInfo: () => extractMetadata('bot'),
+                updateInfo: () => extractMetadata('update'),
+                
+                analyzeContext: analyzeContext,
+                getContext: analyzeContext,
+                
+                // === DATA STORAGE ===
                 User: {
-                    saveData: function(key, value) {
-                        return userDataStorage.set(key, value);
+                    saveData: async (key, value) => {
+                        try {
+                            const supabase = require('../config/supabase');
+                            await supabase.from('universal_data').upsert({
+                                data_type: 'user_data',
+                                bot_token: resolvedBotToken,
+                                user_id: userId.toString(),
+                                data_key: key,
+                                data_value: JSON.stringify(value),
+                                updated_at: new Date().toISOString()
+                            });
+                        } catch (error) {
+                            console.error('❌ Save data error:', error);
+                            throw error;
+                        }
                     },
-                    getData: function(key) {
-                        return userDataStorage.get(key);
+                    getData: async (key) => {
+                        try {
+                            const supabase = require('../config/supabase');
+                            const { data } = await supabase.from('universal_data')
+                                .select('data_value')
+                                .eq('data_type', 'user_data')
+                                .eq('bot_token', resolvedBotToken)
+                                .eq('user_id', userId.toString())
+                                .eq('data_key', key)
+                                .single();
+                            return data ? JSON.parse(data.data_value) : null;
+                        } catch (error) {
+                            console.error('❌ Get data error:', error);
+                            return null;
+                        }
                     },
-                    deleteData: function(key) {
-                        return userDataStorage.delete(key);
-                    },
-                    getAllData: function() {
-                        return userDataStorage.getAll();
-                    },
-                    clearData: function() {
-                        return userDataStorage.clear();
+                    deleteData: async (key) => {
+                        try {
+                            const supabase = require('../config/supabase');
+                            await supabase.from('universal_data')
+                                .delete()
+                                .eq('data_type', 'user_data')
+                                .eq('bot_token', resolvedBotToken)
+                                .eq('user_id', userId.toString())
+                                .eq('data_key', key);
+                        } catch (error) {
+                            console.error('❌ Delete data error:', error);
+                            throw error;
+                        }
                     }
                 },
                 
@@ -254,10 +366,9 @@ async function executeCommandCode(botInstance, code, context) {
                                 data_value: JSON.stringify(value),
                                 updated_at: new Date().toISOString()
                             });
-                            return value;
                         } catch (error) {
                             console.error('❌ Save bot data error:', error);
-                            return value;
+                            throw error;
                         }
                     },
                     getData: async (key) => {
@@ -283,10 +394,9 @@ async function executeCommandCode(botInstance, code, context) {
                                 .eq('data_type', 'bot_data')
                                 .eq('bot_token', resolvedBotToken)
                                 .eq('data_key', key);
-                            return true;
                         } catch (error) {
                             console.error('❌ Delete bot data error:', error);
-                            return false;
+                            throw error;
                         }
                     }
                 },
@@ -294,14 +404,13 @@ async function executeCommandCode(botInstance, code, context) {
                 // === HANDLERS ===
                 nextCommandHandlers: nextCommandHandlers,
                 
-                // === UTILITY FUNCTIONS ===
-                wait: waitFunction,
-                delay: waitFunction,
-                sleep: waitFunction,
-                runPython: runPythonSync,
-                executePython: runPythonSync,
-                waitForAnswer: waitForAnswer,
-                ask: waitForAnswer
+                // === DATA OBJECTS ===
+                userData: createUserObject(),
+                chatData: createChatObject(),
+                currentUser: createUserObject(),
+                currentChat: createChatObject(),
+                context: analyzeContext(),
+                ctx: analyzeContext()
             };
 
             // ✅ ADD DIRECT MESSAGE FUNCTIONS
@@ -328,9 +437,9 @@ async function executeCommandCode(botInstance, code, context) {
             };
 
             // ✅ CREATE DYNAMIC CASE INSENSITIVE ENVIRONMENT
-            const finalContext = createCaseInsensitiveProxy(mergedEnvironment);
+            const finalContext = createDynamicCaseInsensitiveObject(mergedEnvironment);
 
-            // ✅ FIXED: Create ASYNC execution function
+            // ✅ FIXED: Create ASYNC execution function with ALL VARIABLES
             const executionFunction = new Function(
                 'env',
                 `return (async function() {
@@ -340,6 +449,7 @@ async function executeCommandCode(botInstance, code, context) {
                         var bot = env.bot;
                         var Api = env.api;
                         var api = env.api;
+                        var API = env.api;
                         
                         var getUser = env.getuser;
                         var getCurrentUser = env.getcurrentuser;
@@ -354,6 +464,8 @@ async function executeCommandCode(botInstance, code, context) {
                         var sendMessage = env.sendmessage;
                         var send = env.send;
                         var reply = env.reply;
+                        var sendPhoto = env.sendphoto;
+                        var sendDocument = env.senddocument;
                         
                         var params = env.params;
                         var message = env.message;
@@ -369,7 +481,29 @@ async function executeCommandCode(botInstance, code, context) {
                         var waitForAnswer = env.waitforanswer;
                         var ask = env.ask;
                         
+                        var metadata = env.metadata;
+                        var inspect = env.inspect;
+                        var getMeta = env.getmeta;
+                        var analyze = env.analyze;
+                        
+                        var chatInfo = env.chatinfo;
+                        var userInfo = env.userinfo;
+                        var botInfo = env.botinfo;
+                        var updateInfo = env.updateinfo;
+                        
+                        var analyzeContext = env.analyzecontext;
+                        var getContext = env.getcontext;
+                        var context = env.context;
+                        var ctx = env.ctx;
+                        
                         console.log('✅ Execution started for user:', currentUser.first_name);
+                        
+                        // 🎯 TEST METADATA FUNCTION
+                        console.log('🔍 Testing metadata function...');
+                        console.log('Bot.metadata type:', typeof Bot.metadata);
+                        console.log('bot.metadata type:', typeof bot.metadata);
+                        console.log('Api.metadata type:', typeof Api.metadata);
+                        console.log('metadata type:', typeof metadata);
                         
                         // User's code starts here
                         ${code}
