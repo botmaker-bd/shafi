@@ -1,4 +1,4 @@
-// server/core/api-wrapper.js - COMPLETELY FIXED VERSION WITH METADATA & USER DATA
+// server/core/api-wrapper.js - COMPLETELY FIXED VERSION
 class ApiWrapper {
     constructor(bot, context) {
         this.bot = bot;
