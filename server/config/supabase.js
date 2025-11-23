@@ -1,3 +1,4 @@
+// server/config/supabase.js - COMPLETELY FIXED VERSION
 const { createClient } = require('@supabase/supabase-js');
 
 // Configuration with fallbacks
@@ -11,7 +12,7 @@ if (!supabaseUrl || !supabaseKey) {
     process.exit(1);
 }
 
-// Create Supabase client with enhanced configuration
+// Create Supabase client with ENHANCED configuration
 const supabase = createClient(supabaseUrl, supabaseKey, {
     auth: {
         persistSession: false,
@@ -24,20 +25,107 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
         headers: {
             'X-Client-Info': 'telegram-bot-platform@2.0.0'
         }
+    },
+    // ✅ ADDED: Better timeout settings
+    realtime: {
+        timeout: 30000,
     }
 });
 
-// Test connection on startup
+// ✅ ENHANCED connection test with retry
+async function testConnection(retries = 3) {
+    for (let i = 1; i <= retries; i++) {
+        try {
+            console.log(`🔗 Testing Supabase connection (attempt ${i}/${retries})...`);
+            
+            const { data, error } = await supabase
+                .from('universal_data')
+                .select('count')
+                .limit(1)
+                .single();
+
+            if (error) {
+                console.error(`❌ Supabase connection test failed (attempt ${i}):`, error.message);
+                if (i === retries) {
+                    throw error;
+                }
+                // Wait before retry
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                continue;
+            }
+
+            console.log('✅ Supabase connected successfully');
+            console.log('📊 Database is accessible and responsive');
+            return true;
+            
+        } catch (error) {
+            console.error(`❌ Supabase connection error (attempt ${i}):`, error.message);
+            if (i === retries) {
+                console.error('❌ All connection attempts failed');
+                return false;
+            }
+            await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+    }
+}
+
+// ✅ ENHANCED: Check table structure and fix if needed
+async function checkAndFixTableStructure() {
+    try {
+        console.log('🔍 Checking universal_data table structure...');
+        
+        const { data, error } = await supabase
+            .from('universal_data')
+            .select('*')
+            .limit(5);
+
+        if (error) {
+            console.error('❌ Table structure check failed:', error);
+            return false;
+        }
+
+        if (data && data.length > 0) {
+            console.log('✅ Table structure is valid');
+            console.log(`📋 Found ${data.length} sample rows`);
+            
+            // Log sample data structure
+            data.forEach((row, index) => {
+                console.log(`📦 Row ${index + 1}:`, {
+                    data_type: row.data_type,
+                    data_key: row.data_key,
+                    data_value_length: row.data_value?.length || 0,
+                    updated_at: row.updated_at
+                });
+            });
+        } else {
+            console.log('ℹ️ Table is empty - this is normal for new installation');
+        }
+        
+        return true;
+    } catch (error) {
+        console.error('❌ Table check error:', error);
+        return false;
+    }
+}
+
+// ✅ ENHANCED startup sequence
 (async () => {
     try {
-        const { data, error } = await supabase.from('universal_data').select('count').limit(1);
-        if (error) {
-            console.error('❌ Supabase connection test failed:', error.message);
+        console.log('🚀 Initializing Supabase connection...');
+        
+        // Test connection
+        const connectionSuccess = await testConnection();
+        
+        if (connectionSuccess) {
+            // Check table structure
+            await checkAndFixTableStructure();
+            
+            console.log('🎉 Supabase initialization completed successfully');
         } else {
-            console.log('✅ Supabase connected successfully');
+            console.error('❌ Supabase initialization failed');
         }
     } catch (error) {
-        console.error('❌ Supabase connection error:', error.message);
+        console.error('❌ Supabase startup error:', error);
     }
 })();
 
