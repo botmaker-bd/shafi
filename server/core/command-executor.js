@@ -42,11 +42,12 @@ async function executeCommandCode(botInstance, code, context) {
             
             const apiWrapperInstance = new ApiWrapper(botInstance, apiContext);
             
-            // ✅ SIMPLE PROMISE RESOLVER - NO PROXY COMPLICATIONS
+            // ✅ SIMPLE AUTO-RESOLVE HANDLER - NO COMPLEX PROXY
             const createSimpleHandler = (asyncFn, functionName = 'unknown') => {
                 return async (...args) => {
                     try {
-                        return await asyncFn(...args);
+                        const result = await asyncFn(...args);
+                        return result;
                     } catch (error) {
                         console.error(`❌ ${functionName} error:`, error);
                         return null;
@@ -54,7 +55,7 @@ async function executeCommandCode(botInstance, code, context) {
                 };
             };
 
-            // ✅ USER DATA METHODS - ALL ASYNC
+            // ✅ USER DATA METHODS - AUTO-RESOLVE
             const userDataMethods = {
                 getData: createSimpleHandler(async (key) => {
                     try {
@@ -94,7 +95,7 @@ async function executeCommandCode(botInstance, code, context) {
                 }, 'User.increment')
             };
             
-            // ✅ BOT DATA METHODS
+            // ✅ BOT DATA METHODS - AUTO-RESOLVE
             const botDataMethods = {
                 getData: createSimpleHandler(async (key) => {
                     try {
@@ -151,7 +152,7 @@ async function executeCommandCode(botInstance, code, context) {
                 }, 'BotData.deleteData')
             };
             
-            // ✅ BOT METHODS
+            // ✅ BOT METHODS - AUTO-RESOLVE
             const createBotMethod = (methodName) => {
                 return createSimpleHandler(async (...args) => {
                     if (!apiWrapperInstance[methodName]) {
@@ -177,7 +178,7 @@ async function executeCommandCode(botInstance, code, context) {
                 }
             });
             
-            // ✅ METADATA METHODS
+            // ✅ METADATA METHODS - AUTO-RESOLVE
             const metadataFunc = createSimpleHandler(async (target = 'message') => {
                 try {
                     return await apiWrapperInstance.metadata(target);
@@ -191,7 +192,7 @@ async function executeCommandCode(botInstance, code, context) {
             botMethods.Metadata = metadataFunc;
             botMethods.METADATA = metadataFunc;
             
-            // ✅ UTILITY FUNCTIONS
+            // ✅ UTILITY FUNCTIONS - AUTO-RESOLVE
             const waitFunction = createSimpleHandler(async (seconds) => {
                 const ms = seconds * 1000;
                 return new Promise(resolve => setTimeout(() => resolve(`Waited ${seconds} seconds`), ms));
@@ -295,7 +296,7 @@ async function executeCommandCode(botInstance, code, context) {
             
             const BotData = { ...botDataMethods };
             
-            // ✅ DIRECT MESSAGE FUNCTIONS
+            // ✅ DIRECT MESSAGE FUNCTIONS - AUTO-RESOLVE
             const sendMessageFunc = createSimpleHandler(async (text, options = {}) => {
                 return await botInstance.sendMessage(chatId, text, options);
             }, 'sendMessage');
