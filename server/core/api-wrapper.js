@@ -1,4 +1,4 @@
-// server/core/api-wrapper.js - UPDATED WITH METADATA FEATURES
+// server/core/api-wrapper.js - COMPLETELY FIXED VERSION
 class ApiWrapper {
     constructor(bot, context) {
         this.bot = bot;
@@ -72,15 +72,40 @@ class ApiWrapper {
         ];
 
         // Bind all methods to this instance with FIXED chatId handling
-        // ... existing code (all Telegram methods) ...
-  
+        allMethods.forEach(method => {
+            if (this.bot[method]) {
+                this[method] = async (...args) => {
+                    try {
+                        // ✅ FIXED: Smart chatId handling
+                        let finalArgs = [...args];
+                        
+                        if (this.needsChatId(method)) {
+                            // If first arg is NOT a number (chatId), then auto-add current chatId
+                            if (finalArgs.length === 0 || typeof finalArgs[0] !== 'number') {
+                                finalArgs.unshift(this.context.chatId);
+                            }
+                            // If first arg IS a number (chatId), use it directly
+                        }
+                        
+                        const result = await this.bot[method](...finalArgs);
+                        console.log(`✅ API ${method} executed successfully`);
+                        return result;
+                    } catch (error) {
+                        console.error(`❌ API ${method} failed:`, error.message);
+                        throw new Error(`Telegram API Error (${method}): ${error.message}`);
+                    }
+                };
+            } else {
+                console.warn(`⚠️ Method ${method} not available in bot instance`);
+            }
+        });
 
-    // ✅ NEW: METADATA METHODS SETUP
+        // Enhanced utility methods
+        this.setupEnhancedMethods();
+    }
+
+    // ✅ FIXED: METADATA METHODS SETUP
     setupMetadataMethods() {
-        // Create metadata viewer instance
-        const AutoMetadataViewer = require('./auto-metadata-viewer');
-        this.metadataViewer = new AutoMetadataViewer(this.bot, this);
-        
         // Add metadata methods to ApiWrapper
         this.setupMetadataShortcuts();
     }
@@ -198,15 +223,13 @@ class ApiWrapper {
 
             if (deep) {
                 try {
-                    const [admins, membersCount, photo] = await Promise.all([
+                    const [admins, membersCount] = await Promise.all([
                         this.bot.getChatAdministrators(targetChatId).catch(() => null),
-                        this.bot.getChatMemberCount(targetChatId).catch(() => null),
-                        this.bot.getChatPhoto(targetChatId).catch(() => null)
+                        this.bot.getChatMemberCount(targetChatId).catch(() => null)
                     ]);
 
                     detailedInfo.administrators = admins;
                     detailedInfo.member_count = membersCount;
-                    detailedInfo.photo_info = photo;
                 } catch (deepError) {
                     console.warn('⚠️ Deep chat info failed:', deepError.message);
                 }
@@ -301,15 +324,11 @@ class ApiWrapper {
 
             if (deep) {
                 try {
-                    const [commands, description, name] = await Promise.all([
-                        this.bot.getMyCommands().catch(() => null),
-                        this.bot.getMyDescription().catch(() => null),
-                        this.bot.getMyName().catch(() => null)
+                    const [commands] = await Promise.all([
+                        this.bot.getMyCommands().catch(() => null)
                     ]);
 
                     botData.commands = commands;
-                    botData.description = description;
-                    botData.name_info = name;
                 } catch (deepError) {
                     console.warn('⚠️ Deep bot info failed:', deepError.message);
                 }
@@ -525,7 +544,6 @@ ${metadata.status ? `<b>Status:</b> <code>${metadata.status}</code>\n` : ''}
 <b>Mode:</b> <code>${bot.mode}</code>
 
 ${bot.commands ? `<b>Commands:</b> ${bot.commands.length}\n` : ''}
-${bot.description ? `<b>Description:</b>\n<code>${bot.description}</code>\n` : ''}
 
 <code>${metadata.timestamp}</code>
         `.trim();
@@ -581,6 +599,259 @@ ${data.input ? `<b>Input:</b> <code>${data.input}</code>\n` : ''}
         }
     }
 
+    // ✅ FIXED: needsChatId method
+    needsChatId(method) {
+        const chatIdMethods = [
+            'sendMessage', 'sendPhoto', 'sendDocument', 'sendVideo', 'sendAudio',
+            'sendVoice', 'sendLocation', 'sendVenue', 'sendContact', 'sendPoll',
+            'sendDice', 'sendChatAction', 'sendMediaGroup', 'forwardMessage',
+            'copyMessage', 'deleteMessage', 'deleteMessages', 'pinChatMessage',
+            'unpinChatMessage', 'leaveChat', 'getChat', 'getChatAdministrators',
+            'getChatMemberCount', 'getChatMember', 'setChatTitle', 'setChatDescription',
+            'setChatPhoto', 'deleteChatPhoto', 'setChatPermissions', 'banChatMember',
+            'unbanChatMember', 'restrictChatMember', 'promoteChatMember', 'setChatStickerSet',
+            'deleteChatStickerSet', 'createForumTopic', 'editForumTopic', 'closeForumTopic',
+            'reopenForumTopic', 'deleteForumTopic', 'sendSticker'
+        ];
+        return chatIdMethods.includes(method);
+    }
+
+    setupEnhancedMethods() {
+        // User information
+        this.getUser = () => ({
+            id: this.context.userId,
+            username: this.context.username,
+            first_name: this.context.first_name,
+            last_name: this.context.last_name,
+            language_code: this.context.language_code,
+            chat_id: this.context.chatId,
+            is_bot: false
+        });
+
+        // Enhanced send methods
+        this.send = (text, options = {}) => {
+            return this.sendMessage(this.context.chatId, text, {
+                parse_mode: 'HTML',
+                ...options
+            });
+        };
+
+        this.reply = (text, options = {}) => {
+            return this.sendMessage(this.context.chatId, text, {
+                reply_to_message_id: this.context.msg?.message_id,
+                parse_mode: 'HTML',
+                ...options
+            });
+        };
+
+        // Keyboard helpers
+        this.sendKeyboard = (text, buttons, options = {}) => {
+            return this.sendMessage(this.context.chatId, text, {
+                reply_markup: { inline_keyboard: buttons },
+                parse_mode: 'HTML',
+                ...options
+            });
+        };
+
+        this.sendReplyKeyboard = (text, buttons, options = {}) => {
+            return this.sendMessage(this.context.chatId, text, {
+                reply_markup: {
+                    keyboard: buttons,
+                    resize_keyboard: true,
+                    one_time_keyboard: options.one_time || false
+                },
+                parse_mode: 'HTML',
+                ...options
+            });
+        };
+
+        this.removeKeyboard = (text, options = {}) => {
+            return this.sendMessage(this.context.chatId, text, {
+                reply_markup: { remove_keyboard: true },
+                parse_mode: 'HTML',
+                ...options
+            });
+        };
+
+        // Media helpers
+        this.sendImage = (photo, caption = '', options = {}) => {
+            return this.sendPhoto(this.context.chatId, photo, {
+                caption: caption,
+                parse_mode: 'HTML',
+                ...options
+            });
+        };
+
+        this.sendFile = (document, caption = '', options = {}) => {
+            return this.sendDocument(this.context.chatId, document, {
+                caption: caption,
+                parse_mode: 'HTML',
+                ...options
+            });
+        };
+
+        this.sendVideo = (video, caption = '', options = {}) => {
+            return this.sendVideo(this.context.chatId, video, {
+                caption: caption,
+                parse_mode: 'HTML',
+                ...options
+            });
+        };
+
+        // Bulk operations
+        this.sendBulkMessages = async (messages, delay = 1000) => {
+            const results = [];
+            for (const message of messages) {
+                try {
+                    const result = await this.sendMessage(this.context.chatId, message);
+                    results.push({ success: true, result });
+                    await this.wait(delay);
+                } catch (error) {
+                    results.push({ success: false, error: error.message });
+                }
+            }
+            return results;
+        };
+
+        // Python integration
+        this.runPython = async (code) => {
+            const pythonRunner = require('./python-runner');
+            return await pythonRunner.runPythonCode(code);
+        };
+
+        this.installPython = async (library) => {
+            const pythonRunner = require('./python-runner');
+            return await pythonRunner.installPythonLibrary(library);
+        };
+
+        this.uninstallPython = async (library) => {
+            const pythonRunner = require('./python-runner');
+            return await pythonRunner.uninstallPythonLibrary(library);
+        };
+
+        // Utility methods
+        this.wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        // ✅ FIXED: Wait for answer with timeout - IMPROVED VERSION
+        this.waitForAnswer = (question, options = {}) => {
+            return new Promise(async (resolve, reject) => {
+                // Validate context
+                if (!this.context || !this.context.botToken || !this.context.chatId || !this.context.userId) {
+                    console.error('❌ waitForAnswer: Missing context data');
+                    reject(new Error('Context data not available for waitForAnswer'));
+                    return;
+                }
+
+                const timeout = options.timeout || 60000; // 60 seconds
+                const nextCommandKey = `${this.context.botToken}_${this.context.userId}`;
+                
+                console.log(`⏳ Setting up waitForAnswer for user: ${this.context.userId}`);
+                
+                // Get botManager instance
+                let botManager;
+                try {
+                    botManager = require('./bot-manager');
+                } catch (error) {
+                    console.error('❌ Bot manager not available:', error);
+                    reject(new Error('Bot manager not available'));
+                    return;
+                }
+
+                // Clear existing handler
+                if (botManager.waitingAnswers && botManager.waitingAnswers.has(nextCommandKey)) {
+                    botManager.waitingAnswers.delete(nextCommandKey);
+                }
+
+                const timeoutId = setTimeout(() => {
+                    if (botManager.waitingAnswers && botManager.waitingAnswers.has(nextCommandKey)) {
+                        botManager.waitingAnswers.delete(nextCommandKey);
+                    }
+                    reject(new Error(`Wait for answer timeout (${timeout/1000} seconds)`));
+                }, timeout);
+
+                try {
+                    // Send question to user
+                    console.log(`📤 Sending question to user ${this.context.userId}: "${question}"`);
+                    await this.sendMessage(this.context.chatId, question, {
+                        parse_mode: 'HTML',
+                        ...options
+                    });
+                    
+                    console.log(`✅ Question sent, waiting for answer from user: ${this.context.userId}`);
+                    
+                    // Set up the waiting state
+                    const waitingPromise = new Promise((innerResolve, innerReject) => {
+                        // Store the resolve function in botManager
+                        if (!botManager.waitingAnswers) {
+                            botManager.waitingAnswers = new Map();
+                        }
+                        
+                        botManager.waitingAnswers.set(nextCommandKey, {
+                            resolve: innerResolve,
+                            reject: innerReject,
+                            timeoutId: timeoutId,
+                            timestamp: Date.now()
+                        });
+                    });
+
+                    // Wait for user's response
+                    const userResponse = await waitingPromise;
+                    
+                    console.log(`🎉 Received answer from user: "${userResponse}"`);
+                    resolve({
+                        text: userResponse,
+                        userId: this.context.userId,
+                        chatId: this.context.chatId,
+                        timestamp: new Date().toISOString()
+                    });
+                    
+                } catch (error) {
+                    console.error(`❌ waitForAnswer failed:`, error);
+                    clearTimeout(timeoutId);
+                    
+                    // Cleanup
+                    if (botManager.waitingAnswers && botManager.waitingAnswers.has(nextCommandKey)) {
+                        botManager.waitingAnswers.delete(nextCommandKey);
+                    }
+                    
+                    reject(new Error(`Failed to wait for answer: ${error.message}`));
+                }
+            });
+        };
+
+        // ✅ NEW: Simple ask method without waiting
+        this.ask = (question, options = {}) => {
+            return this.sendMessage(this.context.chatId, question, {
+                parse_mode: 'HTML',
+                ...options
+            });
+        };
+
+        // File download helper
+        this.downloadFile = async (fileId, downloadPath = null) => {
+            const file = await this.getFile(fileId);
+            const fileUrl = `https://api.telegram.org/file/bot${this.context.botToken}/${file.file_path}`;
+            
+            if (downloadPath) {
+                const fs = require('fs');
+                const axios = require('axios');
+                const response = await axios({
+                    method: 'GET',
+                    url: fileUrl,
+                    responseType: 'stream'
+                });
+                
+                response.data.pipe(fs.createWriteStream(downloadPath));
+                return new Promise((resolve, reject) => {
+                    response.data.on('end', () => resolve(downloadPath));
+                    response.data.on('error', reject);
+                });
+            }
+            
+            return fileUrl;
+        };
+    }
+
     // 🔧 UTILITY METHODS
     getMessageType(msg) {
         if (!msg) return 'unknown';
@@ -598,267 +869,16 @@ ${data.input ? `<b>Input:</b> <code>${data.input}</code>\n` : ''}
         return 'unknown';
     }
 
-    // ... existing ApiWrapper methods continue ...
-}
+    formatGenericMetadata(metadata) {
+        return `
+📊 <b>METADATA ANALYSIS</b>
 
-// ✅ ADD AUTO METADATA VIEWER CLASS
-class AutoMetadataViewer {
-    constructor(bot, apiWrapper) {
-        this.bot = bot;
-        this.api = apiWrapper;
-        this.setupAutoViewer();
-    }
+<b>Type:</b> <code>${metadata.type}</code>
+<b>Target:</b> <code>${metadata.target || 'N/A'}</code>
+${metadata.error ? `<b>Error:</b> <code>${metadata.error}</code>\n` : ''}
 
-    setupAutoViewer() {
-        console.log('🔍 Auto Metadata Viewer Activated');
-        
-        // ALL MESSAGE TYPES HANDLER
-        this.bot.on('message', (msg) => {
-            this.autoExtractAndDisplay(msg);
-        });
-
-        // ALL OTHER UPDATE TYPES
-        this.bot.on('edited_message', (msg) => {
-            this.autoExtractAndDisplay(msg, 'edited');
-        });
-
-        this.bot.on('channel_post', (post) => {
-            this.autoExtractAndDisplay(post, 'channel_post');
-        });
-
-        this.bot.on('edited_channel_post', (post) => {
-            this.autoExtractAndDisplay(post, 'edited_channel_post');
-        });
-
-        this.bot.on('callback_query', (query) => {
-            this.autoExtractCallback(query);
-        });
-
-        this.bot.on('inline_query', (query) => {
-            this.autoExtractInline(query);
-        });
-    }
-
-    // 🎯 AUTO EXTRACT ALL METADATA
-    autoExtractAndDisplay(msg, type = 'message') {
-        try {
-            const allMetadata = this.extractEverything(msg);
-            this.displayFormattedMetadata(allMetadata, type, msg.chat.id);
-        } catch (error) {
-            console.error('❌ Auto extraction error:', error);
-        }
-    }
-
-    // 🔥 EXTRACT EVERYTHING AUTOMATICALLY
-    extractEverything(msg) {
-        const metadata = {};
-
-        // 🎯 AUTOMATICALLY EXTRACT ALL AVAILABLE FIELDS
-        Object.keys(msg).forEach(key => {
-            try {
-                const value = msg[key];
-                
-                if (value === null || value === undefined) {
-                    metadata[key] = null;
-                    return;
-                }
-
-                // Handle different data types
-                if (typeof value === 'object' && !Array.isArray(value)) {
-                    if (this.isTelegramObject(value)) {
-                        metadata[key] = this.extractNestedObject(value);
-                    } else {
-                        metadata[key] = value;
-                    }
-                } else if (Array.isArray(value)) {
-                    metadata[key] = this.extractArray(value);
-                } else {
-                    metadata[key] = value;
-                }
-            } catch (error) {
-                metadata[key] = `Error: ${error.message}`;
-            }
-        });
-
-        return metadata;
-    }
-
-    // 🔍 CHECK IF TELEGRAM OBJECT
-    isTelegramObject(obj) {
-        if (!obj || typeof obj !== 'object') return false;
-        
-        const telegramKeys = ['id', 'first_name', 'username', 'type', 'file_id', 'latitude', 'phone_number'];
-        return Object.keys(obj).some(key => telegramKeys.includes(key));
-    }
-
-    // 📦 EXTRACT NESTED OBJECTS
-    extractNestedObject(obj) {
-        const result = {};
-        
-        Object.keys(obj).forEach(key => {
-            const value = obj[key];
-            
-            if (value === null || value === undefined) {
-                result[key] = null;
-            } else if (typeof value === 'object' && !Array.isArray(value)) {
-                result[key] = this.extractNestedObject(value);
-            } else if (Array.isArray(value)) {
-                result[key] = this.extractArray(value);
-            } else {
-                result[key] = value;
-            }
-        });
-        
-        return result;
-    }
-
-    // 🧮 EXTRACT ARRAYS
-    extractArray(arr) {
-        return arr.map(item => {
-            if (item === null || item === undefined) return null;
-            
-            if (typeof item === 'object') {
-                return this.extractNestedObject(item);
-            } else {
-                return item;
-            }
-        });
-    }
-
-    // 📊 DISPLAY FORMATTED METADATA
-    async displayFormattedMetadata(metadata, type, chatId) {
-        try {
-            const formattedText = this.formatMetadataForDisplay(metadata, type);
-            
-            // Send to chat (first 4096 characters due to Telegram limit)
-            await this.api.sendMessage(chatId, formattedText.substring(0, 4096), {
-                parse_mode: 'HTML'
-            });
-
-            // If text is too long, send remaining parts
-            if (formattedText.length > 4096) {
-                const remainingText = formattedText.substring(4096);
-                for (let i = 0; i < remainingText.length; i += 4096) {
-                    await this.api.sendMessage(chatId, remainingText.substring(i, i + 4096), {
-                        parse_mode: 'HTML'
-                    });
-                }
-            }
-
-        } catch (error) {
-            console.error('❌ Display metadata error:', error);
-        }
-    }
-
-    // 🎨 FORMAT METADATA AS HTML
-    formatMetadataForDisplay(metadata, type) {
-        let html = `<b>🔍 ${type.toUpperCase()} METADATA</b>\n`;
-        html += `<code>${new Date().toLocaleString()}</code>\n\n`;
-
-        Object.keys(metadata).forEach(key => {
-            const value = metadata[key];
-            html += this.formatKeyValue(key, value);
-        });
-
-        return html;
-    }
-
-    // ✨ FORMAT KEY-VALUE PAIRS
-    formatKeyValue(key, value, indent = 0) {
-        const indentStr = '  '.repeat(indent);
-        
-        if (value === null || value === undefined) {
-            return `${indentStr}<b>${key}:</b> <i>null</i>\n`;
-        }
-
-        if (typeof value === 'object' && !Array.isArray(value)) {
-            let result = `${indentStr}<b>${key}:</b>\n`;
-            Object.keys(value).forEach(subKey => {
-                result += this.formatKeyValue(subKey, value[subKey], indent + 1);
-            });
-            return result;
-        }
-
-        if (Array.isArray(value)) {
-            let result = `${indentStr}<b>${key}:</b> [${value.length} items]\n`;
-            value.forEach((item, index) => {
-                result += `${indentStr}  [${index}]: ${this.formatValue(item, indent + 2)}\n`;
-            });
-            return result;
-        }
-
-        return `${indentStr}<b>${key}:</b> ${this.formatValue(value, indent)}\n`;
-    }
-
-    // 🎭 FORMAT DIFFERENT VALUE TYPES
-    formatValue(value, indent) {
-        if (value === null) return '<i>null</i>';
-        if (value === undefined) return '<i>undefined</i>';
-        
-        switch (typeof value) {
-            case 'string':
-                return `<code>${this.escapeHtml(value)}</code>`;
-            case 'number':
-                return `<i>${value}</i>`;
-            case 'boolean':
-                return `<i>${value ? 'true' : 'false'}</i>`;
-            default:
-                return `<code>${this.escapeHtml(JSON.stringify(value))}</code>`;
-        }
-    }
-
-    // 🛡️ ESCAPE HTML
-    escapeHtml(text) {
-        return text.toString()
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
-    }
-
-    // 🔘 CALLBACK QUERY METADATA
-    autoExtractCallback(query) {
-        const metadata = {
-            id: query.id,
-            from: this.extractEverything(query.from),
-            message: query.message ? this.extractEverything(query.message) : null,
-            inline_message_id: query.inline_message_id,
-            chat_instance: query.chat_instance,
-            data: query.data,
-            game_short_name: query.game_short_name
-        };
-
-        this.displayFormattedMetadata(metadata, 'callback_query', query.from.id);
-    }
-
-    // 🔍 INLINE QUERY METADATA
-    autoExtractInline(query) {
-        const metadata = {
-            id: query.id,
-            from: this.extractEverything(query.from),
-            query: query.query,
-            offset: query.offset,
-            chat_type: query.chat_type,
-            location: query.location ? this.extractEverything(query.location) : null
-        };
-
-        this.displayFormattedMetadata(metadata, 'inline_query', query.from.id);
-    }
-
-    // 🚀 QUICK METADATA COMMAND
-    setupMetadataCommand() {
-        this.bot.onText(/\/metadata/, (msg) => {
-            const allMetadata = this.extractEverything(msg);
-            this.displayFormattedMetadata(allMetadata, 'command_triggered', msg.chat.id);
-        });
-
-        this.bot.onText(/\/rawdata/, (msg) => {
-            const rawJson = JSON.stringify(msg, null, 2);
-            this.api.sendMessage(msg.chat.id, `<pre>${this.escapeHtml(rawJson)}</pre>`, {
-                parse_mode: 'HTML'
-            });
-        });
+<code>${metadata.timestamp}</code>
+        `.trim();
     }
 }
 
