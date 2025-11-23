@@ -261,79 +261,6 @@ async function executeCommandCode(botInstance, code, context) {
                 }
             };
 
-            // ✅ DYNAMIC CASE INSENSITIVE PROXY HANDLER
-            const createDynamicCaseInsensitiveObject = (targetObj) => {
-                const caseInsensitiveCache = new Map();
-                
-                return new Proxy(targetObj, {
-                    get: function(obj, prop) {
-                        if (typeof prop !== 'string') return obj[prop];
-                        
-                        // Convert property to lowercase for case insensitive access
-                        const lowerProp = prop.toLowerCase();
-                        
-                        // Check cache first
-                        if (caseInsensitiveCache.has(lowerProp)) {
-                            return caseInsensitiveCache.get(lowerProp);
-                        }
-                        
-                        // Find the actual property (case insensitive)
-                        const actualProp = Object.keys(obj).find(key => 
-                            key.toLowerCase() === lowerProp
-                        );
-                        
-                        if (actualProp) {
-                            const value = obj[actualProp];
-                            caseInsensitiveCache.set(lowerProp, value);
-                            return value;
-                        }
-                        
-                        // If not found, return undefined
-                        return undefined;
-                    },
-                    
-                    set: function(obj, prop, value) {
-                        if (typeof prop !== 'string') {
-                            obj[prop] = value;
-                            return true;
-                        }
-                        
-                        const lowerProp = prop.toLowerCase();
-                        const actualProp = Object.keys(obj).find(key => 
-                            key.toLowerCase() === lowerProp
-                        ) || prop;
-                        
-                        obj[actualProp] = value;
-                        caseInsensitiveCache.set(lowerProp, value);
-                        return true;
-                    },
-                    
-                    has: function(obj, prop) {
-                        if (typeof prop !== 'string') return prop in obj;
-                        
-                        const lowerProp = prop.toLowerCase();
-                        return Object.keys(obj).some(key => 
-                            key.toLowerCase() === lowerProp
-                        );
-                    },
-                    
-                    ownKeys: function(obj) {
-                        return Object.keys(obj);
-                    },
-                    
-                    getOwnPropertyDescriptor: function(obj, prop) {
-                        if (typeof prop !== 'string') return Object.getOwnPropertyDescriptor(obj, prop);
-                        
-                        const lowerProp = prop.toLowerCase();
-                        const actualProp = Object.keys(obj).find(key => 
-                            key.toLowerCase() === lowerProp
-                        );
-                        
-                        return actualProp ? Object.getOwnPropertyDescriptor(obj, actualProp) : undefined;
-                    }
-                });
-            };
-
             // ✅ CREATE BOT OBJECT WITH ALL METHODS
             const createBotObject = () => {
                 const botObj = {
@@ -360,7 +287,7 @@ async function executeCommandCode(botInstance, code, context) {
                     ask: waitForAnswerFunction
                 };
                 
-                return createDynamicCaseInsensitiveObject(botObj);
+                return botObj;
             };
 
             // ✅ CREATE BOT INSTANCE
@@ -375,8 +302,8 @@ async function executeCommandCode(botInstance, code, context) {
                 getCurrentChat: createChatObjectFunction,
                 
                 // === BOT INSTANCES - ALL VARIATIONS ===
-                bot: botObject,
                 Bot: botObject,
+                bot: botObject,
                 api: botObject,
                 Api: botObject,
                 API: botObject,
@@ -449,61 +376,74 @@ async function executeCommandCode(botInstance, code, context) {
                 ...messageFunctions
             };
 
-            // ✅ CREATE DYNAMIC CASE INSENSITIVE ENVIRONMENT
-            const finalContext = createDynamicCaseInsensitiveObject(mergedEnvironment);
-
-            // ✅ FIXED: Create ASYNC execution function with UNIQUE VARIABLE NAMES
+            // ✅ FIXED: Create ASYNC execution function with ALL VARIABLE VARIATIONS
             const executionFunction = new Function(
                 'env',
                 `return (async function() {
                     try {
-                        // ✅ EXTRACT ALL VARIABLES FROM ENVIRONMENT WITH UNIQUE NAMES
-                        var BotInstance = env.bot;
-                        var botInstance = env.bot;
-                        var ApiInstance = env.api;
-                        var apiInstance = env.api;
-                        var APIInstance = env.api;
+                        // ✅ ALL VARIABLE VARIATIONS DECLARED
+                        var Bot = env.Bot;
+                        var bot = env.bot;
+                        var Api = env.Api;
+                        var api = env.api;
+                        var API = env.API;
                         
-                        var getUserFunc = env.getuser;
-                        var getCurrentUserFunc = env.getcurrentuser;
-                        var userDataObj = env.userdata;
-                        var currentUserObj = env.currentuser;
+                        var User = env.User;
+                        var BotData = env.BotData;
                         
-                        var getChatFunc = env.getchat;
-                        var getCurrentChatFunc = env.getcurrentchat;
-                        var chatDataObj = env.chatdata;
-                        var currentChatObj = env.currentchat;
+                        var msg = env.msg;
+                        var chatId = env.chatId;
+                        var userId = env.userId;
+                        var userInput = env.userInput;
+                        var params = env.params;
+                        var message = env.message;
                         
-                        var sendMessageFunc = env.sendmessage;
-                        var sendFunc = env.send;
-                        var replyFunc = env.reply;
-                        var sendPhotoFunc = env.sendphoto;
-                        var sendDocumentFunc = env.senddocument;
+                        var getUser = env.getUser;
+                        var getChat = env.getChat;
+                        var getCurrentUser = env.getCurrentUser;
+                        var getCurrentChat = env.getCurrentChat;
                         
-                        var paramsArray = env.params;
-                        var messageText = env.message;
-                        var UserStorage = env.user;
-                        var BotDataStorage = env.botdata;
+                        var sendMessage = env.sendMessage;
+                        var send = env.send;
+                        var reply = env.reply;
+                        var sendPhoto = env.sendPhoto;
+                        var sendDocument = env.sendDocument;
+                        var sendVideo = env.sendVideo;
+                        var sendAudio = env.sendAudio;
+                        var sendVoice = env.sendVoice;
+                        var sendLocation = env.sendLocation;
+                        var sendContact = env.sendContact;
                         
-                        var waitFunc = env.wait;
-                        var delayFunc = env.delay;
-                        var sleepFunc = env.sleep;
+                        var wait = env.wait;
+                        var delay = env.delay;
+                        var sleep = env.sleep;
                         
-                        var runPythonFunc = env.runpython;
-                        var executePythonFunc = env.executepython;
-                        var waitForAnswerFunc = env.waitforanswer;
-                        var askFunc = env.ask;
+                        var runPython = env.runPython;
+                        var executePython = env.executePython;
                         
-                        var metaDataFunc = env.metadata;
-                        var inspectFunc = env.inspect;
-                        var getMetaFunc = env.getmeta;
+                        var waitForAnswer = env.waitForAnswer;
+                        var ask = env.ask;
                         
-                        var analyzeContextFunc = env.analyzecontext;
-                        var getContextFunc = env.getcontext;
-                        var contextObj = env.context;
-                        var ctxObj = env.ctx;
+                        var metaData = env.metaData;
+                        var metadata = env.metadata;
+                        var getMeta = env.getMeta;
+                        var inspect = env.inspect;
                         
-                        console.log('✅ Execution started for user:', currentUserObj.first_name);
+                        var analyzeContext = env.analyzeContext;
+                        var getContext = env.getContext;
+                        var context = env.context;
+                        var ctx = env.ctx;
+                        
+                        var userData = env.userData;
+                        var chatData = env.chatData;
+                        var currentUser = env.currentUser;
+                        var currentChat = env.currentChat;
+                        
+                        var nextCommandHandlers = env.nextCommandHandlers;
+                        
+                        console.log('✅ Execution started for user:', currentUser.first_name);
+                        console.log('🔍 Available Bot methods:', Object.keys(Bot).length);
+                        console.log('🔍 Bot.metaData type:', typeof Bot.metaData);
                         
                         // User's code starts here
                         ${code}
@@ -513,9 +453,28 @@ async function executeCommandCode(botInstance, code, context) {
                     } catch (error) {
                         console.error('❌ Execution error:', error);
                         try {
-                            await env.sendMessage("❌ Error: " + error.message);
-                        } catch (e) {
-                            console.error('Failed to send error message:', e);
+                            // ✅ OPTIMIZED ERROR MESSAGES
+                            let errorMsg = "❌ Error: ";
+                            
+                            if (error.message.includes('has already been declared')) {
+                                errorMsg += "Variable conflict. Please use unique variable names.";
+                            } else if (error.message.includes('is not defined')) {
+                                errorMsg += "Undefined variable. Check your code syntax.";
+                            } else if (error.message.includes('Telegram API Error')) {
+                                errorMsg += "Telegram API issue. Check bot permissions.";
+                            } else if (error.message.includes('Python Error')) {
+                                errorMsg += "Python code has errors.";
+                            } else {
+                                errorMsg += error.message.substring(0, 100);
+                            }
+                            
+                            if (errorMsg.length > 200) {
+                                errorMsg = errorMsg.substring(0, 200) + "...";
+                            }
+                            
+                            await env.sendMessage(errorMsg);
+                        } catch (sendError) {
+                            console.error('Failed to send error message:', sendError);
                         }
                         throw error;
                     }
@@ -524,7 +483,7 @@ async function executeCommandCode(botInstance, code, context) {
 
             // Execute the command
             console.log('🚀 Executing command...');
-            const result = await executionFunction(finalContext);
+            const result = await executionFunction(mergedEnvironment);
             
             console.log('✅ Command execution completed');
             resolve(result);
