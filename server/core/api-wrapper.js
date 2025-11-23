@@ -1,4 +1,4 @@
-// server/core/api-wrapper.js - COMPLETELY FIXED VERSION
+// server/core/api-wrapper.js - COMPLETELY FIXED AND ENHANCED VERSION
 class ApiWrapper {
     constructor(bot, context) {
         this.bot = bot;
@@ -6,6 +6,7 @@ class ApiWrapper {
         this.setupAllMethods();
         this.setupMetadataMethods();
         this.setupUserDataMethods();
+        this.setupBotDataMethods(); // ✅ NEW: BotData methods added
     }
 
     setupAllMethods() {
@@ -147,6 +148,24 @@ class ApiWrapper {
         };
     }
 
+    // ✅ NEW: BOT DATA METHODS SETUP
+    setupBotDataMethods() {
+        // Bot data methods
+        this.BotData = {
+            getData: async (key) => {
+                return await this.getBotData(key);
+            },
+            
+            saveData: async (key, value) => {
+                return await this.saveBotData(key, value);
+            },
+            
+            deleteData: async (key) => {
+                return await this.deleteBotData(key);
+            }
+        };
+    }
+
     // 🎯 GET ORIGINAL METADATA - RAW JSON RESPONSE ONLY
     async getOriginalMetadata(target = 'message') {
         try {
@@ -224,9 +243,14 @@ class ApiWrapper {
         }
     }
 
-    // ✅ FIXED: USER DATA METHODS
+    // ✅ FIXED: USER DATA METHODS WITH VALIDATION
     async getUserData(key) {
         try {
+            // ✅ INPUT VALIDATION
+            if (typeof key !== 'string' || key.trim() === '') {
+                throw new Error('User data key must be a non-empty string');
+            }
+
             if (!this.context.botToken || !this.context.userId) {
                 throw new Error('Bot token or user ID not available');
             }
@@ -244,15 +268,17 @@ class ApiWrapper {
 
             if (error) {
                 if (error.code === 'PGRST116') {
-                    return null; // Not found
+                    return null; // Not found - return null instead of throwing
                 }
-                throw error;
+                console.error('❌ Database error in getUserData:', error);
+                throw new Error(`Database error: ${error.message}`);
             }
 
             if (data && data.data_value) {
                 try {
                     return JSON.parse(data.data_value);
-                } catch {
+                } catch (parseError) {
+                    console.warn('⚠️ Failed to parse user data as JSON, returning as string');
                     return data.data_value;
                 }
             }
@@ -267,11 +293,21 @@ class ApiWrapper {
 
     async saveUserData(key, value) {
         try {
+            // ✅ INPUT VALIDATION
+            if (typeof key !== 'string' || key.trim() === '') {
+                throw new Error('User data key must be a non-empty string');
+            }
+            if (value === undefined || value === null) {
+                throw new Error('User data value cannot be null or undefined');
+            }
+
             if (!this.context.botToken || !this.context.userId) {
                 throw new Error('Bot token or user ID not available');
             }
 
             const supabase = require('../config/supabase');
+            
+            const serializedValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
             
             const { error } = await supabase
                 .from('universal_data')
@@ -280,14 +316,15 @@ class ApiWrapper {
                     bot_token: this.context.botToken,
                     user_id: this.context.userId.toString(),
                     data_key: key,
-                    data_value: typeof value === 'object' ? JSON.stringify(value) : String(value),
+                    data_value: serializedValue,
                     updated_at: new Date().toISOString()
                 }, {
                     onConflict: 'data_type,bot_token,user_id,data_key'
                 });
 
             if (error) {
-                throw error;
+                console.error('❌ Database error in saveUserData:', error);
+                throw new Error(`Database error: ${error.message}`);
             }
 
             return value;
@@ -300,6 +337,11 @@ class ApiWrapper {
 
     async deleteUserData(key) {
         try {
+            // ✅ INPUT VALIDATION
+            if (typeof key !== 'string' || key.trim() === '') {
+                throw new Error('User data key must be a non-empty string');
+            }
+
             if (!this.context.botToken || !this.context.userId) {
                 throw new Error('Bot token or user ID not available');
             }
@@ -315,7 +357,8 @@ class ApiWrapper {
                 .eq('data_key', key);
 
             if (error) {
-                throw error;
+                console.error('❌ Database error in deleteUserData:', error);
+                throw new Error(`Database error: ${error.message}`);
             }
 
             return true;
@@ -328,6 +371,14 @@ class ApiWrapper {
 
     async incrementUserData(key, amount = 1) {
         try {
+            // ✅ INPUT VALIDATION
+            if (typeof key !== 'string' || key.trim() === '') {
+                throw new Error('User data key must be a non-empty string');
+            }
+            if (typeof amount !== 'number' || isNaN(amount)) {
+                throw new Error('Increment amount must be a valid number');
+            }
+
             const currentValue = await this.getUserData(key);
             const newValue = (parseInt(currentValue) || 0) + amount;
             await this.saveUserData(key, newValue);
@@ -335,6 +386,129 @@ class ApiWrapper {
         } catch (error) {
             console.error('❌ Increment user data error:', error);
             throw new Error(`Failed to increment user data: ${error.message}`);
+        }
+    }
+
+    // ✅ NEW: BOT DATA METHODS
+    async getBotData(key) {
+        try {
+            // ✅ INPUT VALIDATION
+            if (typeof key !== 'string' || key.trim() === '') {
+                throw new Error('Bot data key must be a non-empty string');
+            }
+
+            if (!this.context.botToken) {
+                throw new Error('Bot token not available');
+            }
+
+            const supabase = require('../config/supabase');
+            
+            const { data, error } = await supabase
+                .from('universal_data')
+                .select('data_value')
+                .eq('data_type', 'bot_data')
+                .eq('bot_token', this.context.botToken)
+                .eq('data_key', key)
+                .single();
+
+            if (error) {
+                if (error.code === 'PGRST116') {
+                    return null; // Not found
+                }
+                console.error('❌ Database error in getBotData:', error);
+                throw new Error(`Database error: ${error.message}`);
+            }
+
+            if (data && data.data_value) {
+                try {
+                    return JSON.parse(data.data_value);
+                } catch (parseError) {
+                    console.warn('⚠️ Failed to parse bot data as JSON, returning as string');
+                    return data.data_value;
+                }
+            }
+
+            return null;
+
+        } catch (error) {
+            console.error('❌ Get bot data error:', error);
+            throw new Error(`Failed to get bot data: ${error.message}`);
+        }
+    }
+
+    async saveBotData(key, value) {
+        try {
+            // ✅ INPUT VALIDATION
+            if (typeof key !== 'string' || key.trim() === '') {
+                throw new Error('Bot data key must be a non-empty string');
+            }
+            if (value === undefined || value === null) {
+                throw new Error('Bot data value cannot be null or undefined');
+            }
+
+            if (!this.context.botToken) {
+                throw new Error('Bot token not available');
+            }
+
+            const supabase = require('../config/supabase');
+            
+            const serializedValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
+            
+            const { error } = await supabase
+                .from('universal_data')
+                .upsert({
+                    data_type: 'bot_data',
+                    bot_token: this.context.botToken,
+                    data_key: key,
+                    data_value: serializedValue,
+                    updated_at: new Date().toISOString()
+                }, {
+                    onConflict: 'data_type,bot_token,data_key'
+                });
+
+            if (error) {
+                console.error('❌ Database error in saveBotData:', error);
+                throw new Error(`Database error: ${error.message}`);
+            }
+
+            return value;
+
+        } catch (error) {
+            console.error('❌ Save bot data error:', error);
+            throw new Error(`Failed to save bot data: ${error.message}`);
+        }
+    }
+
+    async deleteBotData(key) {
+        try {
+            // ✅ INPUT VALIDATION
+            if (typeof key !== 'string' || key.trim() === '') {
+                throw new Error('Bot data key must be a non-empty string');
+            }
+
+            if (!this.context.botToken) {
+                throw new Error('Bot token not available');
+            }
+
+            const supabase = require('../config/supabase');
+            
+            const { error } = await supabase
+                .from('universal_data')
+                .delete()
+                .eq('data_type', 'bot_data')
+                .eq('bot_token', this.context.botToken)
+                .eq('data_key', key);
+
+            if (error) {
+                console.error('❌ Database error in deleteBotData:', error);
+                throw new Error(`Database error: ${error.message}`);
+            }
+
+            return true;
+
+        } catch (error) {
+            console.error('❌ Delete bot data error:', error);
+            throw new Error(`Failed to delete bot data: ${error.message}`);
         }
     }
 
@@ -471,7 +645,7 @@ class ApiWrapper {
         // Utility methods
         this.wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-        // ✅ FIXED: Wait for answer with timeout - IMPROVED VERSION
+        // ✅ IMPROVED: Wait for answer with better error handling
         this.waitForAnswer = (question, options = {}) => {
             return new Promise(async (resolve, reject) => {
                 // Validate context
@@ -498,15 +672,14 @@ class ApiWrapper {
 
                 // Clear existing handler
                 if (botManager.waitingAnswers && botManager.waitingAnswers.has(nextCommandKey)) {
+                    const oldHandler = botManager.waitingAnswers.get(nextCommandKey);
+                    if (oldHandler && oldHandler.timeoutId) {
+                        clearTimeout(oldHandler.timeoutId);
+                    }
                     botManager.waitingAnswers.delete(nextCommandKey);
                 }
 
-                const timeoutId = setTimeout(() => {
-                    if (botManager.waitingAnswers && botManager.waitingAnswers.has(nextCommandKey)) {
-                        botManager.waitingAnswers.delete(nextCommandKey);
-                    }
-                    reject(new Error(`Wait for answer timeout (${timeout/1000} seconds)`));
-                }, timeout);
+                let timeoutId = null;
 
                 try {
                     // Send question to user
@@ -525,16 +698,29 @@ class ApiWrapper {
                             botManager.waitingAnswers = new Map();
                         }
                         
+                        timeoutId = setTimeout(() => {
+                            if (botManager.waitingAnswers.has(nextCommandKey)) {
+                                botManager.waitingAnswers.delete(nextCommandKey);
+                            }
+                            innerReject(new Error(`Wait for answer timeout (${timeout/1000} seconds)`));
+                        }, timeout);
+
                         botManager.waitingAnswers.set(nextCommandKey, {
                             resolve: innerResolve,
                             reject: innerReject,
                             timeoutId: timeoutId,
-                            timestamp: Date.now()
+                            timestamp: Date.now(),
+                            question: question
                         });
                     });
 
                     // Wait for user's response
                     const userResponse = await waitingPromise;
+                    
+                    // Clean up timeout
+                    if (timeoutId) {
+                        clearTimeout(timeoutId);
+                    }
                     
                     console.log(`🎉 Received answer from user: "${userResponse}"`);
                     resolve({
@@ -546,9 +732,13 @@ class ApiWrapper {
                     
                 } catch (error) {
                     console.error(`❌ waitForAnswer failed:`, error);
-                    clearTimeout(timeoutId);
                     
-                    // Cleanup
+                    // Clean up timeout
+                    if (timeoutId) {
+                        clearTimeout(timeoutId);
+                    }
+                    
+                    // Cleanup from botManager
                     if (botManager.waitingAnswers && botManager.waitingAnswers.has(nextCommandKey)) {
                         botManager.waitingAnswers.delete(nextCommandKey);
                     }
@@ -577,7 +767,8 @@ class ApiWrapper {
                 const response = await axios({
                     method: 'GET',
                     url: fileUrl,
-                    responseType: 'stream'
+                    responseType: 'stream',
+                    timeout: 30000 // 30 second timeout
                 });
                 
                 response.data.pipe(fs.createWriteStream(downloadPath));
