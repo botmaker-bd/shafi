@@ -105,7 +105,7 @@ class ApiWrapper {
     }
 
     // ✅ FIXED: METADATA METHODS - DIRECT ORIGINAL RESPONSE
-    setupMetadataMethods() {
+        setupMetadataMethods() {
         // 🔍 METADATA METHOD - DIRECT ORIGINAL RESPONSE
         this.metaData = async (target = 'message') => {
             try {
