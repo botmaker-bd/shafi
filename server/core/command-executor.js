@@ -1,4 +1,4 @@
-// server/core/command-executor.js - FIXED WITH METADATA & USER DATA
+// server/core/command-executor.js - COMPLETELY FIXED VERSION
 async function executeCommandCode(botInstance, code, context) {
     return new Promise(async (resolve, reject) => {
         try {
@@ -415,67 +415,59 @@ async function executeCommandCode(botInstance, code, context) {
             // ✅ CREATE DYNAMIC CASE INSENSITIVE ENVIRONMENT
             const finalContext = createDynamicCaseInsensitiveObject(mergedEnvironment);
 
-            // ✅ FIXED: Create ASYNC execution function with ALL VARIABLES
+            // ✅ FIXED: Create ASYNC execution function with UNIQUE VARIABLE NAMES
             const executionFunction = new Function(
                 'env',
                 `return (async function() {
                     try {
-                        // ✅ EXTRACT ALL VARIABLES FROM ENVIRONMENT
-                        var Bot = env.bot;
-                        var bot = env.bot;
-                        var Api = env.api;
-                        var api = env.api;
-                        var API = env.api;
+                        // ✅ UNIQUE VARIABLE NAMES TO AVOID DUPLICATE DECLARATION ERRORS
+                        var MainBot = env.bot;
+                        var MainApi = env.api;
+                        var MainUser = env.user;
                         
-                        var getUser = env.getuser;
-                        var getCurrentUser = env.getcurrentuser;
-                        var userData = env.userdata;
-                        var currentUser = env.currentuser;
+                        var getUserFunc = env.getuser;
+                        var getCurrentUserFunc = env.getcurrentuser;
+                        var userDataObj = env.userdata;
+                        var currentUserObj = env.currentuser;
                         
-                        var getChat = env.getchat;
-                        var getCurrentChat = env.getcurrentchat;
-                        var chatData = env.chatdata;
-                        var currentChat = env.currentchat;
+                        var getChatFunc = env.getchat;
+                        var getCurrentChatFunc = env.getcurrentchat;
+                        var chatDataObj = env.chatdata;
+                        var currentChatObj = env.currentchat;
                         
-                        var sendMessage = env.sendmessage;
-                        var send = env.send;
-                        var reply = env.reply;
-                        var sendPhoto = env.sendphoto;
-                        var sendDocument = env.senddocument;
+                        var sendMessageFunc = env.sendmessage;
+                        var sendFunc = env.send;
+                        var replyFunc = env.reply;
+                        var sendPhotoFunc = env.sendphoto;
+                        var sendDocumentFunc = env.senddocument;
                         
-                        var params = env.params;
-                        var message = env.message;
-                        var User = env.user;
-                        var BotData = env.botdata;
+                        var paramsArray = env.params;
+                        var messageText = env.message;
+                        var UserData = env.user;
+                        var BotDataStorage = env.botdata;
                         
-                        var wait = env.wait;
-                        var delay = env.delay;
-                        var sleep = env.sleep;
+                        var waitFunc = env.wait;
+                        var delayFunc = env.delay;
+                        var sleepFunc = env.sleep;
                         
-                        var runPython = env.runpython;
-                        var executePython = env.executepython;
-                        var waitForAnswer = env.waitforanswer;
-                        var ask = env.ask;
+                        var runPythonFunc = env.runpython;
+                        var executePythonFunc = env.executepython;
+                        var waitForAnswerFunc = env.waitforanswer;
+                        var askFunc = env.ask;
                         
-                        var metadata = env.metadata;
-                        var metaData = env.metadata;
-                        var Metadata = env.metadata;
-                        var METADATA = env.metadata;
+                        var metadataFunc = env.metadata;
+                        var metaDataFunc = env.metadata;
+                        var MetadataFunc = env.metadata;
+                        var METADATAFunc = env.metadata;
                         
-                        var analyzeContext = env.analyzecontext;
-                        var getContext = env.getcontext;
-                        var context = env.context;
-                        var ctx = env.ctx;
+                        var analyzeContextFunc = env.analyzecontext;
+                        var getContextFunc = env.getcontext;
+                        var contextObj = env.context;
+                        var ctxObj = env.ctx;
                         
-                        console.log('✅ Execution started for user:', currentUser.first_name);
+                        console.log('✅ Execution started for user:', currentUserObj.first_name);
                         
-                        // 🎯 TEST METADATA FUNCTION
-                        console.log('🔍 Testing metadata function...');
-                        console.log('Bot.metadata type:', typeof Bot.metadata);
-                        console.log('bot.metadata type:', typeof bot.metadata);
-                        console.log('metadata type:', typeof metadata);
-                        
-                        // User's code starts here
+                        // User's code starts here - NO VARIABLE DECLARATIONS NEEDED
                         ${code}
                         // User's code ends here
                         
