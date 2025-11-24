@@ -574,172 +574,55 @@ async function executeCommandCode(botInstance, code, context) {
                 ...messageFunctions
             };
 
-            // ✅ FIXED: SIMPLIFIED AUTO AWAIT EXECUTION
+            // ✅ FIXED: SIMPLIFIED EXECUTION WITHOUT COMPLEX TEMPLATE STRINGS
             const executionFunction = new Function(
                 'env',
-                `return (async function() {
-                    try {
-                        // ✅ ALL VARIABLE VARIATIONS DECLARED
-                        var Bot = env.Bot;
-                        var bot = env.bot;
-                        var Api = env.Api;
-                        var api = env.api;
-                        var API = env.API;
-                        
-                        var User = env.User;
-                        var BotData = env.BotData;
-                        
-                        var msg = env.msg;
-                        var chatId = env.chatId;
-                        var userId = env.userId;
-                        var userInput = env.userInput;
-                        var params = env.params;
-                        var message = env.message;
-                        
-                        var getUser = env.getUser;
-                        var getChat = env.getChat;
-                        var getCurrentUser = env.getCurrentUser;
-                        var getCurrentChat = env.getCurrentChat;
-                        
-                        var sendMessage = env.sendMessage;
-                        var send = env.send;
-                        var reply = env.reply;
-                        var sendPhoto = env.sendPhoto;
-                        var sendDocument = env.sendDocument;
-                        var sendVideo = env.sendVideo;
-                        var sendAudio = env.sendAudio;
-                        var sendVoice = env.sendVoice;
-                        var sendLocation = env.sendLocation;
-                        var sendContact = env.sendContact;
-                        
-                        var wait = env.wait;
-                        var delay = env.delay;
-                        var sleep = env.sleep;
-                        
-                        var runPython = env.runPython;
-                        var executePython = env.executePython;
-                        
-                        var waitForAnswer = env.waitForAnswer;
-                        var ask = env.ask;
-                        
-                        var metaData = env.metaData;
-                        var metadata = env.metadata;
-                        var getMeta = env.getMeta;
-                        var inspect = env.inspect;
-                        
-                        var analyzeContext = env.analyzeContext;
-                        var getContext = env.getContext;
-                        var context = env.context;
-                        var ctx = env.ctx;
-                        
-                        var userData = env.userData;
-                        var chatData = env.chatData;
-                        var currentUser = env.currentUser;
-                        var currentChat = env.currentChat;
-                        
-                        var nextCommandHandlers = env.nextCommandHandlers;
-                        
-                        console.log('✅ Execution started for user:', currentUser.first_name);
-                        console.log('🔍 Available Bot methods:', Object.keys(Bot).length);
-                        
-                        // ✅ AUTO AWAIT PROCESSING
-                        const processCode = (code) => {
-                            const asyncPatterns = [
-                                // User data operations
-                                /User\\.(saveData|getData|deleteData|increment|getAllData|clearAll)/,
-                                // Bot data operations  
-                                /BotData\\.(saveData|getData|deleteData)/,
-                                // Wait functions
-                                /waitForAnswer|ask|wait|delay|sleep/,
-                                // Send message functions
-                                /sendMessage|send|reply|sendPhoto|sendDocument|sendVideo|sendAudio|sendVoice|sendLocation|sendContact/,
-                                // Metadata functions
-                                /metaData|metadata|getMeta|inspect/,
-                                // Python functions
-                                /runPython|executePython/
-                            ];
-                            
-                            const lines = code.split('\\\\n');
-                            let result = [];
-                            
-                            for (let line of lines) {
-                                let processedLine = line;
-                                const trimmedLine = line.trim();
-                                
-                                // Skip empty lines and comments
-                                if (!trimmedLine || trimmedLine.startsWith('//')) {
-                                    result.push(line);
-                                    continue;
-                                }
-                                
-                                // Check if line contains async operations but not variable declarations
-                                if (!trimmedLine.startsWith('const ') && 
-                                    !trimmedLine.startsWith('let ') && 
-                                    !trimmedLine.startsWith('var ') &&
-                                    !trimmedLine.startsWith('await ')) {
-                                    
-                                    for (const pattern of asyncPatterns) {
-                                        if (pattern.test(trimmedLine)) {
-                                            processedLine = 'await ' + line;
-                                            break;
-                                        }
-                                    }
-                                }
-                                
-                                result.push(processedLine);
-                            }
-                            
-                            return result.join('\\\\n');
-                        };
-                        
-                        // Process and execute user code
-                        const userCode = \\`${code.replace(/`/g, '\\`')}\\`;
-                        const processedCode = processCode(userCode);
-                        
-                        console.log('🔧 Processed code with auto await:');
-                        console.log(processedCode);
-                        
-                        // Execute the processed code
-                        eval(processedCode);
-                        
-                        return "Command completed successfully";
-                    } catch (error) {
-                        console.error('❌ Execution error:', error);
+                `with(env) {
+                    return (async function() {
                         try {
-                            // ✅ OPTIMIZED ERROR MESSAGES
-                            let errorMsg = "❌ Error: ";
+                            console.log('✅ Execution started for user:', currentUser.first_name);
                             
-                            if (error.message.includes('has already been declared')) {
-                                errorMsg += "Variable conflict. Please use unique variable names.";
-                            } else if (error.message.includes('is not defined')) {
-                                errorMsg += "Undefined variable. Check your code syntax.";
-                            } else if (error.message.includes('Telegram API Error')) {
-                                errorMsg += "Telegram API issue. Check bot permissions.";
-                            } else if (error.message.includes('Python Error')) {
-                                errorMsg += "Python code has errors.";
-                            } else if (error.message.includes('JSON')) {
-                                errorMsg += "Data format error. Try again.";
-                            } else if (error.message.includes('ON CONFLICT')) {
-                                errorMsg += "Database constraint error. This has been fixed automatically.";
-                            } else {
-                                errorMsg += error.message.substring(0, 100);
+                            // ✅ SIMPLE AUTO AWAIT HELPER
+                            const autoAwait = async (func, ...args) => {
+                                const funcStr = func.toString();
+                                const isAsync = funcStr.includes('async') || 
+                                              funcStr.includes('User.') || 
+                                              funcStr.includes('BotData.') ||
+                                              funcStr.includes('sendMessage') ||
+                                              funcStr.includes('sendPhoto') ||
+                                              funcStr.includes('waitForAnswer') ||
+                                              funcStr.includes('wait') ||
+                                              funcStr.includes('metaData');
+                                
+                                if (isAsync) {
+                                    return await func(...args);
+                                } else {
+                                    return func(...args);
+                                }
+                            };
+                            
+                            // User's code starts here
+                            ${code}
+                            // User's code ends here
+                            
+                            return "Command completed successfully";
+                        } catch (error) {
+                            console.error('❌ Execution error:', error);
+                            try {
+                                let errorMsg = "❌ Error: " + error.message.substring(0, 100);
+                                if (errorMsg.length > 200) errorMsg = errorMsg.substring(0, 200) + "...";
+                                await env.sendMessage(errorMsg);
+                            } catch (sendError) {
+                                console.error('Failed to send error message:', sendError);
                             }
-                            
-                            if (errorMsg.length > 200) {
-                                errorMsg = errorMsg.substring(0, 200) + "...";
-                            }
-                            
-                            await env.sendMessage(errorMsg);
-                        } catch (sendError) {
-                            console.error('Failed to send error message:', sendError);
+                            throw error;
                         }
-                        throw error;
-                    }
-                })();`
+                    })();
+                }`
             );
 
             // Execute the command
-            console.log('🚀 Executing command with auto await...');
+            console.log('🚀 Executing command...');
             const result = await executionFunction(mergedEnvironment);
             
             console.log('✅ Command execution completed');
