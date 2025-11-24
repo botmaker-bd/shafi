@@ -551,12 +551,20 @@ async function executeCommandCode(botInstance, code, context) {
                         },
                         
                         // Bot messages with auto-await
-                        BotSend: async (text, options) => {
-                            console.log(`🔄 AUTO-AWAIT: bot.sendMessage("${text.substring(0, 50)}...")`);
-                            const result = await env.bot.sendMessage(env.chatId, text, options);
-                            console.log(`✅ AUTO-AWAIT RESULT: bot.sendMessage =`, result);
-                            return result;
-                        }
+                        // ✅ CORRECTED VERSION - server/core/command-executor.js এ পরিবর্তন করুন
+BotSend: async (text, options) => {
+  console.log(`🔄 AUTO-AWAIT: bot.sendMessage("${text.substring(0, 50)}...")`);
+  
+  try {
+    // ✅ সরাসরি botInstance ব্যবহার করুন, env.bot নয়
+    const result = await botInstance.sendMessage(env.chatId, text, options);
+    console.log(`✅ AUTO-AWAIT RESULT: bot.sendMessage success`);
+    return result;
+  } catch (error) {
+    console.error(`❌ AUTO-AWAIT: bot.sendMessage failed:`, error.message);
+    throw error;
+  }
+}
                     };
 
                     // Process user code to add auto-await
