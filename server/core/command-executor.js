@@ -25,15 +25,10 @@ async function executeCommandCode(botInstance, code, context) {
             
             // Create ApiWrapper context
             const apiContext = {
-                msg: msg,
-                chatId: chatId,
-                userId: userId,
-                username: username || '',
-                first_name: first_name || '',
-                last_name: context.last_name || '',
-                language_code: context.language_code || '',
-                botToken: resolvedBotToken,
-                userInput: userInput,
+                msg, chatId, userId, 
+                username: username || '', first_name: first_name || '',
+                last_name: context.last_name || '', language_code: context.language_code || '',
+                botToken: resolvedBotToken, userInput, 
                 nextCommandHandlers: nextCommandHandlers || new Map()
             };
             
@@ -41,20 +36,8 @@ async function executeCommandCode(botInstance, code, context) {
             
             // Helper functions
             const createUserObject = () => ({
-                ...(msg.from || {
-                    id: userId,
-                    first_name: first_name || '',
-                    username: username || '',
-                    language_code: context.language_code || ''
-                }),
+                ...(msg.from || { id: userId, first_name: first_name || '', username: username || '' }),
                 chat_id: chatId
-            });
-
-            const createChatObject = () => ({
-                ...(msg.chat || {
-                    id: chatId,
-                    type: 'private'
-                })
             });
 
             const runPythonSync = (pythonCode) => {
@@ -81,9 +64,7 @@ async function executeCommandCode(botInstance, code, context) {
                                 setTimeout(() => {
                                     if (nextCommandHandlers.has(waitKey)) {
                                         const handler = nextCommandHandlers.get(waitKey);
-                                        if (handler?.reject) {
-                                            handler.reject(new Error('Wait for answer timeout (5 minutes)'));
-                                        }
+                                        if (handler?.reject) handler.reject(new Error('Wait for answer timeout'));
                                         nextCommandHandlers.delete(waitKey);
                                     }
                                 }, 5 * 60 * 1000);
@@ -103,16 +84,6 @@ async function executeCommandCode(botInstance, code, context) {
                 return await apiWrapperInstance.getOriginalResponse(target);
             };
 
-            const analyzeContext = () => ({
-                user: createUserObject(),
-                chat: createChatObject(),
-                message: msg,
-                bot: { token: resolvedBotToken?.substring(0, 10) + '...', chatId, userId },
-                input: userInput,
-                params: userInput ? userInput.split(' ').slice(1).filter(p => p.trim() !== '') : [],
-                timestamp: new Date().toISOString()
-            });
-
             // Data storage functions
             const userDataFunctions = {
                 saveData: async (key, value) => {
@@ -124,7 +95,6 @@ async function executeCommandCode(botInstance, code, context) {
                             user_id: userId.toString(),
                             data_key: key,
                             data_value: JSON.stringify(value),
-                            metadata: { saved_at: new Date().toISOString(), value_type: typeof value },
                             updated_at: new Date().toISOString()
                         }, { onConflict: 'data_type,bot_token,user_id,data_key' });
 
@@ -163,13 +133,6 @@ async function executeCommandCode(botInstance, code, context) {
 
                     if (error) throw new Error(`Failed to delete data: ${error.message}`);
                     return true;
-                },
-                
-                increment: async (key, amount = 1) => {
-                    const current = await userDataFunctions.getData(key) || 0;
-                    const newValue = parseInt(current) + parseInt(amount);
-                    await userDataFunctions.saveData(key, newValue);
-                    return newValue;
                 }
             };
 
@@ -190,7 +153,6 @@ async function executeCommandCode(botInstance, code, context) {
                             .from('universal_data')
                             .update({
                                 data_value: JSON.stringify(value),
-                                metadata: { saved_at: new Date().toISOString(), value_type: typeof value },
                                 updated_at: new Date().toISOString()
                             })
                             .eq('data_type', 'bot_data')
@@ -204,7 +166,6 @@ async function executeCommandCode(botInstance, code, context) {
                                 bot_token: resolvedBotToken,
                                 data_key: key,
                                 data_value: JSON.stringify(value),
-                                metadata: { saved_at: new Date().toISOString(), value_type: typeof value },
                                 created_at: new Date().toISOString(),
                                 updated_at: new Date().toISOString()
                             });
@@ -231,18 +192,6 @@ async function executeCommandCode(botInstance, code, context) {
                     } catch {
                         return data.data_value;
                     }
-                },
-                
-                deleteData: async (key) => {
-                    const { error } = await supabase
-                        .from('universal_data')
-                        .delete()
-                        .eq('data_type', 'bot_data')
-                        .eq('bot_token', resolvedBotToken)
-                        .eq('data_key', key);
-
-                    if (error) throw new Error(`Failed to delete bot data: ${error.message}`);
-                    return true;
                 }
             };
 
@@ -253,8 +202,6 @@ async function executeCommandCode(botInstance, code, context) {
                 metadata: extractMetadata,
                 getMeta: extractMetadata,
                 inspect: extractMetadata,
-                analyzeContext: analyzeContext,
-                getContext: analyzeContext,
                 wait: wait,
                 delay: wait,
                 sleep: wait,
@@ -268,9 +215,7 @@ async function executeCommandCode(botInstance, code, context) {
             const executionEnv = {
                 // Core functions
                 getUser: createUserObject,
-                getChat: createChatObject,
                 getCurrentUser: createUserObject,
-                getCurrentChat: createChatObject,
                 
                 // Bot instances
                 Bot: botObject,
@@ -282,7 +227,6 @@ async function executeCommandCode(botInstance, code, context) {
                 // Context data
                 msg, chatId, userId, userInput, botToken: resolvedBotToken,
                 params: userInput ? userInput.split(' ').slice(1).filter(p => p.trim() !== '') : [],
-                message: userInput,
                 
                 // Utility functions
                 wait, delay: wait, sleep: wait,
@@ -292,29 +236,17 @@ async function executeCommandCode(botInstance, code, context) {
                 // Metadata functions
                 metaData: extractMetadata, metadata: extractMetadata,
                 getMeta: extractMetadata, inspect: extractMetadata,
-                analyzeContext, getContext: analyzeContext,
-                context: analyzeContext(), ctx: analyzeContext(),
                 
                 // Data storage
                 User: userDataFunctions,
                 BotData: botDataFunctions,
                 
-                // Handlers and data
-                nextCommandHandlers: nextCommandHandlers,
-                userData: createUserObject(),
-                chatData: createChatObject(),
-                currentUser: createUserObject(),
-                currentChat: createChatObject(),
-                
                 // Direct message functions
                 sendMessage: (text, options) => botInstance.sendMessage(chatId, text, options),
-                send: (text, options) => botInstance.sendMessage(chatId, text, options),
-                reply: (text, options) => botInstance.sendMessage(chatId, text, {
-                    reply_to_message_id: msg.message_id, ...options
-                })
+                send: (text, options) => botInstance.sendMessage(chatId, text, options)
             };
 
-            // Execute with simplified auto-await
+            // Execute with auto-await
             const executeWithAutoAwait = async (userCode, env) => {
                 try {
                     // Process code for auto-await
