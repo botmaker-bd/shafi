@@ -17,8 +17,6 @@ console.log(`📍 Port: ${PORT}`);
 console.log(`🌐 Base URL: ${BASE_URL}`);
 console.log(`🔗 Mode: ${USE_WEBHOOK ? 'Webhook' : 'Polling'}`);
 
-// server/index.js - app configuration এর শুরুতে যোগ করুন
-
 // Trust proxy for rate limiting
 app.set('trust proxy', 1);
 
@@ -82,11 +80,11 @@ app.use('/', generalLimiter);
 
 // Serve static files from client directory
 app.use(express.static(path.join(__dirname, '../client'), {
-    index: false, // Don't serve index.html for directories
-    extensions: ['html', 'htm'] // Auto-add extensions
+    index: false,
+    extensions: ['html', 'htm']
 }));
 
-// server/index.js - এই লাইনগুলো আছে কিনা চেক করুন
+// Load routes
 try {
     const authRoutes = require('./routes/auth');
     const botRoutes = require('./routes/bots');
@@ -94,7 +92,7 @@ try {
     const adminRoutes = require('./routes/admin');
     const passwordRoutes = require('./routes/password');
     const webhookRoutes = require('./routes/webhook');
-    const templateRoutes = require('./routes/templates'); // ✅ এই লাইন থাকতে হবে
+    const templateRoutes = require('./routes/templates');
 
     app.use('/api/auth', authRoutes);
     app.use('/api/bots', botRoutes);
@@ -102,7 +100,7 @@ try {
     app.use('/api/admin', adminRoutes);
     app.use('/api/password', passwordRoutes);
     app.use('/api/webhook', webhookRoutes);
-    app.use('/api/templates', templateRoutes); // ✅ এই লাইন থাকতে হবে
+    app.use('/api/templates', templateRoutes);
     
     console.log('✅ All routes loaded successfully');
 } catch (error) {
@@ -110,14 +108,14 @@ try {
     process.exit(1);
 }
 
-// Health check endpoint with detailed info
+// Health check endpoint
 app.get('/api/health', async (req, res) => {
     try {
         const healthInfo = {
             status: 'OK',
             message: 'Bot Platform API is running smoothly',
             timestamp: new Date().toISOString(),
-            version: '2.0.0',
+            version: '2.0.1',
             environment: process.env.NODE_ENV || 'development',
             mode: USE_WEBHOOK ? 'webhook' : 'polling',
             baseUrl: BASE_URL,
@@ -157,7 +155,6 @@ if (USE_WEBHOOK) {
             const update = req.body;
             
             console.log('🔄 Webhook received for bot:', token.substring(0, 10) + '...');
-            console.log('📦 Update type:', update.message ? 'message' : update.callback_query ? 'callback' : 'other');
             
             const botManager = require('./core/bot-manager');
             await botManager.handleBotUpdate(token, update);
@@ -165,7 +162,6 @@ if (USE_WEBHOOK) {
             res.status(200).send('OK');
         } catch (error) {
             console.error('❌ Webhook error:', error);
-            // Still respond with 200 to prevent Telegram from retrying
             res.status(200).send('OK');
         }
     });
@@ -175,8 +171,8 @@ if (USE_WEBHOOK) {
 app.get('/api/info', (req, res) => {
     res.json({
         name: 'Telegram Bot Platform',
-        version: '2.0.0',
-        description: 'Universal Telegram Bot Platform with Python Support',
+        version: '2.0.1',
+        description: 'Universal Telegram Bot Platform with Python Support - FIXED',
         endpoints: {
             auth: '/api/auth',
             bots: '/api/bots',
@@ -218,28 +214,6 @@ app.use('/api/*', (req, res) => {
 app.use((error, req, res, next) => {
     console.error('🚨 Global Error Handler:', error);
     
-    // Log error to database if possible
-    try {
-        const supabase = require('./config/supabase');
-        supabase.from('universal_data').insert({
-            data_type: 'error_log',
-            data_key: `error_${Date.now()}`,
-            data_value: JSON.stringify({
-                message: error.message,
-                stack: error.stack,
-                url: req.originalUrl,
-                method: req.method,
-                timestamp: new Date().toISOString()
-            }),
-            metadata: {
-                type: 'server_error',
-                environment: process.env.NODE_ENV
-            }
-        }).catch(e => console.error('Failed to log error:', e));
-    } catch (logError) {
-        console.error('Failed to initialize error logging:', logError);
-    }
-
     res.status(500).json({
         success: false,
         error: process.env.NODE_ENV === 'production' 
