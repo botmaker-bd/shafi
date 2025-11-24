@@ -1,4 +1,4 @@
-// server/routes/commands.js - OPTIMIZED AND CLEANED VERSION
+// server/routes/commands.js - FIXED VERSION
 const express = require('express');
 const supabase = require('../config/supabase');
 const botManager = require('../core/bot-manager');
@@ -303,7 +303,7 @@ router.delete('/:commandId', async (req, res) => {
     }
 });
 
-// ✅ OPTIMIZED: Temporary command test (MERGED BOTH TEST ENDPOINTS)
+// Test temporary command
 router.post('/test/temp', async (req, res) => {
     try {
         const { code, botToken, testInput, waitForAnswer = false, answerHandler = '' } = req.body;
@@ -367,15 +367,24 @@ router.post('/test/temp', async (req, res) => {
         console.log(`🧪 Testing temporary command with chat ID: ${adminSettings.admin_chat_id}`);
 
         // Execute command
-        const result = await botManager.executeCommand(bot, tempCommand, testMessage, testInput);
+        try {
+            const result = await botManager.executeCommand(bot, tempCommand, testMessage, testInput);
 
-        res.json({
-            success: true,
-            message: 'Command executed successfully! Check your Telegram bot for the message.',
-            testInput: testInput,
-            chatId: adminSettings.admin_chat_id,
-            result: result
-        });
+            res.json({
+                success: true,
+                message: 'Command executed successfully! Check your Telegram bot for the message.',
+                testInput: testInput,
+                chatId: adminSettings.admin_chat_id,
+                result: result
+            });
+        } catch (executionError) {
+            res.status(400).json({
+                success: false,
+                error: 'Command execution failed: ' + executionError.message,
+                testInput: testInput,
+                chatId: adminSettings.admin_chat_id
+            });
+        }
 
     } catch (error) {
         console.error('❌ Test temp command error:', error);
@@ -454,15 +463,24 @@ router.post('/:commandId/test', async (req, res) => {
         console.log(`🧪 Testing command with chat ID: ${adminSettings.admin_chat_id}`);
 
         // Execute command
-        const result = await botManager.executeCommand(bot, command, testMessage, testInput);
+        try {
+            const result = await botManager.executeCommand(bot, command, testMessage, testInput);
 
-        res.json({
-            success: true,
-            message: 'Command executed successfully! Check your Telegram bot for the message.',
-            testInput: testInput,
-            chatId: adminSettings.admin_chat_id,
-            result: result
-        });
+            res.json({
+                success: true,
+                message: 'Command executed successfully! Check your Telegram bot for the message.',
+                testInput: testInput,
+                chatId: adminSettings.admin_chat_id,
+                result: result
+            });
+        } catch (executionError) {
+            res.status(400).json({
+                success: false,
+                error: 'Command execution failed: ' + executionError.message,
+                testInput: testInput,
+                chatId: adminSettings.admin_chat_id
+            });
+        }
 
     } catch (error) {
         console.error('❌ Test command error:', error);
@@ -488,7 +506,7 @@ router.post('/test/python', async (req, res) => {
         }
 
         // Test Python execution directly
-        const result = pythonRunner.runPythonCodeSync(code);
+        const result = await pythonRunner.runPythonCode(code);
 
         res.json({
             success: true,
