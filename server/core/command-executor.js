@@ -1,4 +1,4 @@
-// server/core/command-executor.js - COMPLETELY FIXED VERSION WITH AUTO-AWAIT
+// server/core/command-executor.js - COMPLETELY FIXED VERSION
 async function executeCommandCode(botInstance, code, context) {
     return new Promise(async (resolve, reject) => {
         try {
@@ -574,8 +574,8 @@ async function executeCommandCode(botInstance, code, context) {
                 ...messageFunctions
             };
 
-            // ✅ FIXED: AUTO-AWAIT IMPLEMENTATION
-            const executeWithAutoAwait = async (userCode) => {
+            // ✅ FIXED: PROPER AUTO-AWAIT IMPLEMENTATION
+            const applyAutoAwait = (userCode) => {
                 try {
                     console.log('🔧 Applying auto-await to user code...');
                     
@@ -590,13 +590,26 @@ async function executeCommandCode(botInstance, code, context) {
                     
                     let modifiedCode = userCode;
                     
-                    // Apply auto-await to each pattern
+                    // Apply auto-await to each pattern - FIXED REGEX
                     asyncPatterns.forEach(pattern => {
-                        const regex = new RegExp(`(\\s|^)(${pattern}[^(]+\\))`, 'g');
+                        // Handle different cases: 
+                        // 1. Standalone function calls: User.saveData(...)
+                        // 2. Assignment: const x = User.getData(...)
+                        // 3. In expressions: bot.sendMessage(...)
+                        
+                        const regex = new RegExp(
+                            `(^|\\s|;|\\{|\\})` + // Start of line, space, semicolon, or brace
+                            `(${pattern}[^(]+\\))` + // Function call
+                            `(?!\\s*=>)`, // Not followed by arrow function
+                            'g'
+                        );
+                        
                         modifiedCode = modifiedCode.replace(regex, '$1await $2');
                     });
                     
-                    console.log('✅ Auto-await applied to code');
+                    console.log('✅ Auto-await applied successfully');
+                    console.log('📝 Modified code:', modifiedCode.substring(0, 200) + '...');
+                    
                     return modifiedCode;
                     
                 } catch (error) {
@@ -605,7 +618,9 @@ async function executeCommandCode(botInstance, code, context) {
                 }
             };
 
-            // ✅ FIXED: EXECUTION FUNCTION WITH AUTO-AWAIT
+            // ✅ FIXED: EXECUTION FUNCTION WITH PROPER AUTO-AWAIT
+            const processedCode = applyAutoAwait(code);
+            
             const executionFunction = new Function(
                 'env',
                 `with(env) {
@@ -613,8 +628,8 @@ async function executeCommandCode(botInstance, code, context) {
                         try {
                             console.log('✅ Execution started for user:', currentUser.first_name);
                             
-                            // User's code starts here
-                            ${await executeWithAutoAwait(code)}
+                            // User's code starts here - ALREADY PROCESSED
+                            ${processedCode}
                             // User's code ends here
                             
                             return "Command completed successfully";
