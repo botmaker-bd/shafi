@@ -1,4 +1,4 @@
-// server/core/command-executor.js - OPTIMIZED VERSION
+// server/core/command-executor.js - COMPLETELY FIXED VERSION
 async function executeCommandCode(botInstance, code, context) {
     return new Promise(async (resolve, reject) => {
         try {
@@ -25,10 +25,15 @@ async function executeCommandCode(botInstance, code, context) {
             
             // Create ApiWrapper context
             const apiContext = {
-                msg, chatId, userId, 
-                username: username || '', first_name: first_name || '',
-                last_name: context.last_name || '', language_code: context.language_code || '',
-                botToken: resolvedBotToken, userInput, 
+                msg, 
+                chatId, 
+                userId, 
+                username: username || '', 
+                first_name: first_name || '',
+                last_name: context.last_name || '', 
+                language_code: context.language_code || '',
+                botToken: resolvedBotToken, 
+                userInput, 
                 nextCommandHandlers: nextCommandHandlers || new Map()
             };
             
@@ -36,7 +41,12 @@ async function executeCommandCode(botInstance, code, context) {
             
             // Helper functions
             const createUserObject = () => ({
-                ...(msg.from || { id: userId, first_name: first_name || '', username: username || '' }),
+                ...(msg.from || { 
+                    id: userId, 
+                    first_name: first_name || '', 
+                    username: username || '',
+                    language_code: context.language_code || 'en'
+                }),
                 chat_id: chatId
             });
 
@@ -98,7 +108,10 @@ async function executeCommandCode(botInstance, code, context) {
                             updated_at: new Date().toISOString()
                         }, { onConflict: 'data_type,bot_token,user_id,data_key' });
 
-                    if (error) throw new Error(`Failed to save data: ${error.message}`);
+                    if (error) {
+                        console.error('❌ Save data error:', error);
+                        throw new Error(`Failed to save data: ${error.message}`);
+                    }
                     return value;
                 },
                 
@@ -113,7 +126,11 @@ async function executeCommandCode(botInstance, code, context) {
                         .single();
 
                     if (error?.code === 'PGRST116') return null;
-                    if (error || !data?.data_value) return null;
+                    if (error) {
+                        console.error('❌ Get data error:', error);
+                        return null;
+                    }
+                    if (!data?.data_value) return null;
 
                     try {
                         return JSON.parse(data.data_value);
@@ -131,8 +148,18 @@ async function executeCommandCode(botInstance, code, context) {
                         .eq('user_id', userId.toString())
                         .eq('data_key', key);
 
-                    if (error) throw new Error(`Failed to delete data: ${error.message}`);
+                    if (error) {
+                        console.error('❌ Delete data error:', error);
+                        throw new Error(`Failed to delete data: ${error.message}`);
+                    }
                     return true;
+                },
+
+                increment: async (key, amount = 1) => {
+                    const current = await userDataFunctions.getData(key) || 0;
+                    const newValue = parseInt(current) + parseInt(amount);
+                    await userDataFunctions.saveData(key, newValue);
+                    return newValue;
                 }
             };
 
@@ -171,7 +198,10 @@ async function executeCommandCode(botInstance, code, context) {
                             });
                     }
 
-                    if (result.error) throw new Error(`Failed to save bot data: ${result.error.message}`);
+                    if (result.error) {
+                        console.error('❌ Save bot data error:', result.error);
+                        throw new Error(`Failed to save bot data: ${result.error.message}`);
+                    }
                     return value;
                 },
                 
@@ -185,7 +215,11 @@ async function executeCommandCode(botInstance, code, context) {
                         .single();
 
                     if (error?.code === 'PGRST116') return null;
-                    if (error || !data?.data_value) return null;
+                    if (error) {
+                        console.error('❌ Get bot data error:', error);
+                        return null;
+                    }
+                    if (!data?.data_value) return null;
 
                     try {
                         return JSON.parse(data.data_value);
@@ -195,20 +229,79 @@ async function executeCommandCode(botInstance, code, context) {
                 }
             };
 
-            // Create bot object
+            // Create bot object with ALL methods properly exposed
             const botObject = {
-                ...apiWrapperInstance,
-                metaData: extractMetadata,
-                metadata: extractMetadata,
-                getMeta: extractMetadata,
-                inspect: extractMetadata,
-                wait: wait,
-                delay: wait,
-                sleep: wait,
-                runPython: runPythonSync,
+                // Core Telegram methods
+                sendMessage: (text, options) => apiWrapperInstance.sendMessage(text, options),
+                sendPhoto: (photo, options) => apiWrapperInstance.sendPhoto(photo, options),
+                sendDocument: (document, options) => apiWrapperInstance.sendDocument(document, options),
+                sendVideo: (video, options) => apiWrapperInstance.sendVideo(video, options),
+                sendAudio: (audio, options) => apiWrapperInstance.sendAudio(audio, options),
+                sendVoice: (voice, options) => apiWrapperInstance.sendVoice(voice, options),
+                sendLocation: (latitude, longitude, options) => apiWrapperInstance.sendLocation(latitude, longitude, options),
+                sendVenue: (latitude, longitude, title, address, options) => apiWrapperInstance.sendVenue(latitude, longitude, title, address, options),
+                sendContact: (phoneNumber, firstName, options) => apiWrapperInstance.sendContact(phoneNumber, firstName, options),
+                sendPoll: (question, options, pollOptions) => apiWrapperInstance.sendPoll(question, options, pollOptions),
+                sendDice: (options) => apiWrapperInstance.sendDice(options),
+                sendSticker: (sticker, options) => apiWrapperInstance.sendSticker(sticker, options),
+                sendChatAction: (action) => apiWrapperInstance.sendChatAction(action),
+                sendMediaGroup: (media) => apiWrapperInstance.sendMediaGroup(media),
+                forwardMessage: (fromChatId, messageId) => apiWrapperInstance.forwardMessage(fromChatId, messageId),
+                copyMessage: (fromChatId, messageId) => apiWrapperInstance.copyMessage(fromChatId, messageId),
+                deleteMessage: (messageId) => apiWrapperInstance.deleteMessage(messageId),
+                
+                // Chat methods
+                getChat: () => apiWrapperInstance.getChat(),
+                getChatAdministrators: () => apiWrapperInstance.getChatAdministrators(),
+                getChatMemberCount: () => apiWrapperInstance.getChatMemberCount(),
+                getChatMember: (userId) => apiWrapperInstance.getChatMember(userId),
+                getMe: () => apiWrapperInstance.getMe(),
+                setChatTitle: (title) => apiWrapperInstance.setChatTitle(title),
+                banChatMember: (userId) => apiWrapperInstance.banChatMember(userId),
+                unbanChatMember: (userId) => apiWrapperInstance.unbanChatMember(userId),
+                
+                // Enhanced methods
+                send: (text, options) => apiWrapperInstance.send(text, options),
+                reply: (text, options) => apiWrapperInstance.reply(text, options),
+                sendImage: (photo, caption, options) => apiWrapperInstance.sendImage(photo, caption, options),
+                sendFile: (document, caption, options) => apiWrapperInstance.sendFile(document, caption, options),
+                sendVideoFile: (video, caption, options) => apiWrapperInstance.sendVideoFile(video, caption, options),
+                sendAudioFile: (audio, caption, options) => apiWrapperInstance.sendAudioFile(audio, caption, options),
+                sendVoiceMessage: (voice, caption, options) => apiWrapperInstance.sendVoiceMessage(voice, caption, options),
+                sendLocationMsg: (latitude, longitude, options) => apiWrapperInstance.sendLocationMsg(latitude, longitude, options),
+                sendVenueMsg: (latitude, longitude, title, address, options) => apiWrapperInstance.sendVenueMsg(latitude, longitude, title, address, options),
+                sendContactMsg: (phoneNumber, firstName, options) => apiWrapperInstance.sendContactMsg(phoneNumber, firstName, options),
+                sendKeyboard: (text, buttons, options) => apiWrapperInstance.sendKeyboard(text, buttons, options),
+                sendReplyKeyboard: (text, buttons, options) => apiWrapperInstance.sendReplyKeyboard(text, buttons, options),
+                removeKeyboard: (text, options) => apiWrapperInstance.removeKeyboard(text, options),
+                sendPollMsg: (question, options, pollOptions) => apiWrapperInstance.sendPollMsg(question, options, pollOptions),
+                sendQuiz: (question, options, correctOptionId, quizOptions) => apiWrapperInstance.sendQuiz(question, options, correctOptionId, quizOptions),
+                sendDiceMsg: (emoji, options) => apiWrapperInstance.sendDiceMsg(emoji, options),
+                sendMarkdown: (text, options) => apiWrapperInstance.sendMarkdown(text, options),
+                replyMarkdown: (text, options) => apiWrapperInstance.replyMarkdown(text, options),
+                
+                // Utility methods
+                wait: apiWrapperInstance.wait,
+                waitForAnswer: apiWrapperInstance.waitForAnswer,
+                ask: apiWrapperInstance.ask,
+                runPython: apiWrapperInstance.runPython,
                 executePython: runPythonSync,
-                waitForAnswer: waitForAnswer,
-                ask: waitForAnswer
+                
+                // Metadata methods
+                metaData: apiWrapperInstance.metaData,
+                metadata: apiWrapperInstance.metadata,
+                getMeta: apiWrapperInstance.getMeta,
+                inspect: apiWrapperInstance.inspect,
+                getOriginalResponse: apiWrapperInstance.getOriginalResponse,
+                analyzeContext: apiWrapperInstance.analyzeContext,
+                getContext: apiWrapperInstance.getContext,
+                
+                // User methods
+                getUser: apiWrapperInstance.getUser,
+                getCurrentUser: createUserObject,
+                
+                // Markdown utility
+                escapeMarkdown: apiWrapperInstance.escapeMarkdown
             };
 
             // Execution environment
@@ -217,7 +310,7 @@ async function executeCommandCode(botInstance, code, context) {
                 getUser: createUserObject,
                 getCurrentUser: createUserObject,
                 
-                // Bot instances
+                // Bot instances - ALL variations
                 Bot: botObject,
                 bot: botObject,
                 api: botObject,
@@ -225,28 +318,38 @@ async function executeCommandCode(botInstance, code, context) {
                 API: botObject,
                 
                 // Context data
-                msg, chatId, userId, userInput, botToken: resolvedBotToken,
+                msg, 
+                chatId, 
+                userId, 
+                userInput, 
+                botToken: resolvedBotToken,
                 params: userInput ? userInput.split(' ').slice(1).filter(p => p.trim() !== '') : [],
                 
                 // Utility functions
-                wait, delay: wait, sleep: wait,
-                runPython: runPythonSync, executePython: runPythonSync,
-                waitForAnswer, ask: waitForAnswer,
+                wait, 
+                delay: wait, 
+                sleep: wait,
+                runPython: runPythonSync, 
+                executePython: runPythonSync,
+                waitForAnswer, 
+                ask: waitForAnswer,
                 
                 // Metadata functions
-                metaData: extractMetadata, metadata: extractMetadata,
-                getMeta: extractMetadata, inspect: extractMetadata,
+                metaData: extractMetadata, 
+                metadata: extractMetadata,
+                getMeta: extractMetadata, 
+                inspect: extractMetadata,
                 
                 // Data storage
                 User: userDataFunctions,
                 BotData: botDataFunctions,
                 
-                // Direct message functions
+                // Direct message functions (legacy support)
                 sendMessage: (text, options) => botInstance.sendMessage(chatId, text, options),
                 send: (text, options) => botInstance.sendMessage(chatId, text, options)
             };
 
-            // Execute with auto-await
+            // Execute with auto-await and proper error handling
             const executeWithAutoAwait = async (userCode, env) => {
                 try {
                     // Process code for auto-await
@@ -263,7 +366,14 @@ async function executeCommandCode(botInstance, code, context) {
                         UserGet: async (key) => await env.User.getData(key),
                         BotDataSave: async (key, value) => await env.BotData.saveData(key, value),
                         BotDataGet: async (key) => await env.BotData.getData(key),
-                        BotSend: async (text, options) => await botInstance.sendMessage(env.chatId, text, options)
+                        BotSend: async (text, options) => {
+                            try {
+                                return await botInstance.sendMessage(env.chatId, text, options);
+                            } catch (error) {
+                                console.error('❌ BotSend error:', error);
+                                throw error;
+                            }
+                        }
                     };
 
                     const enhancedEnv = { ...env, __autoAwait: autoAwaitWrapper };
@@ -276,9 +386,12 @@ async function executeCommandCode(botInstance, code, context) {
                                     ${processedCode}
                                     return "Command executed successfully";
                                 } catch (error) {
+                                    console.error('❌ Command execution error:', error);
                                     try {
                                         await env.bot.sendMessage(env.chatId, "❌ Error: " + error.message);
-                                    } catch (sendError) {}
+                                    } catch (sendError) {
+                                        console.error('❌ Failed to send error message:', sendError);
+                                    }
                                     throw error;
                                 }
                             })();
@@ -288,15 +401,19 @@ async function executeCommandCode(botInstance, code, context) {
                     return await executionFunction(enhancedEnv);
                     
                 } catch (error) {
+                    console.error('❌ Auto-await execution error:', error);
                     throw error;
                 }
             };
 
             // Execute command
+            console.log('🔧 Executing command code...');
             const result = await executeWithAutoAwait(code, executionEnv);
+            console.log('✅ Command executed successfully');
             resolve(result);
 
         } catch (error) {
+            console.error('❌ Command executor error:', error);
             reject(error);
         }
     });
