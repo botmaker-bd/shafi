@@ -5,8 +5,8 @@ services:
     env: node
     plan: free
     buildCommand: |
-      npm install
-      npm audit fix --force
+      npm install --legacy-peer-deps
+      npm audit fix --force --legacy-peer-deps
       chmod +x scripts/setup-python-env.sh
       ./scripts/setup-python-env.sh
     startCommand: npm run render-start
