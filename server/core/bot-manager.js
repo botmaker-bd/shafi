@@ -124,9 +124,8 @@ class BotManager {
         }
     }
 
-    // ✅ FIXED: CONTEXT CREATION
+    // ✅ FIXED: CONTEXT CREATION - ALL MISSING FUNCTIONS ADDED
     createExecutionContext(bot, command, msg, userInput) {
-        // ✅ FIX: Ensure botToken is properly passed
         const botToken = command.bot_token;
         
         if (!botToken) {
@@ -140,7 +139,111 @@ class BotManager {
         
         console.log(`🔧 Creating context for bot: ${botToken?.substring(0, 10)}...`);
         
-        const self = this; // Store reference for callbacks
+        const self = this;
+
+        // ✅ ADDED: Missing helper functions
+        const createUserObjectFunction = () => {
+            const userObj = msg.from ? Object.assign({}, msg.from) : {
+                id: msg.from.id,
+                first_name: msg.from.first_name || '',
+                username: msg.from.username || '',
+                language_code: msg.from.language_code || ''
+            };
+            userObj.chat_id = msg.chat.id;
+            return userObj;
+        };
+
+        const createChatObjectFunction = () => {
+            const chatObj = msg.chat ? Object.assign({}, msg.chat) : {
+                id: msg.chat.id,
+                type: 'private',
+                first_name: msg.from.first_name || '',
+                username: msg.from.username || ''
+            };
+            return chatObj;
+        };
+
+        const waitFunction = async (ms) => {
+            console.log(`⏰ Waiting for ${ms}ms...`);
+            return new Promise(resolve => setTimeout(() => {
+                console.log(`✅ Wait completed: ${ms}ms`);
+                resolve(`Waited ${ms}ms`);
+            }, ms));
+        };
+
+        const runPythonSyncFunction = async (code) => {
+            try {
+                console.log('🐍 Executing Python code from command...');
+                const result = await pythonRunner.runPythonCode(code);
+                return result;
+            } catch (error) {
+                console.error('❌ Python execution error:', error);
+                throw error;
+            }
+        };
+
+        const waitForAnswerFunction = async (question, options = {}) => {
+            return new Promise(async (resolve, reject) => {
+                try {
+                    const timeout = options.timeout || 60000;
+                    const nextCommandKey = `${botToken}_${msg.from.id}`;
+                    
+                    console.log(`⏳ Setting up waitForAnswer for user: ${msg.from.id}`);
+                    
+                    // Clear existing handler
+                    if (this.nextCommandHandlers.has(nextCommandKey)) {
+                        this.nextCommandHandlers.delete(nextCommandKey);
+                    }
+
+                    const timeoutId = setTimeout(() => {
+                        if (this.nextCommandHandlers.has(nextCommandKey)) {
+                            this.nextCommandHandlers.delete(nextCommandKey);
+                        }
+                        reject(new Error(`Wait for answer timeout (${timeout/1000} seconds)`));
+                    }, timeout);
+
+                    // Send question to user
+                    console.log(`📤 Sending question to user ${msg.from.id}: "${question}"`);
+                    await bot.sendMessage(msg.chat.id, question, {
+                        parse_mode: 'HTML',
+                        ...options
+                    });
+                    
+                    console.log(`✅ Question sent, waiting for answer from user: ${msg.from.id}`);
+                    
+                    // Set up the waiting state
+                    const waitingPromise = new Promise((innerResolve, innerReject) => {
+                        // Store the resolve function
+                        if (!this.nextCommandHandlers) {
+                            this.nextCommandHandlers = new Map();
+                        }
+                        
+                        this.nextCommandHandlers.set(nextCommandKey, {
+                            resolve: innerResolve,
+                            reject: innerReject,
+                            timeoutId: timeoutId,
+                            timestamp: Date.now(),
+                            bot: bot
+                        });
+                    });
+
+                    // Wait for user's response
+                    const userResponse = await waitingPromise;
+                    
+                    console.log(`🎉 Received answer from user: "${userResponse}"`);
+                    resolve({
+                        text: userResponse,
+                        userId: msg.from.id,
+                        chatId: msg.chat.id,
+                        timestamp: new Date().toISOString()
+                    });
+                    
+                } catch (error) {
+                    console.error(`❌ waitForAnswer failed:`, error);
+                    reject(new Error(`Failed to wait for answer: ${error.message}`));
+                }
+            });
+        };
         
         return {
             msg: msg,
@@ -156,6 +259,19 @@ class BotManager {
             waitingAnswers: this.waitingAnswers,
             commandAnswerHandlers: this.commandAnswerHandlers,
             callbackHandlers: this.callbackHandlers,
+            
+            // ✅ ADDED: Missing functions to context
+            getUser: createUserObjectFunction,
+            getChat: createChatObjectFunction,
+            getCurrentUser: createUserObjectFunction,
+            getCurrentChat: createChatObjectFunction,
+            wait: waitFunction,
+            delay: waitFunction,
+            sleep: waitFunction,
+            runPython: runPythonSyncFunction,
+            executePython: runPythonSyncFunction,
+            waitForAnswer: waitForAnswerFunction,
+            ask: waitForAnswerFunction,
             
             User: {
                 saveData: (key, value) => {
@@ -198,6 +314,56 @@ class BotManager {
                     const newValue = parseInt(current) + amount;
                     this.User.saveData(key, newValue);
                     return newValue;
+                },
+
+                getAllData: async () => {
+                    try {
+                        const { data, error } = await supabase
+                            .from('universal_data')
+                            .select('data_key, data_value')
+                            .eq('data_type', 'user_data')
+                            .eq('bot_token', botToken)
+                            .eq('user_id', msg.from.id.toString());
+
+                        if (error) return {};
+
+                        const result = {};
+                        for (const item of data || []) {
+                            try {
+                                result[item.data_key] = JSON.parse(item.data_value);
+                            } catch {
+                                result[item.data_key] = item.data_value;
+                            }
+                        }
+                        return result;
+                    } catch (error) {
+                        console.error('❌ Get all data error:', error);
+                        return {};
+                    }
+                },
+
+                clearAll: async () => {
+                    try {
+                        const { error } = await supabase
+                            .from('universal_data')
+                            .delete()
+                            .eq('data_type', 'user_data')
+                            .eq('bot_token', botToken)
+                            .eq('user_id', msg.from.id.toString());
+
+                        if (error) throw error;
+                        
+                        // Clear cache
+                        const cacheKeys = Array.from(self.dataCache.keys()).filter(key => 
+                            key.startsWith(`${botToken}_${msg.from.id}_`)
+                        );
+                        cacheKeys.forEach(key => self.dataCache.delete(key));
+                        
+                        return true;
+                    } catch (error) {
+                        console.error('❌ Clear all data error:', error);
+                        throw error;
+                    }
                 }
             },
             
@@ -229,7 +395,13 @@ class BotManager {
                     
                     return true;
                 }
-            }
+            },
+
+            // ✅ ADDED: Data objects for direct access
+            userData: createUserObjectFunction(),
+            chatData: createChatObjectFunction(),
+            currentUser: createUserObjectFunction(),
+            currentChat: createChatObjectFunction()
         };
     }
 
