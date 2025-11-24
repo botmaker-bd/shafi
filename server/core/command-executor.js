@@ -1,4 +1,4 @@
-// server/core/command-executor.js - UPDATED BotData → Bot
+// server/core/command-executor.js - COMPLETELY FIXED
 const CodeTransformer = require('./code-transformer');
 
 async function executeCommandCode(botInstance, code, context) {
@@ -60,7 +60,7 @@ async function executeCommandCode(botInstance, code, context) {
       // Create ApiWrapper instance
       const apiWrapperInstance = new ApiWrapper(botInstance, apiContext);
 
-      // Helper functions
+      // ✅ FIXED: Helper functions - createChatObjectFunction যোগ করুন
       const createUserObjectFunction = () => {
         const userObj = msg.from ? Object.assign({}, msg.from) : {
           id: userId,
@@ -72,7 +72,73 @@ async function executeCommandCode(botInstance, code, context) {
         return userObj;
       };
 
-      // Data storage functions - 🔥 BotData → Bot
+      // ✅ FIXED: createChatObjectFunction যোগ করুন
+      const createChatObjectFunction = () => {
+        const chatObj = msg.chat ? Object.assign({}, msg.chat) : {
+          id: chatId,
+          type: 'private'
+        };
+        return chatObj;
+      };
+
+      // ✅ FIXED: Python runner function
+      const runPythonSyncFunction = (pythonCode) => {
+        try {
+          return pythonRunner.runPythonCodeSync(pythonCode);
+        } catch (error) {
+          throw new Error(`Python Error: ${error.message}`);
+        }
+      };
+
+      // ✅ FIXED: Wait for answer function
+      const waitForAnswerFunction = async (question, options = {}) => {
+        return new Promise((resolveWait, rejectWait) => {
+          try {
+            const waitKey = `${resolvedBotToken}_${userId}`;
+            console.log(`⏳ Setting up waitForAnswer for user ${userId}`);
+
+            botInstance.sendMessage(chatId, question, options)
+              .then(() => {
+                if (nextCommandHandlers) {
+                  nextCommandHandlers.set(waitKey, {
+                    resolve: resolveWait,
+                    reject: rejectWait,
+                    timestamp: Date.now()
+                  });
+
+                  setTimeout(() => {
+                    if (nextCommandHandlers.has(waitKey)) {
+                      const handler = nextCommandHandlers.get(waitKey);
+                      if (handler && handler.reject) {
+                        handler.reject(new Error('Wait for answer timeout (5 minutes)'));
+                      }
+                      nextCommandHandlers.delete(waitKey);
+                    }
+                  }, 5 * 60 * 1000);
+                }
+              })
+              .catch(sendError => {
+                rejectWait(new Error('Failed to send question: ' + sendError.message));
+              });
+          } catch (error) {
+            rejectWait(new Error('WaitForAnswer setup failed: ' + error.message));
+          }
+        });
+      };
+
+      // ✅ FIXED: Wait function (in seconds)
+      const waitFunction = (seconds) => {
+        const ms = seconds * 1000;
+        console.log(`⏰ Waiting for ${seconds} seconds...`);
+        return new Promise(resolveWait => {
+          setTimeout(() => {
+            console.log(`✅ Wait completed: ${seconds} seconds`);
+            resolveWait(`Waited ${seconds} seconds`);
+          }, ms);
+        });
+      };
+
+      // ✅ FIXED: Data storage functions - BotData → Bot
       const userDataFunctions = {
         getData: async (key) => {
           try {
@@ -205,7 +271,7 @@ async function executeCommandCode(botInstance, code, context) {
         }
       };
 
-      // 🔥 BotData → Bot renamed
+      // ✅ FIXED: BotData → Bot renamed
       const botDataFunctions = {
         getData: async (key) => {
           try {
@@ -279,7 +345,7 @@ async function executeCommandCode(botInstance, code, context) {
         }
       };
 
-      // Create bot object with all methods - 🔥 BotData → Bot
+      // ✅ FIXED: Create bot object with all methods - BotData → Bot
       const createBotObject = () => {
         const botObj = {
           ...apiWrapperInstance,
@@ -291,7 +357,7 @@ async function executeCommandCode(botInstance, code, context) {
 
       const botObject = createBotObject();
 
-      // Create execution environment - 🔥 BotData → Bot
+      // ✅ FIXED: Create execution environment - BotData → Bot
       const executionEnv = {
         // Core functions
         getUser: createUserObjectFunction,
@@ -338,7 +404,7 @@ async function executeCommandCode(botInstance, code, context) {
         currentChat: createChatObjectFunction()
       };
 
-      // Add direct message functions
+      // ✅ FIXED: Add direct message functions
       Object.assign(executionEnv, {
         sendMessage: (text, options) => botInstance.sendMessage(chatId, text, options),
         send: (text, options) => botInstance.sendMessage(chatId, text, options),
@@ -355,7 +421,7 @@ async function executeCommandCode(botInstance, code, context) {
         sendContact: (phoneNumber, firstName, options) => botInstance.sendContact(chatId, phoneNumber, firstName, options)
       });
 
-      // Create execution function with transformed code
+      // ✅ FIXED: Create execution function with transformed code
       const executionFunction = new Function('env', `
         return (async function() {
           try {
@@ -366,7 +432,7 @@ async function executeCommandCode(botInstance, code, context) {
             var api = env.api;
             var API = env.API;
             var User = env.User;
-            var BotData = env.BotData;
+            var Bot = env.Bot; // 🔥 Bot for data storage
             var msg = env.msg;
             var chatId = env.chatId;
             var userId = env.userId;
