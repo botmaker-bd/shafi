@@ -1,9 +1,10 @@
-// server/core/api-wrapper.js - OPTIMIZED VERSION
+// server/core/api-wrapper.js - COMPLETELY FIXED VERSION
 class ApiWrapper {
     constructor(bot, context) {
         this.bot = bot;
         this.context = context;
         this.setupAllMethods();
+        this.setupEnhancedMethods();
     }
 
     setupAllMethods() {
@@ -37,8 +38,6 @@ class ApiWrapper {
                     }
                 };
             });
-
-        this.setupEnhancedMethods();
     }
 
     setupEnhancedMethods() {
@@ -168,26 +167,56 @@ class ApiWrapper {
             return await pythonRunner.runPythonCode(code);
         };
 
-        // Metadata inspection
-        this.getMeta = async (target = 'all') => {
+        // ✅ FIXED: METADATA INSPECTION METHODS
+        this.getOriginalResponse = async (target = 'all') => {
             try {
                 let response;
+
                 switch (target.toLowerCase()) {
                     case 'chat': case 'channel': case 'group':
                         response = await this.bot.getChat(this.context.chatId);
                         break;
+
                     case 'user': case 'userinfo':
-                        response = this.context.msg?.from || 
-                                  await this.bot.getChatMember(this.context.chatId, this.context.userId);
+                        if (this.context.msg?.from) {
+                            response = this.context.msg.from;
+                        } else {
+                            response = await this.bot.getChatMember(this.context.chatId, this.context.userId);
+                        }
                         break;
+
                     case 'bot': case 'botinfo':
                         response = await this.bot.getMe();
                         break;
+
                     case 'update': case 'context':
                         response = this.context.msg || this.context;
                         break;
+
+                    case 'all': case 'everything':
+                        const [chat, user, bot, update] = await Promise.all([
+                            this.bot.getChat(this.context.chatId).catch(() => null),
+                            this.bot.getChatMember(this.context.chatId, this.context.userId).catch(() => this.context.msg?.from),
+                            this.bot.getMe().catch(() => null),
+                            this.context.msg || this.context
+                        ]);
+                        response = { chat, user, bot, update };
+                        break;
+
                     default:
-                        response = await this.bot.getChat(this.context.chatId);
+                        if (typeof target === 'number' || target.startsWith('@')) {
+                            if (typeof target === 'number') {
+                                if (target > 0) {
+                                    response = await this.bot.getChatMember(this.context.chatId, target);
+                                } else {
+                                    response = await this.bot.getChat(target);
+                                }
+                            } else {
+                                response = { username: target.substring(1), note: 'Username resolution not implemented' };
+                            }
+                        } else {
+                            response = await this.bot.getChat(this.context.chatId);
+                        }
                 }
 
                 return {
@@ -197,6 +226,7 @@ class ApiWrapper {
                     data: response,
                     timestamp: new Date().toISOString()
                 };
+
             } catch (error) {
                 return {
                     success: false,
@@ -208,10 +238,28 @@ class ApiWrapper {
             }
         };
 
-        // Aliases for metadata
-        this.metaData = this.getMeta;
-        this.metadata = this.getMeta;
-        this.inspect = this.getMeta;
+        // ✅ FIXED: ALIASES FOR METADATA METHODS
+        this.metaData = this.getOriginalResponse;
+        this.metadata = this.getOriginalResponse;
+        this.getMeta = this.getOriginalResponse;
+        this.inspect = this.getOriginalResponse;
+
+        // Context analysis
+        this.analyzeContext = () => ({
+            user: this.getUser(),
+            chat: this.context.msg?.chat || { id: this.context.chatId, type: 'private' },
+            message: this.context.msg,
+            bot: {
+                token: this.context.botToken?.substring(0, 10) + '...',
+                chatId: this.context.chatId,
+                userId: this.context.userId
+            },
+            input: this.context.userInput,
+            params: this.context.userInput ? this.context.userInput.split(' ').slice(1).filter(p => p.trim() !== '') : [],
+            timestamp: new Date().toISOString()
+        });
+
+        this.getContext = this.analyzeContext;
     }
 }
 
