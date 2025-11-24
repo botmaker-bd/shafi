@@ -1,4 +1,4 @@
-// server/core/command-executor.js - FIXED VERSION WITH AUTO AWAIT
+// server/core/command-executor.js - FIXED AUTO AWAIT VERSION
 async function executeCommandCode(botInstance, code, context) {
     return new Promise(async (resolve, reject) => {
         try {
@@ -545,8 +545,8 @@ async function executeCommandCode(botInstance, code, context) {
                 ...messageFunctions
             };
 
-            // ✅ NEW: AUTO AWAIT FUNCTION - Automatically adds await to async calls
-            const autoAwaitFunction = new Function(
+            // ✅ FIXED: SIMPLIFIED AUTO AWAIT FUNCTION
+            const executionFunction = new Function(
                 'env',
                 `return (async function() {
                     try {
@@ -613,54 +613,40 @@ async function executeCommandCode(botInstance, code, context) {
                         console.log('✅ Execution started for user:', currentUser.first_name);
                         console.log('🔍 Available Bot methods:', Object.keys(Bot).length);
                         
-                        // ✅ AUTO AWAIT HELPER FUNCTION
-                        const autoAwait = async (line) => {
-                            // Check if line contains async operations
+                        // ✅ SIMPLIFIED AUTO AWAIT - Process code before execution
+                        const processCodeWithAutoAwait = (code) => {
                             const asyncPatterns = [
+                                // User data operations
                                 /User\\.(saveData|getData|deleteData|increment|getAllData|clearAll)/,
+                                // Bot data operations  
                                 /BotData\\.(saveData|getData|deleteData)/,
+                                // Wait functions
                                 /waitForAnswer|ask|wait|delay|sleep/,
+                                // Send message functions
                                 /sendMessage|send|reply|sendPhoto|sendDocument|sendVideo|sendAudio|sendVoice|sendLocation|sendContact/,
+                                // Metadata functions
                                 /metaData|metadata|getMeta|inspect/,
+                                // Python functions
                                 /runPython|executePython/
                             ];
                             
-                            for (const pattern of asyncPatterns) {
-                                if (pattern.test(line)) {
-                                    // Check if await is already present
-                                    if (!line.trim().startsWith('await ') && !line.trim().startsWith('const ') && !line.trim().startsWith('let ') && !line.trim().startsWith('var ')) {
-                                        return 'await ' + line;
+                            return code.replace(/(\\w+\\.[^(]+\\([^)]*\\))/g, (match) => {
+                                for (const pattern of asyncPatterns) {
+                                    if (pattern.test(match)) {
+                                        // Check if await is already present
+                                        if (!match.startsWith('await ')) {
+                                            return 'await ' + match;
+                                        }
+                                        break;
                                     }
-                                    break;
                                 }
-                            }
-                            return line;
+                                return match;
+                            });
                         };
                         
-                        // Process user code line by line
-                        const userCode = \`${code}\`;
-                        const lines = userCode.split('\\n');
-                        let processedCode = '';
-                        
-                        for (let line of lines) {
-                            const trimmedLine = line.trim();
-                            
-                            // Skip empty lines and comments
-                            if (!trimmedLine || trimmedLine.startsWith('//')) {
-                                processedCode += line + '\\n';
-                                continue;
-                            }
-                            
-                            // Process the line with auto await
-                            const processedLine = await autoAwait(trimmedLine);
-                            processedCode += (processedLine !== trimmedLine ? '    ' + processedLine : line) + '\\n';
-                        }
-                        
-                        console.log('🔧 Processed code with auto await:');
-                        console.log(processedCode);
-                        
-                        // Execute the processed code
-                        eval(processedCode);
+                        // User's code starts here - WITH AUTO AWAIT
+                        ${processCodeWithAutoAwait(code)}
+                        // User's code ends here
                         
                         return "Command completed successfully";
                     } catch (error) {
@@ -698,7 +684,7 @@ async function executeCommandCode(botInstance, code, context) {
 
             // Execute the command
             console.log('🚀 Executing command with auto await...');
-            const result = await autoAwaitFunction(mergedEnvironment);
+            const result = await executionFunction(mergedEnvironment);
             
             console.log('✅ Command execution completed');
             resolve(result);
@@ -708,6 +694,54 @@ async function executeCommandCode(botInstance, code, context) {
             reject(error);
         }
     });
+}
+
+// ✅ HELPER FUNCTION: Process code with auto await
+function processCodeWithAutoAwait(code) {
+    const asyncPatterns = [
+        // User data operations
+        /User\.(saveData|getData|deleteData|increment|getAllData|clearAll)/,
+        // Bot data operations  
+        /BotData\.(saveData|getData|deleteData)/,
+        // Wait functions
+        /waitForAnswer|ask|wait|delay|sleep/,
+        // Send message functions
+        /sendMessage|send|reply|sendPhoto|sendDocument|sendVideo|sendAudio|sendVoice|sendLocation|sendContact/,
+        // Metadata functions
+        /metaData|metadata|getMeta|inspect/,
+        // Python functions
+        /runPython|executePython/
+    ];
+    
+    let processedCode = code;
+    
+    // Process each line
+    const lines = code.split('\n');
+    let resultLines = [];
+    
+    for (let line of lines) {
+        let processedLine = line;
+        
+        // Check if line contains async operations (but not variable declarations)
+        if (line.trim() && 
+            !line.trim().startsWith('//') && 
+            !line.trim().startsWith('const ') && 
+            !line.trim().startsWith('let ') && 
+            !line.trim().startsWith('var ') &&
+            !line.trim().startsWith('await ')) {
+            
+            for (const pattern of asyncPatterns) {
+                if (pattern.test(line)) {
+                    processedLine = 'await ' + line;
+                    break;
+                }
+            }
+        }
+        
+        resultLines.push(processedLine);
+    }
+    
+    return resultLines.join('\n');
 }
 
 module.exports = { executeCommandCode };
