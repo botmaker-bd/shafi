@@ -32,10 +32,15 @@
     "nodemon": "^3.0.1"
   },
   "engines": {
-    "node": "18.20.4",
-    "npm": "10.7.0"
+    "node": "20.18.0",
+    "npm": "10.8.2"
   },
   "overrides": {
-    "axios": "^1.6.0"
+    "@supabase/auth-js": {
+      "node": ">=18.0.0"
+    },
+    "@supabase/supabase-js": {
+      "node": ">=18.0.0"
+    }
   }
 }
