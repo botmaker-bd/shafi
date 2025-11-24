@@ -1,4 +1,4 @@
-// server/core/code-transformer.js
+// server/core/code-transformer.js - UPDATED
 const parser = require('@babel/parser');
 const traverse = require('@babel/traverse').default;
 const generate = require('@babel/generator').default;
@@ -8,7 +8,7 @@ class CodeTransformer {
   static asyncMethods = [
     'User.getData', 'User.saveData', 'User.deleteData', 'User.increment',
     'User.getAllData', 'User.clearAll',
-    'BotData.getData', 'BotData.saveData', 'BotData.deleteData',
+    'Bot.getData', 'Bot.saveData', 'Bot.deleteData', // 🔥 BotData → Bot
     'wait', 'delay', 'sleep', 'waitForAnswer', 'ask',
     'runPython', 'executePython'
   ];
@@ -41,7 +41,7 @@ class CodeTransformer {
   static simpleTransform(code) {
     let transformed = code;
     
-    // Transform User and BotData methods
+    // Transform User and Bot methods
     this.asyncMethods.forEach(method => {
       const regex = new RegExp(`(\\b${method}\\s*\\()`, 'g');
       transformed = transformed.replace(regex, `await $1`);
@@ -61,6 +61,9 @@ class CodeTransformer {
         transformed = transformed.replace(pattern, `await $1`);
       });
     });
+
+    // 🔥 BotData → Bot transformation
+    transformed = transformed.replace(/\bBotData\./g, 'Bot.');
     
     return transformed;
   }
@@ -84,14 +87,14 @@ class CodeTransformer {
         let shouldAddAwait = false;
         let methodName = '';
 
-        // Case 1: Member expressions like User.getData(), bot.sendMessage()
+        // Case 1: Member expressions like User.getData(), Bot.getData()
         if (t.isMemberExpression(node.callee)) {
           const objectName = node.callee.object.name;
           const propertyName = node.callee.property.name;
           
           methodName = `${objectName}.${propertyName}`;
           
-          // Check User/BotData methods
+          // Check User/Bot methods
           if (CodeTransformer.asyncMethods.includes(methodName)) {
             shouldAddAwait = true;
           }
@@ -100,6 +103,12 @@ class CodeTransformer {
           if (['bot', 'Bot', 'api', 'Api', 'API'].includes(objectName) && 
               CodeTransformer.botMethods.includes(propertyName)) {
             shouldAddAwait = true;
+          }
+
+          // 🔥 BotData → Bot transformation in AST
+          if (objectName === 'BotData') {
+            node.callee.object.name = 'Bot';
+            console.log(`🔧 Transformed BotData → Bot for method: ${propertyName}`);
           }
         }
         
@@ -115,6 +124,15 @@ class CodeTransformer {
         if (shouldAddAwait) {
           console.log(`🔧 Auto-await added for: ${methodName}`);
           path.replaceWith(t.awaitExpression(node));
+        }
+      },
+
+      // 🔥 Additional: Transform BotData in MemberExpressions (not just calls)
+      MemberExpression(path) {
+        const { node } = path;
+        if (t.isIdentifier(node.object) && node.object.name === 'BotData') {
+          node.object.name = 'Bot';
+          console.log('🔧 Transformed BotData → Bot in member expression');
         }
       }
     });
@@ -140,10 +158,9 @@ class CodeTransformer {
 if (require.main === module) {
   const testCode = `
 const name = User.getData('user_name');
+const config = BotData.getData('bot_config');
+BotData.saveData('settings', {theme: 'dark'});
 bot.sendMessage('Hello ' + name);
-Bot.saveData('last_used', new Date());
-wait(1000);
-runPython('2+2');
   `;
   
   CodeTransformer.testTransformation(testCode);
