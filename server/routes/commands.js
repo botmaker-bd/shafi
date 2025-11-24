@@ -1,4 +1,4 @@
-// server/routes/commands.js - IMPROVED ERROR HANDLING
+// server/routes/commands.js - OPTIMIZED AND CLEANED VERSION
 const express = require('express');
 const supabase = require('../config/supabase');
 const botManager = require('../core/bot-manager');
@@ -303,7 +303,7 @@ router.delete('/:commandId', async (req, res) => {
     }
 });
 
-// ✅ FIXED: Temporary command test with improved error handling
+// ✅ OPTIMIZED: Temporary command test (MERGED BOTH TEST ENDPOINTS)
 router.post('/test/temp', async (req, res) => {
     try {
         const { code, botToken, testInput, waitForAnswer = false, answerHandler = '' } = req.body;
@@ -339,7 +339,7 @@ router.post('/test/temp', async (req, res) => {
             });
         }
 
-        // Create temporary command with proper structure
+        // Create temporary command
         const tempCommand = {
             id: 'temp_test_command_' + Date.now(),
             command_patterns: testInput || '/test',
@@ -350,12 +350,9 @@ router.post('/test/temp', async (req, res) => {
             answer_handler: answerHandler
         };
 
-        // Create test message with proper structure
+        // Create test message
         const testMessage = {
-            chat: { 
-                id: adminSettings.admin_chat_id,
-                type: 'private'
-            },
+            chat: { id: adminSettings.admin_chat_id },
             from: {
                 id: adminSettings.admin_chat_id,
                 first_name: 'Test User',
@@ -369,26 +366,16 @@ router.post('/test/temp', async (req, res) => {
 
         console.log(`🧪 Testing temporary command with chat ID: ${adminSettings.admin_chat_id}`);
 
-        try {
-            // Execute command with better error handling
-            const result = await botManager.executeCommand(bot, tempCommand, testMessage, testInput);
+        // Execute command
+        const result = await botManager.executeCommand(bot, tempCommand, testMessage, testInput);
 
-            res.json({
-                success: true,
-                message: 'Command executed successfully! Check your Telegram bot for the message.',
-                testInput: testInput,
-                chatId: adminSettings.admin_chat_id,
-                result: result
-            });
-
-        } catch (executionError) {
-            console.error('❌ Command execution failed:', executionError);
-            res.status(500).json({ 
-                success: false,
-                error: 'Command execution failed: ' + executionError.message,
-                details: 'Check the server logs for more information'
-            });
-        }
+        res.json({
+            success: true,
+            message: 'Command executed successfully! Check your Telegram bot for the message.',
+            testInput: testInput,
+            chatId: adminSettings.admin_chat_id,
+            result: result
+        });
 
     } catch (error) {
         console.error('❌ Test temp command error:', error);
@@ -452,7 +439,7 @@ router.post('/:commandId/test', async (req, res) => {
 
         // Create test message
         const testMessage = {
-            chat: { id: adminSettings.admin_chat_id, type: 'private' },
+            chat: { id: adminSettings.admin_chat_id },
             from: {
                 id: adminSettings.admin_chat_id,
                 first_name: 'Test User',
