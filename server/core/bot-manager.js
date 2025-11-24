@@ -977,32 +977,67 @@ We've logged this error and will fix it soon.
         }
     }
 
-    async saveData(dataType, botToken, userId, key, value, metadata = {}) {
-        try {
-            const { data, error } = await supabase
-                .from('universal_data')
-                .upsert({
-                    data_type: dataType,
-                    bot_token: botToken,
-                    user_id: userId ? userId.toString() : null,
-                    data_key: key,
-                    data_value: typeof value === 'object' ? JSON.stringify(value) : String(value),
-                    metadata: metadata,
-                    updated_at: new Date().toISOString()
-                }, {
-                    onConflict: 'data_type,bot_token,user_id,data_key'
-                });
+// server/core/bot-manager.js - COMPLETE FIXED VERSION
 
-            if (error) {
+async saveData(dataType, botToken, userId, key, value, metadata = {}) {
+    try {
+        console.log(`💾 Saving data: ${dataType}.${key} =`, value);
+        
+        // Prepare the data object
+        const dataObject = {
+            data_type: dataType,
+            bot_token: botToken,
+            user_id: userId ? userId.toString() : null,
+            data_key: key,
+            data_value: typeof value === 'object' ? JSON.stringify(value) : String(value),
+            metadata: {
+                ...metadata,
+                value_type: typeof value,
+                saved_at: new Date().toISOString()
+            },
+            updated_at: new Date().toISOString()
+        };
+
+        // ✅ FIXED: Use simple insert for now (avoid UPSERT issues)
+        const { data, error } = await supabase
+            .from('universal_data')
+            .insert([dataObject]);
+
+        if (error) {
+            // If insert fails due to duplicate, try update
+            if (error.code === '23505') {
+                console.log('🔄 Duplicate detected, updating instead...');
+                const { error: updateError } = await supabase
+                    .from('universal_data')
+                    .update({
+                        data_value: dataObject.data_value,
+                        metadata: dataObject.metadata,
+                        updated_at: dataObject.updated_at
+                    })
+                    .eq('data_type', dataType)
+                    .eq('bot_token', botToken)
+                    .eq('user_id', userId ? userId.toString() : null)
+                    .eq('data_key', key);
+
+                if (updateError) {
+                    console.error('❌ Update data error:', updateError);
+                    throw updateError;
+                }
+            } else {
                 console.error('❌ Save data error:', error);
+                throw error;
             }
-            return value;
-        } catch (error) {
-            console.error('❌ Save data error:', error);
-            return value;
         }
-    }
 
+        console.log(`✅ Data saved successfully: ${dataType}.${key}`);
+        return value;
+        
+    } catch (error) {
+        console.error('❌ Save data error:', error);
+        // Don't throw error - allow bot to continue
+        return value;
+    }
+}
     async getData(dataType, botToken, userId, key) {
         try {
             const { data, error } = await supabase
