@@ -1,4 +1,4 @@
-// server/core/command-executor.js - PROMISE RESOLUTION SYSTEM
+// server/core/command-executor.js - COMPLETE FIXED VERSION WITH DEBUG LOGS
 async function executeCommandCode(botInstance, code, context) {
     return new Promise(async (resolve, reject) => {
         try {
@@ -513,254 +513,140 @@ async function executeCommandCode(botInstance, code, context) {
                 ...messageFunctions
             };
 
-            // ✅ ULTIMATE SOLUTION: PROMISE RESOLUTION SYSTEM
-            const executeWithPromiseResolution = async (userCode, env) => {
+            // ✅ ULTIMATE SOLUTION: AUTO-AWAIT WITH DEBUG LOGS
+            const executeWithAutoAwait = async (userCode, env) => {
                 try {
-                    console.log('🚀 Starting promise resolution system...');
+                    console.log('🚀 STARTING AUTO-AWAIT EXECUTION');
+                    console.log('📝 ORIGINAL USER CODE:');
+                    console.log(userCode);
                     
-                    // Create a variable store to hold resolved values
-                    const variableStore = {};
-                    
-                    // Process the code and extract variable assignments
-                    const processedCode = await processCodeWithPromiseResolution(userCode, env, variableStore);
-                    
-                    console.log('✅ Promise resolution completed');
-                    return processedCode;
-                    
-                } catch (error) {
-                    console.error('❌ Promise resolution error:', error);
-                    throw error;
-                }
-            };
-
-            // ✅ PROCESS CODE WITH PROMISE RESOLUTION
-            const processCodeWithPromiseResolution = async (userCode, env, variableStore) => {
-                try {
-                    console.log('🔧 Processing code with promise resolution...');
-                    
-                    // Split into executable blocks
-                    const blocks = splitIntoBlocks(userCode);
-                    const results = [];
-                    
-                    for (let i = 0; i < blocks.length; i++) {
-                        const block = blocks[i];
-                        console.log(`📦 Executing block ${i + 1}: ${block.substring(0, 50)}...`);
+                    // Create auto-await wrapper functions
+                    const autoAwaitWrapper = {
+                        // User data with auto-await
+                        UserSave: async (key, value) => {
+                            console.log(`🔄 AUTO-AWAIT: User.saveData("${key}", ${value})`);
+                            const result = await env.User.saveData(key, value);
+                            console.log(`✅ AUTO-AWAIT RESULT: User.saveData =`, result);
+                            return result;
+                        },
+                        UserGet: async (key) => {
+                            console.log(`🔄 AUTO-AWAIT: User.getData("${key}")`);
+                            const result = await env.User.getData(key);
+                            console.log(`✅ AUTO-AWAIT RESULT: User.getData =`, result);
+                            return result;
+                        },
                         
-                        try {
-                            const result = await executeBlockWithPromiseResolution(block, env, variableStore);
-                            results.push(result);
-                            console.log(`✅ Block ${i + 1} executed successfully`);
-                        } catch (blockError) {
-                            console.error(`❌ Block ${i + 1} failed:`, blockError);
-                            results.push({ error: blockError.message, block: i + 1 });
+                        // Bot data with auto-await
+                        BotDataSave: async (key, value) => {
+                            console.log(`🔄 AUTO-AWAIT: BotData.saveData("${key}", ${value})`);
+                            const result = await env.BotData.saveData(key, value);
+                            console.log(`✅ AUTO-AWAIT RESULT: BotData.saveData =`, result);
+                            return result;
+                        },
+                        BotDataGet: async (key) => {
+                            console.log(`🔄 AUTO-AWAIT: BotData.getData("${key}")`);
+                            const result = await env.BotData.getData(key);
+                            console.log(`✅ AUTO-AWAIT RESULT: BotData.getData =`, result);
+                            return result;
+                        },
+                        
+                        // Bot messages with auto-await
+                        BotSend: async (text, options) => {
+                            console.log(`🔄 AUTO-AWAIT: bot.sendMessage("${text.substring(0, 50)}...")`);
+                            const result = await env.bot.sendMessage(env.chatId, text, options);
+                            console.log(`✅ AUTO-AWAIT RESULT: bot.sendMessage =`, result);
+                            return result;
                         }
-                    }
+                    };
+
+                    // Process user code to add auto-await
+                    let processedCode = userCode;
                     
-                    return {
-                        success: true,
-                        message: "All blocks executed with promise resolution",
-                        results: results,
-                        variables: variableStore
+                    console.log('🔧 PROCESSING CODE FOR AUTO-AWAIT...');
+                    
+                    // Replace User.saveData with auto-awaited version
+                    processedCode = processedCode.replace(
+                        /User\.saveData\(([^)]+)\)/g,
+                        'await __autoAwait.UserSave($1)'
+                    );
+                    
+                    // Replace User.getData with auto-awaited version
+                    processedCode = processedCode.replace(
+                        /User\.getData\(([^)]+)\)/g, 
+                        'await __autoAwait.UserGet($1)'
+                    );
+                    
+                    // Replace BotData.saveData with auto-awaited version
+                    processedCode = processedCode.replace(
+                        /BotData\.saveData\(([^)]+)\)/g,
+                        'await __autoAwait.BotDataSave($1)'
+                    );
+                    
+                    // Replace BotData.getData with auto-awaited version
+                    processedCode = processedCode.replace(
+                        /BotData\.getData\(([^)]+)\)/g,
+                        'await __autoAwait.BotDataGet($1)'
+                    );
+                    
+                    // Replace bot.sendMessage with auto-awaited version
+                    processedCode = processedCode.replace(
+                        /bot\.sendMessage\(([^)]+)\)/g,
+                        'await __autoAwait.BotSend($1)'
+                    );
+                    
+                    console.log('📝 PROCESSED CODE WITH AUTO-AWAIT:');
+                    console.log(processedCode);
+                    
+                    // Create enhanced environment with auto-await wrapper
+                    const enhancedEnv = {
+                        ...env,
+                        __autoAwait: autoAwaitWrapper
                     };
                     
-                } catch (error) {
-                    console.error('❌ Code processing error:', error);
-                    throw error;
-                }
-            };
-
-            // ✅ SPLIT INTO EXECUTABLE BLOCKS
-            const splitIntoBlocks = (code) => {
-                const lines = code.split('\n').filter(line => {
-                    const trimmed = line.trim();
-                    return trimmed !== '' && !trimmed.startsWith('//');
-                });
-                
-                const blocks = [];
-                let currentBlock = '';
-                
-                for (const line of lines) {
-                    // If line ends with semicolon or is a control structure, it's a complete block
-                    if (line.trim().endsWith(';') || 
-                        line.trim().startsWith('if') || 
-                        line.trim().startsWith('for') || 
-                        line.trim().startsWith('while') ||
-                        line.trim().startsWith('const') ||
-                        line.trim().startsWith('let') ||
-                        line.trim().startsWith('var')) {
-                        
-                        if (currentBlock) {
-                            blocks.push(currentBlock + line);
-                            currentBlock = '';
-                        } else {
-                            blocks.push(line);
-                        }
-                    } else {
-                        currentBlock += line + '\n';
-                    }
-                }
-                
-                if (currentBlock) {
-                    blocks.push(currentBlock);
-                }
-                
-                return blocks;
-            };
-
-            // ✅ EXECUTE BLOCK WITH PROMISE RESOLUTION
-            const executeBlockWithPromiseResolution = async (block, env, variableStore) => {
-                try {
-                    console.log(`🔧 Executing block: ${block.substring(0, 60)}...`);
-                    
-                    // Check if it's a variable assignment
-                    if (block.includes('=') && !block.includes('==') && !block.includes('===')) {
-                        return await handleVariableAssignment(block, env, variableStore);
-                    } 
-                    // Check if it's a function call
-                    else if (block.includes('(') && block.includes(')')) {
-                        return await handleFunctionCall(block, env, variableStore);
-                    }
-                    // Other code
-                    else {
-                        return await handleOtherCode(block, env);
-                    }
-                    
-                } catch (error) {
-                    console.error('❌ Block execution error:', error);
-                    throw error;
-                }
-            };
-
-            // ✅ HANDLE VARIABLE ASSIGNMENT WITH PROMISE RESOLUTION
-            const handleVariableAssignment = async (block, env, variableStore) => {
-                try {
-                    console.log(`💾 Handling variable assignment: ${block}`);
-                    
-                    // Extract variable name and value
-                    const match = block.match(/(const|let|var)\s+(\w+)\s*=\s*(.+)/);
-                    if (match) {
-                        const [, declaration, varName, expression] = match;
-                        
-                        // Execute the expression and resolve any promises
-                        const resolvedValue = await resolveExpression(expression, env);
-                        
-                        // Store the resolved value
-                        variableStore[varName] = resolvedValue;
-                        
-                        console.log(`✅ Variable ${varName} =`, resolvedValue);
-                        
-                        return {
-                            type: 'variable_assignment',
-                            variable: varName,
-                            value: resolvedValue,
-                            success: true
-                        };
-                    } else {
-                        throw new Error('Invalid variable assignment syntax');
-                    }
-                    
-                } catch (error) {
-                    console.error('❌ Variable assignment error:', error);
-                    throw error;
-                }
-            };
-
-            // ✅ RESOLVE EXPRESSION (INCLUDING PROMISES)
-            const resolveExpression = async (expression, env) => {
-                try {
-                    console.log(`🔍 Resolving expression: ${expression}`);
-                    
-                    // Create execution function
-                    const resolveFunction = new Function('env', `
-                        with(env) {
+                    // Execute the processed code
+                    const executionFunction = new Function(
+                        'env',
+                        `with(env) {
                             return (async function() {
                                 try {
-                                    return ${expression};
+                                    console.log('🎯 EXECUTING PROCESSED CODE...');
+                                    ${processedCode}
+                                    console.log('✅ PROCESSED CODE EXECUTION COMPLETED');
+                                    return "Command executed successfully with auto-await";
                                 } catch (error) {
-                                    console.error('Expression error:', error);
-                                    return null;
+                                    console.error('❌ PROCESSED CODE ERROR:', error);
+                                    // Send error message
+                                    try {
+                                        await env.bot.sendMessage(env.chatId, "❌ Error: " + error.message);
+                                    } catch (sendError) {
+                                        console.error('Failed to send error message:', sendError);
+                                    }
+                                    throw error;
                                 }
                             })();
-                        }
-                    `);
-                    
-                    // Execute and await the result
-                    let result = resolveFunction(env);
-                    
-                    // If it returns a promise, await it
-                    if (result && typeof result.then === 'function') {
-                        console.log(`⏳ Awaiting promise for expression: ${expression}`);
-                        result = await result;
-                    }
-                    
-                    console.log(`✅ Expression resolved:`, result);
+                        }`
+                    );
+
+                    console.log('🚀 EXECUTING FINAL CODE...');
+                    const result = await executionFunction(enhancedEnv);
+                    console.log('✅ AUTO-AWAIT EXECUTION COMPLETED SUCCESSFULLY');
                     return result;
                     
                 } catch (error) {
-                    console.error('❌ Expression resolution error:', error);
-                    return null;
-                }
-            };
-
-            // ✅ HANDLE FUNCTION CALLS
-            const handleFunctionCall = async (block, env, variableStore) => {
-                try {
-                    console.log(`📞 Handling function call: ${block}`);
-                    
-                    // Execute the function call and resolve any promises
-                    const result = await resolveExpression(block, env);
-                    
-                    console.log(`✅ Function call completed:`, result);
-                    
-                    return {
-                        type: 'function_call',
-                        expression: block,
-                        result: result,
-                        success: true
-                    };
-                    
-                } catch (error) {
-                    console.error('❌ Function call error:', error);
+                    console.error('❌ AUTO-AWAIT EXECUTION FAILED:', error);
                     throw error;
                 }
             };
 
-            // ✅ HANDLE OTHER CODE
-            const handleOtherCode = async (block, env) => {
-                try {
-                    console.log(`📝 Handling other code: ${block}`);
-                    
-                    const executeFunction = new Function('env', `
-                        with(env) {
-                            return (async function() {
-                                try {
-                                    ${block};
-                                    return { success: true, block: '${block}' };
-                                } catch (error) {
-                                    return { success: false, error: error.message, block: '${block}' };
-                                }
-                            })();
-                        }
-                    `);
-                    
-                    const result = await executeFunction(env);
-                    return result;
-                    
-                } catch (error) {
-                    console.error('❌ Other code execution error:', error);
-                    throw error;
-                }
-            };
-
-            // ✅ EXECUTE THE CODE WITH PROMISE RESOLUTION
-            console.log('🚀 Executing user code with promise resolution...');
-            const result = await executeWithPromiseResolution(code, mergedEnvironment);
+            // ✅ EXECUTE WITH AUTO-AWAIT
+            console.log('🔧 STARTING COMMAND EXECUTION WITH AUTO-AWAIT...');
+            const result = await executeWithAutoAwait(code, mergedEnvironment);
             
-            console.log('✅ Command execution completed');
+            console.log('🎉 COMMAND EXECUTION COMPLETED SUCCESSFULLY');
             resolve(result);
 
         } catch (error) {
-            console.error('❌ Command execution failed:', error);
+            console.error('💥 COMMAND EXECUTION FAILED:', error);
             reject(error);
         }
     });
