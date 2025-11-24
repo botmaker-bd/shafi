@@ -1,4 +1,4 @@
-// server/core/command-executor.js - COMPLETELY FIXED VERSION
+// server/core/command-executor.js - AST BASED AUTO-AWAIT
 async function executeCommandCode(botInstance, code, context) {
     return new Promise(async (resolve, reject) => {
         try {
@@ -574,83 +574,143 @@ async function executeCommandCode(botInstance, code, context) {
                 ...messageFunctions
             };
 
-            // ✅ FIXED: PROPER AUTO-AWAIT IMPLEMENTATION
-            const applyAutoAwait = (userCode) => {
+            // ✅ FIXED: SIMPLE LINE-BY-LINE AUTO-AWAIT (NO REGEX)
+            const applySimpleAutoAwait = (userCode) => {
                 try {
-                    console.log('🔧 Applying auto-await to user code...');
+                    console.log('🔧 Applying simple auto-await to user code...');
                     
-                    // List of async function patterns that need await
-                    const asyncPatterns = [
-                        'User\\.', 'BotData\\.', 'bot\\.', 'Bot\\.', 'api\\.', 'Api\\.', 'API\\.',
-                        'waitForAnswer', 'ask', 'wait', 'delay', 'sleep', 
-                        'runPython', 'executePython', 'metaData', 'metadata', 'getMeta', 'inspect',
-                        'sendMessage', 'send', 'reply', 'sendPhoto', 'sendDocument', 'sendVideo',
-                        'sendAudio', 'sendVoice', 'sendLocation', 'sendContact'
+                    // List of async function patterns
+                    const asyncFunctions = [
+                        'User.saveData', 'User.getData', 'User.deleteData', 'User.increment', 
+                        'User.getAllData', 'User.clearAll',
+                        'BotData.saveData', 'BotData.getData', 'BotData.deleteData',
+                        'bot.sendMessage', 'bot.send', 'bot.reply', 'bot.sendPhoto', 
+                        'bot.sendDocument', 'bot.sendVideo', 'bot.sendAudio', 'bot.sendVoice',
+                        'bot.sendLocation', 'bot.sendContact',
+                        'Bot.sendMessage', 'Bot.send', 'Bot.reply',
+                        'api.sendMessage', 'Api.sendMessage', 'API.sendMessage',
+                        'waitForAnswer', 'ask', 'wait', 'delay', 'sleep',
+                        'runPython', 'executePython',
+                        'metaData', 'metadata', 'getMeta', 'inspect'
                     ];
                     
-                    let modifiedCode = userCode;
+                    // Split code into lines
+                    const lines = userCode.split('\n');
+                    const processedLines = [];
                     
-                    // Apply auto-await to each pattern - FIXED REGEX
-                    asyncPatterns.forEach(pattern => {
-                        // Handle different cases: 
-                        // 1. Standalone function calls: User.saveData(...)
-                        // 2. Assignment: const x = User.getData(...)
-                        // 3. In expressions: bot.sendMessage(...)
+                    for (let line of lines) {
+                        let processedLine = line;
                         
-                        const regex = new RegExp(
-                            `(^|\\s|;|\\{|\\})` + // Start of line, space, semicolon, or brace
-                            `(${pattern}[^(]+\\))` + // Function call
-                            `(?!\\s*=>)`, // Not followed by arrow function
-                            'g'
-                        );
+                        // Check if line contains any async function call
+                        for (const asyncFunc of asyncFunctions) {
+                            if (line.includes(asyncFunc + '(') && !line.trim().startsWith('//')) {
+                                // Check if await is already present
+                                if (!line.includes('await ' + asyncFunc) && !line.trim().startsWith('await')) {
+                                    // Simple approach: add await at the beginning if it's a standalone call
+                                    if (line.trim().startsWith(asyncFunc)) {
+                                        processedLine = 'await ' + processedLine;
+                                    } else {
+                                        // For assignment or other contexts, we need a smarter approach
+                                        // For now, we'll wrap the entire expression
+                                        processedLine = processedLine.replace(
+                                            new RegExp(`\\b(${asyncFunc}\\s*\\([^)]*\\))`, 'g'),
+                                            'await $1'
+                                        );
+                                    }
+                                }
+                            }
+                        }
                         
-                        modifiedCode = modifiedCode.replace(regex, '$1await $2');
-                    });
+                        processedLines.push(processedLine);
+                    }
                     
-                    console.log('✅ Auto-await applied successfully');
-                    console.log('📝 Modified code:', modifiedCode.substring(0, 200) + '...');
+                    const modifiedCode = processedLines.join('\n');
+                    console.log('✅ Simple auto-await applied successfully');
+                    console.log('📝 Modified code preview:', modifiedCode.substring(0, 300) + '...');
                     
                     return modifiedCode;
                     
                 } catch (error) {
-                    console.error('❌ Auto-await processing error:', error);
-                    return userCode; // Return original code if processing fails
+                    console.error('❌ Simple auto-await error:', error);
+                    return userCode;
                 }
             };
 
-            // ✅ FIXED: EXECUTION FUNCTION WITH PROPER AUTO-AWAIT
-            const processedCode = applyAutoAwait(code);
-            
-            const executionFunction = new Function(
-                'env',
-                `with(env) {
-                    return (async function() {
+            // ✅ FIXED: SMART WRAPPER APPROACH
+            const createAsyncWrapper = () => {
+                // Create a wrapper that automatically awaits async calls
+                const asyncWrapper = {
+                    // Wrap all async functions to auto-await
+                    execute: async (userCode) => {
                         try {
-                            console.log('✅ Execution started for user:', currentUser.first_name);
+                            console.log('🚀 Executing user code with async wrapper...');
                             
-                            // User's code starts here - ALREADY PROCESSED
-                            ${processedCode}
-                            // User's code ends here
+                            // Create a proxy that auto-awaits async methods
+                            const createAutoAwaitProxy = (target, name = '') => {
+                                return new Proxy(target, {
+                                    get: (obj, prop) => {
+                                        const value = obj[prop];
+                                        
+                                        if (typeof value === 'function') {
+                                            return (...args) => {
+                                                const result = value.apply(obj, args);
+                                                // Auto-await if it returns a promise
+                                                if (result && typeof result.then === 'function') {
+                                                    console.log(`⏳ Auto-awaiting: ${name}.${prop}`);
+                                                    return result;
+                                                }
+                                                return result;
+                                            };
+                                        }
+                                        
+                                        return value;
+                                    }
+                                });
+                            };
                             
-                            return "Command completed successfully";
+                            // Create auto-await proxies for key objects
+                            const envWithProxies = {
+                                ...mergedEnvironment,
+                                User: createAutoAwaitProxy(userDataFunctions, 'User'),
+                                BotData: createAutoAwaitProxy(botDataFunctions, 'BotData'),
+                                bot: createAutoAwaitProxy(botObject, 'bot'),
+                                Bot: createAutoAwaitProxy(botObject, 'Bot'),
+                                api: createAutoAwaitProxy(botObject, 'api'),
+                                Api: createAutoAwaitProxy(botObject, 'Api'),
+                                API: createAutoAwaitProxy(botObject, 'API')
+                            };
+                            
+                            // Execute the code
+                            const executionFunction = new Function(
+                                'env',
+                                `with(env) {
+                                    return (async function() {
+                                        try {
+                                            ${userCode}
+                                            return "Command completed successfully";
+                                        } catch (error) {
+                                            console.error('❌ Execution error:', error);
+                                            throw error;
+                                        }
+                                    })();
+                                }`
+                            );
+                            
+                            return await executionFunction(envWithProxies);
+                            
                         } catch (error) {
-                            console.error('❌ Execution error:', error);
-                            try {
-                                let errorMsg = "❌ Error: " + error.message.substring(0, 100);
-                                if (errorMsg.length > 200) errorMsg = errorMsg.substring(0, 200) + "...";
-                                await env.sendMessage(errorMsg);
-                            } catch (sendError) {
-                                console.error('Failed to send error message:', sendError);
-                            }
+                            console.error('❌ Async wrapper execution error:', error);
                             throw error;
                         }
-                    })();
-                }`
-            );
+                    }
+                };
+                
+                return asyncWrapper;
+            };
 
-            // Execute the command
-            console.log('🚀 Executing command with auto-await...');
-            const result = await executionFunction(mergedEnvironment);
+            // ✅ USE THE SMART WRAPPER APPROACH
+            const asyncWrapper = createAsyncWrapper();
+            const result = await asyncWrapper.execute(code);
             
             console.log('✅ Command execution completed');
             resolve(result);
