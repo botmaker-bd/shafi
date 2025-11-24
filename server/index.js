@@ -150,6 +150,7 @@ app.get('/api/health', async (req, res) => {
 });
 
 // Webhook endpoint for Telegram (only in webhook mode)
+// Webhook endpoint for Telegram (only in webhook mode)
 if (USE_WEBHOOK) {
     app.post('/api/webhook/:token', async (req, res) => {
         try {
@@ -157,7 +158,6 @@ if (USE_WEBHOOK) {
             const update = req.body;
             
             console.log('🔄 Webhook received for bot:', token.substring(0, 10) + '...');
-            console.log('📦 Update type:', update.message ? 'message' : update.callback_query ? 'callback' : 'other');
             
             const botManager = require('./core/bot-manager');
             await botManager.handleBotUpdate(token, update);
@@ -165,12 +165,11 @@ if (USE_WEBHOOK) {
             res.status(200).send('OK');
         } catch (error) {
             console.error('❌ Webhook error:', error);
-            // Still respond with 200 to prevent Telegram from retrying
+            // Always respond with 200 to prevent Telegram from retrying
             res.status(200).send('OK');
         }
     });
 }
-
 // API info endpoint
 app.get('/api/info', (req, res) => {
     res.json({
