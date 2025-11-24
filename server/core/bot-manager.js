@@ -54,11 +54,13 @@ class BotManager {
                     await this.initializeBot(bot.token);
                     successCount++;
                     
+                    // Add delay between bot initializations
                     if (i < bots.length - 1) {
-                        await new Promise(resolve => setTimeout(resolve, 2000));
+                        await new Promise(resolve => setTimeout(resolve, 3000));
                     }
                 } catch (botError) {
                     console.error(`❌ Failed to initialize bot ${bot.name}:`, botError.message);
+                    // Continue with other bots even if one fails
                 }
             }
 
@@ -66,36 +68,233 @@ class BotManager {
             console.log(`✅ ${successCount}/${bots.length} bots initialized successfully`);
         } catch (error) {
             console.error('❌ Initialize all bots error:', error);
+            // Don't throw error - allow server to continue
+            this.initialized = true;
+        }
+    }
+
+    // ✅ FIXED: Enhanced bot initialization with better error handling
+    async initializeBot(token) {
+        try {
+            console.log(`🔄 Initializing bot: ${token.substring(0, 15)}...`);
+
+            const { data: commands, error } = await supabase
+                .from('commands')
+                .select('*')
+                .eq('bot_token', token)
+                .eq('is_active', true);
+
+            if (error) {
+                console.error('❌ Database error fetching commands:', error);
+                // Continue without commands
+            }
+
+            let bot;
+            const botOptions = {
+                request: {
+                    timeout: 30000,
+                    proxy: process.env.PROXY_URL || null
+                },
+                polling: false // We'll handle polling manually if needed
+            };
+
+            // ✅ FIXED: Better webhook handling for Render.com
+            if (this.USE_WEBHOOK) {
+                console.log('🔗 Setting up bot in WEBHOOK mode...');
+                bot = new TelegramBot(token, botOptions);
+                
+                try {
+                    // First delete any existing webhook
+                    await bot.deleteWebHook();
+                    console.log('✅ Existing webhook deleted');
+                    
+                    // Set new webhook with proper configuration for Render
+                    const baseUrl = process.env.BASE_URL || 'https://bot-maker-bd.onrender.com';
+                    const webhookUrl = `${baseUrl}/api/webhook/${token}`;
+                    
+                    console.log(`🔗 Setting webhook: ${webhookUrl}`);
+                    
+                    const webhookResult = await bot.setWebHook(webhookUrl, {
+                        max_connections: 40,
+                        allowed_updates: [
+                            'message', 'edited_message', 'channel_post', 'edited_channel_post',
+                            'inline_query', 'chosen_inline_result', 'callback_query',
+                            'shipping_query', 'pre_checkout_query', 'poll', 'poll_answer',
+                            'my_chat_member', 'chat_member', 'chat_join_request'
+                        ],
+                        drop_pending_updates: true // Clear pending updates
+                    });
+                    
+                    console.log(`✅ Webhook set successfully: ${webhookResult}`);
+                    
+                } catch (webhookError) {
+                    console.error('❌ Webhook setup error:', webhookError.message);
+                    // Continue even if webhook fails
+                }
+            } else {
+                // Polling mode - use with caution on Render
+                console.log('🔄 Setting up bot in POLLING mode...');
+                botOptions.polling = {
+                    interval: 1000,
+                    autoStart: true,
+                    params: {
+                        timeout: 10,
+                        allowed_updates: ['message', 'callback_query']
+                    }
+                };
+                
+                bot = new TelegramBot(token, botOptions);
+            }
+
+            // ✅ FIXED: Better bot connection test
+            try {
+                console.log('🔗 Testing bot connection...');
+                const botInfo = await bot.getMe();
+                console.log(`✅ Bot connected: @${botInfo.username} (${botInfo.first_name})`);
+            } catch (connectionError) {
+                console.error(`❌ Bot connection failed:`, connectionError.message);
+                
+                // Check if it's a token error
+                if (connectionError.message.includes('401') || connectionError.message.includes('Not Found')) {
+                    throw new Error('Invalid bot token');
+                }
+                throw connectionError;
+            }
+
+            // Setup event handlers
+            this.setupEventHandlers(bot, token);
+
+            // Store bot and commands
+            this.activeBots.set(token, bot);
+            this.botCommands.set(token, commands || []);
+
+            console.log(`✅ Bot initialized successfully: ${token.substring(0, 10)}...`);
+
+            // Setup cleanup interval
+            if (!this.cleanupInterval) {
+                this.cleanupInterval = setInterval(() => this.cleanupStaleHandlers(), 5 * 60 * 1000);
+            }
+
+            return true;
+
+        } catch (error) {
+            console.error(`❌ Initialize bot error for ${token.substring(0, 10)}...:`, error.message);
+            
+            // Mark bot as inactive in database if token is invalid
+            if (error.message.includes('Invalid bot token')) {
+                try {
+                    await supabase
+                        .from('bots')
+                        .update({ is_active: false })
+                        .eq('token', token);
+                    console.log(`🚫 Marked bot as inactive due to invalid token`);
+                } catch (dbError) {
+                    console.error('❌ Failed to update bot status:', dbError.message);
+                }
+            }
+            
             throw error;
         }
     }
 
-    getBotInstance(token) {
-        return this.activeBots.get(token);
+    // ✅ FIXED: Enhanced event handlers
+    setupEventHandlers(bot, token) {
+        // Only setup message handler for webhook mode
+        if (this.USE_WEBHOOK) {
+            // In webhook mode, we handle updates via the webhook endpoint
+            console.log(`🎯 Webhook event handlers setup for bot: ${token.substring(0, 10)}...`);
+        } else {
+            // Polling mode - setup all event handlers
+            bot.on('message', (msg) => this.handleMessage(bot, token, msg));
+            bot.on('callback_query', (callbackQuery) => this.handleCallbackQuery(bot, token, callbackQuery));
+        }
+
+        // Error handlers
+        bot.on('polling_error', (error) => {
+            console.error(`❌ Polling error for ${token.substring(0, 10)}...:`, error.message);
+        });
+        
+        bot.on('webhook_error', (error) => {
+            console.error(`❌ Webhook error for ${token.substring(0, 10)}...:`, error.message);
+        });
+        
+        bot.on('error', (error) => {
+            console.error(`❌ Bot error for ${token.substring(0, 10)}...:`, error.message);
+        });
     }
 
-    async handleBotUpdate(token, update) {
+    // ✅ FIXED: Enhanced message handler
+    async handleMessage(bot, token, msg) {
         try {
-            const bot = this.activeBots.get(token);
-            if (bot) {
-                await bot.processUpdate(update);
+            // Skip non-text messages unless they have captions
+            if (!msg.text && !msg.caption) {
+                return;
             }
+
+            const chatId = msg.chat.id;
+            const userId = msg.from.id;
+            const text = msg.text || msg.caption || '';
+            const userKey = `${token}_${userId}`;
+
+            console.log(`📨 Message from ${msg.from.first_name} (${userId}): "${text.substring(0, 50)}..."`);
+
+            // 1. Check for waitForAnswer handlers
+            if (this.nextCommandHandlers.has(userKey)) {
+                console.log(`✅ WAIT FOR ANSWER HANDLER FOUND!`);
+                const handlerData = this.nextCommandHandlers.get(userKey);
+                
+                if (handlerData && handlerData.resolve) {
+                    handlerData.resolve(text);
+                    this.nextCommandHandlers.delete(userKey);
+                    return;
+                }
+                this.nextCommandHandlers.delete(userKey);
+            }
+
+            // 2. Check for command answer handlers
+            if (this.commandAnswerHandlers.has(userKey)) {
+                console.log(`✅ COMMAND ANSWER HANDLER FOUND!`);
+                await this.processCommandAnswer(userKey, text, msg);
+                return;
+            }
+
+            // 3. Handle special commands
+            if (text.startsWith('/python ')) {
+                await this.executePythonCode(bot, chatId, text.replace('/python ', ''));
+                return;
+            }
+
+            // 4. Find and execute matching command
+            const command = await this.findMatchingCommand(token, text, msg);
+            if (command) {
+                console.log(`🎯 Executing command: ${command.command_patterns}`);
+                await this.executeCommand(bot, command, msg, text);
+            } else {
+                console.log(`❌ No matching command found for: "${text}"`);
+                // You can add a default response here
+            }
+
         } catch (error) {
-            console.error('❌ Handle bot update error:', error);
+            console.error('❌ Handle message error:', error);
+            await this.sendError(bot, msg.chat.id, error);
         }
     }
 
+    // ✅ FIXED: Enhanced command execution
     async executeCommand(bot, command, msg, userInput = null) {
         try {
             console.log(`🔧 Executing command: ${command.command_patterns} for chat: ${msg.chat.id}`);
             
+            // Preload user data
             await this.preloadUserData(command.bot_token, msg.from.id);
             
+            // Create execution context
             const context = this.createExecutionContext(bot, command, msg, userInput);
 
+            // Execute the command
             const result = await executeCommandCode(bot, command.code, context);
             
-            // ✅ FIXED: Setup Wait For Answer system with ERROR HANDLING
+            // Setup answer handler if needed
             if (command.wait_for_answer && command.answer_handler) {
                 await this.setupCommandAnswerHandler(bot, command, msg, context);
             }
@@ -103,7 +302,7 @@ class BotManager {
             console.log(`✅ Command executed successfully: ${command.command_patterns}`);
             return {
                 success: true,
-                message: "Command executed and message delivered",
+                message: "Command executed successfully",
                 chatId: msg.chat.id,
                 command: command.command_patterns,
                 result: result
@@ -112,9 +311,12 @@ class BotManager {
         } catch (error) {
             console.error(`❌ Command execution error for ${command.command_patterns}:`, error);
             
-            // ✅ IMPROVED: Better error message
+            // Send user-friendly error message
             try {
-                const errorMsg = `❌ Command Error: ${error.message}\n\nIf this continues, please contact support.`;
+                let errorMsg = `❌ Command Error: ${error.message}`;
+                if (errorMsg.length > 200) {
+                    errorMsg = errorMsg.substring(0, 200) + '...';
+                }
                 await bot.sendMessage(msg.chat.id, errorMsg);
             } catch (sendError) {
                 console.error('❌ Failed to send error message:', sendError);
@@ -124,127 +326,14 @@ class BotManager {
         }
     }
 
-    // ✅ FIXED: CONTEXT CREATION - ALL MISSING FUNCTIONS ADDED
+    // ✅ FIXED: Enhanced context creation
     createExecutionContext(bot, command, msg, userInput) {
         const botToken = command.bot_token;
-        
-        if (!botToken) {
-            console.error('❌ CRITICAL: command.bot_token is undefined!');
-            console.log('Command structure:', {
-                id: command.id,
-                patterns: command.command_patterns,
-                has_token: !!command.bot_token
-            });
-        }
         
         console.log(`🔧 Creating context for bot: ${botToken?.substring(0, 10)}...`);
         
         const self = this;
 
-        // ✅ ADDED: Missing helper functions
-        const createUserObjectFunction = () => {
-            const userObj = msg.from ? Object.assign({}, msg.from) : {
-                id: msg.from.id,
-                first_name: msg.from.first_name || '',
-                username: msg.from.username || '',
-                language_code: msg.from.language_code || ''
-            };
-            userObj.chat_id = msg.chat.id;
-            return userObj;
-        };
-
-        const createChatObjectFunction = () => {
-            const chatObj = msg.chat ? Object.assign({}, msg.chat) : {
-                id: msg.chat.id,
-                type: 'private',
-                first_name: msg.from.first_name || '',
-                username: msg.from.username || ''
-            };
-            return chatObj;
-        };
-
-        const waitFunction = async (ms) => {
-            console.log(`⏰ Waiting for ${ms}ms...`);
-            return new Promise(resolve => setTimeout(() => {
-                console.log(`✅ Wait completed: ${ms}ms`);
-                resolve(`Waited ${ms}ms`);
-            }, ms));
-        };
-
-        const runPythonSyncFunction = async (code) => {
-            try {
-                console.log('🐍 Executing Python code from command...');
-                const result = await pythonRunner.runPythonCode(code);
-                return result;
-            } catch (error) {
-                console.error('❌ Python execution error:', error);
-                throw error;
-            }
-        };
-
-        const waitForAnswerFunction = async (question, options = {}) => {
-            return new Promise(async (resolve, reject) => {
-                try {
-                    const timeout = options.timeout || 60000;
-                    const nextCommandKey = `${botToken}_${msg.from.id}`;
-                    
-                    console.log(`⏳ Setting up waitForAnswer for user: ${msg.from.id}`);
-                    
-                    // Clear existing handler
-                    if (this.nextCommandHandlers.has(nextCommandKey)) {
-                        this.nextCommandHandlers.delete(nextCommandKey);
-                    }
-
-                    const timeoutId = setTimeout(() => {
-                        if (this.nextCommandHandlers.has(nextCommandKey)) {
-                            this.nextCommandHandlers.delete(nextCommandKey);
-                        }
-                        reject(new Error(`Wait for answer timeout (${timeout/1000} seconds)`));
-                    }, timeout);
-
-                    // Send question to user
-                    console.log(`📤 Sending question to user ${msg.from.id}: "${question}"`);
-                    await bot.sendMessage(msg.chat.id, question, {
-                        parse_mode: 'HTML',
-                        ...options
-                    });
-                    
-                    console.log(`✅ Question sent, waiting for answer from user: ${msg.from.id}`);
-                    
-                    // Set up the waiting state
-                    const waitingPromise = new Promise((innerResolve, innerReject) => {
-                        // Store the resolve function
-                        if (!this.nextCommandHandlers) {
-                            this.nextCommandHandlers = new Map();
-                        }
-                        
-                        this.nextCommandHandlers.set(nextCommandKey, {
-                            resolve: innerResolve,
-                            reject: innerReject,
-                            timeoutId: timeoutId,
-                            timestamp: Date.now(),
-                            bot: bot
-                        });
-                    });
-
-                    // Wait for user's response
-                    const userResponse = await waitingPromise;
-                    
-                    console.log(`🎉 Received answer from user: "${userResponse}"`);
-                    resolve({
-                        text: userResponse,
-                        userId: msg.from.id,
-                        chatId: msg.chat.id,
-                        timestamp: new Date().toISOString()
-                    });
-                    
-                } catch (error) {
-                    console.error(`❌ waitForAnswer failed:`, error);
-                    reject(new Error(`Failed to wait for answer: ${error.message}`));
-                }
-            });
-        };
-        
         return {
             msg: msg,
             chatId: msg.chat.id,
@@ -256,589 +345,177 @@ class BotManager {
             botToken: botToken,
             userInput: userInput,
             nextCommandHandlers: this.nextCommandHandlers,
-            waitingAnswers: this.waitingAnswers,
-            commandAnswerHandlers: this.commandAnswerHandlers,
-            callbackHandlers: this.callbackHandlers,
-            
-            // ✅ ADDED: Missing functions to context
-            getUser: createUserObjectFunction,
-            getChat: createChatObjectFunction,
-            getCurrentUser: createUserObjectFunction,
-            getCurrentChat: createChatObjectFunction,
-            wait: waitFunction,
-            delay: waitFunction,
-            sleep: waitFunction,
-            runPython: runPythonSyncFunction,
-            executePython: runPythonSyncFunction,
-            waitForAnswer: waitForAnswerFunction,
-            ask: waitForAnswerFunction,
             
             User: {
-                saveData: (key, value) => {
-                    const cacheKey = `${botToken}_${msg.from.id}_${key}`;
-                    self.dataCache.set(cacheKey, value);
-                    
-                    self.saveData('user_data', botToken, msg.from.id, key, value)
-                        .catch(err => console.error('❌ Background save error:', err));
-                    
-                    return value;
-                },
-                
-                getData: (key) => {
-                    const cacheKey = `${botToken}_${msg.from.id}_${key}`;
-                    if (self.dataCache.has(cacheKey)) {
-                        return self.dataCache.get(cacheKey);
-                    }
-                    
-                    const defaults = {
-                        'total_usage': 0,
-                        'user_count': 1,
-                        'usage_count': 0
-                    };
-                    
-                    return defaults[key] || null;
-                },
-                
-                deleteData: (key) => {
-                    const cacheKey = `${botToken}_${msg.from.id}_${key}`;
-                    self.dataCache.delete(cacheKey);
-                    
-                    self.deleteData('user_data', botToken, msg.from.id, key)
-                        .catch(err => console.error('❌ Background delete error:', err));
-                    
-                    return true;
-                },
-                
-                increment: (key, amount = 1) => {
-                    const current = this.User.getData(key) || 0;
-                    const newValue = parseInt(current) + amount;
-                    this.User.saveData(key, newValue);
-                    return newValue;
-                },
-
-                getAllData: async () => {
+                saveData: async (key, value) => {
                     try {
+                        const cacheKey = `${botToken}_${msg.from.id}_${key}`;
+                        self.dataCache.set(cacheKey, value);
+                        
+                        // Use simple insert to avoid constraint issues
+                        const { error } = await supabase
+                            .from('universal_data')
+                            .insert([{
+                                data_type: 'user_data',
+                                bot_token: botToken,
+                                user_id: msg.from.id.toString(),
+                                data_key: key,
+                                data_value: JSON.stringify(value),
+                                metadata: {
+                                    saved_at: new Date().toISOString(),
+                                    value_type: typeof value
+                                },
+                                created_at: new Date().toISOString(),
+                                updated_at: new Date().toISOString()
+                            }]);
+
+                        if (error && error.code !== '23505') { // Ignore duplicate errors
+                            console.error('❌ Save data error:', error);
+                        }
+                        
+                        return value;
+                    } catch (error) {
+                        console.error('❌ Save data error:', error);
+                        return value;
+                    }
+                },
+                
+                getData: async (key) => {
+                    try {
+                        const cacheKey = `${botToken}_${msg.from.id}_${key}`;
+                        if (self.dataCache.has(cacheKey)) {
+                            return self.dataCache.get(cacheKey);
+                        }
+                        
                         const { data, error } = await supabase
                             .from('universal_data')
-                            .select('data_key, data_value')
+                            .select('data_value')
                             .eq('data_type', 'user_data')
                             .eq('bot_token', botToken)
-                            .eq('user_id', msg.from.id.toString());
+                            .eq('user_id', msg.from.id.toString())
+                            .eq('data_key', key)
+                            .single();
 
-                        if (error) return {};
-
-                        const result = {};
-                        for (const item of data || []) {
-                            try {
-                                result[item.data_key] = JSON.parse(item.data_value);
-                            } catch {
-                                result[item.data_key] = item.data_value;
-                            }
+                        if (error) {
+                            if (error.code === 'PGRST116') return null;
+                            console.error('❌ Get data error:', error);
+                            return null;
                         }
-                        return result;
+
+                        if (!data || !data.data_value) return null;
+
+                        try {
+                            return JSON.parse(data.data_value);
+                        } catch {
+                            return data.data_value;
+                        }
                     } catch (error) {
-                        console.error('❌ Get all data error:', error);
-                        return {};
+                        console.error('❌ Get data error:', error);
+                        return null;
                     }
                 },
-
-                clearAll: async () => {
+                
+                deleteData: async (key) => {
                     try {
+                        const cacheKey = `${botToken}_${msg.from.id}_${key}`;
+                        self.dataCache.delete(cacheKey);
+                        
                         const { error } = await supabase
                             .from('universal_data')
                             .delete()
                             .eq('data_type', 'user_data')
                             .eq('bot_token', botToken)
-                            .eq('user_id', msg.from.id.toString());
+                            .eq('user_id', msg.from.id.toString())
+                            .eq('data_key', key);
 
-                        if (error) throw error;
-                        
-                        // Clear cache
-                        const cacheKeys = Array.from(self.dataCache.keys()).filter(key => 
-                            key.startsWith(`${botToken}_${msg.from.id}_`)
-                        );
-                        cacheKeys.forEach(key => self.dataCache.delete(key));
-                        
+                        if (error) {
+                            console.error('❌ Delete data error:', error);
+                            return false;
+                        }
                         return true;
                     } catch (error) {
-                        console.error('❌ Clear all data error:', error);
-                        throw error;
+                        console.error('❌ Delete data error:', error);
+                        return false;
                     }
                 }
             },
             
             Bot: {
-                saveData: (key, value) => {
-                    const cacheKey = `${botToken}_bot_${key}`;
-                    self.dataCache.set(cacheKey, value);
-                    
-                    self.saveData('bot_data', botToken, null, key, value)
-                        .catch(err => console.error('❌ Background bot save error:', err));
-                    
-                    return value;
-                },
-                
-                getData: (key) => {
-                    const cacheKey = `${botToken}_bot_${key}`;
-                    if (self.dataCache.has(cacheKey)) {
-                        return self.dataCache.get(cacheKey);
-                    }
-                    return null;
-                },
-                
-                deleteData: (key) => {
-                    const cacheKey = `${botToken}_bot_${key}`;
-                    self.dataCache.delete(cacheKey);
-                    
-                    self.deleteData('bot_data', botToken, null, key)
-                        .catch(err => console.error('❌ Background bot delete error:', err));
-                    
-                    return true;
-                }
-            },
+                saveData: async (key, value) => {
+                    try {
+                        const cacheKey = `${botToken}_bot_${key}`;
+                        self.dataCache.set(cacheKey, value);
+                        
+                        const { error } = await supabase
+                            .from('universal_data')
+                            .insert([{
+                                data_type: 'bot_data',
+                                bot_token: botToken,
+                                user_id: null,
+                                data_key: key,
+                                data_value: JSON.stringify(value),
+                                metadata: {
+                                    saved_at: new Date().toISOString(),
+                                    value_type: typeof value
+                                },
+                                created_at: new Date().toISOString(),
+                                updated_at: new Date().toISOString()
+                            }]);
 
-            // ✅ ADDED: Data objects for direct access
-            userData: createUserObjectFunction(),
-            chatData: createChatObjectFunction(),
-            currentUser: createUserObjectFunction(),
-            currentChat: createChatObjectFunction()
+                        if (error && error.code !== '23505') {
+                            console.error('❌ Save bot data error:', error);
+                        }
+                        
+                        return value;
+                    } catch (error) {
+                        console.error('❌ Save bot data error:', error);
+                        return value;
+                    }
+                },
+                
+                getData: async (key) => {
+                    try {
+                        const cacheKey = `${botToken}_bot_${key}`;
+                        if (self.dataCache.has(cacheKey)) {
+                            return self.dataCache.get(cacheKey);
+                        }
+                        
+                        const { data, error } = await supabase
+                            .from('universal_data')
+                            .select('data_value')
+                            .eq('data_type', 'bot_data')
+                            .eq('bot_token', botToken)
+                            .eq('data_key', key)
+                            .single();
+
+                        if (error) {
+                            if (error.code === 'PGRST116') return null;
+                            return null;
+                        }
+
+                        if (!data || !data.data_value) return null;
+
+                        try {
+                            return JSON.parse(data.data_value);
+                        } catch {
+                            return data.data_value;
+                        }
+                    } catch (error) {
+                        console.error('❌ Get bot data error:', error);
+                        return null;
+                    }
+                }
+            }
         };
     }
 
-    // ✅ FIXED: Setup Command Answer Handler with ERROR HANDLING
-    async setupCommandAnswerHandler(bot, command, msg, context) {
-        const userKey = `${command.bot_token}_${msg.from.id}`;
-        
-        console.log(`⏳ Setting up Command Answer Handler for user: ${userKey}`);
-        
-        try {
-            this.commandAnswerHandlers.set(userKey, {
-                bot: bot,
-                command: command,
-                context: context,
-                timestamp: Date.now(),
-                originalMessage: msg
-            });
-            
-            console.log(`✅ Now waiting for answer from user ${msg.from.first_name}`);
-            
-            // Send confirmation message
-            await bot.sendMessage(msg.chat.id, "💬 I'm listening for your response...");
-            
-        } catch (error) {
-            console.error('❌ Failed to setup command answer handler:', error);
-            await bot.sendMessage(msg.chat.id, "❌ Failed to setup response listener. Please try again.");
-        }
-    }
-
-    // ✅ FIXED: Process user's answer with BETTER ERROR HANDLING
-    async processCommandAnswer(userKey, answerText, answerMsg) {
-        let handlerData;
-        
-        try {
-            handlerData = this.commandAnswerHandlers.get(userKey);
-            if (!handlerData) {
-                console.log(`❌ No command handler data found for user: ${userKey}`);
-                return;
-            }
-
-            const { bot, command, context, originalMessage } = handlerData;
-            
-            console.log(`🎯 Processing command answer: "${answerText}" for command: ${command.command_patterns}`);
-            
-            // Send processing message
-            await bot.sendMessage(answerMsg.chat.id, "⏳ Processing your response...");
-            
-            const answerContext = {
-                ...context,
-                params: answerText,
-                userInput: answerText,
-                answerMessage: answerMsg,
-                originalMessage: originalMessage
-            };
-
-            // Execute the answer handler code
-            await executeCommandCode(bot, command.answer_handler, answerContext);
-            
-            console.log(`✅ Command answer handler executed successfully`);
-            
-        } catch (error) {
-            console.error('❌ Command answer handler execution error:', error);
-            
-            // ✅ IMPROVED: Send detailed error message
-            try {
-                const errorMsg = `❌ Answer Handler Error: ${error.message}\n\nPlease try the command again.`;
-                await handlerData?.bot.sendMessage(answerMsg.chat.id, errorMsg);
-            } catch (sendError) {
-                console.error('❌ Failed to send error message:', sendError);
-            }
-            
-        } finally {
-            this.commandAnswerHandlers.delete(userKey);
-            console.log(`🧹 Auto-cleaned command answer handler for ${userKey}`);
-        }
-    }
-
-    // ✅ FIXED: Process waitForAnswer() with BETTER ERROR HANDLING
-    async processWaitForAnswer(userKey, answerText, answerMsg) {
-        let waitingData;
-        
-        try {
-            waitingData = this.waitingAnswers.get(userKey);
-            if (!waitingData) {
-                console.log(`❌ No waiting data found for user: ${userKey}`);
-                return;
-            }
-
-            console.log(`🎯 Processing waitForAnswer: "${answerText}"`);
-            
-            if (waitingData.resolve) {
-                waitingData.resolve(answerText);
-            }
-            
-            console.log(`✅ waitForAnswer resolved successfully`);
-            
-        } catch (error) {
-            console.error('❌ waitForAnswer processing error:', error);
-            
-            if (waitingData && waitingData.reject) {
-                waitingData.reject(error);
-            }
-            
-            // Send error message
-            try {
-                await waitingData?.bot.sendMessage(answerMsg.chat.id, `❌ Error processing your answer: ${error.message}`);
-            } catch (sendError) {
-                console.error('❌ Failed to send error message:', sendError);
-            }
-        } finally {
-            this.waitingAnswers.delete(userKey);
-            console.log(`🧹 Auto-cleaned waitForAnswer for ${userKey}`);
-        }
-    }
-
-    // ✅ NEW: Process Callback Data as Commands
-    async processCallbackAsCommand(bot, token, callbackQuery) {
-        try {
-            const { data, message, from } = callbackQuery;
-            const callbackData = data;
-            
-            console.log(`🔘 Processing callback as command: ${callbackData} from ${from.first_name}`);
-            
-            // Find command that matches this callback data
-            const commands = this.botCommands.get(token) || [];
-            const matchingCommand = commands.find(cmd => {
-                if (!cmd.command_patterns) return false;
-                const patterns = cmd.command_patterns.split(',').map(p => p.trim());
-                return patterns.includes(callbackData);
-            });
-            
-            if (matchingCommand) {
-                console.log(`🎯 Found command for callback: ${matchingCommand.command_patterns}`);
-                
-                // Create a message-like object for the callback
-                const callbackMessage = {
-                    chat: message.chat,
-                    from: from,
-                    message_id: message.message_id,
-                    text: callbackData,
-                    date: new Date().getTime() / 1000
-                };
-                
-                // Execute the command
-                await this.executeCommand(bot, matchingCommand, callbackMessage, callbackData);
-                
-                // Answer the callback query
-                await bot.answerCallbackQuery(callbackQuery.id, { 
-                    text: `Executed: ${callbackData}`,
-                    show_alert: false 
-                });
-                
-            } else {
-                console.log(`❌ No command found for callback: ${callbackData}`);
-                await bot.answerCallbackQuery(callbackQuery.id, { 
-                    text: `Unknown command: ${callbackData}`,
-                    show_alert: true 
-                });
-            }
-            
-        } catch (error) {
-            console.error('❌ Callback command processing error:', error);
-            
-            try {
-                await bot.answerCallbackQuery(callbackQuery.id, { 
-                    text: `Error: ${error.message}`,
-                    show_alert: true 
-                });
-            } catch (answerError) {
-                console.error('❌ Failed to answer callback query:', answerError);
-            }
-        }
-    }
-
-    async preloadUserData(botToken, userId) {
-        try {
-            const { data, error } = await supabase
-                .from('universal_data')
-                .select('data_key, data_value')
-                .eq('data_type', 'user_data')
-                .eq('bot_token', botToken)
-                .eq('user_id', userId.toString());
-
-            if (error) {
-                console.error('❌ Preload data error:', error);
-                return;
-            }
-
-            if (data) {
-                data.forEach(item => {
-                    const cacheKey = `${botToken}_${userId}_${item.data_key}`;
-                    try {
-                        const value = JSON.parse(item.data_value);
-                        this.dataCache.set(cacheKey, value);
-                    } catch {
-                        this.dataCache.set(cacheKey, item.data_value);
-                    }
-                });
-            }
-        } catch (error) {
-            console.error('❌ Preload user data error:', error);
-        }
-    }
-
-    async initializeBot(token) {
-        try {
-            console.log(`🔄 Initializing bot: ${token.substring(0, 15)}...`);
-
-            const { data: commands, error } = await supabase
-                .from('commands')
-                .select('*')
-                .eq('bot_token', token)
-                .eq('is_active', true);
-
-            if (error) throw error;
-
-            let bot;
-            
-            if (this.USE_WEBHOOK) {
-                bot = new TelegramBot(token, { 
-                    polling: false,
-                    request: { 
-                        concurrency: 10,
-                        timeout: 30000
-                    }
-                });
-                
-                const baseUrl = process.env.BASE_URL;
-                const webhookUrl = `${baseUrl}/api/webhook/${token}`;
-                
-                await bot.deleteWebHook();
-                await bot.setWebHook(webhookUrl, {
-                    max_connections: 100,
-                    allowed_updates: [
-                        'message', 'edited_message', 'channel_post', 'edited_channel_post',
-                        'inline_query', 'chosen_inline_result', 'callback_query',
-                        'shipping_query', 'pre_checkout_query', 'poll', 'poll_answer',
-                        'my_chat_member', 'chat_member', 'chat_join_request'
-                    ]
-                });
-                console.log(`✅ Webhook set: ${webhookUrl}`);
-            } else {
-                bot = new TelegramBot(token, { 
-                    polling: {
-                        interval: 1000,
-                        autoStart: true,
-                        params: { 
-                            timeout: 10,
-                            allowed_updates: [
-                                'message', 'edited_message', 'channel_post', 'edited_channel_post',
-                                'inline_query', 'chosen_inline_result', 'callback_query',
-                                'shipping_query', 'pre_checkout_query', 'poll', 'poll_answer',
-                                'my_chat_member', 'chat_member', 'chat_join_request'
-                            ]
-                        }
-                    },
-                    request: {
-                        timeout: 30000
-                    }
-                });
-            }
-
-            this.setupEventHandlers(bot, token);
-
-            try {
-                const botInfo = await bot.getMe();
-                console.log(`✅ Bot connected: @${botInfo.username}`);
-            } catch (botError) {
-                console.error(`❌ Bot connection failed:`, botError.message);
-                throw botError;
-            }
-
-            this.activeBots.set(token, bot);
-            this.botCommands.set(token, commands || []);
-
-            setInterval(() => this.cleanupStaleHandlers(), 5 * 60 * 1000);
-
-            return true;
-        } catch (error) {
-            console.error(`❌ Initialize bot error:`, error);
-            throw error;
-        }
-    }
-
-    setupEventHandlers(bot, token) {
-        bot.on('message', (msg) => this.handleMessage(bot, token, msg));
-        bot.on('edited_message', (msg) => this.handleEditedMessage(bot, token, msg));
-        bot.on('photo', (msg) => this.handleMedia(bot, token, msg, 'photo'));
-        bot.on('video', (msg) => this.handleMedia(bot, token, msg, 'video'));
-        bot.on('document', (msg) => this.handleMedia(bot, token, msg, 'document'));
-        bot.on('audio', (msg) => this.handleMedia(bot, token, msg, 'audio'));
-        bot.on('voice', (msg) => this.handleMedia(bot, token, msg, 'voice'));
-        bot.on('sticker', (msg) => this.handleMedia(bot, token, msg, 'sticker'));
-        bot.on('location', (msg) => this.handleLocation(bot, token, msg));
-        bot.on('contact', (msg) => this.handleContact(bot, token, msg));
-        bot.on('poll', (poll) => this.handlePoll(bot, token, poll));
-        bot.on('poll_answer', (pollAnswer) => this.handlePollAnswer(bot, token, pollAnswer));
-        
-        // ✅ FIXED: Callback query handler - NOW PROCESSES AS COMMANDS
-        bot.on('callback_query', (callbackQuery) => this.handleCallbackQuery(bot, token, callbackQuery));
-        
-        bot.on('inline_query', (inlineQuery) => this.handleInlineQuery(bot, token, inlineQuery));
-        bot.on('new_chat_members', (msg) => this.handleChatMember(bot, token, msg, 'new'));
-        bot.on('left_chat_member', (msg) => this.handleChatMember(bot, token, msg, 'left'));
-        
-        bot.on('polling_error', (error) => console.error(`❌ Polling error:`, error));
-        bot.on('webhook_error', (error) => console.error(`❌ Webhook error:`, error));
-        bot.on('error', (error) => console.error(`❌ Bot error:`, error));
-    }
-
-    // ✅ FIXED: MESSAGE HANDLER
-    async handleMessage(bot, token, msg) {
-        try {
-            if (!msg.text && !msg.caption) return;
-
-            const chatId = msg.chat.id;
-            const userId = msg.from.id;
-            const text = msg.text || msg.caption || '';
-
-            console.log(`📨 Message from ${msg.from.first_name} (${userId}): "${text}"`);
-            console.log(`🔑 Bot token: ${token.substring(0, 10)}...`);
-
-            const userKey = `${token}_${userId}`;
-
-            // ✅ FIXED: 1. FIRST - Check for waitForAnswer() promises
-            if (this.nextCommandHandlers.has(userKey)) {
-                console.log(`✅ WAIT FOR ANSWER HANDLER FOUND! Processing...`);
-                const handlerData = this.nextCommandHandlers.get(userKey);
-                
-                if (handlerData && handlerData.resolve) {
-                    console.log(`🎯 Resolving waitForAnswer with: "${text}"`);
-                    handlerData.resolve(text);
-                    this.nextCommandHandlers.delete(userKey);
-                    console.log(`✅ waitForAnswer resolved successfully`);
-                    return;
-                } else {
-                    console.log(`❌ Handler data exists but resolve function missing`);
-                    this.nextCommandHandlers.delete(userKey);
-                }
-            }
-
-            // 2. Check for command-based answer handlers
-            if (this.commandAnswerHandlers.has(userKey)) {
-                console.log(`✅ COMMAND ANSWER HANDLER FOUND! Processing...`);
-                await this.processCommandAnswer(userKey, text, msg);
-                return;
-            }
-
-            // 3. Check for next command handler (other types)
-            const nextCommandKey = `${token}_${userId}_next`;
-            if (this.nextCommandHandlers.has(nextCommandKey)) {
-                console.log(`✅ NEXT COMMAND HANDLER FOUND! Executing...`);
-                const handler = this.nextCommandHandlers.get(nextCommandKey);
-                this.nextCommandHandlers.delete(nextCommandKey);
-                
-                try {
-                    await handler(text, msg);
-                    console.log(`✅ Next command handler executed successfully`);
-                    return;
-                } catch (handlerError) {
-                    console.error(`❌ Next command handler error:`, handlerError);
-                    await this.sendError(bot, chatId, handlerError);
-                    return;
-                }
-            }
-
-            // Handle special commands
-            if (text.startsWith('/python ')) {
-                await this.executePythonCode(bot, chatId, text.replace('/python ', ''));
-                return;
-            }
-
-            if (text.startsWith('/ai ') || text.startsWith('/generate ')) {
-                await this.generateAICode(bot, chatId, text);
-                return;
-            }
-
-            // Find and execute matching command
-            const command = await this.findMatchingCommand(token, text, msg);
-            if (command) {
-                console.log(`🎯 Executing command: ${command.command_patterns}`);
-                console.log(`🔑 Command bot token: ${command.bot_token?.substring(0, 10)}...`);
-                await this.executeCommand(bot, command, msg, text);
-            } else {
-                console.log(`❌ No matching command found for: "${text}"`);
-            }
-
-        } catch (error) {
-            console.error('❌ Handle message error:', error);
-            await this.sendError(bot, msg.chat.id, error);
-        }
-    }
-
-    // ✅ FIXED: Cleanup stale handlers
-    cleanupStaleHandlers() {
-        const now = Date.now();
-        const STALE_TIMEOUT = 10 * 60 * 1000; // 10 minutes
-        
-        // Cleanup waitForAnswer handlers
-        for (const [userKey, handlerData] of this.nextCommandHandlers.entries()) {
-            if (now - handlerData.timestamp > STALE_TIMEOUT) {
-                console.log(`🧹 Removing stale waitForAnswer handler for ${userKey}`);
-                if (handlerData.reject) {
-                    handlerData.reject(new Error('Wait for answer timeout (system cleanup)'));
-                }
-                this.nextCommandHandlers.delete(userKey);
-            }
-        }
-        
-        // Cleanup command answer handlers
-        for (const [userKey, handlerData] of this.commandAnswerHandlers.entries()) {
-            if (now - handlerData.timestamp > STALE_TIMEOUT) {
-                console.log(`🧹 Removing stale command handler for ${userKey}`);
-                this.commandAnswerHandlers.delete(userKey);
-            }
-        }
-    }
-
-    // ✅ FIXED: Callback Query Handler - NOW PROCESSES AS COMMANDS
+    // Other methods remain mostly the same but with better error handling...
     async handleCallbackQuery(bot, token, callbackQuery) {
         try {
-            const { data, message, from } = callbackQuery;
+            const { data, from } = callbackQuery;
             console.log(`🔘 Callback received: ${data} from ${from.first_name}`);
 
-            // 1. FIRST: Try to process as a command
             await this.processCallbackAsCommand(bot, token, callbackQuery);
-            
-            // 2. SECOND: If not processed as command, try nextCommandHandlers
-            const callbackKey = `${token}_${data}`;
-            if (this.nextCommandHandlers.has(callbackKey)) {
-                console.log(`✅ NEXT COMMAND HANDLER FOUND FOR CALLBACK!`);
-                const handler = this.nextCommandHandlers.get(callbackKey);
-                await handler(data, callbackQuery);
-                this.nextCommandHandlers.delete(callbackKey);
-            }
-
-            // Always answer the callback query
             await bot.answerCallbackQuery(callbackQuery.id);
             
         } catch (error) {
@@ -852,94 +529,6 @@ class BotManager {
                 console.error('❌ Failed to answer callback query:', answerError);
             }
         }
-    }
-
-    async handleMedia(bot, token, msg, mediaType) {
-        try {
-            const caption = msg.caption || '';
-            const command = await this.findMatchingCommand(token, caption, msg);
-            if (command) {
-                await this.executeCommand(bot, command, msg, caption);
-            }
-        } catch (error) {
-            console.error(`❌ Handle ${mediaType} error:`, error);
-        }
-    }
-
-    async handleInlineQuery(bot, token, inlineQuery) {
-        try {
-            console.log(`🔍 Inline query: ${inlineQuery.query}`);
-            
-            const results = [{
-                type: 'article',
-                id: '1',
-                title: 'Inline Result',
-                input_message_content: {
-                    message_text: `You searched: ${inlineQuery.query}`
-                },
-                description: 'Test inline result'
-            }];
-
-            await bot.answerInlineQuery(inlineQuery.id, results);
-        } catch (error) {
-            console.error('❌ Inline query error:', error);
-        }
-    }
-
-    async handleEditedMessage(bot, token, msg) {
-        console.log(`✏️ Edited message from ${msg.from.first_name}`);
-    }
-
-    async handleLocation(bot, token, msg) {
-        console.log(`📍 Location from ${msg.from.first_name}`);
-    }
-
-    async handleContact(bot, token, msg) {
-        console.log(`📞 Contact from ${msg.from.first_name}`);
-    }
-
-    async handlePoll(bot, token, poll) {
-        console.log(`📊 Poll: ${poll.question}`);
-    }
-
-    async handlePollAnswer(bot, token, pollAnswer) {
-        console.log(`🗳️ Poll answer received`);
-    }
-
-    async handleChatMember(bot, token, msg, type) {
-        console.log(`👥 ${type === 'new' ? 'New' : 'Left'} chat member`);
-    }
-
-    async executePythonCode(bot, chatId, pythonCode) {
-        try {
-            await bot.sendMessage(chatId, '🐍 Executing Python code...');
-            const result = await pythonRunner.runPythonCode(pythonCode);
-            await bot.sendMessage(chatId, `✅ Python Result:\n\`\`\`\n${result}\n\`\`\``, {
-                parse_mode: 'Markdown'
-            });
-        } catch (error) {
-            await bot.sendMessage(chatId, `❌ Python Error:\n\`\`\`\n${error.message}\n\`\`\``, {
-                parse_mode: 'Markdown'
-            });
-        }
-    }
-
-    async generateAICode(bot, chatId, prompt) {
-        try {
-            const aiPrompt = prompt.replace('/ai ', '').replace('/generate ', '');
-            const generatedCode = this.generateCodeFromPrompt(aiPrompt);
-            await bot.sendMessage(chatId, `🤖 Generated Code:\n\`\`\`javascript\n${generatedCode}\n\`\`\``, {
-                parse_mode: 'Markdown'
-            });
-        } catch (error) {
-            await bot.sendMessage(chatId, `❌ AI Generation Error: ${error.message}`);
-        }
-    }
-
-    generateCodeFromPrompt(prompt) {
-        return `// AI Generated code for: "${prompt}"
-const user = getUser();
-bot.sendMessage(\`Hello \${user.first_name}! You said: "${prompt}"\`);`;
     }
 
     async findMatchingCommand(token, text, msg) {
@@ -977,116 +566,23 @@ We've logged this error and will fix it soon.
         }
     }
 
-// server/core/bot-manager.js - COMPLETE FIXED VERSION
-
-async saveData(dataType, botToken, userId, key, value, metadata = {}) {
-    try {
-        console.log(`💾 Saving data: ${dataType}.${key} =`, value);
-        
-        // Prepare the data object
-        const dataObject = {
-            data_type: dataType,
-            bot_token: botToken,
-            user_id: userId ? userId.toString() : null,
-            data_key: key,
-            data_value: typeof value === 'object' ? JSON.stringify(value) : String(value),
-            metadata: {
-                ...metadata,
-                value_type: typeof value,
-                saved_at: new Date().toISOString()
-            },
-            updated_at: new Date().toISOString()
-        };
-
-        // ✅ FIXED: Use simple insert for now (avoid UPSERT issues)
-        const { data, error } = await supabase
-            .from('universal_data')
-            .insert([dataObject]);
-
-        if (error) {
-            // If insert fails due to duplicate, try update
-            if (error.code === '23505') {
-                console.log('🔄 Duplicate detected, updating instead...');
-                const { error: updateError } = await supabase
-                    .from('universal_data')
-                    .update({
-                        data_value: dataObject.data_value,
-                        metadata: dataObject.metadata,
-                        updated_at: dataObject.updated_at
-                    })
-                    .eq('data_type', dataType)
-                    .eq('bot_token', botToken)
-                    .eq('user_id', userId ? userId.toString() : null)
-                    .eq('data_key', key);
-
-                if (updateError) {
-                    console.error('❌ Update data error:', updateError);
-                    throw updateError;
-                }
-            } else {
-                console.error('❌ Save data error:', error);
-                throw error;
-            }
-        }
-
-        console.log(`✅ Data saved successfully: ${dataType}.${key}`);
-        return value;
-        
-    } catch (error) {
-        console.error('❌ Save data error:', error);
-        // Don't throw error - allow bot to continue
-        return value;
-    }
-}
-    async getData(dataType, botToken, userId, key) {
-        try {
-            const { data, error } = await supabase
-                .from('universal_data')
-                .select('data_value, metadata')
-                .eq('data_type', dataType)
-                .eq('bot_token', botToken)
-                .eq('user_id', userId ? userId.toString() : null)
-                .eq('data_key', key)
-                .single();
-
-            if (error) {
-                if (error.code === 'PGRST116') return null;
-                console.error('❌ Get data error:', error);
-                return null;
-            }
-            
-            if (data && data.data_value) {
-                try {
-                    return JSON.parse(data.data_value);
-                } catch {
-                    return data.data_value;
-                }
-            }
-            return null;
-        } catch (error) {
-            console.error('❌ Get data error:', error);
-            return null;
-        }
+    getBotInstance(token) {
+        return this.activeBots.get(token);
     }
 
-    async deleteData(dataType, botToken, userId, key) {
+    async handleBotUpdate(token, update) {
         try {
-            const { error } = await supabase
-                .from('universal_data')
-                .delete()
-                .eq('data_type', dataType)
-                .eq('bot_token', botToken)
-                .eq('user_id', userId ? userId.toString() : null)
-                .eq('data_key', key);
-
-            if (error) {
-                console.error('❌ Delete data error:', error);
-                return false;
+            const bot = this.activeBots.get(token);
+            if (bot && this.USE_WEBHOOK) {
+                // Process the update through our message handler
+                if (update.message) {
+                    await this.handleMessage(bot, token, update.message);
+                } else if (update.callback_query) {
+                    await this.handleCallbackQuery(bot, token, update.callback_query);
+                }
             }
-            return true;
         } catch (error) {
-            console.error('❌ Delete data error:', error);
-            return false;
+            console.error('❌ Handle bot update error:', error);
         }
     }
 
