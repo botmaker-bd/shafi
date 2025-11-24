@@ -1,4 +1,4 @@
-// server/core/command-executor.js - COMPLETELY FIXED VERSION
+// server/core/command-executor.js - FIXED VERSION WITH AUTO AWAIT
 async function executeCommandCode(botInstance, code, context) {
     return new Promise(async (resolve, reject) => {
         try {
@@ -545,8 +545,8 @@ async function executeCommandCode(botInstance, code, context) {
                 ...messageFunctions
             };
 
-            // ✅ FIXED: Create ASYNC execution function with ALL VARIABLE VARIATIONS
-            const executionFunction = new Function(
+            // ✅ NEW: AUTO AWAIT FUNCTION - Automatically adds await to async calls
+            const autoAwaitFunction = new Function(
                 'env',
                 `return (async function() {
                     try {
@@ -612,11 +612,55 @@ async function executeCommandCode(botInstance, code, context) {
                         
                         console.log('✅ Execution started for user:', currentUser.first_name);
                         console.log('🔍 Available Bot methods:', Object.keys(Bot).length);
-                        console.log('🔍 Bot.metaData type:', typeof Bot.metaData);
                         
-                        // User's code starts here
-                        ${code}
-                        // User's code ends here
+                        // ✅ AUTO AWAIT HELPER FUNCTION
+                        const autoAwait = async (line) => {
+                            // Check if line contains async operations
+                            const asyncPatterns = [
+                                /User\\.(saveData|getData|deleteData|increment|getAllData|clearAll)/,
+                                /BotData\\.(saveData|getData|deleteData)/,
+                                /waitForAnswer|ask|wait|delay|sleep/,
+                                /sendMessage|send|reply|sendPhoto|sendDocument|sendVideo|sendAudio|sendVoice|sendLocation|sendContact/,
+                                /metaData|metadata|getMeta|inspect/,
+                                /runPython|executePython/
+                            ];
+                            
+                            for (const pattern of asyncPatterns) {
+                                if (pattern.test(line)) {
+                                    // Check if await is already present
+                                    if (!line.trim().startsWith('await ') && !line.trim().startsWith('const ') && !line.trim().startsWith('let ') && !line.trim().startsWith('var ')) {
+                                        return 'await ' + line;
+                                    }
+                                    break;
+                                }
+                            }
+                            return line;
+                        };
+                        
+                        // Process user code line by line
+                        const userCode = \`${code}\`;
+                        const lines = userCode.split('\\n');
+                        let processedCode = '';
+                        
+                        for (let line of lines) {
+                            const trimmedLine = line.trim();
+                            
+                            // Skip empty lines and comments
+                            if (!trimmedLine || trimmedLine.startsWith('//')) {
+                                processedCode += line + '\\n';
+                                continue;
+                            }
+                            
+                            // Process the line with auto await
+                            const processedLine = await autoAwait(trimmedLine);
+                            processedCode += (processedLine !== trimmedLine ? '    ' + processedLine : line) + '\\n';
+                        }
+                        
+                        console.log('🔧 Processed code with auto await:');
+                        console.log(processedCode);
+                        
+                        // Execute the processed code
+                        eval(processedCode);
                         
                         return "Command completed successfully";
                     } catch (error) {
@@ -653,8 +697,8 @@ async function executeCommandCode(botInstance, code, context) {
             );
 
             // Execute the command
-            console.log('🚀 Executing command...');
-            const result = await executionFunction(mergedEnvironment);
+            console.log('🚀 Executing command with auto await...');
+            const result = await autoAwaitFunction(mergedEnvironment);
             
             console.log('✅ Command execution completed');
             resolve(result);
