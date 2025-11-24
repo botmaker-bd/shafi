@@ -1,4 +1,4 @@
-// server/core/bot-manager.js - OPTIMIZED VERSION
+// server/core/bot-manager.js - FIXED VERSION
 const TelegramBot = require('node-telegram-bot-api');
 const supabase = require('../config/supabase');
 const { executeCommandCode } = require('./command-executor');
@@ -68,6 +68,8 @@ class BotManager {
 
     async executeCommand(bot, command, msg, userInput = null) {
         try {
+            console.log(`🔧 Executing command: ${command.command_patterns}`);
+            
             await this.preloadUserData(command.bot_token, msg.from.id);
             
             const context = this.createExecutionContext(bot, command, msg, userInput);
@@ -91,7 +93,9 @@ class BotManager {
             try {
                 const errorMsg = `❌ Command Error: ${error.message}`;
                 await bot.sendMessage(msg.chat.id, errorMsg);
-            } catch (sendError) {}
+            } catch (sendError) {
+                console.error('❌ Failed to send error message:', sendError);
+            }
             
             throw error;
         }
@@ -102,16 +106,25 @@ class BotManager {
         
         if (!botToken) {
             console.error('❌ CRITICAL: command.bot_token is undefined!');
+            console.log('🔍 Command object:', command);
         }
         
         const self = this;
 
         return {
-            msg, chatId: msg.chat.id, userId: msg.from.id,
-            username: msg.from.username, first_name: msg.from.first_name,
-            last_name: msg.from.last_name, language_code: msg.from.language_code,
-            botToken, userInput, nextCommandHandlers: this.waitingAnswers,
-            waitingAnswers: this.waitingAnswers, commandAnswerHandlers: this.commandAnswerHandlers,
+            msg, 
+            chatId: msg.chat.id, 
+            userId: msg.from.id,
+            username: msg.from.username || '', 
+            first_name: msg.from.first_name || '',
+            last_name: msg.from.last_name || '', 
+            language_code: msg.from.language_code || '',
+            botToken: botToken || 'unknown', 
+            userInput, 
+            nextCommandHandlers: this.waitingAnswers,
+            waitingAnswers: this.waitingAnswers, 
+            commandAnswerHandlers: this.commandAnswerHandlers,
+            command: command,
             
             User: {
                 saveData: (key, value) => {
@@ -121,8 +134,8 @@ class BotManager {
                 },
                 
                 getData: (key) => {
-                    const defaults = { 'total_usage': 0, 'user_count': 1, 'usage_count': 0 };
-                    return defaults[key] || null;
+                    // This will be handled by the actual getData function in command-executor
+                    return null;
                 },
                 
                 deleteData: (key) => 
@@ -130,10 +143,8 @@ class BotManager {
                         .catch(err => console.error('❌ Background delete error:', err)),
                 
                 increment: async (key, amount = 1) => {
-                    const current = this.User.getData(key) || 0;
-                    const newValue = parseInt(current) + parseInt(amount);
-                    this.User.saveData(key, newValue);
-                    return newValue;
+                    // This will be handled by the actual increment function in command-executor
+                    return amount;
                 }
             },
             
