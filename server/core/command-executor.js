@@ -1,4 +1,4 @@
-// server/core/command-executor.js - COMPLETELY FIXED VERSION
+// server/core/command-executor.js - COMPLETE FIXED VERSION WITH DEBUG LOGS
 async function executeCommandCode(botInstance, code, context) {
     return new Promise(async (resolve, reject) => {
         try {
@@ -263,67 +263,6 @@ async function executeCommandCode(botInstance, code, context) {
                         console.error('❌ Increment data error:', error);
                         throw error;
                     }
-                },
-                
-                // ✅ NEW: Get all user data
-                getAllData: async () => {
-                    try {
-                        const supabase = require('../config/supabase');
-                        console.log(`📊 Getting all user data`);
-                        
-                        const { data, error } = await supabase
-                            .from('universal_data')
-                            .select('data_key, data_value, updated_at')
-                            .eq('data_type', 'user_data')
-                            .eq('bot_token', resolvedBotToken)
-                            .eq('user_id', userId.toString());
-
-                        if (error) {
-                            console.error('❌ Get all data error:', error);
-                            return {};
-                        }
-
-                        const result = {};
-                        for (const item of data || []) {
-                            try {
-                                result[item.data_key] = JSON.parse(item.data_value);
-                            } catch {
-                                result[item.data_key] = item.data_value;
-                            }
-                        }
-                        
-                        console.log(`✅ Retrieved ${Object.keys(result).length} user data entries`);
-                        return result;
-                    } catch (error) {
-                        console.error('❌ Get all data error:', error);
-                        return {};
-                    }
-                },
-                
-                // ✅ NEW: Clear all user data
-                clearAll: async () => {
-                    try {
-                        const supabase = require('../config/supabase');
-                        console.log(`🧹 Clearing all user data`);
-                        
-                        const { error } = await supabase
-                            .from('universal_data')
-                            .delete()
-                            .eq('data_type', 'user_data')
-                            .eq('bot_token', resolvedBotToken)
-                            .eq('user_id', userId.toString());
-
-                        if (error) {
-                            console.error('❌ Clear all data error:', error);
-                            throw new Error(`Failed to clear data: ${error.message}`);
-                        }
-                        
-                        console.log(`✅ All user data cleared`);
-                        return true;
-                    } catch (error) {
-                        console.error('❌ Clear all data error:', error);
-                        throw error;
-                    }
                 }
             };
 
@@ -574,62 +513,140 @@ async function executeCommandCode(botInstance, code, context) {
                 ...messageFunctions
             };
 
-            // ✅ FIXED: SIMPLIFIED EXECUTION WITHOUT COMPLEX TEMPLATE STRINGS
-            const executionFunction = new Function(
-                'env',
-                `with(env) {
-                    return (async function() {
-                        try {
-                            console.log('✅ Execution started for user:', currentUser.first_name);
-                            
-                            // ✅ SIMPLE AUTO AWAIT HELPER
-                            const autoAwait = async (func, ...args) => {
-                                const funcStr = func.toString();
-                                const isAsync = funcStr.includes('async') || 
-                                              funcStr.includes('User.') || 
-                                              funcStr.includes('BotData.') ||
-                                              funcStr.includes('sendMessage') ||
-                                              funcStr.includes('sendPhoto') ||
-                                              funcStr.includes('waitForAnswer') ||
-                                              funcStr.includes('wait') ||
-                                              funcStr.includes('metaData');
-                                
-                                if (isAsync) {
-                                    return await func(...args);
-                                } else {
-                                    return func(...args);
-                                }
-                            };
-                            
-                            // User's code starts here
-                            ${code}
-                            // User's code ends here
-                            
-                            return "Command completed successfully";
-                        } catch (error) {
-                            console.error('❌ Execution error:', error);
-                            try {
-                                let errorMsg = "❌ Error: " + error.message.substring(0, 100);
-                                if (errorMsg.length > 200) errorMsg = errorMsg.substring(0, 200) + "...";
-                                await env.sendMessage(errorMsg);
-                            } catch (sendError) {
-                                console.error('Failed to send error message:', sendError);
-                            }
-                            throw error;
+            // ✅ ULTIMATE SOLUTION: AUTO-AWAIT WITH DEBUG LOGS
+            const executeWithAutoAwait = async (userCode, env) => {
+                try {
+                    console.log('🚀 STARTING AUTO-AWAIT EXECUTION');
+                    console.log('📝 ORIGINAL USER CODE:');
+                    console.log(userCode);
+                    
+                    // Create auto-await wrapper functions
+                    const autoAwaitWrapper = {
+                        // User data with auto-await
+                        UserSave: async (key, value) => {
+                            console.log(`🔄 AUTO-AWAIT: User.saveData("${key}", ${value})`);
+                            const result = await env.User.saveData(key, value);
+                            console.log(`✅ AUTO-AWAIT RESULT: User.saveData =`, result);
+                            return result;
+                        },
+                        UserGet: async (key) => {
+                            console.log(`🔄 AUTO-AWAIT: User.getData("${key}")`);
+                            const result = await env.User.getData(key);
+                            console.log(`✅ AUTO-AWAIT RESULT: User.getData =`, result);
+                            return result;
+                        },
+                        
+                        // Bot data with auto-await
+                        BotDataSave: async (key, value) => {
+                            console.log(`🔄 AUTO-AWAIT: BotData.saveData("${key}", ${value})`);
+                            const result = await env.BotData.saveData(key, value);
+                            console.log(`✅ AUTO-AWAIT RESULT: BotData.saveData =`, result);
+                            return result;
+                        },
+                        BotDataGet: async (key) => {
+                            console.log(`🔄 AUTO-AWAIT: BotData.getData("${key}")`);
+                            const result = await env.BotData.getData(key);
+                            console.log(`✅ AUTO-AWAIT RESULT: BotData.getData =`, result);
+                            return result;
+                        },
+                        
+                        // Bot messages with auto-await
+                        BotSend: async (text, options) => {
+                            console.log(`🔄 AUTO-AWAIT: bot.sendMessage("${text.substring(0, 50)}...")`);
+                            const result = await env.bot.sendMessage(env.chatId, text, options);
+                            console.log(`✅ AUTO-AWAIT RESULT: bot.sendMessage =`, result);
+                            return result;
                         }
-                    })();
-                }`
-            );
+                    };
 
-            // Execute the command
-            console.log('🚀 Executing command...');
-            const result = await executionFunction(mergedEnvironment);
+                    // Process user code to add auto-await
+                    let processedCode = userCode;
+                    
+                    console.log('🔧 PROCESSING CODE FOR AUTO-AWAIT...');
+                    
+                    // Replace User.saveData with auto-awaited version
+                    processedCode = processedCode.replace(
+                        /User\.saveData\(([^)]+)\)/g,
+                        'await __autoAwait.UserSave($1)'
+                    );
+                    
+                    // Replace User.getData with auto-awaited version
+                    processedCode = processedCode.replace(
+                        /User\.getData\(([^)]+)\)/g, 
+                        'await __autoAwait.UserGet($1)'
+                    );
+                    
+                    // Replace BotData.saveData with auto-awaited version
+                    processedCode = processedCode.replace(
+                        /BotData\.saveData\(([^)]+)\)/g,
+                        'await __autoAwait.BotDataSave($1)'
+                    );
+                    
+                    // Replace BotData.getData with auto-awaited version
+                    processedCode = processedCode.replace(
+                        /BotData\.getData\(([^)]+)\)/g,
+                        'await __autoAwait.BotDataGet($1)'
+                    );
+                    
+                    // Replace bot.sendMessage with auto-awaited version
+                    processedCode = processedCode.replace(
+                        /bot\.sendMessage\(([^)]+)\)/g,
+                        'await __autoAwait.BotSend($1)'
+                    );
+                    
+                    console.log('📝 PROCESSED CODE WITH AUTO-AWAIT:');
+                    console.log(processedCode);
+                    
+                    // Create enhanced environment with auto-await wrapper
+                    const enhancedEnv = {
+                        ...env,
+                        __autoAwait: autoAwaitWrapper
+                    };
+                    
+                    // Execute the processed code
+                    const executionFunction = new Function(
+                        'env',
+                        `with(env) {
+                            return (async function() {
+                                try {
+                                    console.log('🎯 EXECUTING PROCESSED CODE...');
+                                    ${processedCode}
+                                    console.log('✅ PROCESSED CODE EXECUTION COMPLETED');
+                                    return "Command executed successfully with auto-await";
+                                } catch (error) {
+                                    console.error('❌ PROCESSED CODE ERROR:', error);
+                                    // Send error message
+                                    try {
+                                        await env.bot.sendMessage(env.chatId, "❌ Error: " + error.message);
+                                    } catch (sendError) {
+                                        console.error('Failed to send error message:', sendError);
+                                    }
+                                    throw error;
+                                }
+                            })();
+                        }`
+                    );
+
+                    console.log('🚀 EXECUTING FINAL CODE...');
+                    const result = await executionFunction(enhancedEnv);
+                    console.log('✅ AUTO-AWAIT EXECUTION COMPLETED SUCCESSFULLY');
+                    return result;
+                    
+                } catch (error) {
+                    console.error('❌ AUTO-AWAIT EXECUTION FAILED:', error);
+                    throw error;
+                }
+            };
+
+            // ✅ EXECUTE WITH AUTO-AWAIT
+            console.log('🔧 STARTING COMMAND EXECUTION WITH AUTO-AWAIT...');
+            const result = await executeWithAutoAwait(code, mergedEnvironment);
             
-            console.log('✅ Command execution completed');
+            console.log('🎉 COMMAND EXECUTION COMPLETED SUCCESSFULLY');
             resolve(result);
 
         } catch (error) {
-            console.error('❌ Command execution failed:', error);
+            console.error('💥 COMMAND EXECUTION FAILED:', error);
             reject(error);
         }
     });
