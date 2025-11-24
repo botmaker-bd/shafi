@@ -1,4 +1,4 @@
-// server/core/command-executor.js - COMPLETELY UPDATED WITH AUTO-AWAIT
+// server/core/command-executor.js - UPDATED BotData → Bot
 const CodeTransformer = require('./code-transformer');
 
 async function executeCommandCode(botInstance, code, context) {
@@ -23,7 +23,7 @@ async function executeCommandCode(botInstance, code, context) {
       console.log('🔧 Starting command execution with AUTO-AWAIT');
       console.log('📝 Original code length:', code.length);
 
-      // 🔥 AUTO-AWAIT TRANSFORMATION
+      // 🔥 AUTO-AWAIT TRANSFORMATION (includes BotData → Bot)
       let transformedCode;
       try {
         transformedCode = CodeTransformer.transform(code);
@@ -72,72 +72,7 @@ async function executeCommandCode(botInstance, code, context) {
         return userObj;
       };
 
-      const createChatObjectFunction = () => {
-        const chatObj = msg.chat ? Object.assign({}, msg.chat) : {
-          id: chatId,
-          type: 'private'
-        };
-        return chatObj;
-      };
-
-      // Python runner function
-      const runPythonSyncFunction = (pythonCode) => {
-        try {
-          return pythonRunner.runPythonCodeSync(pythonCode);
-        } catch (error) {
-          throw new Error(`Python Error: ${error.message}`);
-        }
-      };
-
-      // Wait for answer function
-      const waitForAnswerFunction = async (question, options = {}) => {
-        return new Promise((resolveWait, rejectWait) => {
-          try {
-            const waitKey = `${resolvedBotToken}_${userId}`;
-            console.log(`⏳ Setting up waitForAnswer for user ${userId}`);
-
-            botInstance.sendMessage(chatId, question, options)
-              .then(() => {
-                if (nextCommandHandlers) {
-                  nextCommandHandlers.set(waitKey, {
-                    resolve: resolveWait,
-                    reject: rejectWait,
-                    timestamp: Date.now()
-                  });
-
-                  setTimeout(() => {
-                    if (nextCommandHandlers.has(waitKey)) {
-                      const handler = nextCommandHandlers.get(waitKey);
-                      if (handler && handler.reject) {
-                        handler.reject(new Error('Wait for answer timeout (5 minutes)'));
-                      }
-                      nextCommandHandlers.delete(waitKey);
-                    }
-                  }, 5 * 60 * 1000);
-                }
-              })
-              .catch(sendError => {
-                rejectWait(new Error('Failed to send question: ' + sendError.message));
-              });
-          } catch (error) {
-            rejectWait(new Error('WaitForAnswer setup failed: ' + error.message));
-          }
-        });
-      };
-
-      // Wait function (in seconds)
-      const waitFunction = (seconds) => {
-        const ms = seconds * 1000;
-        console.log(`⏰ Waiting for ${seconds} seconds...`);
-        return new Promise(resolveWait => {
-          setTimeout(() => {
-            console.log(`✅ Wait completed: ${seconds} seconds`);
-            resolveWait(`Waited ${seconds} seconds`);
-          }, ms);
-        });
-      };
-
-      // Data storage functions
+      // Data storage functions - 🔥 BotData → Bot
       const userDataFunctions = {
         getData: async (key) => {
           try {
@@ -270,6 +205,7 @@ async function executeCommandCode(botInstance, code, context) {
         }
       };
 
+      // 🔥 BotData → Bot renamed
       const botDataFunctions = {
         getData: async (key) => {
           try {
@@ -343,19 +279,19 @@ async function executeCommandCode(botInstance, code, context) {
         }
       };
 
-      // Create bot object with all methods
+      // Create bot object with all methods - 🔥 BotData → Bot
       const createBotObject = () => {
         const botObj = {
           ...apiWrapperInstance,
           User: userDataFunctions,
-          BotData: botDataFunctions
+          Bot: botDataFunctions  // 🔥 Changed from BotData to Bot
         };
         return botObj;
       };
 
       const botObject = createBotObject();
 
-      // Create execution environment
+      // Create execution environment - 🔥 BotData → Bot
       const executionEnv = {
         // Core functions
         getUser: createUserObjectFunction,
@@ -364,8 +300,8 @@ async function executeCommandCode(botInstance, code, context) {
         getCurrentChat: createChatObjectFunction,
         
         // Bot instances
-        Bot: botObject,
-        bot: botObject,
+        Bot: botObject,        // 🔥 This is the Telegram Bot
+        bot: botObject,        // 🔥 This is the Telegram Bot  
         api: botObject,
         Api: botObject,
         API: botObject,
@@ -388,9 +324,9 @@ async function executeCommandCode(botInstance, code, context) {
         waitForAnswer: waitForAnswerFunction,
         ask: waitForAnswerFunction,
         
-        // Data storage
+        // Data storage - 🔥 BotData → Bot
         User: userDataFunctions,
-        BotData: botDataFunctions,
+        Bot: botDataFunctions,  // 🔥 Changed from BotData to Bot
         
         // Handlers
         nextCommandHandlers: nextCommandHandlers,
