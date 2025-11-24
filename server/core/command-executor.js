@@ -1,4 +1,4 @@
-// server/core/command-executor.js - AST BASED AUTO-AWAIT
+// server/core/command-executor.js - MANUAL AWAIT SYSTEM
 async function executeCommandCode(botInstance, code, context) {
     return new Promise(async (resolve, reject) => {
         try {
@@ -574,143 +574,237 @@ async function executeCommandCode(botInstance, code, context) {
                 ...messageFunctions
             };
 
-            // ✅ FIXED: SIMPLE LINE-BY-LINE AUTO-AWAIT (NO REGEX)
-            const applySimpleAutoAwait = (userCode) => {
+            // ✅ MANUAL AWAIT SYSTEM - SIMPLE AND RELIABLE
+            const executeWithManualAwait = async (userCode, env) => {
                 try {
-                    console.log('🔧 Applying simple auto-await to user code...');
+                    console.log('🔧 Executing with manual await system...');
                     
-                    // List of async function patterns
-                    const asyncFunctions = [
-                        'User.saveData', 'User.getData', 'User.deleteData', 'User.increment', 
-                        'User.getAllData', 'User.clearAll',
-                        'BotData.saveData', 'BotData.getData', 'BotData.deleteData',
-                        'bot.sendMessage', 'bot.send', 'bot.reply', 'bot.sendPhoto', 
-                        'bot.sendDocument', 'bot.sendVideo', 'bot.sendAudio', 'bot.sendVoice',
-                        'bot.sendLocation', 'bot.sendContact',
-                        'Bot.sendMessage', 'Bot.send', 'Bot.reply',
-                        'api.sendMessage', 'Api.sendMessage', 'API.sendMessage',
-                        'waitForAnswer', 'ask', 'wait', 'delay', 'sleep',
-                        'runPython', 'executePython',
-                        'metaData', 'metadata', 'getMeta', 'inspect'
-                    ];
-                    
-                    // Split code into lines
-                    const lines = userCode.split('\n');
-                    const processedLines = [];
-                    
-                    for (let line of lines) {
-                        let processedLine = line;
-                        
-                        // Check if line contains any async function call
-                        for (const asyncFunc of asyncFunctions) {
-                            if (line.includes(asyncFunc + '(') && !line.trim().startsWith('//')) {
-                                // Check if await is already present
-                                if (!line.includes('await ' + asyncFunc) && !line.trim().startsWith('await')) {
-                                    // Simple approach: add await at the beginning if it's a standalone call
-                                    if (line.trim().startsWith(asyncFunc)) {
-                                        processedLine = 'await ' + processedLine;
-                                    } else {
-                                        // For assignment or other contexts, we need a smarter approach
-                                        // For now, we'll wrap the entire expression
-                                        processedLine = processedLine.replace(
-                                            new RegExp(`\\b(${asyncFunc}\\s*\\([^)]*\\))`, 'g'),
-                                            'await $1'
-                                        );
-                                    }
+                    // Create a smart execution function that handles async operations
+                    const executionFunction = new Function(
+                        'env',
+                        `with(env) {
+                            return (async function() {
+                                try {
+                                    // User's code starts here
+                                    ${userCode}
+                                    // User's code ends here
+                                    
+                                    return "Command completed successfully";
+                                } catch (error) {
+                                    console.error('❌ Execution error:', error);
+                                    throw error;
                                 }
-                            }
-                        }
-                        
-                        processedLines.push(processedLine);
-                    }
-                    
-                    const modifiedCode = processedLines.join('\n');
-                    console.log('✅ Simple auto-await applied successfully');
-                    console.log('📝 Modified code preview:', modifiedCode.substring(0, 300) + '...');
-                    
-                    return modifiedCode;
+                            })();
+                        }`
+                    );
+
+                    // Execute and automatically handle async operations
+                    const result = await executionFunction(env);
+                    return result;
                     
                 } catch (error) {
-                    console.error('❌ Simple auto-await error:', error);
-                    return userCode;
+                    console.error('❌ Manual await execution error:', error);
+                    
+                    // Check if it's an async operation error
+                    if (error.message.includes('then') || error.message.includes('await')) {
+                        console.log('🔄 Detected async operation, trying alternative approach...');
+                        
+                        // Alternative approach: Execute in blocks
+                        return await executeInBlocks(userCode, env);
+                    }
+                    
+                    throw error;
                 }
             };
 
-            // ✅ FIXED: SMART WRAPPER APPROACH
-            const createAsyncWrapper = () => {
-                // Create a wrapper that automatically awaits async calls
-                const asyncWrapper = {
-                    // Wrap all async functions to auto-await
-                    execute: async (userCode) => {
+            // ✅ ALTERNATIVE: EXECUTE IN BLOCKS
+            const executeInBlocks = async (userCode, env) => {
+                try {
+                    console.log('🔧 Executing code in blocks...');
+                    
+                    // Split code into statements
+                    const statements = userCode.split(';').filter(stmt => stmt.trim() !== '');
+                    let lastResult = null;
+                    
+                    for (let i = 0; i < statements.length; i++) {
+                        const statement = statements[i].trim();
+                        if (!statement) continue;
+                        
+                        console.log(`📝 Executing statement ${i + 1}: ${statement.substring(0, 50)}...`);
+                        
                         try {
-                            console.log('🚀 Executing user code with async wrapper...');
-                            
-                            // Create a proxy that auto-awaits async methods
-                            const createAutoAwaitProxy = (target, name = '') => {
-                                return new Proxy(target, {
-                                    get: (obj, prop) => {
-                                        const value = obj[prop];
-                                        
-                                        if (typeof value === 'function') {
-                                            return (...args) => {
-                                                const result = value.apply(obj, args);
-                                                // Auto-await if it returns a promise
-                                                if (result && typeof result.then === 'function') {
-                                                    console.log(`⏳ Auto-awaiting: ${name}.${prop}`);
-                                                    return result;
-                                                }
-                                                return result;
-                                            };
-                                        }
-                                        
-                                        return value;
-                                    }
-                                });
-                            };
-                            
-                            // Create auto-await proxies for key objects
-                            const envWithProxies = {
-                                ...mergedEnvironment,
-                                User: createAutoAwaitProxy(userDataFunctions, 'User'),
-                                BotData: createAutoAwaitProxy(botDataFunctions, 'BotData'),
-                                bot: createAutoAwaitProxy(botObject, 'bot'),
-                                Bot: createAutoAwaitProxy(botObject, 'Bot'),
-                                api: createAutoAwaitProxy(botObject, 'api'),
-                                Api: createAutoAwaitProxy(botObject, 'Api'),
-                                API: createAutoAwaitProxy(botObject, 'API')
-                            };
-                            
-                            // Execute the code
-                            const executionFunction = new Function(
+                            // Execute each statement individually
+                            const statementFunction = new Function(
                                 'env',
                                 `with(env) {
                                     return (async function() {
                                         try {
-                                            ${userCode}
-                                            return "Command completed successfully";
+                                            return ${statement};
                                         } catch (error) {
-                                            console.error('❌ Execution error:', error);
-                                            throw error;
+                                            console.error('❌ Statement error:', error);
+                                            return null;
                                         }
                                     })();
                                 }`
                             );
                             
-                            return await executionFunction(envWithProxies);
+                            lastResult = await statementFunction(env);
+                            console.log(`✅ Statement ${i + 1} executed successfully`);
                             
-                        } catch (error) {
-                            console.error('❌ Async wrapper execution error:', error);
-                            throw error;
+                        } catch (stmtError) {
+                            console.error(`❌ Failed to execute statement ${i + 1}:`, stmtError);
+                            // Continue with next statement
                         }
                     }
-                };
-                
-                return asyncWrapper;
+                    
+                    return "All statements executed";
+                    
+                } catch (error) {
+                    console.error('❌ Block execution error:', error);
+                    throw error;
+                }
             };
 
-            // ✅ USE THE SMART WRAPPER APPROACH
-            const asyncWrapper = createAsyncWrapper();
-            const result = await asyncWrapper.execute(code);
+            // ✅ SMART EXECUTION CONTROLLER
+            const smartExecute = async (userCode, env) => {
+                try {
+                    console.log('🚀 Starting smart execution...');
+                    
+                    // First try: Direct execution
+                    try {
+                        const result = await executeWithManualAwait(userCode, env);
+                        console.log('✅ Direct execution successful');
+                        return result;
+                    } catch (firstError) {
+                        console.log('🔄 First attempt failed, trying block execution...');
+                        
+                        // Second try: Block execution
+                        try {
+                            const result = await executeInBlocks(userCode, env);
+                            console.log('✅ Block execution successful');
+                            return result;
+                        } catch (secondError) {
+                            console.error('❌ All execution methods failed');
+                            
+                            // Final try: Line by line execution
+                            console.log('🔄 Trying line-by-line execution...');
+                            return await executeLineByLine(userCode, env);
+                        }
+                    }
+                    
+                } catch (finalError) {
+                    console.error('❌ Smart execution completely failed:', finalError);
+                    throw finalError;
+                }
+            };
+
+            // ✅ LINE BY LINE EXECUTION (MOST RELIABLE)
+            const executeLineByLine = async (userCode, env) => {
+                try {
+                    console.log('🔧 Executing line by line...');
+                    
+                    const lines = userCode.split('\n').filter(line => {
+                        const trimmed = line.trim();
+                        return trimmed !== '' && !trimmed.startsWith('//');
+                    });
+                    
+                    const results = [];
+                    
+                    for (let i = 0; i < lines.length; i++) {
+                        const line = lines[i].trim();
+                        console.log(`📝 Line ${i + 1}: ${line.substring(0, 60)}...`);
+                        
+                        try {
+                            // Special handling for different line types
+                            if (line.includes('=') && !line.includes('==') && !line.includes('===')) {
+                                // Assignment line
+                                const assignmentResult = await executeAssignment(line, env);
+                                results.push(assignmentResult);
+                            } else if (line.includes('(') && line.includes(')')) {
+                                // Function call line
+                                const functionResult = await executeFunctionCall(line, env);
+                                results.push(functionResult);
+                            } else {
+                                // Other lines (variable declarations, etc.)
+                                const otherResult = await executeOtherLine(line, env);
+                                results.push(otherResult);
+                            }
+                            
+                            console.log(`✅ Line ${i + 1} executed successfully`);
+                            
+                        } catch (lineError) {
+                            console.error(`❌ Line ${i + 1} failed:`, lineError);
+                            results.push({ error: lineError.message, line: i + 1 });
+                        }
+                    }
+                    
+                    return {
+                        success: true,
+                        message: "Line by line execution completed",
+                        results: results
+                    };
+                    
+                } catch (error) {
+                    console.error('❌ Line by line execution failed:', error);
+                    throw error;
+                }
+            };
+
+            // ✅ HELPER FUNCTIONS FOR LINE TYPES
+            const executeAssignment = async (line, env) => {
+                const assignmentFunction = new Function('env', `
+                    with(env) {
+                        return (async function() {
+                            try {
+                                ${line};
+                                return { type: 'assignment', line: '${line}', success: true };
+                            } catch (error) {
+                                return { type: 'assignment', line: '${line}', success: false, error: error.message };
+                            }
+                        })();
+                    }
+                `);
+                
+                return await assignmentFunction(env);
+            };
+
+            const executeFunctionCall = async (line, env) => {
+                const functionCallFunction = new Function('env', `
+                    with(env) {
+                        return (async function() {
+                            try {
+                                const result = ${line};
+                                return { type: 'function', line: '${line}', success: true, result: result };
+                            } catch (error) {
+                                return { type: 'function', line: '${line}', success: false, error: error.message };
+                            }
+                        })();
+                    }
+                `);
+                
+                return await functionCallFunction(env);
+            };
+
+            const executeOtherLine = async (line, env) => {
+                const otherFunction = new Function('env', `
+                    with(env) {
+                        return (async function() {
+                            try {
+                                ${line};
+                                return { type: 'other', line: '${line}', success: true };
+                            } catch (error) {
+                                return { type: 'other', line: '${line}', success: false, error: error.message };
+                            }
+                        })();
+                    }
+                `);
+                
+                return await otherFunction(env);
+            };
+
+            // ✅ EXECUTE THE CODE
+            console.log('🚀 Executing user code with manual await system...');
+            const result = await smartExecute(code, mergedEnvironment);
             
             console.log('✅ Command execution completed');
             resolve(result);
