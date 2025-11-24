@@ -18,22 +18,31 @@ class ApiWrapper {
             'unbanChatMember', 'restrictChatMember', 'promoteChatMember', 'sendSticker'
         ];
 
-        // Bind all available methods with smart chatId handling
+        // Bind all available methods with proper parameter handling
         Object.getOwnPropertyNames(Object.getPrototypeOf(this.bot))
             .filter(method => typeof this.bot[method] === 'function' && method !== 'constructor')
             .forEach(method => {
                 this[method] = async (...args) => {
                     try {
-                        // Auto-add chatId for methods that need it
                         let finalArgs = [...args];
-                        if (chatIdMethods.includes(method) && 
-                            (finalArgs.length === 0 || typeof finalArgs[0] !== 'number')) {
-                            finalArgs.unshift(this.context.chatId);
+                        
+                        // For methods that need chatId, auto-add it if not provided
+                        if (chatIdMethods.includes(method)) {
+                            // If first arg is not a number (chatId), prepend chatId
+                            if (finalArgs.length === 0 || typeof finalArgs[0] !== 'number') {
+                                finalArgs.unshift(this.context.chatId);
+                            }
                         }
+                        
+                        console.log(`🔧 API Call: ${method}`, { 
+                            chatId: this.context.chatId,
+                            args: finalArgs.length 
+                        });
                         
                         const result = await this.bot[method](...finalArgs);
                         return result;
                     } catch (error) {
+                        console.error(`❌ Telegram API Error (${method}):`, error.message);
                         throw new Error(`Telegram API Error (${method}): ${error.message}`);
                     }
                 };
@@ -52,27 +61,95 @@ class ApiWrapper {
             is_bot: false
         });
 
-        // Enhanced message methods
-        this.send = (text, options = {}) => 
-            this.sendMessage(this.context.chatId, text, { parse_mode: 'HTML', ...options });
+        // Enhanced message methods with proper parameter handling
+        this.send = (text, options = {}) => {
+            const finalOptions = { 
+                parse_mode: 'HTML', 
+                ...options 
+            };
+            return this.sendMessage(this.context.chatId, text, finalOptions);
+        };
 
-        this.reply = (text, options = {}) => 
-            this.sendMessage(this.context.chatId, text, { 
+        this.reply = (text, options = {}) => {
+            const finalOptions = { 
                 reply_to_message_id: this.context.msg?.message_id, 
                 parse_mode: 'HTML', 
                 ...options 
-            });
+            };
+            return this.sendMessage(this.context.chatId, text, finalOptions);
+        };
+
+        // Media helpers with proper parameter order
+        this.sendImage = (photo, caption = '', options = {}) => {
+            const finalOptions = { 
+                caption, 
+                parse_mode: 'HTML', 
+                ...options 
+            };
+            return this.sendPhoto(this.context.chatId, photo, finalOptions);
+        };
+
+        this.sendFile = (document, caption = '', options = {}) => {
+            const finalOptions = { 
+                caption, 
+                parse_mode: 'HTML', 
+                ...options 
+            };
+            return this.sendDocument(this.context.chatId, document, finalOptions);
+        };
+
+        this.sendVideoFile = (video, caption = '', options = {}) => {
+            const finalOptions = { 
+                caption, 
+                parse_mode: 'HTML', 
+                ...options 
+            };
+            return this.sendVideo(this.context.chatId, video, finalOptions);
+        };
+
+        this.sendAudioFile = (audio, caption = '', options = {}) => {
+            const finalOptions = { 
+                caption, 
+                parse_mode: 'HTML', 
+                ...options 
+            };
+            return this.sendAudio(this.context.chatId, audio, finalOptions);
+        };
+
+        this.sendVoiceMessage = (voice, caption = '', options = {}) => {
+            const finalOptions = { 
+                caption, 
+                parse_mode: 'HTML', 
+                ...options 
+            };
+            return this.sendVoice(this.context.chatId, voice, finalOptions);
+        };
+
+        // Location helpers
+        this.sendLocationMsg = (latitude, longitude, options = {}) => {
+            return this.sendLocation(this.context.chatId, latitude, longitude, options);
+        };
+
+        this.sendVenueMsg = (latitude, longitude, title, address, options = {}) => {
+            return this.sendVenue(this.context.chatId, latitude, longitude, title, address, options);
+        };
+
+        this.sendContactMsg = (phoneNumber, firstName, options = {}) => {
+            return this.sendContact(this.context.chatId, phoneNumber, firstName, options);
+        };
 
         // Keyboard helpers
-        this.sendKeyboard = (text, buttons, options = {}) => 
-            this.sendMessage(this.context.chatId, text, {
+        this.sendKeyboard = (text, buttons, options = {}) => {
+            const finalOptions = {
                 reply_markup: { inline_keyboard: buttons },
                 parse_mode: 'HTML',
                 ...options
-            });
+            };
+            return this.sendMessage(this.context.chatId, text, finalOptions);
+        };
 
-        this.sendReplyKeyboard = (text, buttons, options = {}) => 
-            this.sendMessage(this.context.chatId, text, {
+        this.sendReplyKeyboard = (text, buttons, options = {}) => {
+            const finalOptions = {
                 reply_markup: {
                     keyboard: buttons,
                     resize_keyboard: true,
@@ -80,21 +157,42 @@ class ApiWrapper {
                 },
                 parse_mode: 'HTML',
                 ...options
-            });
+            };
+            return this.sendMessage(this.context.chatId, text, finalOptions);
+        };
 
-        this.removeKeyboard = (text, options = {}) => 
-            this.sendMessage(this.context.chatId, text, {
+        this.removeKeyboard = (text, options = {}) => {
+            const finalOptions = {
                 reply_markup: { remove_keyboard: true },
                 parse_mode: 'HTML',
                 ...options
-            });
+            };
+            return this.sendMessage(this.context.chatId, text, finalOptions);
+        };
 
-        // Media helpers
-        this.sendImage = (photo, caption = '', options = {}) => 
-            this.sendPhoto(this.context.chatId, photo, { caption, parse_mode: 'HTML', ...options });
+        // Poll helpers
+        this.sendPollMsg = (question, options, pollOptions = {}) => {
+            const finalOptions = {
+                is_anonymous: false,
+                allows_multiple_answers: false,
+                ...pollOptions
+            };
+            return this.sendPoll(this.context.chatId, question, options, finalOptions);
+        };
 
-        this.sendFile = (document, caption = '', options = {}) => 
-            this.sendDocument(this.context.chatId, document, { caption, parse_mode: 'HTML', ...options });
+        this.sendQuiz = (question, options, correctOptionId, quizOptions = {}) => {
+            const finalOptions = {
+                type: "quiz",
+                correct_option_id: correctOptionId,
+                is_anonymous: false,
+                ...quizOptions
+            };
+            return this.sendPoll(this.context.chatId, question, options, finalOptions);
+        };
+
+        this.sendDiceMsg = (emoji = '🎲', options = {}) => {
+            return this.sendDice(this.context.chatId, { emoji, ...options });
+        };
 
         // Utility methods
         this.wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -167,7 +265,7 @@ class ApiWrapper {
             return await pythonRunner.runPythonCode(code);
         };
 
-        // ✅ FIXED: METADATA INSPECTION METHODS
+        // Metadata inspection methods
         this.getOriginalResponse = async (target = 'all') => {
             try {
                 let response;
@@ -238,7 +336,7 @@ class ApiWrapper {
             }
         };
 
-        // ✅ FIXED: ALIASES FOR METADATA METHODS
+        // Aliases for metadata methods
         this.metaData = this.getOriginalResponse;
         this.metadata = this.getOriginalResponse;
         this.getMeta = this.getOriginalResponse;
@@ -260,6 +358,31 @@ class ApiWrapper {
         });
 
         this.getContext = this.analyzeContext;
+
+        // Markdown escaping utility
+        this.escapeMarkdown = (text) => {
+            if (typeof text !== 'string') return text;
+            return text.replace(/([_*[\]()~`>#+\-=|{}.!])/g, '\\$1');
+        };
+
+        // Safe markdown message sender
+        this.sendMarkdown = (text, options = {}) => {
+            const escapedText = this.escapeMarkdown(text);
+            return this.sendMessage(this.context.chatId, escapedText, { 
+                parse_mode: 'Markdown',
+                ...options 
+            });
+        };
+
+        // Safe markdown reply
+        this.replyMarkdown = (text, options = {}) => {
+            const escapedText = this.escapeMarkdown(text);
+            return this.sendMessage(this.context.chatId, escapedText, { 
+                reply_to_message_id: this.context.msg?.message_id,
+                parse_mode: 'Markdown',
+                ...options 
+            });
+        };
     }
 }
 
