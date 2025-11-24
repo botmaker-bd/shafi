@@ -1,0 +1,46 @@
+{
+  "name": "telegram-bot-platform",
+  "version": "2.0.0",
+  "description": "Universal Telegram Bot Platform with Python Support",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "nodemon server/index.js",
+    "build": "echo 'No build needed'",
+    "setup-python": "chmod +x scripts/setup-python-env.sh && ./scripts/setup-python-env.sh",
+    "install-deps": "npm install && pip3 install -r requirements.txt",
+    "render-start": "node server/index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "axios": "^1.6.0",
+    "cors": "^2.8.5",
+    "body-parser": "^1.20.2",
+    "@supabase/supabase-js": "^2.38.0",
+    "node-telegram-bot-api": "^0.64.0",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "uuid": "^9.0.1",
+    "dotenv": "^16.3.1",
+    "express-rate-limit": "^7.1.5",
+    "@babel/parser": "^7.23.0",
+    "@babel/traverse": "^7.23.0",
+    "@babel/generator": "^7.23.0",
+    "@babel/types": "^7.23.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": "20.18.0",
+    "npm": "10.8.2"
+  },
+  "overrides": {
+    "@supabase/auth-js": {
+      "node": ">=18.0.0"
+    },
+    "@supabase/supabase-js": {
+      "node": ">=18.0.0"
+    }
+  }
+}
