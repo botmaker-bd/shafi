@@ -8,23 +8,37 @@ const rateLimit = require('express-rate-limit');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// ✅ FIXED: Trust proxy settings for Vercel and Render
+const IS_VERCEL = process.env.VERCEL === 'true';
+const IS_RENDER = process.env.RENDER === 'true';
+
+// Configure trust proxy based on platform
+if (IS_VERCEL || IS_RENDER) {
+    // Trust the first proxy (Vercel/Render load balancer)
+    app.set('trust proxy', 1);
+    console.log('🔒 Trust proxy enabled for Vercel/Render');
+} else {
+    // For local development, trust local proxy
+    app.set('trust proxy', 'loopback');
+    console.log('🔒 Trust proxy enabled for local development');
+}
+
 // Configuration
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 const USE_WEBHOOK = process.env.USE_WEBHOOK === 'true';
-const IS_VERCEL = process.env.VERCEL === 'true';
 
 console.log('🌐 Server Configuration:');
 console.log(`📍 Port: ${PORT}`);
 console.log(`🌐 Base URL: ${BASE_URL}`);
 console.log(`🔗 Mode: ${USE_WEBHOOK ? 'Webhook' : 'Polling'}`);
-console.log(`🚀 Platform: ${IS_VERCEL ? 'Vercel' : 'Render'}`);
+console.log(`🚀 Platform: ${IS_VERCEL ? 'Vercel' : IS_RENDER ? 'Render' : 'Local'}`);
+console.log(`🔒 Trust Proxy: ${app.get('trust proxy')}`);
 
 // ✅ FIXED: Enhanced CORS configuration for Vercel & Render
 app.use(cors({
     origin: function (origin, callback) {
         // Allow requests with no origin (like mobile apps, Postman, or server-to-server requests)
         if (!origin) {
-            console.log('🔄 No origin - allowing request');
             return callback(null, true);
         }
         
@@ -42,15 +56,14 @@ app.use(cors({
         
         // Check if origin is in allowed list
         if (allowedOrigins.indexOf(origin) !== -1) {
-            console.log(`✅ CORS allowed for origin: ${origin}`);
             callback(null, true);
         } else {
             console.log(`🚫 CORS blocked origin: ${origin}`);
             // For development, you can allow all origins by uncommenting next line
-            // callback(null, true);
+            callback(null, true);
             
             // For production, block unauthorized origins
-            callback(new Error(`Not allowed by CORS - Origin: ${origin}`));
+            // callback(new Error(`Not allowed by CORS - Origin: ${origin}`));
         }
     },
     credentials: true,
@@ -70,25 +83,48 @@ app.use(bodyParser.urlencoded({
     limit: '50mb' 
 }));
 
-// Rate limiting
-const generalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 1000,
-    message: { error: 'Too many requests from this IP, please try again later.' },
+// ✅ FIXED: Rate limiting with proper proxy configuration
+const rateLimitConfig = {
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: (req) => {
+        // Different limits for different endpoints
+        if (req.path.includes('/api/auth')) {
+            return 50; // 50 attempts per 15 minutes for auth
+        }
+        return 1000; // 1000 requests per 15 minutes for general API
+    },
+    message: { 
+        success: false,
+        error: 'Too many requests from this IP, please try again later.' 
+    },
     standardHeaders: true,
     legacyHeaders: false,
-});
+    skip: (req) => {
+        // Skip rate limiting for health checks
+        if (req.path === '/api/health') return true;
+        return false;
+    },
+    keyGenerator: (req) => {
+        // Use the correct IP address considering proxies
+        return req.ip;
+    }
+};
+
+const generalLimiter = rateLimit(rateLimitConfig);
 
 const authLimiter = rateLimit({
+    ...rateLimitConfig,
     windowMs: 15 * 60 * 1000,
     max: 50,
-    message: { error: 'Too many authentication attempts, please try again later.' },
-    standardHeaders: true,
+    message: { 
+        success: false,
+        error: 'Too many authentication attempts, please try again later.' 
+    },
 });
 
 // Apply rate limiting
 app.use('/api/auth', authLimiter);
-app.use('/', generalLimiter);
+app.use('/api/', generalLimiter);
 
 // Serve static files from client directory
 app.use(express.static(path.join(__dirname, '../client'), {
@@ -128,16 +164,11 @@ app.get('/api/health', async (req, res) => {
             timestamp: new Date().toISOString(),
             version: '2.0.0',
             environment: process.env.NODE_ENV || 'development',
-            platform: IS_VERCEL ? 'Vercel' : 'Render',
+            platform: IS_VERCEL ? 'Vercel' : IS_RENDER ? 'Render' : 'Local',
             baseUrl: BASE_URL,
-            cors: {
-                enabled: true,
-                allowedOrigins: [
-                    'https://bot-maker-bd.vercel.app',
-                    'https://bot-maker-bd.onrender.com',
-                    'http://localhost:3000'
-                ]
-            },
+            trustProxy: app.get('trust proxy'),
+            clientIp: req.ip,
+            forwardedFor: req.headers['x-forwarded-for'],
             features: {
                 python: !IS_VERCEL,
                 webhook: USE_WEBHOOK,
@@ -182,7 +213,8 @@ app.get('/api/info', (req, res) => {
         name: 'Telegram Bot Platform',
         version: '2.0.0',
         description: 'Universal Telegram Bot Platform - Vercel/Render Compatible',
-        platform: IS_VERCEL ? 'Vercel' : 'Render',
+        platform: IS_VERCEL ? 'Vercel' : IS_RENDER ? 'Render' : 'Local',
+        trustProxy: app.get('trust proxy'),
         endpoints: {
             auth: '/api/auth',
             bots: '/api/bots',
@@ -190,10 +222,6 @@ app.get('/api/info', (req, res) => {
             admin: '/api/admin',
             webhook: '/api/webhook',
             templates: '/api/templates'
-        },
-        cors: {
-            enabled: true,
-            note: 'Configured for Vercel and Render domains'
         }
     });
 });
@@ -202,7 +230,10 @@ app.get('/api/info', (req, res) => {
 app.get('*', (req, res) => {
     // Don't serve API routes as HTML
     if (req.path.startsWith('/api/')) {
-        return res.status(404).json({ error: 'API endpoint not found' });
+        return res.status(404).json({ 
+            success: false,
+            error: 'API endpoint not found' 
+        });
     }
     
     // Serve the main HTML file for all other routes (SPA)
@@ -227,25 +258,13 @@ app.use('/api/*', (req, res) => {
     });
 });
 
-// ✅ FIXED: Better CORS error handling
+// Global error handling middleware
 app.use((error, req, res, next) => {
     if (error.message.includes('CORS')) {
-        console.error('🚨 CORS Error:', {
-            origin: req.get('origin'),
-            method: req.method,
-            url: req.originalUrl,
-            headers: req.headers
-        });
-        
         return res.status(403).json({
             success: false,
             error: 'CORS policy violation',
-            message: error.message,
-            allowedOrigins: [
-                'https://bot-maker-bd.vercel.app',
-                'https://bot-maker-bd.onrender.com',
-                'http://localhost:3000'
-            ]
+            message: error.message
         });
     }
     
@@ -282,11 +301,8 @@ if (IS_VERCEL) {
         console.log(`📍 Port: ${PORT}`);
         console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
         console.log(`🌐 Base URL: ${BASE_URL}`);
+        console.log(`🔒 Trust Proxy: ${app.get('trust proxy')}`);
         console.log(`🕒 Started at: ${new Date().toISOString()}`);
-        console.log('✅ CORS Enabled for:');
-        console.log('   - https://bot-maker-bd.vercel.app');
-        console.log('   - https://bot-maker-bd.onrender.com');
-        console.log('   - http://localhost:3000');
         
         if (USE_WEBHOOK) {
             console.log(`🤖 Webhook URL: ${BASE_URL}/api/webhook/{BOT_TOKEN}`);
