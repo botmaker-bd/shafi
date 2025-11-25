@@ -19,32 +19,47 @@ console.log(`🌐 Base URL: ${BASE_URL}`);
 console.log(`🔗 Mode: ${USE_WEBHOOK ? 'Webhook' : 'Polling'}`);
 console.log(`🚀 Platform: ${IS_VERCEL ? 'Vercel' : 'Render'}`);
 
-// Enhanced CORS configuration for Vercel & Render
+// ✅ FIXED: Enhanced CORS configuration for Vercel & Render
 app.use(cors({
     origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps, Postman, or server-to-server requests)
+        if (!origin) {
+            console.log('🔄 No origin - allowing request');
+            return callback(null, true);
+        }
+        
         const allowedOrigins = [
+            'https://bot-maker-bd.vercel.app',
+            'https://bot-maker-bd-git-main-botmaker-bds-projects.vercel.app',
+            'https://bot-maker-qv82o5hu5-botmaker-bds-projects.vercel.app',
+            'https://bot-maker-bd-botmaker-bds-projects.vercel.app',
             'https://bot-maker-bd.onrender.com',
-            'https://telegram-bot-platform.vercel.app',
             'http://localhost:3000',
             'http://localhost:8080',
             'http://127.0.0.1:3000',
             'http://127.0.0.1:8080'
         ];
         
-        // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin) return callback(null, true);
-        
+        // Check if origin is in allowed list
         if (allowedOrigins.indexOf(origin) !== -1) {
+            console.log(`✅ CORS allowed for origin: ${origin}`);
             callback(null, true);
         } else {
-            console.log('🚫 CORS blocked origin:', origin);
-            callback(new Error('Not allowed by CORS'));
+            console.log(`🚫 CORS blocked origin: ${origin}`);
+            // For development, you can allow all origins by uncommenting next line
+            // callback(null, true);
+            
+            // For production, block unauthorized origins
+            callback(new Error(`Not allowed by CORS - Origin: ${origin}`));
         }
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Origin', 'Accept']
 }));
+
+// Handle preflight requests
+app.options('*', cors());
 
 // Body parser middleware with increased limits
 app.use(bodyParser.json({ 
@@ -115,6 +130,14 @@ app.get('/api/health', async (req, res) => {
             environment: process.env.NODE_ENV || 'development',
             platform: IS_VERCEL ? 'Vercel' : 'Render',
             baseUrl: BASE_URL,
+            cors: {
+                enabled: true,
+                allowedOrigins: [
+                    'https://bot-maker-bd.vercel.app',
+                    'https://bot-maker-bd.onrender.com',
+                    'http://localhost:3000'
+                ]
+            },
             features: {
                 python: !IS_VERCEL,
                 webhook: USE_WEBHOOK,
@@ -168,11 +191,9 @@ app.get('/api/info', (req, res) => {
             webhook: '/api/webhook',
             templates: '/api/templates'
         },
-        features: {
-            python_support: !IS_VERCEL,
-            webhook_mode: USE_WEBHOOK,
-            multi_bot: true,
-            real_time_commands: true
+        cors: {
+            enabled: true,
+            note: 'Configured for Vercel and Render domains'
         }
     });
 });
@@ -206,8 +227,28 @@ app.use('/api/*', (req, res) => {
     });
 });
 
-// Global error handling middleware
+// ✅ FIXED: Better CORS error handling
 app.use((error, req, res, next) => {
+    if (error.message.includes('CORS')) {
+        console.error('🚨 CORS Error:', {
+            origin: req.get('origin'),
+            method: req.method,
+            url: req.originalUrl,
+            headers: req.headers
+        });
+        
+        return res.status(403).json({
+            success: false,
+            error: 'CORS policy violation',
+            message: error.message,
+            allowedOrigins: [
+                'https://bot-maker-bd.vercel.app',
+                'https://bot-maker-bd.onrender.com',
+                'http://localhost:3000'
+            ]
+        });
+    }
+    
     console.error('🚨 Global Error Handler:', error);
     
     res.status(500).json({
@@ -242,6 +283,10 @@ if (IS_VERCEL) {
         console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
         console.log(`🌐 Base URL: ${BASE_URL}`);
         console.log(`🕒 Started at: ${new Date().toISOString()}`);
+        console.log('✅ CORS Enabled for:');
+        console.log('   - https://bot-maker-bd.vercel.app');
+        console.log('   - https://bot-maker-bd.onrender.com');
+        console.log('   - http://localhost:3000');
         
         if (USE_WEBHOOK) {
             console.log(`🤖 Webhook URL: ${BASE_URL}/api/webhook/{BOT_TOKEN}`);
@@ -269,25 +314,9 @@ if (IS_VERCEL) {
         
         server.close(() => {
             console.log('✅ HTTP server closed');
-            
-            // Clean up bot connections
-            try {
-                const botManager = require('./core/bot-manager');
-                if (botManager.activeBots) {
-                    botManager.activeBots.forEach((bot, token) => {
-                        console.log(`🛑 Stopping bot: ${token.substring(0, 15)}...`);
-                        botManager.removeBot(token);
-                    });
-                }
-            } catch (error) {
-                console.error('Error during bot cleanup:', error);
-            }
-            
-            console.log('✅ Cleanup completed');
             process.exit(0);
         });
 
-        // Force close after 10 seconds
         setTimeout(() => {
             console.error('❌ Could not close connections in time, forcefully shutting down');
             process.exit(1);
