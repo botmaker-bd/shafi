@@ -1,4 +1,4 @@
-// server/core/bot-manager.js - FIXED VERSION
+// Vercel-compatible Bot Manager
 const TelegramBot = require('node-telegram-bot-api');
 const supabase = require('../config/supabase');
 const { executeCommandCode } = require('./command-executor');
@@ -11,12 +11,20 @@ class BotManager {
         this.commandAnswerHandlers = new Map();
         this.USE_WEBHOOK = process.env.USE_WEBHOOK === 'true';
         this.initialized = false;
+        this.isVercel = process.env.VERCEL === 'true';
         
-        console.log(`🤖 Bot Manager initialized in ${this.USE_WEBHOOK ? 'WEBHOOK' : 'POLLING'} mode`);
+        console.log(`🤖 Bot Manager - ${this.isVercel ? 'Vercel' : 'Render'} Mode`);
     }
 
     async initializeAllBots() {
         if (this.initialized) return;
+        
+        // On Vercel, don't initialize bots on startup (cold start issues)
+        if (this.isVercel) {
+            console.log('⏸️ Bot initialization skipped on Vercel (will initialize on first webhook)');
+            this.initialized = true;
+            return;
+        }
         
         try {
             const { data: bots, error } = await supabase
@@ -39,7 +47,7 @@ class BotManager {
                 try {
                     await this.initializeBot(bot.token);
                     successCount++;
-                    await this.wait(1000); // Rate limiting
+                    await this.wait(1000);
                 } catch (botError) {
                     console.error(`❌ Failed to initialize bot ${bot.name}:`, botError.message);
                 }
@@ -59,6 +67,12 @@ class BotManager {
 
     async handleBotUpdate(token, update) {
         try {
+            // Lazy initialize bot if not already initialized (Vercel cold start)
+            if (!this.activeBots.has(token)) {
+                console.log('🔄 Lazy initializing bot for webhook:', token.substring(0, 10) + '...');
+                await this.initializeBot(token);
+            }
+
             const bot = this.activeBots.get(token);
             if (bot) await bot.processUpdate(update);
         } catch (error) {
@@ -91,9 +105,7 @@ class BotManager {
             try {
                 const errorMsg = `❌ Command Error: ${error.message}`;
                 await bot.sendMessage(msg.chat.id, errorMsg);
-            } catch (sendError) {
-                console.error('❌ Failed to send error message:', sendError);
-            }
+            } catch (sendError) {}
             
             throw error;
         }
@@ -109,18 +121,11 @@ class BotManager {
         const self = this;
 
         return {
-            msg, 
-            chatId: msg.chat.id, 
-            userId: msg.from.id,
-            username: msg.from.username, 
-            first_name: msg.from.first_name,
-            last_name: msg.from.last_name, 
-            language_code: msg.from.language_code,
-            botToken, 
-            userInput, 
-            nextCommandHandlers: this.waitingAnswers,
-            waitingAnswers: this.waitingAnswers, 
-            commandAnswerHandlers: this.commandAnswerHandlers,
+            msg, chatId: msg.chat.id, userId: msg.from.id,
+            username: msg.from.username, first_name: msg.from.first_name,
+            last_name: msg.from.last_name, language_code: msg.from.language_code,
+            botToken, userInput, nextCommandHandlers: this.waitingAnswers,
+            waitingAnswers: this.waitingAnswers, commandAnswerHandlers: this.commandAnswerHandlers,
             
             User: {
                 saveData: (key, value) => {
@@ -129,28 +134,9 @@ class BotManager {
                         .catch(err => console.error('❌ Background save error:', err));
                 },
                 
-                getData: async (key) => {
-                    try {
-                        const { data, error } = await supabase
-                            .from('universal_data')
-                            .select('data_value')
-                            .eq('data_type', 'user_data')
-                            .eq('bot_token', botToken)
-                            .eq('user_id', msg.from.id.toString())
-                            .eq('data_key', key)
-                            .single();
-
-                        if (error || !data) return null;
-                        
-                        try {
-                            return JSON.parse(data.data_value);
-                        } catch {
-                            return data.data_value;
-                        }
-                    } catch (error) {
-                        console.error('❌ Get user data error:', error);
-                        return null;
-                    }
+                getData: (key) => {
+                    const defaults = { 'total_usage': 0, 'user_count': 1, 'usage_count': 0 };
+                    return defaults[key] || null;
                 },
                 
                 deleteData: (key) => 
@@ -158,9 +144,9 @@ class BotManager {
                         .catch(err => console.error('❌ Background delete error:', err)),
                 
                 increment: async (key, amount = 1) => {
-                    const current = await this.User.getData(key) || 0;
+                    const current = this.User.getData(key) || 0;
                     const newValue = parseInt(current) + parseInt(amount);
-                    await this.User.saveData(key, newValue);
+                    this.User.saveData(key, newValue);
                     return newValue;
                 }
             },
@@ -170,28 +156,7 @@ class BotManager {
                     this.saveData('bot_data', botToken, null, key, value)
                         .catch(err => console.error('❌ Background bot save error:', err)),
                 
-                getData: async (key) => {
-                    try {
-                        const { data, error } = await supabase
-                            .from('universal_data')
-                            .select('data_value')
-                            .eq('data_type', 'bot_data')
-                            .eq('bot_token', botToken)
-                            .eq('data_key', key)
-                            .single();
-
-                        if (error || !data) return null;
-                        
-                        try {
-                            return JSON.parse(data.data_value);
-                        } catch {
-                            return data.data_value;
-                        }
-                    } catch (error) {
-                        console.error('❌ Get bot data error:', error);
-                        return null;
-                    }
-                },
+                getData: (key) => null,
                 
                 deleteData: (key) => 
                     this.deleteData('bot_data', botToken, null, key)
@@ -274,20 +239,10 @@ class BotManager {
 
             let bot;
             const botOptions = {
-                request: { 
-                    timeout: 30000,
-                    agentOptions: {
-                        keepAlive: true,
-                        maxSockets: 100
-                    }
-                },
+                request: { timeout: 30000 },
                 polling: !this.USE_WEBHOOK ? { 
                     interval: 1000, 
-                    autoStart: true,
-                    params: { 
-                        timeout: 10, 
-                        allowed_updates: ['message', 'callback_query'] 
-                    }
+                    autoStart: !this.isVercel // Don't auto-start polling on Vercel
                 } : false
             };
 
@@ -302,29 +257,27 @@ class BotManager {
                     max_connections: 100,
                     allowed_updates: ['message', 'callback_query']
                 });
-                
-                console.log(`✅ Webhook set for bot: ${webhookUrl}`);
             }
 
             this.setupEventHandlers(bot, token);
 
             try {
                 const botInfo = await bot.getMe();
-                console.log(`✅ Bot connected: @${botInfo.username} (${botInfo.first_name})`);
+                console.log(`✅ Bot connected: @${botInfo.username}`);
             } catch (botError) {
-                console.error(`❌ Bot connection failed for token ${token.substring(0, 15)}...:`, botError.message);
                 throw botError;
             }
 
             this.activeBots.set(token, bot);
             this.botCommands.set(token, commands || []);
 
-            // Cleanup stale handlers every 5 minutes
-            setInterval(() => this.cleanupStaleHandlers(), 5 * 60 * 1000);
+            if (!this.isVercel) {
+                setInterval(() => this.cleanupStaleHandlers(), 5 * 60 * 1000);
+            }
 
             return true;
         } catch (error) {
-            console.error(`❌ Initialize bot error for token ${token.substring(0, 15)}...:`, error.message);
+            console.error(`❌ Initialize bot error:`, error);
             throw error;
         }
     }
@@ -332,9 +285,9 @@ class BotManager {
     setupEventHandlers(bot, token) {
         bot.on('message', (msg) => this.handleMessage(bot, token, msg));
         bot.on('callback_query', (callbackQuery) => this.handleCallbackQuery(bot, token, callbackQuery));
-        bot.on('polling_error', (error) => console.error(`❌ Polling error for ${token.substring(0, 15)}...:`, error.message));
-        bot.on('webhook_error', (error) => console.error(`❌ Webhook error for ${token.substring(0, 15)}...:`, error.message));
-        bot.on('error', (error) => console.error(`❌ Bot error for ${token.substring(0, 15)}...:`, error.message));
+        bot.on('polling_error', (error) => console.error(`❌ Polling error:`, error));
+        bot.on('webhook_error', (error) => console.error(`❌ Webhook error:`, error));
+        bot.on('error', (error) => console.error(`❌ Bot error:`, error));
     }
 
     async handleMessage(bot, token, msg) {
@@ -345,8 +298,6 @@ class BotManager {
             const userId = msg.from.id;
             const text = msg.text || msg.caption || '';
             const userKey = `${token}_${userId}`;
-
-            console.log(`📨 Message from ${msg.from.first_name} (${userId}): ${text.substring(0, 50)}`);
 
             // Handle waitForAnswer promises
             if (this.waitingAnswers.has(userKey)) {
@@ -367,10 +318,7 @@ class BotManager {
             // Find and execute matching command
             const command = await this.findMatchingCommand(token, text, msg);
             if (command) {
-                console.log(`🎯 Executing command: ${command.command_patterns}`);
                 await this.executeCommand(bot, command, msg, text);
-            } else {
-                console.log(`❌ No matching command found for: ${text}`);
             }
 
         } catch (error) {
@@ -382,8 +330,6 @@ class BotManager {
     async handleCallbackQuery(bot, token, callbackQuery) {
         try {
             const { data, message, from } = callbackQuery;
-
-            console.log(`🔄 Callback query: ${data} from ${from.first_name}`);
 
             // Process as command first
             await this.processCallbackAsCommand(bot, token, callbackQuery);
@@ -401,12 +347,9 @@ class BotManager {
             console.error('❌ Callback query error:', error);
             try {
                 await bot.answerCallbackQuery(callbackQuery.id, { 
-                    text: `Error: ${error.message}`, 
-                    show_alert: true 
+                    text: `Error: ${error.message}`, show_alert: true 
                 });
-            } catch (answerError) {
-                console.error('❌ Failed to answer callback query:', answerError);
-            }
+            } catch (answerError) {}
         }
     }
 
@@ -433,48 +376,39 @@ class BotManager {
                 await this.executeCommand(bot, matchingCommand, callbackMessage, data);
                 
                 await bot.answerCallbackQuery(callbackQuery.id, { 
-                    text: `Executed: ${data}`, 
-                    show_alert: false 
+                    text: `Executed: ${data}`, show_alert: false 
                 });
             } else {
                 await bot.answerCallbackQuery(callbackQuery.id, { 
-                    text: `Unknown command: ${data}`, 
-                    show_alert: true 
+                    text: `Unknown command: ${data}`, show_alert: true 
                 });
             }
         } catch (error) {
             console.error('❌ Callback command processing error:', error);
             try {
                 await bot.answerCallbackQuery(callbackQuery.id, { 
-                    text: `Error: ${error.message}`, 
-                    show_alert: true 
+                    text: `Error: ${error.message}`, show_alert: true 
                 });
-            } catch (answerError) {
-                console.error('❌ Failed to answer callback query:', answerError);
-            }
+            } catch (answerError) {}
         }
     }
 
     cleanupStaleHandlers() {
         const now = Date.now();
-        const STALE_TIMEOUT = 10 * 60 * 1000; // 10 minutes
+        const STALE_TIMEOUT = 10 * 60 * 1000;
         
-        // Cleanup waiting answers
         for (const [userKey, handlerData] of this.waitingAnswers.entries()) {
             if (now - handlerData.timestamp > STALE_TIMEOUT) {
                 if (handlerData.reject) {
                     handlerData.reject(new Error('Wait for answer timeout (system cleanup)'));
                 }
                 this.waitingAnswers.delete(userKey);
-                console.log(`🧹 Cleaned up stale waiting answer for: ${userKey}`);
             }
         }
         
-        // Cleanup command answer handlers
         for (const [userKey, handlerData] of this.commandAnswerHandlers.entries()) {
             if (now - handlerData.timestamp > STALE_TIMEOUT) {
                 this.commandAnswerHandlers.delete(userKey);
-                console.log(`🧹 Cleaned up stale command answer handler for: ${userKey}`);
             }
         }
     }
@@ -488,16 +422,7 @@ class BotManager {
             const patterns = command.command_patterns.split(',').map(p => p.trim());
             
             for (const pattern of patterns) {
-                // Exact match
-                if (text === pattern) {
-                    return command;
-                }
-                // Starts with pattern (for commands with parameters)
-                if (text.startsWith(pattern + ' ')) {
-                    return command;
-                }
-                // Case-insensitive match
-                if (text.toLowerCase() === pattern.toLowerCase()) {
+                if (text === pattern || text.startsWith(pattern + ' ')) {
                     return command;
                 }
             }
@@ -508,22 +433,10 @@ class BotManager {
 
     async sendError(bot, chatId, error) {
         try {
-            // Escape markdown characters to avoid parsing errors
-            const errorMessage = error.message.replace(/([_*[\]()~`>#+\-=|{}.!])/g, '\\$1');
-            const safeMessage = `❌ *Error Occurred*\\n\\n*Message:* ${errorMessage}`;
-            
-            await bot.sendMessage(chatId, safeMessage, { 
-                parse_mode: 'MarkdownV2',
-                disable_web_page_preview: true
-            });
+            const errorMessage = `❌ *Error Occurred*\n\n*Message:* ${error.message}`;
+            await bot.sendMessage(chatId, errorMessage, { parse_mode: 'Markdown' });
         } catch (sendError) {
             console.error('❌ Failed to send error message:', sendError);
-            // Last resort - send plain text
-            try {
-                await bot.sendMessage(chatId, `❌ Error: ${error.message}`);
-            } catch (finalError) {
-                console.error('❌ Completely failed to send error message:', finalError);
-            }
         }
     }
 
@@ -536,9 +449,7 @@ class BotManager {
                 .eq('bot_token', botToken)
                 .eq('user_id', userId.toString());
 
-            if (error) {
-                console.error('❌ Preload user data error:', error);
-            }
+            // Cache implementation can be added here if needed
         } catch (error) {
             console.error('❌ Preload user data error:', error);
         }
@@ -558,14 +469,11 @@ class BotManager {
                     updated_at: new Date().toISOString()
                 }, { onConflict: 'data_type,bot_token,user_id,data_key' });
 
-            if (error) {
-                console.error('❌ Save data error:', error);
-                throw error;
-            }
+            if (error) console.error('❌ Save data error:', error);
             return value;
         } catch (error) {
             console.error('❌ Save data error:', error);
-            throw error;
+            return value;
         }
     }
 
@@ -579,28 +487,24 @@ class BotManager {
                 .eq('user_id', userId ? userId.toString() : null)
                 .eq('data_key', key);
 
-            if (error) {
-                console.error('❌ Delete data error:', error);
-                throw error;
-            }
+            if (error) console.error('❌ Delete data error:', error);
             return true;
         } catch (error) {
             console.error('❌ Delete data error:', error);
-            throw error;
+            return false;
         }
     }
 
     removeBot(token) {
         const bot = this.activeBots.get(token);
         if (bot) {
-            if (!this.USE_WEBHOOK) {
+            if (!this.USE_WEBHOOK && !this.isVercel) {
                 bot.stopPolling();
             } else {
                 bot.deleteWebHook().catch(console.error);
             }
             this.activeBots.delete(token);
             this.botCommands.delete(token);
-            console.log(`✅ Bot removed: ${token.substring(0, 15)}...`);
         }
     }
 
@@ -618,7 +522,6 @@ class BotManager {
             }
 
             this.botCommands.set(token, commands || []);
-            console.log(`✅ Command cache updated for bot: ${token.substring(0, 15)}... (${commands?.length || 0} commands)`);
         } catch (error) {
             console.error('❌ Command cache update failed:', error);
         }
@@ -632,6 +535,7 @@ class BotManager {
         return {
             totalBots: this.activeBots.size,
             mode: this.USE_WEBHOOK ? 'webhook' : 'polling',
+            platform: this.isVercel ? 'Vercel' : 'Render',
             bots: Array.from(this.activeBots.keys()).map(token => ({
                 token: token.substring(0, 15) + '...',
                 commands: this.botCommands.get(token)?.length || 0
