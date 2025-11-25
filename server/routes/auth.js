@@ -5,7 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 const supabase = require('../config/supabase');
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'bot-maker-pro-secret-key-2024-safe-vercel-render';
+const JWT_SECRET = process.env.JWT_SECRET || 'bot-maker-pro-secret-key-2024-safe';
 
 const SECURITY_QUESTIONS = [
     "What city were you born in?",
@@ -23,7 +23,7 @@ router.get('/security-questions', (req, res) => {
     });
 });
 
-// Signup endpoint - FIXED
+// Signup endpoint
 router.post('/signup', async (req, res) => {
     try {
         const { email, password, securityQuestion, securityAnswer } = req.body;
@@ -52,18 +52,19 @@ router.post('/signup', async (req, res) => {
             });
         }
 
-        // Check if user already exists - FIXED QUERY
+        // Check if user already exists
         const { data: existingUser, error: userCheckError } = await supabase
             .from('users')
             .select('id')
-            .eq('email', email.toLowerCase().trim());
+            .eq('email', email.toLowerCase().trim())
+            .single();
 
-        if (userCheckError) {
+        if (userCheckError && userCheckError.code !== 'PGRST116') {
             console.error('❌ Database error checking user:', userCheckError);
             throw userCheckError;
         }
 
-        if (existingUser && existingUser.length > 0) {
+        if (existingUser) {
             return res.status(400).json({ 
                 success: false,
                 error: 'User already exists with this email' 
@@ -74,32 +75,21 @@ router.post('/signup', async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 12);
         const hashedSecurityAnswer = await bcrypt.hash(securityAnswer.trim(), 12);
 
-        // Create user - FIXED INSERT
+        // Create user
         const { data: user, error: createError } = await supabase
             .from('users')
-            .insert({
+            .insert([{
                 email: email.toLowerCase().trim(),
                 password: hashedPassword,
                 security_question: securityQuestion,
                 security_answer: hashedSecurityAnswer,
-                is_admin: false,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-            })
-            .select()
+                is_admin: false
+            }])
+            .select('id, email, created_at, is_admin')
             .single();
 
         if (createError) {
             console.error('❌ Database error creating user:', createError);
-            
-            // Handle specific Supabase errors
-            if (createError.code === '23505') {
-                return res.status(400).json({ 
-                    success: false,
-                    error: 'User already exists with this email' 
-                });
-            }
-            
             throw createError;
         }
 
@@ -109,12 +99,29 @@ router.post('/signup', async (req, res) => {
             email: user.email 
         }, JWT_SECRET, { expiresIn: '7d' });
 
+        // Create session
+        const sessionId = uuidv4();
+        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+        const { error: sessionError } = await supabase
+            .from('user_sessions')
+            .insert([{
+                user_id: user.id,
+                token: sessionId,
+                expires_at: expiresAt.toISOString()
+            }]);
+
+        if (sessionError) {
+            console.error('❌ Session creation error:', sessionError);
+        }
+
         console.log('✅ User created successfully:', user.email);
 
         res.json({
             success: true,
             message: 'Account created successfully!',
-            token: token,
+            token,
+            sessionId,
             user: { 
                 id: user.id, 
                 email: user.email,
@@ -129,8 +136,8 @@ router.post('/signup', async (req, res) => {
         
         if (error.code === '23505') {
             errorMessage = 'User already exists with this email';
-        } else if (error.message.includes('database')) {
-            errorMessage = 'Database connection error';
+        } else if (error.code === '22P02') {
+            errorMessage = 'Invalid input data';
         }
 
         res.status(500).json({ 
@@ -140,10 +147,10 @@ router.post('/signup', async (req, res) => {
     }
 });
 
-// Login endpoint - FIXED
+// Login endpoint
 router.post('/login', async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const { email, password, remember } = req.body;
 
         console.log('🔄 Login attempt for:', email);
 
@@ -154,27 +161,20 @@ router.post('/login', async (req, res) => {
             });
         }
 
-        // Find user - FIXED QUERY
-        const { data: users, error: userError } = await supabase
+        // Find user
+        const { data: user, error: userError } = await supabase
             .from('users')
             .select('*')
             .eq('email', email.toLowerCase().trim())
-            .limit(1);
+            .single();
 
-        if (userError) {
-            console.error('❌ Database error:', userError);
-            throw userError;
-        }
-
-        if (!users || users.length === 0) {
+        if (userError || !user) {
             console.log('❌ User not found:', email);
             return res.status(400).json({ 
                 success: false,
                 error: 'Invalid email or password' 
             });
         }
-
-        const user = users[0];
 
         // Verify password
         const validPassword = await bcrypt.compare(password, user.password);
@@ -187,6 +187,7 @@ router.post('/login', async (req, res) => {
         }
 
         // Generate token
+        const tokenExpiry = remember ? '30d' : '7d';
         const token = jwt.sign(
             { 
                 userId: user.id, 
@@ -194,16 +195,29 @@ router.post('/login', async (req, res) => {
                 isAdmin: user.is_admin 
             }, 
             JWT_SECRET,
-            { expiresIn: '7d' }
+            { expiresIn: tokenExpiry }
         );
+
+        // Create session
+        const sessionId = uuidv4();
+        const expiresAt = new Date(Date.now() + (remember ? 30 : 7) * 24 * 60 * 60 * 1000);
+
+        const { error: sessionError } = await supabase
+            .from('user_sessions')
+            .insert([{
+                user_id: user.id,
+                token: sessionId,
+                expires_at: expiresAt.toISOString()
+            }]);
+
+        if (sessionError) {
+            console.error('❌ Session creation error:', sessionError);
+        }
 
         // Update last login
         await supabase
             .from('users')
-            .update({ 
-                last_login: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-            })
+            .update({ last_login: new Date().toISOString() })
             .eq('id', user.id);
 
         console.log('✅ Login successful for:', user.email);
@@ -211,7 +225,8 @@ router.post('/login', async (req, res) => {
         res.json({
             success: true,
             message: 'Login successful!',
-            token: token,
+            token,
+            sessionId,
             user: { 
                 id: user.id, 
                 email: user.email,
@@ -228,7 +243,7 @@ router.post('/login', async (req, res) => {
     }
 });
 
-// Verify token endpoint - FIXED
+// Verify token endpoint
 router.get('/verify', async (req, res) => {
     try {
         const token = req.headers.authorization?.replace('Bearer ', '');
@@ -242,20 +257,18 @@ router.get('/verify', async (req, res) => {
 
         const decoded = jwt.verify(token, JWT_SECRET);
         
-        const { data: users, error } = await supabase
+        const { data: user } = await supabase
             .from('users')
             .select('id, email, is_admin')
             .eq('id', decoded.userId)
-            .limit(1);
+            .single();
 
-        if (error || !users || users.length === 0) {
+        if (!user) {
             return res.status(401).json({ 
                 success: false,
                 error: 'User account not found' 
             });
         }
-
-        const user = users[0];
 
         res.json({ 
             success: true,
@@ -278,8 +291,15 @@ router.get('/verify', async (req, res) => {
 // Logout endpoint
 router.post('/logout', async (req, res) => {
     try {
-        // In stateless JWT, we don't need to do much on logout
-        // Client should remove the token locally
+        const { sessionId } = req.body;
+        
+        if (sessionId) {
+            await supabase
+                .from('user_sessions')
+                .delete()
+                .eq('token', sessionId);
+        }
+
         res.json({ 
             success: true, 
             message: 'Logged out successfully' 
@@ -293,7 +313,7 @@ router.post('/logout', async (req, res) => {
     }
 });
 
-// Change password endpoint - FIXED
+// Change password endpoint
 router.post('/change-password', async (req, res) => {
     try {
         const { currentPassword, newPassword, userId } = req.body;
@@ -312,21 +332,19 @@ router.post('/change-password', async (req, res) => {
             });
         }
 
-        // Get user current password - FIXED QUERY
-        const { data: users, error: userError } = await supabase
+        // Get user current password
+        const { data: user, error: userError } = await supabase
             .from('users')
             .select('password')
             .eq('id', userId)
-            .limit(1);
+            .single();
 
-        if (userError || !users || users.length === 0) {
+        if (userError || !user) {
             return res.status(404).json({ 
                 success: false,
                 error: 'User not found' 
             });
         }
-
-        const user = users[0];
 
         // Verify current password
         const validCurrentPassword = await bcrypt.compare(currentPassword, user.password);
@@ -340,7 +358,7 @@ router.post('/change-password', async (req, res) => {
         // Hash new password
         const hashedNewPassword = await bcrypt.hash(newPassword, 12);
 
-        // Update password - FIXED UPDATE
+        // Update password
         const { error: updateError } = await supabase
             .from('users')
             .update({ 
@@ -367,7 +385,7 @@ router.post('/change-password', async (req, res) => {
     }
 });
 
-// Get user profile - FIXED
+// Get user profile
 router.get('/profile', async (req, res) => {
     try {
         const token = req.headers.authorization?.replace('Bearer ', '');
@@ -381,20 +399,18 @@ router.get('/profile', async (req, res) => {
 
         const decoded = jwt.verify(token, JWT_SECRET);
         
-        const { data: users, error } = await supabase
+        const { data: user, error } = await supabase
             .from('users')
             .select('id, email, is_admin, created_at, last_login')
             .eq('id', decoded.userId)
-            .limit(1);
+            .single();
 
-        if (error || !users || users.length === 0) {
+        if (error || !user) {
             return res.status(404).json({ 
                 success: false,
                 error: 'User not found' 
             });
         }
-
-        const user = users[0];
 
         res.json({ 
             success: true,
@@ -411,42 +427,6 @@ router.get('/profile', async (req, res) => {
         res.status(401).json({ 
             success: false,
             error: 'Invalid token' 
-        });
-    }
-});
-
-// Check if email exists
-router.post('/check-email', async (req, res) => {
-    try {
-        const { email } = req.body;
-
-        if (!email) {
-            return res.status(400).json({ 
-                success: false,
-                error: 'Email is required' 
-            });
-        }
-
-        const { data: users, error } = await supabase
-            .from('users')
-            .select('id')
-            .eq('email', email.toLowerCase().trim())
-            .limit(1);
-
-        if (error) {
-            throw error;
-        }
-
-        res.json({
-            success: true,
-            exists: users && users.length > 0
-        });
-
-    } catch (error) {
-        console.error('❌ Check email error:', error);
-        res.status(500).json({ 
-            success: false,
-            error: 'Failed to check email' 
         });
     }
 });
