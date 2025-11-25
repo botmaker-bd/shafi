@@ -1,4 +1,3 @@
-# render.yaml
 services:
   - type: web
     name: telegram-bot-platform
@@ -6,8 +5,7 @@ services:
     plan: free
     buildCommand: |
       npm install
-      chmod +x scripts/setup-python-env.sh
-      ./scripts/setup-python-env.sh
+      echo "Skipping Python setup on Render..."
     startCommand: npm start
     envVars:
       - key: NODE_ENV
@@ -15,10 +13,17 @@ services:
       - key: USE_WEBHOOK
         value: true
       - key: BASE_URL
-        value: https://bot-maker-bd.onrender.com
+        fromService:
+          name: telegram-bot-platform
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
       - key: SUPABASE_URL
         value: https://tyoaazgsoqvubgfychmd.supabase.co
       - key: SUPABASE_KEY
         value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR5b2Fhemdzb3F2dWJnZnljaG1kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI3NTE0NDQsImV4cCI6MjA3ODMyNzQ0NH0.czWc-rOitmnn31iAvgTEvZj7bW-aJ2ysFymoWJ8UZCc
+      - key: JWT_SECRET
+        generateValue: true
+      - key: VERCEL
+        value: false
     healthCheckPath: /api/health
     autoDeploy: true
