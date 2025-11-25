@@ -1,53 +1,54 @@
-// Common functionality for all pages
+/**
+ * Common JavaScript utilities for Bot Maker Pro
+ * Compatible with both Vercel and Render
+ */
+
 class CommonApp {
     constructor() {
+        this.user = null;
+        this.token = null;
         this.init();
     }
 
     init() {
-        this.setupMobileMenu();
-        this.setupUserMenu();
-        this.setupActiveNav();
-        this.updateUserInfo();
+        this.checkAuth();
+        this.setupEventListeners();
+        this.loadUserInfo();
     }
 
-    setupMobileMenu() {
-        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-        const navLinks = document.getElementById('navLinks');
+    async checkAuth() {
+        this.token = localStorage.getItem('token');
+        const userData = localStorage.getItem('user');
 
-        if (mobileMenuBtn && navLinks) {
-            mobileMenuBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                navLinks.classList.toggle('mobile-open');
-            });
+        if (!this.token || !userData) {
+            // Redirect to login if not on login page
+            if (!window.location.pathname.includes('login.html') && 
+                !window.location.pathname.includes('signup.html') &&
+                !window.location.pathname.includes('index.html')) {
+                window.location.href = 'login.html';
+            }
+            return;
+        }
 
-            // Close mobile menu when clicking outside
-            document.addEventListener('click', (e) => {
-                if (!mobileMenuBtn.contains(e.target) && !navLinks.contains(e.target)) {
-                    navLinks.classList.remove('mobile-open');
+        try {
+            const response = await fetch('/api/auth/verify', {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
                 }
             });
+
+            if (!response.ok) {
+                throw new Error('Invalid token');
+            }
+
+            this.user = JSON.parse(userData);
+            this.updateUI();
+        } catch (error) {
+            this.logout();
         }
     }
 
-    setupUserMenu() {
-        const userBtn = document.getElementById('userMenuBtn');
-        const userDropdown = document.getElementById('userDropdown');
-
-        if (userBtn && userDropdown) {
-            userBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                userDropdown.classList.toggle('show');
-            });
-
-            // Close dropdown when clicking outside
-            document.addEventListener('click', (e) => {
-                if (!userBtn.contains(e.target) && !userDropdown.contains(e.target)) {
-                    userDropdown.classList.remove('show');
-                }
-            });
-        }
-
+    setupEventListeners() {
         // Logout functionality
         const logoutBtn = document.getElementById('logoutBtn');
         if (logoutBtn) {
@@ -56,119 +57,200 @@ class CommonApp {
                 this.logout();
             });
         }
-    }
 
-    setupActiveNav() {
-        const currentPage = window.location.pathname.split('/').pop() || 'dashboard.html';
-        const navLinks = document.querySelectorAll('.nav-link');
+        // User menu toggle
+        const userMenuBtn = document.getElementById('userMenuBtn');
+        const userDropdown = document.getElementById('userDropdown');
         
-        navLinks.forEach(link => {
-            const href = link.getAttribute('href');
-            if (href === currentPage) {
-                link.classList.add('active');
-            } else {
-                link.classList.remove('active');
-            }
-        });
+        if (userMenuBtn && userDropdown) {
+            userMenuBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                userDropdown.style.display = userDropdown.style.display === 'block' ? 'none' : 'block';
+            });
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', () => {
+                userDropdown.style.display = 'none';
+            });
+        }
+
+        // Mobile menu toggle
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        const navLinks = document.getElementById('navLinks');
+        
+        if (mobileMenuBtn && navLinks) {
+            mobileMenuBtn.addEventListener('click', () => {
+                navLinks.style.display = navLinks.style.display === 'flex' ? 'none' : 'flex';
+            });
+        }
     }
 
-    updateUserInfo() {
-        const userData = localStorage.getItem('user');
-        if (userData) {
-            try {
-                const user = JSON.parse(userData);
-                const userEmail = document.getElementById('userEmail');
-                const userAvatar = document.getElementById('userAvatar');
-                const userName = document.getElementById('userName');
+    loadUserInfo() {
+        if (this.user) {
+            const userAvatar = document.getElementById('userAvatar');
+            const userEmail = document.getElementById('userEmail');
+            
+            if (userAvatar) {
+                userAvatar.textContent = this.user.email.charAt(0).toUpperCase();
+            }
+            
+            if (userEmail) {
+                userEmail.textContent = this.user.email;
+            }
+        }
+    }
 
-                if (userEmail) userEmail.textContent = user.email;
-                if (userAvatar) userAvatar.textContent = user.email.charAt(0).toUpperCase();
-                if (userName) userName.textContent = user.email.split('@')[0];
-            } catch (error) {
-                console.error('Error parsing user data:', error);
+    updateUI() {
+        // Update navigation based on user role
+        if (this.user && this.user.isAdmin) {
+            const adminLink = document.querySelector('a[href="admin-settings.html"]');
+            if (adminLink) {
+                adminLink.style.display = 'block';
             }
         }
     }
 
     logout() {
-        const sessionId = localStorage.getItem('sessionId');
-        const token = localStorage.getItem('token');
-        
-        if (sessionId && token) {
-            fetch('/api/auth/logout', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ sessionId })
-            }).catch(() => {});
-        }
-
-        localStorage.clear();
-        window.location.href = 'index.html';
-    }
-
-    showLoading(show) {
-        const overlay = document.getElementById('loadingOverlay');
-        if (overlay) {
-            overlay.style.display = show ? 'flex' : 'none';
-        }
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('sessionId');
+        window.location.href = 'login.html';
     }
 
     showNotification(message, type = 'info') {
         // Remove existing notifications
-        const existing = document.querySelector('.notification');
-        if (existing) existing.remove();
+        const existingNotifications = document.querySelectorAll('.app-notification');
+        existingNotifications.forEach(notification => notification.remove());
 
+        // Create new notification
         const notification = document.createElement('div');
-        notification.className = `notification notification-${type}`;
+        notification.className = `app-notification notification-${type}`;
         notification.innerHTML = `
             <div class="notification-content">
-                <i class="fas fa-${type === 'error' ? 'exclamation-triangle' : type === 'success' ? 'check-circle' : 'info-circle'}"></i>
+                <span class="notification-icon">
+                    ${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}
+                </span>
                 <span class="notification-message">${message}</span>
                 <button class="notification-close">&times;</button>
             </div>
         `;
 
-        Object.assign(notification.style, {
-            position: 'fixed',
-            top: '20px',
-            right: '20px',
-            background: type === 'error' ? '#ef4444' : type === 'success' ? '#10b981' : '#3b82f6',
-            color: 'white',
-            padding: '1rem 1.5rem',
-            borderRadius: '0.5rem',
-            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-            zIndex: '10000',
-            maxWidth: '400px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.75rem'
-        });
-
-        notification.querySelector('.notification-close').addEventListener('click', () => {
-            notification.remove();
-        });
+        // Add styles
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: ${type === 'success' ? '#d4edda' : type === 'error' ? '#f8d7da' : '#d1ecf1'};
+            color: ${type === 'success' ? '#155724' : type === 'error' ? '#721c24' : '#0c5460'};
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            z-index: 10000;
+            max-width: 400px;
+            border: 1px solid ${type === 'success' ? '#c3e6cb' : type === 'error' ? '#f5c6cb' : '#bee5eb'};
+            animation: slideIn 0.3s ease;
+        `;
 
         document.body.appendChild(notification);
 
-        setTimeout(() => {
+        // Add close button functionality
+        const closeBtn = notification.querySelector('.notification-close');
+        closeBtn.addEventListener('click', () => {
             notification.remove();
+        });
+
+        // Auto remove after 5 seconds
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.remove();
+            }
         }, 5000);
     }
 
-    showError(message) {
-        this.showNotification(message, 'error');
+    async apiCall(endpoint, options = {}) {
+        const defaultOptions = {
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${this.token}`
+            }
+        };
+
+        const finalOptions = { ...defaultOptions, ...options };
+        
+        try {
+            const response = await fetch(endpoint, finalOptions);
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.error || 'API request failed');
+            }
+            
+            return data;
+        } catch (error) {
+            console.error('API call error:', error);
+            this.showNotification(error.message, 'error');
+            throw error;
+        }
     }
 
-    showSuccess(message) {
-        this.showNotification(message, 'success');
+    formatDate(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
+
+    debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
     }
 }
 
-// Initialize common functionality
-let commonApp;
-document.addEventListener('DOMContentLoaded', () => {
-    commonApp = new CommonApp();
-});
+// Initialize common app
+const commonApp = new CommonApp();
+
+// Add CSS for notifications
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideIn {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+    
+    .notification-content {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .notification-close {
+        background: none;
+        border: none;
+        font-size: 18px;
+        cursor: pointer;
+        padding: 0;
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+`;
+document.head.appendChild(style);
