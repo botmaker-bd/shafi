@@ -11,20 +11,20 @@ const PORT = process.env.PORT || 3000;
 // Configuration
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 const USE_WEBHOOK = process.env.USE_WEBHOOK === 'true';
+const IS_VERCEL = process.env.VERCEL === 'true';
 
 console.log('🌐 Server Configuration:');
 console.log(`📍 Port: ${PORT}`);
 console.log(`🌐 Base URL: ${BASE_URL}`);
 console.log(`🔗 Mode: ${USE_WEBHOOK ? 'Webhook' : 'Polling'}`);
+console.log(`🚀 Platform: ${IS_VERCEL ? 'Vercel' : 'Render'}`);
 
-// Trust proxy for rate limiting
-app.set('trust proxy', 1);
-
-// Enhanced CORS configuration
+// Enhanced CORS configuration for Vercel & Render
 app.use(cors({
     origin: function (origin, callback) {
         const allowedOrigins = [
             'https://bot-maker-bd.onrender.com',
+            'https://telegram-bot-platform.vercel.app',
             'http://localhost:3000',
             'http://localhost:8080',
             'http://127.0.0.1:3000',
@@ -48,28 +48,25 @@ app.use(cors({
 
 // Body parser middleware with increased limits
 app.use(bodyParser.json({ 
-    limit: '50mb',
-    verify: (req, res, buf) => {
-        req.rawBody = buf;
-    }
+    limit: '50mb'
 }));
 app.use(bodyParser.urlencoded({ 
     extended: true, 
     limit: '50mb' 
 }));
 
-// Rate limiting with different rules for different endpoints
+// Rate limiting
 const generalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 1000, // limit each IP to 1000 requests per windowMs
+    windowMs: 15 * 60 * 1000,
+    max: 1000,
     message: { error: 'Too many requests from this IP, please try again later.' },
     standardHeaders: true,
     legacyHeaders: false,
 });
 
 const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 50, // limit each IP to 50 login attempts per windowMs
+    windowMs: 15 * 60 * 1000,
+    max: 50,
     message: { error: 'Too many authentication attempts, please try again later.' },
     standardHeaders: true,
 });
@@ -84,7 +81,7 @@ app.use(express.static(path.join(__dirname, '../client'), {
     extensions: ['html', 'htm']
 }));
 
-// Load routes
+// API Routes - Vercel compatible
 try {
     const authRoutes = require('./routes/auth');
     const botRoutes = require('./routes/bots');
@@ -105,7 +102,6 @@ try {
     console.log('✅ All routes loaded successfully');
 } catch (error) {
     console.error('❌ Route loading failed:', error);
-    process.exit(1);
 }
 
 // Health check endpoint
@@ -115,27 +111,16 @@ app.get('/api/health', async (req, res) => {
             status: 'OK',
             message: 'Bot Platform API is running smoothly',
             timestamp: new Date().toISOString(),
-            version: '2.0.1',
+            version: '2.0.0',
             environment: process.env.NODE_ENV || 'development',
-            mode: USE_WEBHOOK ? 'webhook' : 'polling',
+            platform: IS_VERCEL ? 'Vercel' : 'Render',
             baseUrl: BASE_URL,
-            system: {
-                nodeVersion: process.version,
-                platform: process.platform,
-                uptime: process.uptime(),
-                memory: process.memoryUsage()
+            features: {
+                python: !IS_VERCEL,
+                webhook: USE_WEBHOOK,
+                multi_bot: true
             }
         };
-
-        // Try to check database connection
-        try {
-            const supabase = require('./config/supabase');
-            const { data, error } = await supabase.from('universal_data').select('count').limit(1);
-            healthInfo.database = error ? 'disconnected' : 'connected';
-        } catch (dbError) {
-            healthInfo.database = 'error';
-            healthInfo.dbError = dbError.message;
-        }
 
         res.json(healthInfo);
     } catch (error) {
@@ -147,7 +132,7 @@ app.get('/api/health', async (req, res) => {
     }
 });
 
-// Webhook endpoint for Telegram (only in webhook mode)
+// Webhook endpoint for Telegram
 if (USE_WEBHOOK) {
     app.post('/api/webhook/:token', async (req, res) => {
         try {
@@ -156,6 +141,7 @@ if (USE_WEBHOOK) {
             
             console.log('🔄 Webhook received for bot:', token.substring(0, 10) + '...');
             
+            // Lazy load bot manager to avoid Vercel cold start issues
             const botManager = require('./core/bot-manager');
             await botManager.handleBotUpdate(token, update);
             
@@ -171,22 +157,23 @@ if (USE_WEBHOOK) {
 app.get('/api/info', (req, res) => {
     res.json({
         name: 'Telegram Bot Platform',
-        version: '2.0.1',
-        description: 'Universal Telegram Bot Platform with Python Support - FIXED',
+        version: '2.0.0',
+        description: 'Universal Telegram Bot Platform - Vercel/Render Compatible',
+        platform: IS_VERCEL ? 'Vercel' : 'Render',
         endpoints: {
             auth: '/api/auth',
             bots: '/api/bots',
             commands: '/api/commands',
             admin: '/api/admin',
-            webhook: '/api/webhook'
+            webhook: '/api/webhook',
+            templates: '/api/templates'
         },
-        features: [
-            'Universal Data Storage',
-            'Python Library Support',
-            'Webhook & Polling Modes',
-            'Multi-Bot Management',
-            'Real-time Command Execution'
-        ]
+        features: {
+            python_support: !IS_VERCEL,
+            webhook_mode: USE_WEBHOOK,
+            multi_bot: true,
+            real_time_commands: true
+        }
     });
 });
 
@@ -198,7 +185,16 @@ app.get('*', (req, res) => {
     }
     
     // Serve the main HTML file for all other routes (SPA)
-    res.sendFile(path.join(__dirname, '../client/index.html'));
+    const filePath = path.join(__dirname, '../client', req.path);
+    
+    // Check if file exists
+    const fs = require('fs');
+    if (fs.existsSync(filePath) && !fs.statSync(filePath).isDirectory()) {
+        res.sendFile(filePath);
+    } else {
+        // Fallback to index.html for SPA routing
+        res.sendFile(path.join(__dirname, '../client/index.html'));
+    }
 });
 
 // 404 handler for API routes
@@ -218,8 +214,7 @@ app.use((error, req, res, next) => {
         success: false,
         error: process.env.NODE_ENV === 'production' 
             ? 'Internal server error' 
-            : error.message,
-        ...(process.env.NODE_ENV !== 'production' && { stack: error.stack })
+            : error.message
     });
 });
 
@@ -231,69 +226,74 @@ process.on('unhandledRejection', (reason, promise) => {
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
     console.error('🚨 Uncaught Exception:', error);
-    process.exit(1);
+    if (!IS_VERCEL) process.exit(1);
 });
 
-// Start server
-const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log('\n🚀 Server started successfully!');
-    console.log(`📍 Port: ${PORT}`);
-    console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`🌐 Base URL: ${BASE_URL}`);
-    console.log(`🕒 Started at: ${new Date().toISOString()}`);
-    console.log(`🔗 Health check: ${BASE_URL}/api/health`);
-    console.log(`📚 API Info: ${BASE_URL}/api/info`);
-    
-    if (USE_WEBHOOK) {
-        console.log(`🤖 Webhook URL: ${BASE_URL}/api/webhook/{BOT_TOKEN}`);
-    } else {
-        console.log(`🔄 Running in Polling mode`);
-    }
-    
-    console.log('----------------------------------------\n');
-    
-    // Initialize bots after server starts with delay
-    setTimeout(async () => {
-        try {
-            const botManager = require('./core/bot-manager');
-            await botManager.initializeAllBots();
-            console.log('✅ All bots initialized successfully');
-        } catch (error) {
-            console.error('❌ Bot initialization failed:', error);
-        }
-    }, 5000);
-});
-
-// Graceful shutdown
-const gracefulShutdown = (signal) => {
-    console.log(`\n🛑 ${signal} received, shutting down gracefully...`);
-    
-    server.close(() => {
-        console.log('✅ HTTP server closed');
+// Vercel-specific: Export the app for serverless functions
+if (IS_VERCEL) {
+    console.log('🚀 Starting in Vercel serverless mode');
+    module.exports = app;
+} else {
+    // Traditional server startup for Render
+    console.log('🚀 Starting in Render server mode');
+    const server = app.listen(PORT, '0.0.0.0', () => {
+        console.log('\n🚀 Server started successfully!');
+        console.log(`📍 Port: ${PORT}`);
+        console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+        console.log(`🌐 Base URL: ${BASE_URL}`);
+        console.log(`🕒 Started at: ${new Date().toISOString()}`);
         
-        // Clean up bot connections
-        try {
-            const botManager = require('./core/bot-manager');
-            botManager.activeBots.forEach((bot, token) => {
-                console.log(`🛑 Stopping bot: ${token.substring(0, 15)}...`);
-                botManager.removeBot(token);
-            });
-        } catch (error) {
-            console.error('Error during bot cleanup:', error);
+        if (USE_WEBHOOK) {
+            console.log(`🤖 Webhook URL: ${BASE_URL}/api/webhook/{BOT_TOKEN}`);
+        } else {
+            console.log(`🔄 Running in Polling mode`);
         }
         
-        console.log('✅ Cleanup completed');
-        process.exit(0);
+        console.log('----------------------------------------\n');
+        
+        // Initialize bots after server starts with delay
+        setTimeout(async () => {
+            try {
+                const botManager = require('./core/bot-manager');
+                await botManager.initializeAllBots();
+                console.log('✅ All bots initialized successfully');
+            } catch (error) {
+                console.error('❌ Bot initialization failed:', error);
+            }
+        }, 3000);
     });
 
-    // Force close after 10 seconds
-    setTimeout(() => {
-        console.error('❌ Could not close connections in time, forcefully shutting down');
-        process.exit(1);
-    }, 10000);
-};
+    // Graceful shutdown for Render
+    const gracefulShutdown = (signal) => {
+        console.log(`\n🛑 ${signal} received, shutting down gracefully...`);
+        
+        server.close(() => {
+            console.log('✅ HTTP server closed');
+            
+            // Clean up bot connections
+            try {
+                const botManager = require('./core/bot-manager');
+                if (botManager.activeBots) {
+                    botManager.activeBots.forEach((bot, token) => {
+                        console.log(`🛑 Stopping bot: ${token.substring(0, 15)}...`);
+                        botManager.removeBot(token);
+                    });
+                }
+            } catch (error) {
+                console.error('Error during bot cleanup:', error);
+            }
+            
+            console.log('✅ Cleanup completed');
+            process.exit(0);
+        });
 
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+        // Force close after 10 seconds
+        setTimeout(() => {
+            console.error('❌ Could not close connections in time, forcefully shutting down');
+            process.exit(1);
+        }, 10000);
+    };
 
-module.exports = app;
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+}
