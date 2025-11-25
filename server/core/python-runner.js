@@ -4,14 +4,19 @@ const fs = require('fs');
 const path = require('path');
 const supabase = require('../config/supabase');
 
+// server/core/python-runner.js
 class PythonRunner {
     constructor() {
         this.isVercel = process.env.VERCEL === '1' || process.env.NOW_REGION;
         this.tempDir = this.getTempDir();
         this.initialized = false;
+        
+        // Node.js 22-এ spawnSync可能会有changes
         this.pythonCommand = this.findPythonCommand();
-        this.supported = !this.isVercel; // Vercel-এ Python সাপোর্টেড না
+        this.supported = !this.isVercel;
     }
+    
+    // বাকি code unchanged রাখুন
 
     getTempDir() {
         if (this.isVercel) {
