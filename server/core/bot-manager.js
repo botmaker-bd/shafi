@@ -3,7 +3,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const supabase = require('../config/supabase');
 const pythonRunner = require('./python-runner');
 const ApiWrapper = require('./api-wrapper');
-const { executeCommandCode } = require('./command-executor');
+const { executeCommandCode } = require('./command-executor.js');
 
 class BotManager {
     constructor() {
