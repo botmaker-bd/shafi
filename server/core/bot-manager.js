@@ -14,7 +14,6 @@ class BotManager {
         this.initialized = false;
         this.dataCache = new Map();
         this.waitingAnswers = new Map();
-        this.commandAnswerHandlers = new Map();
         this.callbackHandlers = new Map();
         
         console.log(`🤖 Bot Manager initialized in ${this.USE_WEBHOOK ? 'WEBHOOK' : 'POLLING'} mode`);
@@ -154,7 +153,6 @@ class BotManager {
             userInput: userInput,
             nextCommandHandlers: this.nextCommandHandlers,
             waitingAnswers: this.waitingAnswers,
-            commandAnswerHandlers: this.commandAnswerHandlers,
             callbackHandlers: this.callbackHandlers,
             
             User: {
@@ -234,78 +232,8 @@ class BotManager {
     }
 
     // ✅ FIXED: Setup Command Answer Handler with ERROR HANDLING
-    // async setupCommandAnswerHandler(bot, command, msg, context) {
-        // const userKey = `${command.bot_token}_${msg.from.id}`;
-        
-        // console.log(`⏳ Setting up Command Answer Handler for user: ${userKey}`);
-        
-        // try {
-            // this.commandAnswerHandlers.set(userKey, {
-                // bot: bot,
-                // command: command,
-                // context: context,
-                // timestamp: Date.now(),
-                // originalMessage: msg
-            // });
-            
-            // console.log(`✅ Now waiting for answer from user ${msg.from.first_name}`);
-            
-            // // Send confirmation message
-            // await bot.sendMessage(msg.chat.id, "💬 I'm listening for your response...");
-            
-        // } catch (error) {
-            // console.error('❌ Failed to setup command answer handler:', error);
-            // await bot.sendMessage(msg.chat.id, "❌ Failed to setup response listener. Please try again.");
-        // }
-    // }
 
     // ✅ FIXED: Process user's answer with BETTER ERROR HANDLING
-    // async processCommandAnswer(userKey, answerText, answerMsg) {
-        // let handlerData;
-        
-        // try {
-            // handlerData = this.commandAnswerHandlers.get(userKey);
-            // if (!handlerData) {
-                // console.log(`❌ No command handler data found for user: ${userKey}`);
-                // return;
-            // }
-
-            // const { bot, command, context, originalMessage } = handlerData;
-            
-            // console.log(`🎯 Processing command answer: "${answerText}" for command: ${command.command_patterns}`);
-            
-            // // Send processing message
-            // await bot.sendMessage(answerMsg.chat.id, "⏳ Processing your response...");
-            
-            // // const answerContext = {
-                // // ...context,
-                // // params: answerText,
-                // // userInput: answerText,
-                // // answerMessage: answerMsg,
-                // // originalMessage: originalMessage
-            // // };
-
-            // // Execute the answer handler code
-            // await executeCommandCode(bot, command.answer_handler, answerContext);
-            
-            // console.log(`✅ Command answer handler executed successfully`);
-            
-        // } catch (error) {
-            // console.error('❌ Command answer handler execution error:', error);
-            
-            // // ✅ IMPROVED: Send detailed error message
-            // try {
-                // const errorMsg = `❌ Answer Handler Error: ${error.message}\n\nPlease try the command again.`;
-                // await handlerData?.bot.sendMessage(answerMsg.chat.id, errorMsg);
-            // } catch (sendError) {
-                // console.error('❌ Failed to send error message:', sendError);
-            // }
-            
-        // } finally {
-            // this.commandAnswerHandlers.delete(userKey);
-            // console.log(`🧹 Auto-cleaned command answer handler for ${userKey}`);
-        // }
-    // }
 
     // ✅ FIXED: Process waitForAnswer() with BETTER ERROR HANDLING
     async processWaitForAnswer(userKey, answerText, answerMsg) {
@@ -571,12 +499,6 @@ class BotManager {
                 }
             }
 
-            // 2. Check for command-based answer handlers
-            if (this.commandAnswerHandlers.has(userKey)) {
-                console.log(`✅ COMMAND ANSWER HANDLER FOUND! Processing...`);
-                await this.processCommandAnswer(userKey, text, msg);
-                return;
-            }
 
             // 3. Check for next command handler (other types)
             const nextCommandKey = `${token}_${userId}_next`;
@@ -595,17 +517,6 @@ class BotManager {
                     return;
                 }
             }
-
-            // Handle special commands
-            // if (text.startsWith('/python ')) {
-                // await this.executePythonCode(bot, chatId, text.replace('/python ', ''));
-                // return;
-            // }
-
-            // if (text.startsWith('/ai ') || text.startsWith('/generate ')) {
-                // await this.generateAICode(bot, chatId, text);
-                // return;
-            // }
             
 const command = await this.findMatchingCommand(token, text, msg);
 
@@ -650,13 +561,6 @@ if (command) {
             }
         }
         
-        // Cleanup command answer handlers
-        for (const [userKey, handlerData] of this.commandAnswerHandlers.entries()) {
-            if (now - handlerData.timestamp > STALE_TIMEOUT) {
-                console.log(`🧹 Removing stale command handler for ${userKey}`);
-                this.commandAnswerHandlers.delete(userKey);
-            }
-        }
     }
 
     // ✅ FIXED: Callback Query Handler - NOW PROCESSES AS COMMANDS
