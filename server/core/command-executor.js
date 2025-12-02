@@ -106,12 +106,9 @@ async function executeCommandCode(botInstance, code, context) {
             const isChatId = (val) => {
                 if (!val) return false;
                 if (typeof val === 'number') {
-                    // Chat IDs are integers. Latitudes are roughly -90 to 90. 
-                    // Safe check: If absolute value > 200, it's likely a Chat ID.
                     return Number.isInteger(val) && Math.abs(val) > 200;
                 }
                 if (typeof val === 'string') {
-                    // Starts with @, or consists of digits (possibly with negative sign)
                     return val.startsWith('@') || /^-?\d+$/.test(val);
                 }
                 return false;
@@ -130,23 +127,18 @@ async function executeCommandCode(botInstance, code, context) {
                 if (!noChatIdMethods.includes(methodName)) {
                     let shouldInject = false;
 
-                    // Case 1: sendLocation(lat, long) -> 2 args -> Inject
                     if (methodName === 'sendLocation') {
                         if (args.length === 2 || (args.length === 3 && typeof args[2] === 'object')) {
                             shouldInject = true;
                         }
                     }
-                    // Case 2: sendMediaGroup(mediaArray) -> 1 arg (Array) -> Inject
                     else if (methodName === 'sendMediaGroup') {
                         if (Array.isArray(args[0])) {
                             shouldInject = true;
                         }
                     }
-                    // Case 3: General Methods (sendMessage, sendPhoto, etc.)
                     else {
-                        // If no args OR first arg is NOT a Chat ID -> Inject
                         if (args.length === 0 || !isChatId(args[0])) {
-                            // Extra Safety: sending methods usually start with 'send', 'forward', 'copy'
                             if (methodName.startsWith('send') || methodName.startsWith('forward') || methodName.startsWith('copy')) {
                                 shouldInject = true;
                             }
@@ -182,7 +174,7 @@ async function executeCommandCode(botInstance, code, context) {
                 waitForAnswer: waitForAnswerLogic
             };
 
-            // --- 6. AUTO-AWAIT ENGINE (FIXED REGEX) ---
+            // --- 6. AUTO-AWAIT ENGINE (FIXED) ---
             const executeWithAutoAwait = async (userCode, env) => {
                 const __autoAwait = {
                     UserSave: (k, v) => env.User.saveData(k, v),
@@ -192,6 +184,9 @@ async function executeCommandCode(botInstance, code, context) {
                     BotDataGet: (k) => env.bot.getData(k),
                     BotDataDel: (k) => env.bot.deleteData(k),
                     Ask: (q, o) => env.ask(q, o),
+                    
+                    // ✅ FIX: Added Wait function mapping here
+                    Wait: (s) => env.wait(s), 
                     
                     // The Generic Caller
                     BotGeneric: async (method, ...args) => {
@@ -204,7 +199,6 @@ async function executeCommandCode(botInstance, code, context) {
 
                 // 🛡️ REGEX RULES (Applied strictly in order)
                 const rules = [
-                    // A. Specific Methods (User/Bot Data/Ask)
                     { r: /User\s*\.\s*saveData\s*\(([^)]+)\)/g,   to: 'await __autoAwait.UserSave($1)' },
                     { r: /User\s*\.\s*getData\s*\(([^)]+)\)/g,    to: 'await __autoAwait.UserGet($1)' },
                     { r: /User\s*\.\s*deleteData\s*\(([^)]+)\)/g, to: 'await __autoAwait.UserDel($1)' },
@@ -215,16 +209,16 @@ async function executeCommandCode(botInstance, code, context) {
                     
                     { r: /(ask|waitForAnswer)\s*\(([^)]+)\)/g, to: 'await __autoAwait.Ask($2)' },
                     
+                    // Regex for Wait/Sleep
                     { r: /(wait|sleep)\s*\(([^)]+)\)/g, to: 'await __autoAwait.Wait($2)' },
                    
-                    // B. Universal Bot Calls - Empty Arguments (e.g., Bot.getMe())
-                    // Fixes: "SyntaxError: Unexpected token )" caused by trailing comma
+                    // Fix for empty arguments calls (e.g. getMe())
                     { 
                         r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer)([a-zA-Z0-9_]+)\s*\(\s*\)/g, 
                         to: "await __autoAwait.BotGeneric('$2')" 
                     },
 
-                    // C. Universal Bot Calls - With Arguments (e.g., Bot.sendMessage('Hi'))
+                    // General bot calls
                     { 
                         r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer)([a-zA-Z0-9_]+)\s*\(/g, 
                         to: "await __autoAwait.BotGeneric('$2', " 
@@ -249,8 +243,6 @@ async function executeCommandCode(botInstance, code, context) {
 
         } catch (error) {
             console.error('💥 Execution Error:', error.message);
-            // Optional: Notify user in chat about the error
-            // botInstance.sendMessage(chatId, `❌ Script Error: ${error.message}`).catch(() => {});
             reject(error);
         } finally {
             await supabase.from('active_sessions').delete().eq('session_id', sessionKey);
