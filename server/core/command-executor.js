@@ -2,21 +2,36 @@ const ApiWrapper = require('./api-wrapper');
 const supabase = require('../config/supabase');
 const pythonRunner = require('./python-runner');
 
-/**
- * Executes dynamic code with sandbox environment, auto-await, and session management.
- * Fixed: Removed 'new Promise' anti-pattern to prevent AggregateError/EFATAL crashes.
- */
 async function executeCommandCode(botInstance, code, context) {
-    const { msg, userId, botToken, userInput, nextCommandHandlers } = context;
+    // ✅ userInput সঠিকভাবে extract করুন
+    const msg = context.msg || context;
+    const userId = context.userId || msg?.from?.id;
+    const botToken = context.botToken || context.command?.bot_token;
     
-    // 🛡️ SECURITY LAYER: Validate Chat ID
-    let rawChatId = context.chatId || msg?.chat?.id;
-    if (!rawChatId) {
+    // ✅ userInput বিভিন্ন জায়গা থেকে extract করার চেষ্টা করুন
+    let userInput = context.userInput || 
+                   context.params || 
+                   msg?.text || 
+                   msg?.caption || 
+                   context.userInputValue || 
+                   '';
+    
+    const chatId = context.chatId || msg?.chat?.id;
+    
+    // ✅ ডিবাগ লগ
+    // console.log(`🔍 command-executor context:`);
+    // console.log(`  - userInput: "${userInput}"`);
+    // console.log(`  - context keys: ${Object.keys(context).join(', ')}`);
+    // console.log(`  - msg.text: "${msg?.text}"`);
+    // console.log(`  - context.params: "${context.params}"`);
+    
+    if (!chatId) {
         throw new Error("CRITICAL: Chat ID is missing in context!");
     }
-    const chatId = String(rawChatId); 
+    
     const sessionKey = `sess_${userId}_${Date.now()}`;
-
+    
+    // ... বাকি কোড
     // --- 1. SETUP ---
     let resolvedBotToken = botToken;
     if (!resolvedBotToken && context.command) resolvedBotToken = context.command.bot_token;
