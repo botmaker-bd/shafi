@@ -1,40 +1,28 @@
 const express = require('express');
-const botManager = require('../core/bot-manager');
 const router = express.Router();
+const botManager = require('../core/bot-manager');
 
-// Webhook endpoint for Telegram
+// Handle Telegram Webhooks
 router.post('/:token', async (req, res) => {
     try {
-        const { token } = req.params;
+        const token = req.params.token;
         const update = req.body;
-        
-        console.log('🔄 Webhook received for bot:', token.substring(0, 10) + '...');
-        
-        await botManager.handleBotUpdate(token, update);
-        
-        res.status(200).send('OK');
-    } catch (error) {
-        console.error('❌ Webhook error:', error);
-        res.status(200).send('OK');
-    }
-});
 
-// Webhook info endpoint
-router.get('/info/:token', async (req, res) => {
-    try {
-        const { token } = req.params;
-        const baseUrl = process.env.BASE_URL;
-        const webhookUrl = `${baseUrl}/api/webhook/${token}`;
-        
-        res.json({
-            success: true,
-            token: token.substring(0, 15) + '...',
-            webhook_url: webhookUrl,
-            mode: process.env.USE_WEBHOOK === 'true' ? 'webhook' : 'polling',
-            status: 'active'
-        });
+        // ভ্যালিডেশন: টোকেন বা আপডেট না থাকলে ইগনোর করুন
+        if (!token || !update) {
+            return res.status(400).send('Invalid request');
+        }
+
+        // BotManager কে আপডেট প্রসেস করতে বলুন
+        // (আগের ভার্সনে হয়তো ফাংশনটির নাম ভিন্ন ছিল, এখন এটি handleBotUpdate)
+        await botManager.handleBotUpdate(token, update);
+
+        // টেলিগ্রামকে সবসময় 200 OK পাঠাতে হবে, নাহলে তারা বারবার রি-ট্রাই করবে
+        res.sendStatus(200);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('❌ Webhook route error:', error.message);
+        // এরর হলেও 200 পাঠাতে হবে যাতে টেলিগ্রাম লুপে না পড়ে
+        res.sendStatus(200);
     }
 });
 
