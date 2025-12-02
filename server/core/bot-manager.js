@@ -464,96 +464,88 @@ class BotManager {
     }
 
     // ✅ FIXED: MESSAGE HANDLER
-    async handleMessage(bot, token, msg) {
-        try {
-            if (!msg.text && !msg.caption) return;
+async handleMessage(bot, token, msg) {
+    try {
+        if (!msg.text && !msg.caption) return;
 
-            const chatId = msg.chat.id;
-            const userId = msg.from.id;
-            const text = msg.text || msg.caption || '';
-            
-            const userInput = msg.text || msg.caption || '';
-
-            console.log(`📨 Message from ${msg.from.first_name} (${userId}): "${text}"`);
-            console.log(`🔑 Bot token: ${token.substring(0, 10)}...`);
-
-            const userKey = `${token}_${userId}`;
-
-            // ✅ FIXED: 1. FIRST - Check for waitForAnswer() promises
-            if (this.nextCommandHandlers.has(userKey)) {
-                console.log(`✅ WAIT FOR ANSWER HANDLER FOUND! Processing...`);
-                const handlerData = this.nextCommandHandlers.get(userKey);
-                
-                if (handlerData && handlerData.resolve) {
-                    console.log(`🎯 Resolving waitForAnswer with: "${text}"`);
-                    handlerData.resolve(text);
-                    this.nextCommandHandlers.delete(userKey);
-                    console.log(`✅ waitForAnswer resolved successfully`);
-                    return;
-                } else {
-                    console.log(`❌ Handler data exists but resolve function missing`);
-                    this.nextCommandHandlers.delete(userKey);
-                }
-            }
-
-
-            // 3. Check for next command handler (other types)
-            const nextCommandKey = `${token}_${userId}_next`;
-            if (this.nextCommandHandlers.has(nextCommandKey)) {
-                console.log(`✅ NEXT COMMAND HANDLER FOUND! Executing...`);
-                const handler = this.nextCommandHandlers.get(nextCommandKey);
-                this.nextCommandHandlers.delete(nextCommandKey);
-                
-                try {
-                    await handler(text, msg);
-                    console.log(`✅ Next command handler executed successfully`);
-                    return;
-                } catch (handlerError) {
-                    console.error(`❌ Next command handler error:`, handlerError);
-                    await this.sendError(bot, chatId, handlerError);
-                    return;
-                }
-            }
-            
-const command = await this.findMatchingCommand(token, text, msg);
-
-if (command) {
-    // কমান্ড পাওয়া গেছে, রান করা হচ্ছে
-    await this.executeCommand(bot, command, msg, text);
-} else {
-    // ✅ NEW: Command NOT Found Response (Private Chat Only)
-    if (msg.chat.type === 'private') {
+        const chatId = msg.chat.id;
+        const userId = msg.from.id;
+        const text = msg.text || msg.caption || '';
         
-        // ১. টেক্সট ভেরিয়েবল নিশ্চিত করা
-        const rawText = text || ''; // আগে text ভেরিয়েবল ডিফাইন করা থাকতে হবে
+        // ✅ FIXED: userInput properly set
+        const userInput = text;
 
-        // ২. লজিক: যদি ২০ এর বেশি হয়, তবেই কাটবে এবং '...' যোগ করবে
-        let displayText = rawText;
-        if (rawText.length > 20) {
-            displayText = rawText.substring(0, 20) + '...';
+        console.log(`📨 Message from ${msg.from.first_name} (${userId}): "${text}"`);
+        console.log(`🔑 Bot token: ${token.substring(0, 10)}...`);
+
+        const userKey = `${token}_${userId}`;
+
+        // ✅ FIXED: 1. FIRST - Check for waitForAnswer() promises
+        if (this.nextCommandHandlers.has(userKey)) {
+            console.log(`✅ WAIT FOR ANSWER HANDLER FOUND! Processing...`);
+            const handlerData = this.nextCommandHandlers.get(userKey);
+            
+            if (handlerData && handlerData.resolve) {
+                console.log(`🎯 Resolving waitForAnswer with: "${text}"`);
+                handlerData.resolve(text);
+                this.nextCommandHandlers.delete(userKey);
+                console.log(`✅ waitForAnswer resolved successfully`);
+                return;
+            } else {
+                console.log(`❌ Handler data exists but resolve function missing`);
+                this.nextCommandHandlers.delete(userKey);
+            }
         }
 
-        // ৩. HTML Escape (নিরাপত্তার জন্য: <, >, & রিপ্লেস করা)
-        const safeText = displayText
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;");
-
-        // ৪. মেসেজ পাঠানো
-        await bot.sendMessage(
-            msg.chat.id, 
-            `❌ <b>Unknown Command:</b> ${safeText}\n\nদুঃখিত, এই কমান্ডটি খুঁজে পাওয়া যায়নি।`, 
-            { parse_mode: 'HTML' }
-        );
-    }
-}
-
-        } catch (error) {
-            console.error('❌ Handle message error:', error);
-            await this.sendError(bot, msg.chat.id, error);
+        // 2. Check for next command handler (other types)
+        const nextCommandKey = `${token}_${userId}_next`;
+        if (this.nextCommandHandlers.has(nextCommandKey)) {
+            console.log(`✅ NEXT COMMAND HANDLER FOUND! Executing...`);
+            const handler = this.nextCommandHandlers.get(nextCommandKey);
+            this.nextCommandHandlers.delete(nextCommandKey);
+            
+            try {
+                await handler(text, msg);
+                console.log(`✅ Next command handler executed successfully`);
+                return;
+            } catch (handlerError) {
+                console.error(`❌ Next command handler error:`, handlerError);
+                await this.sendError(bot, chatId, handlerError);
+                return;
+            }
         }
-    }
+        
+        const command = await this.findMatchingCommand(token, text, msg);
 
+        if (command) {
+            // কমান্ড পাওয়া গেছে, রান করা হচ্ছে
+            await this.executeCommand(bot, command, msg, userInput);
+        } else {
+            // Command NOT Found Response (Private Chat Only)
+            if (msg.chat.type === 'private') {
+                let displayText = text;
+                if (text.length > 20) {
+                    displayText = text.substring(0, 20) + '...';
+                }
+                
+                const safeText = displayText
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;");
+
+                await bot.sendMessage(
+                    msg.chat.id, 
+                    `❌ <b>Unknown Command:</b> ${safeText}\n\nদুঃখিত, এই কমান্ডটি খুঁজে পাওয়া যায়নি।`, 
+                    { parse_mode: 'HTML' }
+                );
+            }
+        }
+
+    } catch (error) {
+        console.error('❌ Handle message error:', error);
+        await this.sendError(bot, msg.chat.id, error);
+    }
+}   
     // ✅ FIXED: Cleanup stale handlers
     cleanupStaleHandlers() {
         const now = Date.now();
