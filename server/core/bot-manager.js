@@ -694,23 +694,42 @@ if (command) {
 // bot.sendMessage(\`Hello \${user.first_name}! You said: "${prompt}"\`);`;
     // }
 
-    async findMatchingCommand(token, text, msg) {
-        const commands = this.botCommands.get(token) || [];
+    // bot-manager.js - findMatchingCommand মেথড
+async findMatchingCommand(token, text, msg) {
+    const commands = this.botCommands.get(token) || [];
+    
+    for (const command of commands) {
+        if (!command.command_patterns) continue;
         
-        for (const command of commands) {
-            if (!command.command_patterns) continue;
+        const patterns = command.command_patterns.split(',').map(p => p.trim());
+        
+        for (const pattern of patterns) {
+            // Exact match check
+            if (text === pattern) {
+                console.log(`✅ Exact match found: "${text}" = "${pattern}"`);
+                return command;
+            }
             
-            const patterns = command.command_patterns.split(',').map(p => p.trim());
+            // Pattern দিয়ে শুরু হলে
+            if (text.startsWith(pattern + ' ')) {
+                console.log(`✅ Pattern match found: "${text}" starts with "${pattern}"`);
+                return command;
+            }
             
-            for (const pattern of patterns) {
-                if (text === pattern || text.startsWith(pattern + ' ')) {
+            // Alternative: slash ছাড়া pattern
+            if (!pattern.startsWith('/') && text.startsWith('/' + pattern)) {
+                const patternWithSlash = '/' + pattern;
+                if (text === patternWithSlash || text.startsWith(patternWithSlash + ' ')) {
+                    console.log(`✅ Alternative match found: "${text}" matches "${pattern}"`);
                     return command;
                 }
             }
         }
-        
-        return null;
     }
+    
+    console.log(`❌ No matching command found for: "${text}"`);
+    return null;
+}
 
     async sendError(bot, chatId, error) {
         try {
