@@ -234,78 +234,78 @@ class BotManager {
     }
 
     // ✅ FIXED: Setup Command Answer Handler with ERROR HANDLING
-    async setupCommandAnswerHandler(bot, command, msg, context) {
-        const userKey = `${command.bot_token}_${msg.from.id}`;
+    // async setupCommandAnswerHandler(bot, command, msg, context) {
+        // const userKey = `${command.bot_token}_${msg.from.id}`;
         
-        console.log(`⏳ Setting up Command Answer Handler for user: ${userKey}`);
+        // console.log(`⏳ Setting up Command Answer Handler for user: ${userKey}`);
         
-        try {
-            this.commandAnswerHandlers.set(userKey, {
-                bot: bot,
-                command: command,
-                context: context,
-                timestamp: Date.now(),
-                originalMessage: msg
-            });
+        // try {
+            // this.commandAnswerHandlers.set(userKey, {
+                // bot: bot,
+                // command: command,
+                // context: context,
+                // timestamp: Date.now(),
+                // originalMessage: msg
+            // });
             
-            console.log(`✅ Now waiting for answer from user ${msg.from.first_name}`);
+            // console.log(`✅ Now waiting for answer from user ${msg.from.first_name}`);
             
-            // Send confirmation message
-            await bot.sendMessage(msg.chat.id, "💬 I'm listening for your response...");
+            // // Send confirmation message
+            // await bot.sendMessage(msg.chat.id, "💬 I'm listening for your response...");
             
-        } catch (error) {
-            console.error('❌ Failed to setup command answer handler:', error);
-            await bot.sendMessage(msg.chat.id, "❌ Failed to setup response listener. Please try again.");
-        }
-    }
+        // } catch (error) {
+            // console.error('❌ Failed to setup command answer handler:', error);
+            // await bot.sendMessage(msg.chat.id, "❌ Failed to setup response listener. Please try again.");
+        // }
+    // }
 
     // ✅ FIXED: Process user's answer with BETTER ERROR HANDLING
-    async processCommandAnswer(userKey, answerText, answerMsg) {
-        let handlerData;
+    // async processCommandAnswer(userKey, answerText, answerMsg) {
+        // let handlerData;
         
-        try {
-            handlerData = this.commandAnswerHandlers.get(userKey);
-            if (!handlerData) {
-                console.log(`❌ No command handler data found for user: ${userKey}`);
-                return;
-            }
+        // try {
+            // handlerData = this.commandAnswerHandlers.get(userKey);
+            // if (!handlerData) {
+                // console.log(`❌ No command handler data found for user: ${userKey}`);
+                // return;
+            // }
 
-            const { bot, command, context, originalMessage } = handlerData;
+            // const { bot, command, context, originalMessage } = handlerData;
             
-            console.log(`🎯 Processing command answer: "${answerText}" for command: ${command.command_patterns}`);
+            // console.log(`🎯 Processing command answer: "${answerText}" for command: ${command.command_patterns}`);
             
-            // Send processing message
-            await bot.sendMessage(answerMsg.chat.id, "⏳ Processing your response...");
+            // // Send processing message
+            // await bot.sendMessage(answerMsg.chat.id, "⏳ Processing your response...");
             
-            const answerContext = {
-                ...context,
-                params: answerText,
-                userInput: answerText,
-                answerMessage: answerMsg,
-                originalMessage: originalMessage
-            };
+            // // const answerContext = {
+                // // ...context,
+                // // params: answerText,
+                // // userInput: answerText,
+                // // answerMessage: answerMsg,
+                // // originalMessage: originalMessage
+            // // };
 
-            // Execute the answer handler code
-            await executeCommandCode(bot, command.answer_handler, answerContext);
+            // // Execute the answer handler code
+            // await executeCommandCode(bot, command.answer_handler, answerContext);
             
-            console.log(`✅ Command answer handler executed successfully`);
+            // console.log(`✅ Command answer handler executed successfully`);
             
-        } catch (error) {
-            console.error('❌ Command answer handler execution error:', error);
+        // } catch (error) {
+            // console.error('❌ Command answer handler execution error:', error);
             
-            // ✅ IMPROVED: Send detailed error message
-            try {
-                const errorMsg = `❌ Answer Handler Error: ${error.message}\n\nPlease try the command again.`;
-                await handlerData?.bot.sendMessage(answerMsg.chat.id, errorMsg);
-            } catch (sendError) {
-                console.error('❌ Failed to send error message:', sendError);
-            }
+            // // ✅ IMPROVED: Send detailed error message
+            // try {
+                // const errorMsg = `❌ Answer Handler Error: ${error.message}\n\nPlease try the command again.`;
+                // await handlerData?.bot.sendMessage(answerMsg.chat.id, errorMsg);
+            // } catch (sendError) {
+                // console.error('❌ Failed to send error message:', sendError);
+            // }
             
-        } finally {
-            this.commandAnswerHandlers.delete(userKey);
-            console.log(`🧹 Auto-cleaned command answer handler for ${userKey}`);
-        }
-    }
+        // } finally {
+            // this.commandAnswerHandlers.delete(userKey);
+            // console.log(`🧹 Auto-cleaned command answer handler for ${userKey}`);
+        // }
+    // }
 
     // ✅ FIXED: Process waitForAnswer() with BETTER ERROR HANDLING
     async processWaitForAnswer(userKey, answerText, answerMsg) {
@@ -377,10 +377,10 @@ class BotManager {
                 await this.executeCommand(bot, matchingCommand, callbackMessage, callbackData);
                 
                 // Answer the callback query
-                await bot.answerCallbackQuery(callbackQuery.id, { 
-                    text: `Executed: ${callbackData}`,
-                    show_alert: false 
-                });
+                // await bot.answerCallbackQuery(callbackQuery.id, { 
+                    // text: `Executed: ${callbackData}`,
+                    // show_alert: false 
+                // });
                 
             } else {
                 console.log(`❌ No command found for callback: ${callbackData}`);
@@ -618,7 +618,7 @@ class BotManager {
                 // গ্রুপ চ্যাটে স্প্যামিং কমানোর জন্য চেক করা যেতে পারে (Optional), 
                 // কিন্তু প্রাইভেট চ্যাটের জন্য এটা জরুরি।
                 if (msg.chat.type === 'private') {
-                    await bot.sendMessage(msg.chat.id, `❌ <b>Unknown Command: ${command.substring(0,10)} ... </b>\nদুঃখিত, এই কমান্ডটি খুঁজে পাওয়া যায়নি।`, { parse_mode: 'HTML' });
+                    await bot.sendMessage(msg.chat.id, `❌ <b>Unknown Command: ${msg.substring(0,10)} ... </b>\nদুঃখিত, এই কমান্ডটি খুঁজে পাওয়া যায়নি।`, { parse_mode: 'HTML' });
                 }
             }
 
