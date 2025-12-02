@@ -94,11 +94,6 @@ class BotManager {
 
             const result = await executeCommandCode(bot, command.code, context);
             
-            // ✅ FIXED: Setup Wait For Answer system with ERROR HANDLING
-            if (command.wait_for_answer && command.answer_handler) {
-                await this.setupCommandAnswerHandler(bot, command, msg, context);
-            }
-            
             console.log(`✅ Command executed successfully: ${command.command_patterns}`);
             return {
                 success: true,
