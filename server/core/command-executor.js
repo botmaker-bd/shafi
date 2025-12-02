@@ -14,48 +14,56 @@ async function executeCommandCode(botInstance, code, context) {
                          msg?.caption || 
                          '';
     
-    // ✅ params extract করার improved লজিক
+    // ✅ COMMAND এবং PARAMS আলাদা করার লজিক
+    let commandText = '';
     let params = '';
-    const command = context.command;
+    const currentCommand = context.command;
     
-    if (command && command.command_patterns && fullUserInput) {
-        const patterns = command.command_patterns.split(',').map(p => p.trim());
+    if (currentCommand && currentCommand.command_patterns && fullUserInput) {
+        const patterns = currentCommand.command_patterns.split(',').map(p => p.trim());
         
         for (const pattern of patterns) {
-            // Exact match বা pattern দিয়ে শুরু হলে
-            if (fullUserInput === pattern || fullUserInput.startsWith(pattern + ' ')) {
-                // Pattern remove করে params নিন
+            // Exact match
+            if (fullUserInput === pattern) {
+                commandText = pattern;
+                params = '';
+                break;
+            }
+            
+            // Pattern দিয়ে শুরু হলে
+            if (fullUserInput.startsWith(pattern + ' ')) {
+                commandText = pattern;
                 params = fullUserInput.substring(pattern.length).trim();
                 break;
             }
             
-            // Alternative: যদি pattern এ slash না থাকে কিন্তু user slash দিয়ে লিখে
+            // Alternative: slash ছাড়া pattern
             if (!pattern.startsWith('/') && fullUserInput.startsWith('/' + pattern)) {
                 const patternWithSlash = '/' + pattern;
                 if (fullUserInput === patternWithSlash || fullUserInput.startsWith(patternWithSlash + ' ')) {
+                    commandText = patternWithSlash;
                     params = fullUserInput.substring(patternWithSlash.length).trim();
                     break;
                 }
             }
         }
-    }
-    
-    // ✅ যদি params না পাওয়া যায়, পুরোটা ধরে নিন (কমান্ড ম্যাচ না করলে)
-    if (params === '' && command && command.command_patterns) {
-        // কমান্ড ম্যাচ করছে কিন্তু params নেই
-        params = '';
+        
+        // যদি কোনো match না পাওয়া যায়, default হিসেবে
+        if (!commandText && patterns.length > 0) {
+            commandText = patterns[0];
+            params = fullUserInput;
+        }
     }
     
     const chatId = context.chatId || msg?.chat?.id;
     const nextCommandHandlers = context.nextCommandHandlers || new Map();
     
     // ✅ ডিবাগ লগ
-    console.log(`🔍 command-executor context:`);
-    console.log(`  - Command Patterns: "${command?.command_patterns}"`);
-    console.log(`  - fullUserInput: "${fullUserInput}"`);
-    console.log(`  - params: "${params}"`);
-    console.log(`  - chatId: ${chatId}`);
-    console.log(`  - userId: ${userId}`);
+    console.log(`🔍 EXECUTOR DEBUG:`);
+    console.log(`  - Full Input: "${fullUserInput}"`);
+    console.log(`  - Command Found: "${commandText}"`);
+    console.log(`  - Params Extracted: "${params}"`);
+    console.log(`  - Command Patterns: "${currentCommand?.command_patterns}"`);
     
     if (!chatId) {
         throw new Error("CRITICAL: Chat ID is missing in context!");
@@ -63,11 +71,10 @@ async function executeCommandCode(botInstance, code, context) {
     
     const sessionKey = `sess_${userId}_${Date.now()}`;
     
-    // --- 1. SETUP ---
+    // --- বাকি কোড একই থাকবে ---
     let resolvedBotToken = botToken;
     if (!resolvedBotToken && context.command) resolvedBotToken = context.command.bot_token;
     
-    // Token Fallback
     if (!resolvedBotToken) {
         try { 
             const i = await botInstance.getMe(); 
@@ -78,7 +85,7 @@ async function executeCommandCode(botInstance, code, context) {
     }
 
     try {
-        // --- 2. SESSION START ---
+        // SESSION START
         try {
             await supabase.from('active_sessions').insert({
                 session_id: sessionKey, 
@@ -91,7 +98,7 @@ async function executeCommandCode(botInstance, code, context) {
             console.warn("⚠️ Session logging failed:", sessionErr.message);
         }
 
-        // --- 3. DATA FUNCTIONS ---
+        // DATA FUNCTIONS (same as before)
         const userDataFunctions = {
             saveData: async (key, value) => {
                 const { error } = await supabase.from('universal_data').upsert({
@@ -150,67 +157,19 @@ async function executeCommandCode(botInstance, code, context) {
             }
         };
 
-        // --- 4. INTERACTION ---
-        const waitForAnswerLogic = async (question, options = {}) => {
-            return new Promise((resolveWait, rejectWait) => {
-                const waitKey = `${resolvedBotToken}_${userId}`;
-                
-                botInstance.sendMessage(chatId, question, options).then(() => {
-                    const timeout = setTimeout(() => {
-                        if (nextCommandHandlers?.has(waitKey)) {
-                            nextCommandHandlers.delete(waitKey);
-                            rejectWait(new Error('Timeout: User took too long to respond.'));
-                        }
-                    }, 5 * 60 * 1000); // 5 Minutes
-
-                    if (nextCommandHandlers) {
-                        nextCommandHandlers.set(waitKey, {
-                            resolve: (ans) => { clearTimeout(timeout); resolveWait(ans); },
-                            reject: (err) => { clearTimeout(timeout); rejectWait(err); },
-                            timestamp: Date.now()
-                        });
-                    } else {
-                        clearTimeout(timeout);
-                        rejectWait(new Error('Handler system error'));
-                    }
-                }).catch(e => rejectWait(e));
-            });
+        // ENVIRONMENT SETUP
+        const apiCtx = { 
+            msg, 
+            chatId, 
+            userId, 
+            botToken: resolvedBotToken, 
+            userInput: fullUserInput, 
+            command: commandText,
+            params: params,
+            nextCommandHandlers 
         };
-
-        // --- 5. SMART BOT WRAPPER ---
-        const isChatId = (val) => {
-            if (!val) return false;
-            if (typeof val === 'number') return Number.isInteger(val) && Math.abs(val) > 200;
-            if (typeof val === 'string') return val.startsWith('@') || /^-?\d+$/.test(val);
-            return false;
-        };
-
-        const dynamicBotCaller = async (methodName, ...args) => {
-            if (typeof botInstance[methodName] !== 'function') {
-                throw new Error(`Method '${methodName}' missing in API`);
-            }
-            const noChatIdMethods = ['getMe', 'getWebhookInfo', 'deleteWebhook', 'setWebhook', 'answerCallbackQuery', 'answerInlineQuery', 'stopPoll', 'downloadFile', 'logOut', 'close'];
-
-            if (!noChatIdMethods.includes(methodName)) {
-                let shouldInject = false;
-                if (methodName === 'sendLocation') {
-                    if (args.length === 2 || (args.length === 3 && typeof args[2] === 'object')) shouldInject = true;
-                } else if (methodName === 'sendMediaGroup') {
-                    if (Array.isArray(args[0])) shouldInject = true;
-                } else {
-                    if (args.length === 0 || !isChatId(args[0])) {
-                        if (methodName.startsWith('send') || methodName.startsWith('forward') || methodName.startsWith('copy')) shouldInject = true;
-                    }
-                }
-                if (shouldInject) args.unshift(chatId);
-            }
-            return await botInstance[methodName](...args);
-        };
-
-        // --- 6. ENVIRONMENT SETUP ---
-        const apiCtx = { msg, chatId, userId, botToken: resolvedBotToken, userInput: fullUserInput, params, nextCommandHandlers };
+        
         const apiWrapperInstance = new ApiWrapper(botInstance, apiCtx);
-
         const botObject = { ...apiWrapperInstance, ...botDataFunctions };
 
         const baseExecutionEnv = {
@@ -222,19 +181,42 @@ async function executeCommandCode(botInstance, code, context) {
             msg, 
             chatId, 
             userId,
-            userInput: fullUserInput,    // ✅ সম্পূর্ণ user input (কমান্ড সহ)
-            params: params,               // ✅ শুধুমাত্র কমান্ডের পরের অংশ
+            userInput: fullUserInput,    // ✅ সম্পূর্ণ input (কমান্ড সহ)
+            command: commandText,         // ✅ শুধুমাত্র কমান্ড অংশ
+            params: params,               // ✅ শুধুমাত্র প্যারামিটার অংশ
             currentUser: msg.from || { id: userId, first_name: context.first_name || 'User' },
             wait: (sec) => new Promise(r => setTimeout(r, sec * 1000)),
             sleep: (sec) => new Promise(r => setTimeout(r, sec * 1000)),
-            runPython: (c) => pythonRunner.runPythonCodeSync(c),  // ✅ সরাসরি সিঙ্ক কল
-            ask: waitForAnswerLogic,
-            waitForAnswer: waitForAnswerLogic
+            runPython: (c) => pythonRunner.runPythonCodeSync(c),
+            ask: (q, o) => {
+                return new Promise((resolveAsk, rejectAsk) => {
+                    const waitKey = `${resolvedBotToken}_${userId}_ask`;
+                    botInstance.sendMessage(chatId, q, o).then(() => {
+                        const timeout = setTimeout(() => {
+                            if (nextCommandHandlers?.has(waitKey)) {
+                                nextCommandHandlers.delete(waitKey);
+                                rejectAsk(new Error('Timeout'));
+                            }
+                        }, 5 * 60 * 1000);
+
+                        if (nextCommandHandlers) {
+                            nextCommandHandlers.set(waitKey, {
+                                resolve: resolveAsk,
+                                reject: rejectAsk,
+                                timestamp: Date.now()
+                            });
+                        } else {
+                            clearTimeout(timeout);
+                            rejectAsk(new Error('Handler error'));
+                        }
+                    }).catch(rejectAsk);
+                });
+            },
+            waitForAnswer: (q, o) => baseExecutionEnv.ask(q, o)
         };
 
-        // --- 7. AUTO-AWAIT ENGINE ---
+        // AUTO-AWAIT ENGINE (same as before)
         const executeWithAutoAwait = async (userCode, env) => {
-            // ✅ এখানে __autoAwait define করুন
             const __autoAwait = {
                 UserSave: async (k, v) => await env.User.saveData(k, v),
                 UserGet: async (k) => await env.User.getData(k),
@@ -245,16 +227,17 @@ async function executeCommandCode(botInstance, code, context) {
                 Ask: async (q, o) => await env.ask(q, o),
                 Wait: async (s) => await env.wait(s),
                 Python: async (c) => {  
-                    // ✅ await যোগ হবে
                     const result = await pythonRunner.runPythonCode(c);
                     return result;
                 },
                 BotGeneric: async (method, ...args) => {
-                    return await dynamicBotCaller(method, ...args);
+                    if (typeof botInstance[method] !== 'function') {
+                        throw new Error(`Method '${method}' missing in API`);
+                    }
+                    return await botInstance[method](...args);
                 }
             };
 
-            // ✅ এখানে rules define করুন
             const rules = [
                 { r: /User\s*\.\s*saveData\s*\(([^)]+)\)/g,   to: 'await __autoAwait.UserSave($1)' },
                 { r: /User\s*\.\s*getData\s*\(([^)]+)\)/g,    to: 'await __autoAwait.UserGet($1)' },
@@ -264,7 +247,7 @@ async function executeCommandCode(botInstance, code, context) {
                 { r: /(Bot|bot)\s*\.\s*deleteData\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotDataDel($2)' },
                 { r: /(ask|waitForAnswer)\s*\(([^)]+)\)/g, to: 'await __autoAwait.Ask($2)' },
                 { r: /(wait|sleep)\s*\(([^)]+)\)/g, to: 'await __autoAwait.Wait($2)' },
-                { r: /runPython\s*\(([^)]+)\)/g, to: 'await __autoAwait.Python($1)' },  // ✅ নতুন rule
+                { r: /runPython\s*\(([^)]+)\)/g, to: 'await __autoAwait.Python($1)' },
                 { r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer)([a-zA-Z0-9_]+)\s*\(\s*\)/g, 
                   to: "await __autoAwait.BotGeneric('$2')" },
                 { r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer)([a-zA-Z0-9_]+)\s*\(/g, 
@@ -278,11 +261,7 @@ async function executeCommandCode(botInstance, code, context) {
                 processedCode = processedCode.replace(rule.r, rule.to); 
             });
 
-            // 🔥 FIX: User code এ context variable এর পরিবর্তে env ব্যবহার করুন
             const finalCode = `
-                // Available variables in user code:
-                // msg, chatId, userId, userInput, params, bot, Bot, User, currentUser, wait, sleep, runPython, ask
-                
                 try {
                     ${processedCode}
                 } catch (error) {
@@ -299,17 +278,14 @@ async function executeCommandCode(botInstance, code, context) {
             `);
             
             return await run(enhancedEnv);
-
         };
 
         // EXECUTE
         return await executeWithAutoAwait(code, baseExecutionEnv);
 
     } catch (error) {
-        // DETAILED ERROR LOGGING
         console.error('💥 Execution Error:', error);
         
-        // Handle AggregateError specifically
         if (error.name === 'AggregateError') {
             console.error('🔍 Aggregate Errors:', error.errors);
             throw new Error(`Connection Error: ${error.errors[0]?.message || 'Check Network/Supabase'}`);
@@ -317,10 +293,9 @@ async function executeCommandCode(botInstance, code, context) {
 
         throw error;
     } finally {
-        // CLEANUP
         try {
             await supabase.from('active_sessions').delete().eq('session_id', sessionKey);
-        } catch (e) { /* ignore cleanup error */ }
+        } catch (e) { /* ignore */ }
     }
 }
 
