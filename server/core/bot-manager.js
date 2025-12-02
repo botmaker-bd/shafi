@@ -524,16 +524,28 @@ if (command) {
     // কমান্ড পাওয়া গেছে, রান করা হচ্ছে
     await this.executeCommand(bot, command, msg, text);
 } else {
-    // ✅ NEW: Command NOT Found Response
+    // ✅ NEW: Command NOT Found Response (Private Chat Only)
     if (msg.chat.type === 'private') {
-        // ফিক্স: msg.substring এর বদলে text.substring ব্যবহার করা হয়েছে
-        // এবং HTML এর জন্য < বা > থাকলে যাতে এরর না দেয়, তাই একটু সাবধানে হ্যান্ডেল করা ভালো।
         
-        const safeText = (text || '').replace(/</g, '&lt;').replace(/>/g, '&gt;'); // HTML Escape (নিরাপত্তার জন্য)
+        // ১. টেক্সট ভেরিয়েবল নিশ্চিত করা
+        const rawText = text || ''; // আগে text ভেরিয়েবল ডিফাইন করা থাকতে হবে
 
+        // ২. লজিক: যদি ২০ এর বেশি হয়, তবেই কাটবে এবং '...' যোগ করবে
+        let displayText = rawText;
+        if (rawText.length > 20) {
+            displayText = rawText.substring(0, 20) + '...';
+        }
+
+        // ৩. HTML Escape (নিরাপত্তার জন্য: <, >, & রিপ্লেস করা)
+        const safeText = displayText
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
+
+        // ৪. মেসেজ পাঠানো
         await bot.sendMessage(
             msg.chat.id, 
-            `❌ <b>Unknown Command:</b> ${safeText.substring(0, 20)}...\n\nদুঃখিত, এই কমান্ডটি খুঁজে পাওয়া যায়নি।`, 
+            `❌ <b>Unknown Command:</b> ${safeText}\n\nদুঃখিত, এই কমান্ডটি খুঁজে পাওয়া যায়নি।`, 
             { parse_mode: 'HTML' }
         );
     }
