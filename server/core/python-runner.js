@@ -117,10 +117,6 @@ try:
     # User's code
 ${this.indentCode(code)}
     
-    # If no result variable, indicate success
-    if 'result' not in locals() and 'result' not in globals():
-        print("✅ Python code executed successfully")
-    
 except Exception as e:
     print(f"❌ Python Error: {str(e)}")
     sys.exit(1)`;
