@@ -1,5 +1,5 @@
 // server/core/python-runner.js - COMPLETELY FIXED
-const { spawnSync } = require('child_process');
+const { spawn } = require('child_process'); // spawnSync এর বদলে spawn
 const fs = require('fs');
 const path = require('path');
 const supabase = require('../config/supabase');
@@ -49,24 +49,59 @@ class PythonRunner {
     }
 
     // ✅ FIXED: PROPER PYTHON CODE EXECUTION
-    runPythonCodeSync(code) {
-        try {
-            console.log('🐍 Executing Python code synchronously...');
-            console.log('📝 Python code:', code);
+    // server/core/python-runner.js এর runPythonCode মেথডটি রিপ্লেস করুন
+
+// ... (class এর ভেতরে)
+
+    runPythonCode(code) {
+        return new Promise((resolve, reject) => {
+            const tempFile = path.join(this.tempDir, `script_${Date.now()}.py`);
             
-            // Check if it's a simple expression
-            if (this.isSimpleExpression(code)) {
-                console.log('🔧 Using simple expression mode');
-                return this.runSimpleExpression(code);
-            }
+            // টেমপ্লেট তৈরি
+            const pythonTemplate = `# Python Code Execution
+import sys
+try:
+${this.indentCode(code)}
+except Exception as e:
+    print(f"❌ Python Error: {str(e)}")
+    sys.exit(1)`;
+
+            fs.writeFileSync(tempFile, pythonTemplate);
+
+            const pythonCommand = process.env.PYTHON_PATH || 'python3';
             
-            // For multi-line code, use file execution
-            return this.runPythonFile(code);
-            
-        } catch (error) {
-            console.error('❌ Python execution error:', error);
-            throw new Error(`Python Error: ${error.message}`);
-        }
+            // Async spawn ব্যবহার
+            const pythonProcess = spawn(pythonCommand, [tempFile], {
+                cwd: this.tempDir
+            });
+
+            let outputData = '';
+            let errorData = '';
+
+            pythonProcess.stdout.on('data', (data) => {
+                outputData += data.toString();
+            });
+
+            pythonProcess.stderr.on('data', (data) => {
+                errorData += data.toString();
+            });
+
+            pythonProcess.on('close', (code) => {
+                // ক্লিনআপ
+                if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
+
+                if (code !== 0) {
+                    reject(new Error(errorData || outputData || 'Unknown Python Error'));
+                } else {
+                    resolve(outputData.trim());
+                }
+            });
+
+            pythonProcess.on('error', (err) => {
+                if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
+                reject(err);
+            });
+        });
     }
 
     // ✅ CHECK IF SIMPLE EXPRESSION
