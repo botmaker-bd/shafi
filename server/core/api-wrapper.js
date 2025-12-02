@@ -1,5 +1,5 @@
 const fs = require('fs');
-const axios = require('axios'); // Ensure axios is installed: npm install axios
+const axios = require('axios');
 
 class ApiWrapper {
     constructor(bot, context) {
@@ -10,33 +10,26 @@ class ApiWrapper {
         this.setupEnhancedMethods();
     }
 
-    // ✅ FIXED: Robust Chat ID Injection (Same logic as command-executor)
     setupAllMethods() {
         const allMethods = [
-            // Messages
             'sendMessage', 'forwardMessage', 'copyMessage', 'sendPhoto', 
             'sendAudio', 'sendDocument', 'sendVideo', 'sendAnimation',
             'sendVoice', 'sendVideoNote', 'sendMediaGroup', 'sendLocation',
             'sendVenue', 'sendContact', 'sendPoll', 'sendDice', 'sendChatAction',
-            // Editing
             'editMessageText', 'editMessageCaption', 'editMessageMedia',
             'editMessageReplyMarkup', 'editMessageLiveLocation', 'stopMessageLiveLocation',
-            // Chat & Members
             'deleteMessage', 'deleteMessages', 'pinChatMessage', 'unpinChatMessage',
             'leaveChat', 'getChat', 'getChatAdministrators', 'getChatMemberCount',
             'getChatMember', 'setChatTitle', 'setChatDescription', 'setChatPhoto',
             'deleteChatPhoto', 'setChatPermissions', 'banChatMember', 'unbanChatMember',
             'restrictChatMember', 'promoteChatMember', 'approveChatJoinRequest', 
             'declineChatJoinRequest', 'setChatStickerSet', 'deleteChatStickerSet',
-            // Stickers & Forum
             'sendSticker', 'uploadStickerFile', 'createForumTopic', 'editForumTopic',
             'closeForumTopic', 'reopenForumTopic', 'deleteForumTopic',
-            // Others
             'answerCallbackQuery', 'answerInlineQuery', 'getFile', 'downloadFile',
             'getMe', 'logOut', 'close'
         ];
 
-        // Helper to validate Chat ID
         const isChatId = (val) => {
             if (!val) return false;
             if (typeof val === 'number') return Number.isInteger(val) && Math.abs(val) > 200;
@@ -48,7 +41,6 @@ class ApiWrapper {
             if (this.bot[method]) {
                 this[method] = async (...args) => {
                     try {
-                        // 🛡️ SMART ARGUMENT INJECTION
                         const noChatIdMethods = [
                             'getMe', 'getWebhookInfo', 'deleteWebhook', 'setWebhook',
                             'answerCallbackQuery', 'answerInlineQuery', 'stopPoll', 
@@ -58,34 +50,23 @@ class ApiWrapper {
                         if (!noChatIdMethods.includes(method)) {
                             let shouldInject = false;
                             
-                            // Case 1: sendLocation (lat, long) -> Inject
                             if (method === 'sendLocation') {
-                                if (args.length === 2 || (args.length === 3 && typeof args[2] === 'object')) {
-                                    shouldInject = true;
-                                }
+                                if (args.length === 2 || (args.length === 3 && typeof args[2] === 'object')) shouldInject = true;
                             }
-                            // Case 2: sendMediaGroup (Array) -> Inject
                             else if (method === 'sendMediaGroup') {
                                 if (Array.isArray(args[0])) shouldInject = true;
                             }
-                            // Case 3: General Methods
                             else {
                                 if (args.length === 0 || !isChatId(args[0])) {
-                                    if (method.startsWith('send') || method.startsWith('forward') || method.startsWith('copy')) {
-                                        shouldInject = true;
-                                    }
+                                    if (method.startsWith('send') || method.startsWith('forward') || method.startsWith('copy')) shouldInject = true;
                                 }
                             }
 
-                            if (shouldInject) {
-                                args.unshift(this.context.chatId);
-                            }
+                            if (shouldInject) args.unshift(this.context.chatId);
                         }
 
-                        const result = await this.bot[method](...args);
-                        return result;
+                        return await this.bot[method](...args);
                     } catch (error) {
-                        console.error(`❌ API ${method} failed:`, error.message);
                         throw new Error(`API Error (${method}): ${error.message}`);
                     }
                 };
@@ -94,7 +75,6 @@ class ApiWrapper {
     }
 
     setupMetadataMethods() {
-        // Aliases for metadata inspection
         this.metaData = this.metadata = this.getMeta = this.inspect = async (target = 'all') => {
             return await this.getOriginalResponse(target);
         };
@@ -104,7 +84,6 @@ class ApiWrapper {
         try {
             let data;
             const t = target.toLowerCase();
-            
             if (t === 'chat' || t === 'group') data = await this.bot.getChat(this.context.chatId);
             else if (t === 'user') data = await this.bot.getChatMember(this.context.chatId, this.context.userId);
             else if (t === 'bot') data = await this.bot.getMe();
@@ -123,7 +102,6 @@ class ApiWrapper {
     }
 
     setupEnhancedMethods() {
-        // User Info Helper
         this.getUser = () => ({
             id: this.context.userId,
             username: this.context.username,
@@ -131,54 +109,43 @@ class ApiWrapper {
             chat_id: this.context.chatId
         });
 
-        // Shortcuts
         this.send = (text, opt) => this.sendMessage(this.context.chatId, text, { parse_mode: 'HTML', ...opt });
         this.reply = (text, opt) => this.sendMessage(this.context.chatId, text, { 
             reply_to_message_id: this.context.msg?.message_id, parse_mode: 'HTML', ...opt 
         });
 
-        // Media Helpers
-        this.sendImage = (url, caption, opt) => this.sendPhoto(this.context.chatId, url, { caption, parse_mode: 'HTML', ...opt });
-        this.sendFile = (url, caption, opt) => this.sendDocument(this.context.chatId, url, { caption, parse_mode: 'HTML', ...opt });
-
-        // Utility
         this.wait = (sec) => new Promise(r => setTimeout(r, sec * 1000));
         this.sleep = this.wait;
 
-        // Python Integration
         this.runPython = async (code) => {
             const pythonRunner = require('./python-runner');
             return await pythonRunner.runPythonCodeAsync(code);
         };
 
-        // ✅ FIXED: waitForAnswer using CONTEXT (No Circular Dependency)
+        // 🔴 FIX: Removed require('./bot-manager'). Using context.nextCommandHandlers directly.
         this.waitForAnswer = (question, options = {}) => {
             return new Promise(async (resolve, reject) => {
                 const { nextCommandHandlers, botToken, userId, chatId } = this.context;
                 
                 if (!nextCommandHandlers) {
-                    return reject(new Error('Handler system not available in context'));
+                    return reject(new Error('Handler system not available'));
                 }
 
                 const waitKey = `${botToken}_${userId}`;
-                const timeoutMs = options.timeout || 60000; // 60s default
+                const timeoutMs = options.timeout || 60000;
 
-                // Clear previous handler if exists
                 if (nextCommandHandlers.has(waitKey)) nextCommandHandlers.delete(waitKey);
 
-                // Timeout Logic
                 const timeoutId = setTimeout(() => {
                     if (nextCommandHandlers.has(waitKey)) {
                         nextCommandHandlers.delete(waitKey);
-                        reject(new Error(`Timeout: No answer after ${timeoutMs/1000}s`));
+                        reject(new Error(`Timeout (${timeoutMs/1000}s)`));
                     }
                 }, timeoutMs);
 
-                // Ask the question
                 try {
                     await this.sendMessage(chatId, question, { parse_mode: 'HTML', ...options });
                     
-                    // Register Handler
                     nextCommandHandlers.set(waitKey, {
                         resolve: (answer) => {
                             clearTimeout(timeoutId);
@@ -198,10 +165,8 @@ class ApiWrapper {
             });
         };
 
-        // Alias for waitForAnswer
         this.ask = this.waitForAnswer;
 
-        // ✅ File Download Helper
         this.downloadFile = async (fileId, downloadPath = null) => {
             const file = await this.bot.getFile(fileId);
             const fileUrl = `https://api.telegram.org/file/bot${this.context.botToken}/${file.file_path}`;
