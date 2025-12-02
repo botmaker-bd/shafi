@@ -14,21 +14,36 @@ async function executeCommandCode(botInstance, code, context) {
                          msg?.caption || 
                          '';
     
-    // ✅ params শুধুমাত্র কমান্ডের পরের অংশ
+    // ✅ params extract করার improved লজিক
     let params = '';
-    if (fullUserInput) {
-        // Find matching command pattern
-        const commandPatterns = context.command?.command_patterns?.split(',').map(p => p.trim()) || [];
-        for (const pattern of commandPatterns) {
+    const command = context.command;
+    
+    if (command && command.command_patterns && fullUserInput) {
+        const patterns = command.command_patterns.split(',').map(p => p.trim());
+        
+        for (const pattern of patterns) {
+            // Exact match বা pattern দিয়ে শুরু হলে
             if (fullUserInput === pattern || fullUserInput.startsWith(pattern + ' ')) {
-                params = fullUserInput.replace(pattern, '').trim();
+                // Pattern remove করে params নিন
+                params = fullUserInput.substring(pattern.length).trim();
                 break;
             }
+            
+            // Alternative: যদি pattern এ slash না থাকে কিন্তু user slash দিয়ে লিখে
+            if (!pattern.startsWith('/') && fullUserInput.startsWith('/' + pattern)) {
+                const patternWithSlash = '/' + pattern;
+                if (fullUserInput === patternWithSlash || fullUserInput.startsWith(patternWithSlash + ' ')) {
+                    params = fullUserInput.substring(patternWithSlash.length).trim();
+                    break;
+                }
+            }
         }
-        // যদি কোনো matching pattern না থাকে, পুরোটা params ধরা হবে
-        if (!params && commandPatterns.length === 0) {
-            params = fullUserInput;
-        }
+    }
+    
+    // ✅ যদি params না পাওয়া যায়, পুরোটা ধরে নিন (কমান্ড ম্যাচ না করলে)
+    if (params === '' && command && command.command_patterns) {
+        // কমান্ড ম্যাচ করছে কিন্তু params নেই
+        params = '';
     }
     
     const chatId = context.chatId || msg?.chat?.id;
@@ -36,6 +51,7 @@ async function executeCommandCode(botInstance, code, context) {
     
     // ✅ ডিবাগ লগ
     console.log(`🔍 command-executor context:`);
+    console.log(`  - Command Patterns: "${command?.command_patterns}"`);
     console.log(`  - fullUserInput: "${fullUserInput}"`);
     console.log(`  - params: "${params}"`);
     console.log(`  - chatId: ${chatId}`);
