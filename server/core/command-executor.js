@@ -8,20 +8,36 @@ async function executeCommandCode(botInstance, code, context) {
     const userId = context.userId || msg?.from?.id;
     const botToken = context.botToken || context.command?.bot_token;
     
-    // ✅ userInput বিভিন্ন জায়গা থেকে extract করার চেষ্টা করুন
-    let userInput = context.userInput || 
-                   context.params || 
-                   msg?.text || 
-                   msg?.caption || 
-                   context.userInputValue || 
-                   '';
+    // ✅ সম্পূর্ণ user input (কমান্ড সহ)
+    const fullUserInput = context.userInput || 
+                         msg?.text || 
+                         msg?.caption || 
+                         '';
+    
+    // ✅ params শুধুমাত্র কমান্ডের পরের অংশ
+    let params = '';
+    if (fullUserInput) {
+        // Find matching command pattern
+        const commandPatterns = context.command?.command_patterns?.split(',').map(p => p.trim()) || [];
+        for (const pattern of commandPatterns) {
+            if (fullUserInput === pattern || fullUserInput.startsWith(pattern + ' ')) {
+                params = fullUserInput.replace(pattern, '').trim();
+                break;
+            }
+        }
+        // যদি কোনো matching pattern না থাকে, পুরোটা params ধরা হবে
+        if (!params && commandPatterns.length === 0) {
+            params = fullUserInput;
+        }
+    }
     
     const chatId = context.chatId || msg?.chat?.id;
     const nextCommandHandlers = context.nextCommandHandlers || new Map();
     
     // ✅ ডিবাগ লগ
     console.log(`🔍 command-executor context:`);
-    console.log(`  - userInput: "${userInput}"`);
+    console.log(`  - fullUserInput: "${fullUserInput}"`);
+    console.log(`  - params: "${params}"`);
     console.log(`  - chatId: ${chatId}`);
     console.log(`  - userId: ${userId}`);
     
@@ -176,7 +192,7 @@ async function executeCommandCode(botInstance, code, context) {
         };
 
         // --- 6. ENVIRONMENT SETUP ---
-        const apiCtx = { msg, chatId, userId, botToken: resolvedBotToken, userInput, nextCommandHandlers };
+        const apiCtx = { msg, chatId, userId, botToken: resolvedBotToken, userInput: fullUserInput, params, nextCommandHandlers };
         const apiWrapperInstance = new ApiWrapper(botInstance, apiCtx);
 
         const botObject = { ...apiWrapperInstance, ...botDataFunctions };
@@ -190,8 +206,8 @@ async function executeCommandCode(botInstance, code, context) {
             msg, 
             chatId, 
             userId,
-            userInput,  // ✅ এখানে যোগ করুন
-            params: userInput,  // ✅ compatibility জন্য
+            userInput: fullUserInput,    // ✅ সম্পূর্ণ user input (কমান্ড সহ)
+            params: params,               // ✅ শুধুমাত্র কমান্ডের পরের অংশ
             currentUser: msg.from || { id: userId, first_name: context.first_name || 'User' },
             wait: (sec) => new Promise(r => setTimeout(r, sec * 1000)),
             sleep: (sec) => new Promise(r => setTimeout(r, sec * 1000)),
@@ -246,19 +262,28 @@ async function executeCommandCode(botInstance, code, context) {
                 processedCode = processedCode.replace(rule.r, rule.to); 
             });
 
-            // 🔥 FIX: Added newline (\n) before catch block to prevent comment errors
+            // 🔥 FIX: User code এ context variable এর পরিবর্তে env ব্যবহার করুন
+            const finalCode = `
+                // Available variables in user code:
+                // msg, chatId, userId, userInput, params, bot, Bot, User, currentUser, wait, sleep, runPython, ask
+                
+                try {
+                    ${processedCode}
+                } catch (error) {
+                    throw error;
+                }
+            `;
+
             const run = new Function('env', `
                 with(env) {
                     return (async function() {
-                        try { 
-                            ${processedCode} 
-                            ; return "✅ Success"; 
-                        } 
-                        catch (err) { throw err; }
+                        ${finalCode}
                     })();
                 }
             `);
+            
             return await run(enhancedEnv);
+
         };
 
         // EXECUTE
