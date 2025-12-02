@@ -17,13 +17,13 @@ async function executeCommandCode(botInstance, code, context) {
                    '';
     
     const chatId = context.chatId || msg?.chat?.id;
+    const nextCommandHandlers = context.nextCommandHandlers || new Map();
     
     // ✅ ডিবাগ লগ
-    // console.log(`🔍 command-executor context:`);
-    // console.log(`  - userInput: "${userInput}"`);
-    // console.log(`  - context keys: ${Object.keys(context).join(', ')}`);
-    // console.log(`  - msg.text: "${msg?.text}"`);
-    // console.log(`  - context.params: "${context.params}"`);
+    console.log(`🔍 command-executor context:`);
+    console.log(`  - userInput: "${userInput}"`);
+    console.log(`  - chatId: ${chatId}`);
+    console.log(`  - userId: ${userId}`);
     
     if (!chatId) {
         throw new Error("CRITICAL: Chat ID is missing in context!");
@@ -31,7 +31,6 @@ async function executeCommandCode(botInstance, code, context) {
     
     const sessionKey = `sess_${userId}_${Date.now()}`;
     
-    // ... বাকি কোড
     // --- 1. SETUP ---
     let resolvedBotToken = botToken;
     if (!resolvedBotToken && context.command) resolvedBotToken = context.command.bot_token;
@@ -48,7 +47,6 @@ async function executeCommandCode(botInstance, code, context) {
 
     try {
         // --- 2. SESSION START ---
-        // Supabase error handling wrapped to prevent crashing
         try {
             await supabase.from('active_sessions').insert({
                 session_id: sessionKey, 
@@ -58,7 +56,7 @@ async function executeCommandCode(botInstance, code, context) {
                 started_at: new Date().toISOString()
             });
         } catch (sessionErr) {
-            console.warn("⚠️ Session logging failed (Check DB connection):", sessionErr.message);
+            console.warn("⚠️ Session logging failed:", sessionErr.message);
         }
 
         // --- 3. DATA FUNCTIONS ---
@@ -184,62 +182,69 @@ async function executeCommandCode(botInstance, code, context) {
         const botObject = { ...apiWrapperInstance, ...botDataFunctions };
 
         const baseExecutionEnv = {
-            Bot: botObject, bot: botObject, Api: botObject, api: botObject,
+            Bot: botObject, 
+            bot: botObject, 
+            Api: botObject, 
+            api: botObject,
             User: userDataFunctions,
-            msg, chatId, userId,
+            msg, 
+            chatId, 
+            userId,
+            userInput,  // ✅ এখানে যোগ করুন
+            params: userInput,  // ✅ compatibility জন্য
             currentUser: msg.from || { id: userId, first_name: context.first_name || 'User' },
             wait: (sec) => new Promise(r => setTimeout(r, sec * 1000)),
             sleep: (sec) => new Promise(r => setTimeout(r, sec * 1000)),
-            runPython: (c) => pythonRunner.runPythonCodeSync(c),
+            runPython: (c) => pythonRunner.runPythonCodeSync(c),  // ✅ সরাসরি সিঙ্ক কল
             ask: waitForAnswerLogic,
             waitForAnswer: waitForAnswerLogic
         };
 
         // --- 7. AUTO-AWAIT ENGINE ---
         const executeWithAutoAwait = async (userCode, env) => {
-            // Line ~200 এর পরে
-const __autoAwait = {
-    UserSave: async (k, v) => await env.User.saveData(k, v),
-    UserGet: async (k) => await env.User.getData(k),
-    UserDel: async (k) => await env.User.deleteData(k),
-    BotDataSave: async (k, v) => await env.bot.saveData(k, v),
-    BotDataGet: async (k) => await env.bot.getData(k),
-    BotDataDel: async (k) => await env.bot.deleteData(k),
-    Ask: async (q, o) => await env.ask(q, o),
-    Wait: async (s) => await env.wait(s),
-    Python: async (c) => {  // ✅ এখানে await যোগ হবে
-        const result = await pythonRunner.runPythonCode(c);  // async ভার্সন ব্যবহার
-        return result;
-    },
-    BotGeneric: async (method, ...args) => {
-        return await dynamicBotCaller(method, ...args);
-    }
-};
+            // ✅ এখানে __autoAwait define করুন
+            const __autoAwait = {
+                UserSave: async (k, v) => await env.User.saveData(k, v),
+                UserGet: async (k) => await env.User.getData(k),
+                UserDel: async (k) => await env.User.deleteData(k),
+                BotDataSave: async (k, v) => await env.bot.saveData(k, v),
+                BotDataGet: async (k) => await env.bot.getData(k),
+                BotDataDel: async (k) => await env.bot.deleteData(k),
+                Ask: async (q, o) => await env.ask(q, o),
+                Wait: async (s) => await env.wait(s),
+                Python: async (c) => {  
+                    // ✅ await যোগ হবে
+                    const result = await pythonRunner.runPythonCode(c);
+                    return result;
+                },
+                BotGeneric: async (method, ...args) => {
+                    return await dynamicBotCaller(method, ...args);
+                }
+            };
 
-// Line ~180 এর পরে regex rules
+            // ✅ এখানে rules define করুন
+            const rules = [
+                { r: /User\s*\.\s*saveData\s*\(([^)]+)\)/g,   to: 'await __autoAwait.UserSave($1)' },
+                { r: /User\s*\.\s*getData\s*\(([^)]+)\)/g,    to: 'await __autoAwait.UserGet($1)' },
+                { r: /User\s*\.\s*deleteData\s*\(([^)]+)\)/g, to: 'await __autoAwait.UserDel($1)' },
+                { r: /(Bot|bot)\s*\.\s*saveData\s*\(([^)]+)\)/g,   to: 'await __autoAwait.BotDataSave($2)' },
+                { r: /(Bot|bot)\s*\.\s*getData\s*\(([^)]+)\)/g,    to: 'await __autoAwait.BotDataGet($2)' },
+                { r: /(Bot|bot)\s*\.\s*deleteData\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotDataDel($2)' },
+                { r: /(ask|waitForAnswer)\s*\(([^)]+)\)/g, to: 'await __autoAwait.Ask($2)' },
+                { r: /(wait|sleep)\s*\(([^)]+)\)/g, to: 'await __autoAwait.Wait($2)' },
+                { r: /runPython\s*\(([^)]+)\)/g, to: 'await __autoAwait.Python($1)' },  // ✅ নতুন rule
+                { r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer)([a-zA-Z0-9_]+)\s*\(\s*\)/g, 
+                  to: "await __autoAwait.BotGeneric('$2')" },
+                { r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer)([a-zA-Z0-9_]+)\s*\(/g, 
+                  to: "await __autoAwait.BotGeneric('$2', " }
+            ];
 
             const enhancedEnv = { ...env, __autoAwait };
             let processedCode = userCode;
 
-            // Regex Rules
-            const rules = [
-    { r: /User\s*\.\s*saveData\s*\(([^)]+)\)/g,   to: 'await __autoAwait.UserSave($1)' },
-    { r: /User\s*\.\s*getData\s*\(([^)]+)\)/g,    to: 'await __autoAwait.UserGet($1)' },
-    { r: /User\s*\.\s*deleteData\s*\(([^)]+)\)/g, to: 'await __autoAwait.UserDel($1)' },
-    { r: /(Bot|bot)\s*\.\s*saveData\s*\(([^)]+)\)/g,   to: 'await __autoAwait.BotDataSave($2)' },
-    { r: /(Bot|bot)\s*\.\s*getData\s*\(([^)]+)\)/g,    to: 'await __autoAwait.BotDataGet($2)' },
-    { r: /(Bot|bot)\s*\.\s*deleteData\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotDataDel($2)' },
-    { r: /(ask|waitForAnswer)\s*\(([^)]+)\)/g, to: 'await __autoAwait.Ask($2)' },
-    { r: /(wait|sleep)\s*\(([^)]+)\)/g, to: 'await __autoAwait.Wait($2)' },
-    { r: /runPython\s*\(([^)]+)\)/g, to: 'await __autoAwait.Python($1)' },  // ✅ নতুন rule
-    { r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer)([a-zA-Z0-9_]+)\s*\(\s*\)/g, 
-      to: "await __autoAwait.BotGeneric('$2')" },
-    { r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer)([a-zA-Z0-9_]+)\s*\(/g, 
-      to: "await __autoAwait.BotGeneric('$2', " }
-];
-
-
-            rules.forEach(rule => { processedCode = processedCode.replace(rule.r, rule.to); });
+            rules.forEach(rule => { 
+                processedCode = processedCode.replace(rule.r, rule.to); 
+            });
 
             // 🔥 FIX: Added newline (\n) before catch block to prevent comment errors
             const run = new Function('env', `
