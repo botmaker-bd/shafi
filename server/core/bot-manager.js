@@ -618,7 +618,7 @@ class BotManager {
                 // গ্রুপ চ্যাটে স্প্যামিং কমানোর জন্য চেক করা যেতে পারে (Optional), 
                 // কিন্তু প্রাইভেট চ্যাটের জন্য এটা জরুরি।
                 if (msg.chat.type === 'private') {
-                    await bot.sendMessage(msg.chat.id, "❌ <b>Unknown Command</b>\nদুঃখিত, এই কমান্ডটি খুঁজে পাওয়া যায়নি।", { parse_mode: 'HTML' });
+                    await bot.sendMessage(msg.chat.id, `❌ <b>Unknown Command: ${command.substring(0,10)} ... </b>\nদুঃখিত, এই কমান্ডটি খুঁজে পাওয়া যায়নি।`, { parse_mode: 'HTML' });
                 }
             }
 
