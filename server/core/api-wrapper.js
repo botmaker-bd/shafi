@@ -1,184 +1,468 @@
-const fs = require('fs');
-const axios = require('axios');
-
+// server/core/api-wrapper.js - COMPLETELY FIXED VERSION
 class ApiWrapper {
     constructor(bot, context) {
         this.bot = bot;
         this.context = context;
         this.setupAllMethods();
         this.setupMetadataMethods();
-        this.setupEnhancedMethods();
     }
 
     setupAllMethods() {
+        // COMPLETE Telegram Bot API Methods
         const allMethods = [
+            // === MESSAGE METHODS ===
             'sendMessage', 'forwardMessage', 'copyMessage', 'sendPhoto', 
             'sendAudio', 'sendDocument', 'sendVideo', 'sendAnimation',
             'sendVoice', 'sendVideoNote', 'sendMediaGroup', 'sendLocation',
             'sendVenue', 'sendContact', 'sendPoll', 'sendDice', 'sendChatAction',
+
+            // === MESSAGE EDITING ===
             'editMessageText', 'editMessageCaption', 'editMessageMedia',
             'editMessageReplyMarkup', 'editMessageLiveLocation', 'stopMessageLiveLocation',
-            'deleteMessage', 'deleteMessages', 'pinChatMessage', 'unpinChatMessage',
-            'leaveChat', 'getChat', 'getChatAdministrators', 'getChatMemberCount',
-            'getChatMember', 'setChatTitle', 'setChatDescription', 'setChatPhoto',
-            'deleteChatPhoto', 'setChatPermissions', 'banChatMember', 'unbanChatMember',
-            'restrictChatMember', 'promoteChatMember', 'approveChatJoinRequest', 
-            'declineChatJoinRequest', 'setChatStickerSet', 'deleteChatStickerSet',
-            'sendSticker', 'uploadStickerFile', 'createForumTopic', 'editForumTopic',
-            'closeForumTopic', 'reopenForumTopic', 'deleteForumTopic',
-            'answerCallbackQuery', 'answerInlineQuery', 'getFile', 'downloadFile',
-            'getMe', 'logOut', 'close'
+
+            // === MESSAGE MANAGEMENT ===
+            'deleteMessage', 'deleteMessages',
+
+            // === CHAT METHODS ===
+            'getChat', 'getChatAdministrators', 'getChatMemberCount',
+            'getChatMember', 'setChatTitle', 'setChatDescription',
+            'setChatPhoto', 'deleteChatPhoto', 'setChatPermissions',
+            'exportChatInviteLink', 'createChatInviteLink', 'editChatInviteLink',
+            'revokeChatInviteLink', 'approveChatJoinRequest', 'declineChatJoinRequest',
+            'setChatAdministratorCustomTitle', 'banChatMember', 'unbanChatMember',
+            'restrictChatMember', 'promoteChatMember',
+            'banChatSenderChat', 'unbanChatSenderChat', 'setChatStickerSet',
+            'deleteChatStickerSet',
+
+            // === CHAT MANAGEMENT ===
+            'getChatMenuButton', 'setChatMenuButton',
+            'leaveChat', 'pinChatMessage', 'unpinChatMessage', 'unpinAllChatMessages',
+
+            // === STICKER METHODS ===
+            'sendSticker', 'getStickerSet', 'getCustomEmojiStickers',
+            'uploadStickerFile', 'createNewStickerSet', 'addStickerToSet',
+            'setStickerPositionInSet', 'deleteStickerFromSet', 'setStickerSetThumbnail',
+            'setStickerSetThumb', 'setStickerEmojiList', 'setStickerKeywords',
+            'setStickerMaskPosition', 'setStickerSetTitle',
+
+            // === FORUM & TOPIC METHODS ===
+            'createForumTopic', 'editForumTopic', 'closeForumTopic',
+            'reopenForumTopic', 'deleteForumTopic', 'unpinAllForumTopicMessages',
+            'getForumTopicIconStickers', 'editGeneralForumTopic', 'closeGeneralForumTopic',
+            'reopenGeneralForumTopic', 'hideGeneralForumTopic', 'unhideGeneralForumTopic',
+
+            // === INLINE & CALLBACK ===
+            'answerInlineQuery', 'answerWebAppQuery', 'answerCallbackQuery',
+            'answerPreCheckoutQuery', 'answerShippingQuery',
+
+            // === PAYMENT METHODS ===
+            'sendInvoice', 'createInvoiceLink', 'refundStarPayment',
+
+            // === BOT MANAGEMENT ===
+            'getMe', 'logOut', 'close', 'getMyCommands', 'setMyCommands',
+            'deleteMyCommands', 'getMyDescription', 'setMyDescription',
+            'getMyShortDescription', 'setMyShortDescription', 'getMyName',
+            'setMyName', 'getMyDefaultAdministratorRights', 'setMyDefaultAdministratorRights',
+
+            // === GAME METHODS ===
+            'sendGame', 'setGameScore', 'getGameHighScores',
+
+            // === FILE METHODS ===
+            'getFile', 'downloadFile'
         ];
 
-        const isChatId = (val) => {
-            if (!val) return false;
-            if (typeof val === 'number') return Number.isInteger(val) && Math.abs(val) > 200;
-            if (typeof val === 'string') return val.startsWith('@') || /^-?\d+$/.test(val);
-            return false;
-        };
-
+        // Bind all methods to this instance with FIXED chatId handling
         allMethods.forEach(method => {
             if (this.bot[method]) {
                 this[method] = async (...args) => {
                     try {
-                        const noChatIdMethods = [
-                            'getMe', 'getWebhookInfo', 'deleteWebhook', 'setWebhook',
-                            'answerCallbackQuery', 'answerInlineQuery', 'stopPoll', 
-                            'downloadFile', 'logOut', 'close'
-                        ];
-
-                        if (!noChatIdMethods.includes(method)) {
-                            let shouldInject = false;
-                            
-                            if (method === 'sendLocation') {
-                                if (args.length === 2 || (args.length === 3 && typeof args[2] === 'object')) shouldInject = true;
+                        // ✅ FIXED: Smart chatId handling
+                        let finalArgs = [...args];
+                        
+                        if (this.needsChatId(method)) {
+                            // If first arg is NOT a number (chatId), then auto-add current chatId
+                            if (finalArgs.length === 0 || typeof finalArgs[0] !== 'number') {
+                                finalArgs.unshift(this.context.chatId);
                             }
-                            else if (method === 'sendMediaGroup') {
-                                if (Array.isArray(args[0])) shouldInject = true;
-                            }
-                            else {
-                                if (args.length === 0 || !isChatId(args[0])) {
-                                    if (method.startsWith('send') || method.startsWith('forward') || method.startsWith('copy')) shouldInject = true;
-                                }
-                            }
-
-                            if (shouldInject) args.unshift(this.context.chatId);
+                            // If first arg IS a number (chatId), use it directly
                         }
-
-                        return await this.bot[method](...args);
+                        
+                        const result = await this.bot[method](...finalArgs);
+                        console.log(`✅ API ${method} executed successfully`);
+                        return result;
                     } catch (error) {
-                        throw new Error(`API Error (${method}): ${error.message}`);
+                        console.error(`❌ API ${method} failed:`, error.message);
+                        throw new Error(`Telegram API Error (${method}): ${error.message}`);
                     }
                 };
+            } else {
+                console.warn(`⚠️ Method ${method} not available in bot instance`);
             }
         });
+
+        // Enhanced utility methods
+        this.setupEnhancedMethods();
     }
 
+    // ✅ FIXED: METADATA METHODS SETUP
     setupMetadataMethods() {
-        this.metaData = this.metadata = this.getMeta = this.inspect = async (target = 'all') => {
+        // Add metadata methods to ApiWrapper
+        this.setupMetadataShortcuts();
+    }
+
+    setupMetadataShortcuts() {
+        // 🔍 METADATA INSPECTION METHODS - ORIGINAL RESPONSE ONLY
+        this.metaData = async (target = 'all') => {
+            return await this.getOriginalResponse(target);
+        };
+
+        this.metadata = async (target = 'all') => {
+            return await this.getOriginalResponse(target);
+        };
+
+        this.getMeta = async (target = 'all') => {
+            return await this.getOriginalResponse(target);
+        };
+
+        this.inspect = async (target = 'all') => {
             return await this.getOriginalResponse(target);
         };
     }
 
+    // 🎯 GET ORIGINAL RESPONSE ONLY (JSON FORMAT)
     async getOriginalResponse(target = 'all') {
         try {
-            let data;
-            const t = target.toLowerCase();
-            if (t === 'chat' || t === 'group') data = await this.bot.getChat(this.context.chatId);
-            else if (t === 'user') data = await this.bot.getChatMember(this.context.chatId, this.context.userId);
-            else if (t === 'bot') data = await this.bot.getMe();
-            else if (t === 'msg' || t === 'message') data = this.context.msg;
-            else if (t === 'all') {
-                data = {
-                    msg: this.context.msg,
-                    chat: await this.bot.getChat(this.context.chatId).catch(()=>null),
-                    user: await this.bot.getChatMember(this.context.chatId, this.context.userId).catch(()=>null)
-                };
-            } else {
-                data = this.context.msg;
+            let originalResponse;
+
+            switch (target.toLowerCase()) {
+                case 'chat':
+                case 'channel':
+                case 'group':
+                    originalResponse = await this.bot.getChat(this.context.chatId);
+                    break;
+
+                case 'user':
+                case 'userinfo':
+                    // For current user in context
+                    if (this.context.msg?.from) {
+                        originalResponse = this.context.msg.from;
+                    } else {
+                        // Try to get user info from chat member data
+                        originalResponse = await this.bot.getChatMember(this.context.chatId, this.context.userId);
+                    }
+                    break;
+
+                case 'bot':
+                case 'botinfo':
+                    originalResponse = await this.bot.getMe();
+                    break;
+
+                case 'update':
+                case 'context':
+                    originalResponse = this.context.msg || this.context;
+                    break;
+
+                case 'all':
+                case 'everything':
+                    const [chat, user, bot, update] = await Promise.all([
+                        this.bot.getChat(this.context.chatId).catch(() => null),
+                        this.bot.getChatMember(this.context.chatId, this.context.userId).catch(() => this.context.msg?.from),
+                        this.bot.getMe().catch(() => null),
+                        this.context.msg || this.context
+                    ]);
+                    originalResponse = { chat, user, bot, update };
+                    break;
+
+                default:
+                    // If target is a specific ID
+                    if (typeof target === 'number' || target.startsWith('@')) {
+                        if (typeof target === 'number') {
+                            if (target > 0) {
+                                // Positive number - user ID
+                                originalResponse = await this.bot.getChatMember(this.context.chatId, target);
+                            } else {
+                                // Negative number - chat ID
+                                originalResponse = await this.bot.getChat(target);
+                            }
+                        } else {
+                            // Username
+                            originalResponse = { username: target.substring(1), note: 'Username resolution not implemented' };
+                        }
+                    } else {
+                        originalResponse = await this.bot.getChat(this.context.chatId);
+                    }
             }
-            return data;
-        } catch (e) { return { error: e.message }; }
+
+            // Return original response in JSON format
+            return {
+                success: true,
+                type: 'original_response',
+                target: target,
+                data: originalResponse,
+                timestamp: new Date().toISOString()
+            };
+
+        } catch (error) {
+            console.error('❌ Metadata inspection error:', error);
+            return {
+                success: false,
+                type: 'original_response',
+                target: target,
+                error: error.message,
+                timestamp: new Date().toISOString()
+            };
+        }
+    }
+
+    // ✅ FIXED: needsChatId method
+    needsChatId(method) {
+        const chatIdMethods = [
+            'sendMessage', 'sendPhoto', 'sendDocument', 'sendVideo', 'sendAudio',
+            'sendVoice', 'sendLocation', 'sendVenue', 'sendContact', 'sendPoll',
+            'sendDice', 'sendChatAction', 'sendMediaGroup', 'forwardMessage',
+            'copyMessage', 'deleteMessage', 'deleteMessages', 'pinChatMessage',
+            'unpinChatMessage', 'leaveChat', 'getChat', 'getChatAdministrators',
+            'getChatMemberCount', 'getChatMember', 'setChatTitle', 'setChatDescription',
+            'setChatPhoto', 'deleteChatPhoto', 'setChatPermissions', 'banChatMember',
+            'unbanChatMember', 'restrictChatMember', 'promoteChatMember', 'setChatStickerSet',
+            'deleteChatStickerSet', 'createForumTopic', 'editForumTopic', 'closeForumTopic',
+            'reopenForumTopic', 'deleteForumTopic', 'sendSticker'
+        ];
+        return chatIdMethods.includes(method);
     }
 
     setupEnhancedMethods() {
+        // User information
         this.getUser = () => ({
             id: this.context.userId,
             username: this.context.username,
             first_name: this.context.first_name,
-            chat_id: this.context.chatId
+            last_name: this.context.last_name,
+            language_code: this.context.language_code,
+            chat_id: this.context.chatId,
+            is_bot: false
         });
 
-        this.send = (text, opt) => this.sendMessage(this.context.chatId, text, { parse_mode: 'HTML', ...opt });
-        this.reply = (text, opt) => this.sendMessage(this.context.chatId, text, { 
-            reply_to_message_id: this.context.msg?.message_id, parse_mode: 'HTML', ...opt 
-        });
-
-        this.wait = (sec) => new Promise(r => setTimeout(r, sec * 1000));
-        this.sleep = this.wait;
-
-        this.runPython = async (code) => {
-            const pythonRunner = require('./python-runner');
-            return await pythonRunner.runPythonCodeAsync(code);
+        // Enhanced send methods
+        this.send = (text, options = {}) => {
+            return this.sendMessage(this.context.chatId, text, {
+                parse_mode: 'HTML',
+                ...options
+            });
         };
 
-        // 🔴 FIX: Removed require('./bot-manager'). Using context.nextCommandHandlers directly.
+        this.reply = (text, options = {}) => {
+            return this.sendMessage(this.context.chatId, text, {
+                reply_to_message_id: this.context.msg?.message_id,
+                parse_mode: 'HTML',
+                ...options
+            });
+        };
+
+        // Keyboard helpers
+        this.sendKeyboard = (text, buttons, options = {}) => {
+            return this.sendMessage(this.context.chatId, text, {
+                reply_markup: { inline_keyboard: buttons },
+                parse_mode: 'HTML',
+                ...options
+            });
+        };
+
+        this.sendReplyKeyboard = (text, buttons, options = {}) => {
+            return this.sendMessage(this.context.chatId, text, {
+                reply_markup: {
+                    keyboard: buttons,
+                    resize_keyboard: true,
+                    one_time_keyboard: options.one_time || false
+                },
+                parse_mode: 'HTML',
+                ...options
+            });
+        };
+
+        this.removeKeyboard = (text, options = {}) => {
+            return this.sendMessage(this.context.chatId, text, {
+                reply_markup: { remove_keyboard: true },
+                parse_mode: 'HTML',
+                ...options
+            });
+        };
+
+        // Media helpers
+        this.sendImage = (photo, caption = '', options = {}) => {
+            return this.sendPhoto(this.context.chatId, photo, {
+                caption: caption,
+                parse_mode: 'HTML',
+                ...options
+            });
+        };
+
+        this.sendFile = (document, caption = '', options = {}) => {
+            return this.sendDocument(this.context.chatId, document, {
+                caption: caption,
+                parse_mode: 'HTML',
+                ...options
+            });
+        };
+
+        this.sendVideoFile = (video, caption = '', options = {}) => {
+            return this.sendVideo(this.context.chatId, video, {
+                caption: caption,
+                parse_mode: 'HTML',
+                ...options
+            });
+        };
+
+        // Bulk operations
+        this.sendBulkMessages = async (messages, delay = 1000) => {
+            const results = [];
+            for (const message of messages) {
+                try {
+                    const result = await this.sendMessage(this.context.chatId, message);
+                    results.push({ success: true, result });
+                    await this.wait(delay);
+                } catch (error) {
+                    results.push({ success: false, error: error.message });
+                }
+            }
+            return results;
+        };
+
+        // Python integration
+        this.runPython = async (code) => {
+            const pythonRunner = require('./python-runner');
+            return await pythonRunner.runPythonCode(code);
+        };
+
+        this.installPython = async (library) => {
+            const pythonRunner = require('./python-runner');
+            return await pythonRunner.installPythonLibrary(library);
+        };
+
+        this.uninstallPython = async (library) => {
+            const pythonRunner = require('./python-runner');
+            return await pythonRunner.uninstallPythonLibrary(library);
+        };
+
+        // Utility methods
+        this.wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        // ✅ FIXED: Wait for answer with timeout - IMPROVED VERSION
         this.waitForAnswer = (question, options = {}) => {
             return new Promise(async (resolve, reject) => {
-                const { nextCommandHandlers, botToken, userId, chatId } = this.context;
-                
-                if (!nextCommandHandlers) {
-                    return reject(new Error('Handler system not available'));
+                // Validate context
+                if (!this.context || !this.context.botToken || !this.context.chatId || !this.context.userId) {
+                    console.error('❌ waitForAnswer: Missing context data');
+                    reject(new Error('Context data not available for waitForAnswer'));
+                    return;
                 }
 
-                const waitKey = `${botToken}_${userId}`;
-                const timeoutMs = options.timeout || 60000;
+                const timeout = options.timeout || 60000; // 60 seconds
+                const nextCommandKey = `${this.context.botToken}_${this.context.userId}`;
+                
+                console.log(`⏳ Setting up waitForAnswer for user: ${this.context.userId}`);
+                
+                // Get botManager instance
+                let botManager;
+                try {
+                    botManager = require('./bot-manager');
+                } catch (error) {
+                    console.error('❌ Bot manager not available:', error);
+                    reject(new Error('Bot manager not available'));
+                    return;
+                }
 
-                if (nextCommandHandlers.has(waitKey)) nextCommandHandlers.delete(waitKey);
+                // Clear existing handler
+                if (botManager.waitingAnswers && botManager.waitingAnswers.has(nextCommandKey)) {
+                    botManager.waitingAnswers.delete(nextCommandKey);
+                }
 
                 const timeoutId = setTimeout(() => {
-                    if (nextCommandHandlers.has(waitKey)) {
-                        nextCommandHandlers.delete(waitKey);
-                        reject(new Error(`Timeout (${timeoutMs/1000}s)`));
+                    if (botManager.waitingAnswers && botManager.waitingAnswers.has(nextCommandKey)) {
+                        botManager.waitingAnswers.delete(nextCommandKey);
                     }
-                }, timeoutMs);
+                    reject(new Error(`Wait for answer timeout (${timeout/1000} seconds)`));
+                }, timeout);
 
                 try {
-                    await this.sendMessage(chatId, question, { parse_mode: 'HTML', ...options });
+                    // Send question to user
+                    console.log(`📤 Sending question to user ${this.context.userId}: "${question}"`);
+                    await this.sendMessage(this.context.chatId, question, {
+                        parse_mode: 'HTML',
+                        ...options
+                    });
                     
-                    nextCommandHandlers.set(waitKey, {
-                        resolve: (answer) => {
-                            clearTimeout(timeoutId);
-                            resolve(answer);
-                        },
-                        reject: (err) => {
-                            clearTimeout(timeoutId);
-                            reject(err);
-                        },
-                        timestamp: Date.now()
+                    console.log(`✅ Question sent, waiting for answer from user: ${this.context.userId}`);
+                    
+                    // Set up the waiting state
+                    const waitingPromise = new Promise((innerResolve, innerReject) => {
+                        // Store the resolve function in botManager
+                        if (!botManager.waitingAnswers) {
+                            botManager.waitingAnswers = new Map();
+                        }
+                        
+                        botManager.waitingAnswers.set(nextCommandKey, {
+                            resolve: innerResolve,
+                            reject: innerReject,
+                            timeoutId: timeoutId,
+                            timestamp: Date.now()
+                        });
+                    });
+
+                    // Wait for user's response
+                    const userResponse = await waitingPromise;
+                    
+                    console.log(`🎉 Received answer from user: "${userResponse}"`);
+                    resolve({
+                        text: userResponse,
+                        userId: this.context.userId,
+                        chatId: this.context.chatId,
+                        timestamp: new Date().toISOString()
                     });
                     
                 } catch (error) {
+                    console.error(`❌ waitForAnswer failed:`, error);
                     clearTimeout(timeoutId);
-                    reject(new Error(`Failed to send question: ${error.message}`));
+                    
+                    // Cleanup
+                    if (botManager.waitingAnswers && botManager.waitingAnswers.has(nextCommandKey)) {
+                        botManager.waitingAnswers.delete(nextCommandKey);
+                    }
+                    
+                    reject(new Error(`Failed to wait for answer: ${error.message}`));
                 }
             });
         };
 
-        this.ask = this.waitForAnswer;
+        // ✅ NEW: Simple ask method without waiting
+        this.ask = (question, options = {}) => {
+            return this.sendMessage(this.context.chatId, question, {
+                parse_mode: 'HTML',
+                ...options
+            });
+        };
 
+        // File download helper
         this.downloadFile = async (fileId, downloadPath = null) => {
-            const file = await this.bot.getFile(fileId);
+            const file = await this.getFile(fileId);
             const fileUrl = `https://api.telegram.org/file/bot${this.context.botToken}/${file.file_path}`;
             
             if (downloadPath) {
-                const response = await axios({ method: 'GET', url: fileUrl, responseType: 'stream' });
+                const fs = require('fs');
+                const axios = require('axios');
+                const response = await axios({
+                    method: 'GET',
+                    url: fileUrl,
+                    responseType: 'stream'
+                });
+                
                 response.data.pipe(fs.createWriteStream(downloadPath));
                 return new Promise((resolve, reject) => {
                     response.data.on('end', () => resolve(downloadPath));
                     response.data.on('error', reject);
                 });
             }
+            
             return fileUrl;
         };
     }
