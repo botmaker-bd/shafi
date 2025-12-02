@@ -17,9 +17,7 @@ console.log(`📍 Port: ${PORT}`);
 console.log(`🌐 Base URL: ${BASE_URL}`);
 console.log(`🔗 Mode: ${USE_WEBHOOK ? 'Webhook' : 'Polling'}`);
 
-// server/index.js - app configuration এর শুরুতে যোগ করুন
-
-// Trust proxy for rate limiting
+// Trust proxy for rate limiting (Important for Render/Heroku)
 app.set('trust proxy', 1);
 
 // Enhanced CORS configuration
@@ -60,19 +58,19 @@ app.use(bodyParser.urlencoded({
     limit: '50mb' 
 }));
 
-// Rate limiting with different rules for different endpoints
+// Rate limiting configuration
 const generalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 1000, // limit each IP to 1000 requests per windowMs
-    message: { error: 'Too many requests from this IP, please try again later.' },
+    max: 1000,
+    message: { error: 'Too many requests, please try again later.' },
     standardHeaders: true,
     legacyHeaders: false,
 });
 
 const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 50, // limit each IP to 50 login attempts per windowMs
-    message: { error: 'Too many authentication attempts, please try again later.' },
+    windowMs: 15 * 60 * 1000,
+    max: 50,
+    message: { error: 'Too many login attempts, please try again later.' },
     standardHeaders: true,
 });
 
@@ -82,11 +80,11 @@ app.use('/', generalLimiter);
 
 // Serve static files from client directory
 app.use(express.static(path.join(__dirname, '../client'), {
-    index: false, // Don't serve index.html for directories
-    extensions: ['html', 'htm'] // Auto-add extensions
+    index: false,
+    extensions: ['html', 'htm']
 }));
 
-// server/index.js - এই লাইনগুলো আছে কিনা চেক করুন
+// ✅ ROUTE LOADING (Fixed & Clean)
 try {
     const authRoutes = require('./routes/auth');
     const botRoutes = require('./routes/bots');
@@ -94,15 +92,16 @@ try {
     const adminRoutes = require('./routes/admin');
     const passwordRoutes = require('./routes/password');
     const webhookRoutes = require('./routes/webhook');
-    const templateRoutes = require('./routes/templates'); // ✅ এই লাইন থাকতে হবে
+    const templateRoutes = require('./routes/templates');
 
+    // Mount Routes
     app.use('/api/auth', authRoutes);
     app.use('/api/bots', botRoutes);
     app.use('/api/commands', commandRoutes);
     app.use('/api/admin', adminRoutes);
     app.use('/api/password', passwordRoutes);
-    app.use('/api/webhook', webhookRoutes);
-    app.use('/api/templates', templateRoutes); // ✅ এই লাইন থাকতে হবে
+    app.use('/api/webhook', webhookRoutes); // ✅ Webhook handled here
+    app.use('/api/templates', templateRoutes);
     
     console.log('✅ All routes loaded successfully');
 } catch (error) {
@@ -110,175 +109,80 @@ try {
     process.exit(1);
 }
 
-// Health check endpoint with detailed info
+// Health check endpoint
 app.get('/api/health', async (req, res) => {
     try {
         const healthInfo = {
             status: 'OK',
-            message: 'Bot Platform API is running smoothly',
+            message: 'Bot Platform API is running',
             timestamp: new Date().toISOString(),
-            version: '2.0.0',
-            environment: process.env.NODE_ENV || 'development',
             mode: USE_WEBHOOK ? 'webhook' : 'polling',
             baseUrl: BASE_URL,
-            system: {
-                nodeVersion: process.version,
-                platform: process.platform,
-                uptime: process.uptime(),
-                memory: process.memoryUsage()
-            }
+            uptime: process.uptime()
         };
 
-        // Try to check database connection
+        // Database connection check
         try {
             const supabase = require('./config/supabase');
-            const { data, error } = await supabase.from('universal_data').select('count').limit(1);
+            const { error } = await supabase.from('universal_data').select('count').limit(1);
             healthInfo.database = error ? 'disconnected' : 'connected';
         } catch (dbError) {
             healthInfo.database = 'error';
-            healthInfo.dbError = dbError.message;
         }
 
         res.json(healthInfo);
     } catch (error) {
-        res.status(500).json({
-            status: 'ERROR',
-            message: 'Health check failed',
-            error: error.message
-        });
+        res.status(500).json({ status: 'ERROR', error: error.message });
     }
 });
 
-// Webhook endpoint for Telegram (only in webhook mode)
-if (USE_WEBHOOK) {
-    app.post('/api/webhook/:token', async (req, res) => {
-        try {
-            const { token } = req.params;
-            const update = req.body;
-            
-            console.log('🔄 Webhook received for bot:', token.substring(0, 10) + '...');
-            console.log('📦 Update type:', update.message ? 'message' : update.callback_query ? 'callback' : 'other');
-            
-            const botManager = require('./core/bot-manager');
-            await botManager.handleBotUpdate(token, update);
-            
-            res.status(200).send('OK');
-        } catch (error) {
-            console.error('❌ Webhook error:', error);
-            // Still respond with 200 to prevent Telegram from retrying
-            res.status(200).send('OK');
-        }
-    });
-}
-
-// API info endpoint
+// API Info Endpoint
 app.get('/api/info', (req, res) => {
     res.json({
         name: 'Telegram Bot Platform',
         version: '2.0.0',
-        description: 'Universal Telegram Bot Platform with Python Support',
         endpoints: {
             auth: '/api/auth',
             bots: '/api/bots',
-            commands: '/api/commands',
-            admin: '/api/admin',
             webhook: '/api/webhook'
-        },
-        features: [
-            'Universal Data Storage',
-            'Python Library Support',
-            'Webhook & Polling Modes',
-            'Multi-Bot Management',
-            'Real-time Command Execution'
-        ]
+        }
     });
 });
 
-// Serve SPA - All other routes go to client
+// Serve SPA - All other routes go to client/index.html
 app.get('*', (req, res) => {
-    // Don't serve API routes as HTML
     if (req.path.startsWith('/api/')) {
         return res.status(404).json({ error: 'API endpoint not found' });
     }
-    
-    // Serve the main HTML file for all other routes (SPA)
     res.sendFile(path.join(__dirname, '../client/index.html'));
 });
 
-// 404 handler for API routes
-app.use('/api/*', (req, res) => {
-    res.status(404).json({
-        success: false,
-        error: 'API endpoint not found',
-        path: req.originalUrl
-    });
-});
-
-// Global error handling middleware
+// Global Error Handler
 app.use((error, req, res, next) => {
-    console.error('🚨 Global Error Handler:', error);
+    console.error('🚨 Global Error:', error);
     
-    // Log error to database if possible
+    // Log to DB (Optional)
     try {
         const supabase = require('./config/supabase');
         supabase.from('universal_data').insert({
             data_type: 'error_log',
             data_key: `error_${Date.now()}`,
-            data_value: JSON.stringify({
-                message: error.message,
-                stack: error.stack,
-                url: req.originalUrl,
-                method: req.method,
-                timestamp: new Date().toISOString()
-            }),
-            metadata: {
-                type: 'server_error',
-                environment: process.env.NODE_ENV
-            }
-        }).catch(e => console.error('Failed to log error:', e));
-    } catch (logError) {
-        console.error('Failed to initialize error logging:', logError);
-    }
+            data_value: JSON.stringify({ message: error.message, url: req.originalUrl }),
+            metadata: { env: process.env.NODE_ENV }
+        }).catch(() => {}); // Silent fail for log
+    } catch (e) {}
 
     res.status(500).json({
         success: false,
-        error: process.env.NODE_ENV === 'production' 
-            ? 'Internal server error' 
-            : error.message,
-        ...(process.env.NODE_ENV !== 'production' && { stack: error.stack })
+        error: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
     });
 });
 
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('🚨 Unhandled Rejection at:', promise, 'reason:', reason);
-});
-
-// Handle uncaught exceptions
-process.on('uncaughtException', (error) => {
-    console.error('🚨 Uncaught Exception:', error);
-    process.exit(1);
-});
-
-// Start server
+// Start Server
 const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log('\n🚀 Server started successfully!');
-    console.log(`📍 Port: ${PORT}`);
-    console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`🌐 Base URL: ${BASE_URL}`);
-    console.log(`🕒 Started at: ${new Date().toISOString()}`);
-    console.log(`🔗 Health check: ${BASE_URL}/api/health`);
-    console.log(`📚 API Info: ${BASE_URL}/api/info`);
+    console.log(`\n🚀 Server started on port ${PORT}`);
     
-    if (USE_WEBHOOK) {
-        console.log(`🤖 Webhook URL: ${BASE_URL}/api/webhook/{BOT_TOKEN}`);
-    } else {
-        console.log(`🔄 Running in Polling mode`);
-    }
-    
-    console.log('----------------------------------------\n');
-    
-    // Initialize bots after server starts with delay
+    // Initialize Bots
     setTimeout(async () => {
         try {
             const botManager = require('./core/bot-manager');
@@ -290,33 +194,19 @@ const server = app.listen(PORT, '0.0.0.0', () => {
     }, 5000);
 });
 
-// Graceful shutdown
+// Graceful Shutdown
 const gracefulShutdown = (signal) => {
-    console.log(`\n🛑 ${signal} received, shutting down gracefully...`);
-    
+    console.log(`\n🛑 ${signal} received, shutting down...`);
     server.close(() => {
-        console.log('✅ HTTP server closed');
-        
-        // Clean up bot connections
         try {
             const botManager = require('./core/bot-manager');
-            botManager.activeBots.forEach((bot, token) => {
-                console.log(`🛑 Stopping bot: ${token.substring(0, 15)}...`);
-                botManager.removeBot(token);
-            });
-        } catch (error) {
-            console.error('Error during bot cleanup:', error);
-        }
-        
-        console.log('✅ Cleanup completed');
+            botManager.activeBots.forEach((bot, token) => botManager.removeBot(token));
+        } catch (e) { console.error('Cleanup error:', e); }
+        console.log('✅ Shutdown complete');
         process.exit(0);
     });
-
-    // Force close after 10 seconds
-    setTimeout(() => {
-        console.error('❌ Could not close connections in time, forcefully shutting down');
-        process.exit(1);
-    }, 10000);
+    
+    setTimeout(() => process.exit(1), 10000); // Force kill
 };
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
