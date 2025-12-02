@@ -1,11 +1,11 @@
-// server/core/python-runner.js - COMPLETELY FIXED
-const { spawnSync } = require('child_process');
+const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const supabase = require('../config/supabase');
 
 class PythonRunner {
     constructor() {
+        // টেম্পোরারি ফোল্ডার তৈরি
         this.tempDir = path.join(__dirname, '../../temp');
         if (!fs.existsSync(this.tempDir)) {
             fs.mkdirSync(this.tempDir, { recursive: true });
@@ -16,257 +16,190 @@ class PythonRunner {
 
     async initialize() {
         if (this.initialized) return;
-        
         try {
             await this.checkPython();
             this.initialized = true;
             console.log('✅ Python runner initialized successfully');
         } catch (error) {
-            console.error('❌ Python runner initialization failed:', error);
+            console.error('❌ Python runner initialization failed:', error.message);
         }
     }
 
+    // পাইথন ইনস্টল আছে কিনা চেক করা
     async checkPython() {
         return new Promise((resolve, reject) => {
-            try {
-                const result = spawnSync('python3', ['--version'], { encoding: 'utf-8' });
-                if (result.status === 0) {
-                    console.log('🐍 Python3 found:', result.stdout.trim());
-                    resolve();
-                } else {
-                    const result2 = spawnSync('python', ['--version'], { encoding: 'utf-8' });
-                    if (result2.status === 0) {
-                        console.log('🐍 Python found:', result2.stdout.trim());
-                        resolve();
-                    } else {
-                        reject(new Error('Python is not installed or not in PATH'));
-                    }
-                }
-            } catch (error) {
-                reject(new Error('Python check failed: ' + error.message));
-            }
+            const check = (cmd) => {
+                const p = spawn(cmd, ['--version']);
+                p.on('error', () => null);
+                p.on('close', (code) => code === 0 ? resolve(cmd) : null);
+            };
+            
+            // Try python3 first, then python
+            const p3 = spawn('python3', ['--version']);
+            p3.on('error', () => {
+                const p = spawn('python', ['--version']);
+                p.on('error', () => reject(new Error('Python not found')));
+                p.on('close', (c) => c === 0 ? resolve('python') : reject(new Error('Python not installed')));
+            });
+            p3.on('close', (c) => c === 0 ? resolve('python3') : null);
         });
     }
 
-    // ✅ FIXED: PROPER PYTHON CODE EXECUTION
-    runPythonCodeSync(code) {
-        try {
-            console.log('🐍 Executing Python code synchronously...');
-            console.log('📝 Python code:', code);
-            
-            // Check if it's a simple expression
-            if (this.isSimpleExpression(code)) {
-                console.log('🔧 Using simple expression mode');
-                return this.runSimpleExpression(code);
-            }
-            
-            // For multi-line code, use file execution
-            return this.runPythonFile(code);
-            
-        } catch (error) {
-            console.error('❌ Python execution error:', error);
-            throw new Error(`Python Error: ${error.message}`);
+    // 🔄 MAIN EXECUTION FUNCTION (ASYNC)
+    async runPythonCodeAsync(code) {
+        // 1. ছোট অংক হলে দ্রুত রান করবে (Simple Math)
+        if (this.isSimpleExpression(code)) {
+            return this.runSimpleExpressionAsync(code);
         }
+        
+        // 2. বড় কোড হলে ফাইল বানিয়ে রান করবে
+        return this.runPythonFileAsync(code);
     }
 
-    // ✅ CHECK IF SIMPLE EXPRESSION
+    // Compatibility Alias (যাতে আগের কোড না ভাঙে)
+    // নোট: এটি এখন Promise রিটার্ন করে, তাই caller কে 'await' ব্যবহার করতে হবে
+    async runPythonCodeSync(code) {
+        return this.runPythonCodeAsync(code);
+    }
+
     isSimpleExpression(code) {
+        // যেমন: 2 + 2, 100 * 50
         const simplePattern = /^[0-9+\-*/().\s]+$/;
         return simplePattern.test(code.trim()) && !code.includes('\n');
     }
 
-    // ✅ RUN SIMPLE EXPRESSION
-    runSimpleExpression(expression) {
-        try {
-            console.log('🔧 Running simple expression:', expression);
-            
+    // ছোট এক্সপ্রেশন রানার
+    async runSimpleExpressionAsync(expression) {
+        return new Promise((resolve, reject) => {
             const pythonCommand = process.env.PYTHON_PATH || 'python3';
-            const result = spawnSync(pythonCommand, ['-c', `print(${expression})`], {
-                timeout: 10000,
-                encoding: 'utf-8'
+            const process = spawn(pythonCommand, ['-c', `print(${expression})`]);
+            
+            let output = '';
+            let errorOutput = '';
+
+            process.stdout.on('data', (d) => output += d.toString());
+            process.stderr.on('data', (d) => errorOutput += d.toString());
+
+            process.on('close', (code) => {
+                if (code !== 0) reject(new Error(errorOutput || 'Calculation failed'));
+                else resolve(output.trim());
             });
 
-            if (result.error) {
-                throw new Error(`Python process error: ${result.error.message}`);
-            }
-
-            if (result.status !== 0) {
-                throw new Error(result.stderr || 'Python execution failed');
-            }
-
-            const output = result.stdout ? result.stdout.trim() : 'No output';
-            console.log('✅ Simple expression result:', output);
-            return output;
-
-        } catch (error) {
-            console.error('❌ Simple expression error:', error);
-            throw error;
-        }
+            // 5 সেকেন্ড টাইমআউট
+            setTimeout(() => {
+                process.kill();
+                reject(new Error('Timeout: Expression took too long'));
+            }, 5000);
+        });
     }
 
-    // ✅ RUN PYTHON FILE FOR MULTI-LINE CODE
-    runPythonFile(code) {
-        try {
-            const tempFile = path.join(this.tempDir, `script_${Date.now()}.py`);
-            
-            // ✅ FIXED: CLEAN PYTHON TEMPLATE
-            const pythonTemplate = `# Python Code Execution
+    // 🐍 ফাইল রানার (এডভান্সড)
+    async runPythonFileAsync(code) {
+        const tempFile = path.join(this.tempDir, `script_${Date.now()}.py`);
+        
+        // স্মার্ট টেমপ্লেট: এটি 'result' ভেরিয়েবল অটোমেটিক প্রিন্ট করে
+        const pythonTemplate = `# Python Execution Wrapper
 import sys
+import json
 
 try:
-    # User's code
 ${this.indentCode(code)}
-    
-    # If no result variable, indicate success
-    if 'result' not in locals() and 'result' not in globals():
-        print("✅ Python code executed successfully")
-    
+
+    # Auto-detect 'result' variable
+    if 'result' in locals():
+        val = locals()['result']
+        if isinstance(val, (dict, list)):
+            print(json.dumps(val, indent=2)) # JSON format for objects
+        else:
+            print(str(val))
+            
+    elif 'result' in globals():
+        val = globals()['result']
+        print(str(val))
+        
+    else:
+        # যদি ইউজার নিজে print() করে থাকে, তাহলে কিছু করার দরকার নেই
+        pass 
+
 except Exception as e:
-    print(f"❌ Python Error: {str(e)}")
-    sys.exit(1)`;
+    # এরর হলে stderr এ পাঠানো হবে
+    print(f"{str(e)}", file=sys.stderr)
+    sys.exit(1)
+`;
 
-            // Write Python file
-            fs.writeFileSync(tempFile, pythonTemplate);
-            console.log('📄 Python file created');
-            
-            // Execute Python
+        fs.writeFileSync(tempFile, pythonTemplate);
+
+        return new Promise((resolve, reject) => {
             const pythonCommand = process.env.PYTHON_PATH || 'python3';
-            const result = spawnSync(pythonCommand, [tempFile], {
-                timeout: 30000,
-                encoding: 'utf-8',
-                cwd: this.tempDir
-            });
+            const process = spawn(pythonCommand, [tempFile], { cwd: this.tempDir });
 
-            // Clean up
-            try {
-                if (fs.existsSync(tempFile)) {
-                    fs.unlinkSync(tempFile);
+            let output = '';
+            let errorOutput = '';
+
+            process.stdout.on('data', (d) => output += d.toString());
+            process.stderr.on('data', (d) => errorOutput += d.toString());
+
+            process.on('close', (code) => {
+                // ফাইল ডিলিট
+                try { if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile); } catch(e){}
+
+                if (code !== 0) {
+                    // ক্লিন এরর মেসেজ
+                    const cleanError = errorOutput.trim();
+                    reject(new Error(cleanError || 'Python script failed'));
+                } else {
+                    const finalOutput = output.trim();
+                    resolve(finalOutput || "✅ Code executed successfully (No output)");
                 }
-            } catch (cleanupError) {
-                console.error('❌ Temp file cleanup error:', cleanupError);
-            }
-
-            // Check for errors
-            if (result.error) {
-                throw new Error(`Python process error: ${result.error.message}`);
-            }
-
-            if (result.status !== 0) {
-                const errorMsg = result.stderr || result.stdout || 'Python execution failed';
-                throw new Error(errorMsg.split('\n')[0]); // Get first error line
-            }
-
-            const output = result.stdout ? result.stdout.trim() : 'Code executed (no output)';
-            console.log('✅ Python output:', output);
-            return output;
-
-        } catch (error) {
-            console.error('❌ Python file execution error:', error);
-            throw error;
-        }
-    }
-
-    // ✅ FIXED: PROPER INDENTATION
-    indentCode(code) {
-        const lines = code.split('\n');
-        const indentedLines = lines.map(line => {
-            if (line.trim() === '') return '';
-            return '    ' + line;
-        });
-        return indentedLines.join('\n');
-    }
-
-    // Compatibility method
-    async runPythonCode(code) {
-        return this.runPythonCodeSync(code);
-    }
-
-    // Other methods remain the same...
-    async installPythonLibrary(libraryName) {
-        await this.initialize();
-        try {
-            console.log(`📦 Installing Python library: ${libraryName}`);
-            const pipCommand = process.env.PIP_PATH || 'pip3';
-            const result = spawnSync(pipCommand, ['install', libraryName], {
-                encoding: 'utf-8',
-                timeout: 120000
             });
+
+            // ⏱️ ৩০ সেকেন্ড টাইমআউট (Infinite Loop Protection)
+            setTimeout(() => {
+                process.kill();
+                try { if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile); } catch(e){}
+                reject(new Error('⏱️ Timeout: Script execution exceeded 30 seconds'));
+            }, 30000);
+        });
+    }
+
+    indentCode(code) {
+        return code.split('\n').map(line => '    ' + line).join('\n');
+    }
+
+    // লাইব্রেরি ইনস্টলার (pip)
+    async installPythonLibrary(libraryName) {
+        console.log(`📦 Installing: ${libraryName}...`);
+        return new Promise((resolve, reject) => {
+            const pipCommand = process.env.PIP_PATH || 'pip3';
+            const process = spawn(pipCommand, ['install', libraryName]);
             
-            if (result.status === 0) {
-                console.log(`✅ Successfully installed ${libraryName}`);
-                await this.saveInstalledLibrary(libraryName);
-                return { 
-                    library: libraryName, 
-                    installed: true,
-                    output: result.stdout 
-                };
-            } else {
-                throw new Error(result.stderr || 'Installation failed');
-            }
-        } catch (error) {
-            throw new Error(`Failed to install ${libraryName}: ${error.message}`);
-        }
+            process.on('close', async (code) => {
+                if (code === 0) {
+                    await this.saveInstalledLibrary(libraryName);
+                    resolve({ library: libraryName, installed: true });
+                } else {
+                    reject(new Error(`Failed to install ${libraryName}`));
+                }
+            });
+        });
     }
 
     async saveInstalledLibrary(libraryName) {
         try {
-            const { data: currentData } = await supabase
-                .from('universal_data')
-                .select('data_value')
-                .eq('data_type', 'system')
-                .eq('data_key', 'python_libraries')
-                .single();
-
-            let libraries = [];
-            if (currentData && currentData.data_value) {
-                try {
-                    libraries = JSON.parse(currentData.data_value);
-                } catch (e) {
-                    libraries = [];
-                }
-            }
-
-            if (!libraries.includes(libraryName)) {
-                libraries.push(libraryName);
+            const { data } = await supabase.from('universal_data')
+                .select('data_value').eq('data_key', 'python_libraries').single();
+            
+            let libs = data ? JSON.parse(data.data_value) : [];
+            if (!libs.includes(libraryName)) {
+                libs.push(libraryName);
                 await supabase.from('universal_data').upsert({
-                    data_type: 'system',
-                    data_key: 'python_libraries',
-                    data_value: JSON.stringify(libraries),
-                    metadata: { 
-                        last_updated: new Date().toISOString(),
-                        total_libraries: libraries.length
-                    },
-                    updated_at: new Date().toISOString()
+                    data_type: 'system', data_key: 'python_libraries', 
+                    data_value: JSON.stringify(libs)
                 }, { onConflict: 'data_type,data_key' });
-                
-                console.log(`💾 Saved library info: ${libraryName}`);
             }
-        } catch (error) {
-            console.error('❌ Save library error:', error);
-        }
-    }
-
-    async getInstalledLibraries() {
-        try {
-            const { data } = await supabase
-                .from('universal_data')
-                .select('data_value')
-                .eq('data_type', 'system')
-                .eq('data_key', 'python_libraries')
-                .single();
-
-            if (data && data.data_value) {
-                return JSON.parse(data.data_value);
-            }
-            return [];
-        } catch (error) {
-            console.error('❌ Get installed libraries error:', error);
-            return [];
-        }
+        } catch (e) { console.error('Lib Save Error:', e); }
     }
 }
 
-// Create singleton instance
 const pythonRunnerInstance = new PythonRunner();
-
 module.exports = pythonRunnerInstance;
