@@ -112,13 +112,13 @@ class BotManager {
         } catch (error) {
             console.error(`❌ Command execution error for ${command.command_patterns}:`, error);
             
-            // ✅ IMPROVED: Better error message
-            try {
-                const errorMsg = `❌ Command Error: ${error.message}\n\nIf this continues, please contact support.`;
-                await bot.sendMessage(msg.chat.id, errorMsg);
-            } catch (sendError) {
-                console.error('❌ Failed to send error message:', sendError);
-            }
+            // // ✅ IMPROVED: Better error message
+            // try {
+                // const errorMsg = `❌ Command Error: ${error.message}\n\nIf this continues, please contact support.`;
+                // await bot.sendMessage(msg.chat.id, errorMsg);
+            // } catch (sendError) {
+                // console.error('❌ Failed to send error message:', sendError);
+            // }
             
             throw error;
         }
@@ -597,24 +597,29 @@ class BotManager {
             }
 
             // Handle special commands
-            if (text.startsWith('/python ')) {
-                await this.executePythonCode(bot, chatId, text.replace('/python ', ''));
-                return;
-            }
+            // if (text.startsWith('/python ')) {
+                // await this.executePythonCode(bot, chatId, text.replace('/python ', ''));
+                // return;
+            // }
 
-            if (text.startsWith('/ai ') || text.startsWith('/generate ')) {
-                await this.generateAICode(bot, chatId, text);
-                return;
-            }
+            // if (text.startsWith('/ai ') || text.startsWith('/generate ')) {
+                // await this.generateAICode(bot, chatId, text);
+                // return;
+            // }
+            
 
-            // Find and execute matching command
             const command = await this.findMatchingCommand(token, text, msg);
+            
             if (command) {
-                console.log(`🎯 Executing command: ${command.command_patterns}`);
-                console.log(`🔑 Command bot token: ${command.bot_token?.substring(0, 10)}...`);
+                // কমান্ড পাওয়া গেছে, রান করা হচ্ছে
                 await this.executeCommand(bot, command, msg, text);
             } else {
-                console.log(`❌ No matching command found for: "${text}"`);
+                // ✅ NEW: Command NOT Found Response
+                // গ্রুপ চ্যাটে স্প্যামিং কমানোর জন্য চেক করা যেতে পারে (Optional), 
+                // কিন্তু প্রাইভেট চ্যাটের জন্য এটা জরুরি।
+                if (msg.chat.type === 'private') {
+                    await bot.sendMessage(msg.chat.id, "❌ <b>Unknown Command</b>\nদুঃখিত, এই কমান্ডটি খুঁজে পাওয়া যায়নি।", { parse_mode: 'HTML' });
+                }
             }
 
         } catch (error) {
@@ -738,37 +743,37 @@ class BotManager {
         console.log(`👥 ${type === 'new' ? 'New' : 'Left'} chat member`);
     }
 
-    async executePythonCode(bot, chatId, pythonCode) {
-        try {
-            await bot.sendMessage(chatId, '🐍 Executing Python code...');
-            const result = await pythonRunner.runPythonCode(pythonCode);
-            await bot.sendMessage(chatId, `✅ Python Result:\n\`\`\`\n${result}\n\`\`\``, {
-                parse_mode: 'Markdown'
-            });
-        } catch (error) {
-            await bot.sendMessage(chatId, `❌ Python Error:\n\`\`\`\n${error.message}\n\`\`\``, {
-                parse_mode: 'Markdown'
-            });
-        }
-    }
+    // async executePythonCode(bot, chatId, pythonCode) {
+        // try {
+            // await bot.sendMessage(chatId, '🐍 Executing Python code...');
+            // const result = await pythonRunner.runPythonCode(pythonCode);
+            // await bot.sendMessage(chatId, `✅ Python Result:\n\`\`\`\n${result}\n\`\`\``, {
+                // parse_mode: 'Markdown'
+            // });
+        // } catch (error) {
+            // await bot.sendMessage(chatId, `❌ Python Error:\n\`\`\`\n${error.message}\n\`\`\``, {
+                // parse_mode: 'Markdown'
+            // });
+        // }
+    // }
 
-    async generateAICode(bot, chatId, prompt) {
-        try {
-            const aiPrompt = prompt.replace('/ai ', '').replace('/generate ', '');
-            const generatedCode = this.generateCodeFromPrompt(aiPrompt);
-            await bot.sendMessage(chatId, `🤖 Generated Code:\n\`\`\`javascript\n${generatedCode}\n\`\`\``, {
-                parse_mode: 'Markdown'
-            });
-        } catch (error) {
-            await bot.sendMessage(chatId, `❌ AI Generation Error: ${error.message}`);
-        }
-    }
+    // async generateAICode(bot, chatId, prompt) {
+        // try {
+            // const aiPrompt = prompt.replace('/ai ', '').replace('/generate ', '');
+            // const generatedCode = this.generateCodeFromPrompt(aiPrompt);
+            // await bot.sendMessage(chatId, `🤖 Generated Code:\n\`\`\`javascript\n${generatedCode}\n\`\`\``, {
+                // parse_mode: 'Markdown'
+            // });
+        // } catch (error) {
+            // await bot.sendMessage(chatId, `❌ AI Generation Error: ${error.message}`);
+        // }
+    // }
 
-    generateCodeFromPrompt(prompt) {
-        return `// AI Generated code for: "${prompt}"
-const user = getUser();
-bot.sendMessage(\`Hello \${user.first_name}! You said: "${prompt}"\`);`;
-    }
+    // generateCodeFromPrompt(prompt) {
+        // return `// AI Generated code for: "${prompt}"
+// const user = getUser();
+// bot.sendMessage(\`Hello \${user.first_name}! You said: "${prompt}"\`);`;
+    // }
 
     async findMatchingCommand(token, text, msg) {
         const commands = this.botCommands.get(token) || [];
