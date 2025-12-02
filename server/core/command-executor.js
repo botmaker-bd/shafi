@@ -6,7 +6,6 @@ async function executeCommandCode(botInstance, code, context) {
     const { msg, userId, botToken, userInput, nextCommandHandlers } = context;
     
     // 🛡️ SECURITY LAYER 1: Chat ID Validation & Fallback
-    // chatId না থাকলে msg থেকে নেওয়ার চেষ্টা করবে, তাও না থাকলে এরর দেবে।
     let rawChatId = context.chatId || msg?.chat?.id;
     if (!rawChatId) {
         throw new Error("CRITICAL: Chat ID is missing in context!");
@@ -29,7 +28,7 @@ async function executeCommandCode(botInstance, code, context) {
                     session_id: sessionKey, bot_token: resolvedBotToken, user_id: userId.toString(),
                     chat_id: chatId, started_at: new Date().toISOString()
                 });
-            } catch (e) { /* ignore */ }
+            } catch (e) { /* ignore non-critical session errors */ }
 
             // --- 2. DATA FUNCTIONS ---
             const userDataFunctions = {
@@ -78,79 +77,83 @@ async function executeCommandCode(botInstance, code, context) {
             const waitForAnswerLogic = async (question, options = {}) => {
                 return new Promise((resolveWait, rejectWait) => {
                     const waitKey = `${resolvedBotToken}_${userId}`;
-                    // Force chatId here as well
+                    
                     botInstance.sendMessage(chatId, question, options).then(() => {
+                        // Timeout Handler
                         const timeout = setTimeout(() => {
                             if (nextCommandHandlers?.has(waitKey)) {
                                 nextCommandHandlers.delete(waitKey);
-                                rejectWait(new Error('Timeout'));
+                                rejectWait(new Error('Timeout: User took too long to respond.'));
                             }
-                        }, 5 * 60 * 1000);
-                        nextCommandHandlers.set(waitKey, {
-                            resolve: (ans) => { clearTimeout(timeout); resolveWait(ans); },
-                            reject: (err) => { clearTimeout(timeout); rejectWait(err); },
-                            timestamp: Date.now()
-                        });
+                        }, 5 * 60 * 1000); // 5 Minutes
+
+                        if (nextCommandHandlers) {
+                            nextCommandHandlers.set(waitKey, {
+                                resolve: (ans) => { clearTimeout(timeout); resolveWait(ans); },
+                                reject: (err) => { clearTimeout(timeout); rejectWait(err); },
+                                timestamp: Date.now()
+                            });
+                        } else {
+                            clearTimeout(timeout);
+                            rejectWait(new Error('Command handler system not initialized.'));
+                        }
                     }).catch(e => rejectWait(e));
                 });
             };
 
-            // --- 4. SMART BOT WRAPPER (FIXED & ROBUST) ---
+            // --- 4. SMART BOT WRAPPER (Auto Inject Chat ID) ---
             
-            // Helper to identify if the first argument is explicitly a Chat ID
             const isChatId = (val) => {
                 if (!val) return false;
-                // If it's a number (and likely an ID, not a latitude)
                 if (typeof val === 'number') {
-                    // Coordinates usually have decimals or are small numbers. Chat IDs are huge integers.
-                    // Simple check: if it's an integer and absolute value > 200 (to avoid small lat/long/counts)
+                    // Chat IDs are integers. Latitudes are roughly -90 to 90. 
+                    // Safe check: If absolute value > 200, it's likely a Chat ID.
                     return Number.isInteger(val) && Math.abs(val) > 200;
                 }
-                // If it's a string starting with @ or digits or negative sign
                 if (typeof val === 'string') {
+                    // Starts with @, or consists of digits (possibly with negative sign)
                     return val.startsWith('@') || /^-?\d+$/.test(val);
                 }
-                // Objects, Arrays, or URLs are NOT Chat IDs
                 return false;
             };
 
             const dynamicBotCaller = async (methodName, ...args) => {
                 if (typeof botInstance[methodName] !== 'function') {
-                    throw new Error(`Method ${methodName} does not exist`);
+                    throw new Error(`Method '${methodName}' does not exist in Telegram API.`);
                 }
 
-                const noChatIdMethods = ['getMe', 'getWebhookInfo', 'deleteWebhook', 'setWebhook', 'answerCallbackQuery', 'answerInlineQuery', 'stopPoll', 'downloadFile'];
+                const noChatIdMethods = [
+                    'getMe', 'getWebhookInfo', 'deleteWebhook', 'setWebhook', 
+                    'answerCallbackQuery', 'answerInlineQuery', 'stopPoll', 'downloadFile', 'logOut', 'close'
+                ];
 
                 if (!noChatIdMethods.includes(methodName)) {
                     let shouldInject = false;
 
-                    // 🛠️ Special Handling for sendLocation (lat, long)
+                    // Case 1: sendLocation(lat, long) -> 2 args -> Inject
                     if (methodName === 'sendLocation') {
-                        // If 2 args (lat, long) OR 3 args (lat, long, opts) -> Inject ChatID
                         if (args.length === 2 || (args.length === 3 && typeof args[2] === 'object')) {
                             shouldInject = true;
                         }
                     }
-                    // 🛠️ Special Handling for sendMediaGroup (mediaArray)
+                    // Case 2: sendMediaGroup(mediaArray) -> 1 arg (Array) -> Inject
                     else if (methodName === 'sendMediaGroup') {
-                        // If first arg is Array -> Inject ChatID
                         if (Array.isArray(args[0])) {
                             shouldInject = true;
                         }
                     }
-                    // 🛠️ General Handling (sendMessage, sendPhoto, etc.)
+                    // Case 3: General Methods (sendMessage, sendPhoto, etc.)
                     else {
-                        // If no args OR first arg is NOT a chat ID -> Inject
+                        // If no args OR first arg is NOT a Chat ID -> Inject
                         if (args.length === 0 || !isChatId(args[0])) {
-                            // Extra check: sending methods usually need injection if first arg is URL/Text
-                            if (methodName.startsWith('send') || methodName === 'forwardMessage' || methodName === 'copyMessage') {
+                            // Extra Safety: sending methods usually start with 'send', 'forward', 'copy'
+                            if (methodName.startsWith('send') || methodName.startsWith('forward') || methodName.startsWith('copy')) {
                                 shouldInject = true;
                             }
                         }
                     }
 
                     if (shouldInject) {
-                        // console.log(`💉 Injecting ChatID (${chatId}) for ${methodName}`);
                         args.unshift(chatId);
                     }
                 }
@@ -171,7 +174,6 @@ async function executeCommandCode(botInstance, code, context) {
                 Bot: botObject, bot: botObject, Api: botObject, api: botObject,
                 User: userDataFunctions,
                 msg, chatId, userId,
-                // currentUser always guaranteed
                 currentUser: msg.from || { id: userId, first_name: first_name || 'User' },
                 wait: (sec) => new Promise(r => setTimeout(r, sec * 1000)),
                 sleep: (sec) => new Promise(r => setTimeout(r, sec * 1000)),
@@ -180,7 +182,7 @@ async function executeCommandCode(botInstance, code, context) {
                 waitForAnswer: waitForAnswerLogic
             };
 
-            // --- 6. AUTO-AWAIT ENGINE ---
+            // --- 6. AUTO-AWAIT ENGINE (FIXED REGEX) ---
             const executeWithAutoAwait = async (userCode, env) => {
                 const __autoAwait = {
                     UserSave: (k, v) => env.User.saveData(k, v),
@@ -200,17 +202,27 @@ async function executeCommandCode(botInstance, code, context) {
                 const enhancedEnv = { ...env, __autoAwait };
                 let processedCode = userCode;
 
-                // Regex Rules
+                // 🛡️ REGEX RULES (Applied strictly in order)
                 const rules = [
+                    // A. Specific Methods (User/Bot Data/Ask)
                     { r: /User\s*\.\s*saveData\s*\(([^)]+)\)/g,   to: 'await __autoAwait.UserSave($1)' },
                     { r: /User\s*\.\s*getData\s*\(([^)]+)\)/g,    to: 'await __autoAwait.UserGet($1)' },
                     { r: /User\s*\.\s*deleteData\s*\(([^)]+)\)/g, to: 'await __autoAwait.UserDel($1)' },
+                    
                     { r: /(Bot|bot)\s*\.\s*saveData\s*\(([^)]+)\)/g,   to: 'await __autoAwait.BotDataSave($2)' },
                     { r: /(Bot|bot)\s*\.\s*getData\s*\(([^)]+)\)/g,    to: 'await __autoAwait.BotDataGet($2)' },
                     { r: /(Bot|bot)\s*\.\s*deleteData\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotDataDel($2)' },
+                    
                     { r: /(ask|waitForAnswer)\s*\(([^)]+)\)/g, to: 'await __autoAwait.Ask($2)' },
                     
-                    // Universal Bot Call Catcher
+                    // B. Universal Bot Calls - Empty Arguments (e.g., Bot.getMe())
+                    // Fixes: "SyntaxError: Unexpected token )" caused by trailing comma
+                    { 
+                        r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer)([a-zA-Z0-9_]+)\s*\(\s*\)/g, 
+                        to: "await __autoAwait.BotGeneric('$2')" 
+                    },
+
+                    // C. Universal Bot Calls - With Arguments (e.g., Bot.sendMessage('Hi'))
                     { 
                         r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer)([a-zA-Z0-9_]+)\s*\(/g, 
                         to: "await __autoAwait.BotGeneric('$2', " 
@@ -222,7 +234,8 @@ async function executeCommandCode(botInstance, code, context) {
                 const run = new Function('env', `
                     with(env) {
                         return (async function() {
-                            try { ${processedCode} ; return "✅ Done"; } catch (err) { throw err; }
+                            try { ${processedCode} ; return "✅ Execution Successful"; } 
+                            catch (err) { throw err; }
                         })();
                     }
                 `);
@@ -233,7 +246,9 @@ async function executeCommandCode(botInstance, code, context) {
             resolve(result);
 
         } catch (error) {
-            console.error('💥 Error:', error.message);
+            console.error('💥 Execution Error:', error.message);
+            // Optional: Notify user in chat about the error
+            // botInstance.sendMessage(chatId, `❌ Script Error: ${error.message}`).catch(() => {});
             reject(error);
         } finally {
             await supabase.from('active_sessions').delete().eq('session_id', sessionKey);
