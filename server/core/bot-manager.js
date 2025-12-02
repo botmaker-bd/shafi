@@ -607,20 +607,26 @@ class BotManager {
                 // return;
             // }
             
+const command = await this.findMatchingCommand(token, text, msg);
 
-            const command = await this.findMatchingCommand(token, text, msg);
-            
-            if (command) {
-                // কমান্ড পাওয়া গেছে, রান করা হচ্ছে
-                await this.executeCommand(bot, command, msg, text);
-            } else {
-                // ✅ NEW: Command NOT Found Response
-                // গ্রুপ চ্যাটে স্প্যামিং কমানোর জন্য চেক করা যেতে পারে (Optional), 
-                // কিন্তু প্রাইভেট চ্যাটের জন্য এটা জরুরি।
-                if (msg.chat.type === 'private') {
-                    await bot.sendMessage(msg.chat.id, `❌ <b>Unknown Command: ${msg.substring(0,10)} ... </b>\nদুঃখিত, এই কমান্ডটি খুঁজে পাওয়া যায়নি।`, { parse_mode: 'HTML' });
-                }
-            }
+if (command) {
+    // কমান্ড পাওয়া গেছে, রান করা হচ্ছে
+    await this.executeCommand(bot, command, msg, text);
+} else {
+    // ✅ NEW: Command NOT Found Response
+    if (msg.chat.type === 'private') {
+        // ফিক্স: msg.substring এর বদলে text.substring ব্যবহার করা হয়েছে
+        // এবং HTML এর জন্য < বা > থাকলে যাতে এরর না দেয়, তাই একটু সাবধানে হ্যান্ডেল করা ভালো।
+        
+        const safeText = (text || '').replace(/</g, '&lt;').replace(/>/g, '&gt;'); // HTML Escape (নিরাপত্তার জন্য)
+
+        await bot.sendMessage(
+            msg.chat.id, 
+            `❌ <b>Unknown Command:</b> ${safeText.substring(0, 20)}...\n\nদুঃখিত, এই কমান্ডটি খুঁজে পাওয়া যায়নি।`, 
+            { parse_mode: 'HTML' }
+        );
+    }
+}
 
         } catch (error) {
             console.error('❌ Handle message error:', error);
