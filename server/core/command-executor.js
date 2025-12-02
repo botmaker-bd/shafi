@@ -215,6 +215,8 @@ async function executeCommandCode(botInstance, code, context) {
                     
                     { r: /(ask|waitForAnswer)\s*\(([^)]+)\)/g, to: 'await __autoAwait.Ask($2)' },
                     
+                    { r: /(wait|sleep)\s*\(([^)]+)\)/g, to: 'await __autoAwait.Wait($2)' },
+                   
                     // B. Universal Bot Calls - Empty Arguments (e.g., Bot.getMe())
                     // Fixes: "SyntaxError: Unexpected token )" caused by trailing comma
                     { 
