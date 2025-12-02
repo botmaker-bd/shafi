@@ -29,12 +29,12 @@ class PythonRunner {
     async checkPython() {
         return new Promise((resolve, reject) => {
             try {
-                const result = spawnSync('python3', ['--version'], { encoding: 'utf-8' });
+                const result = spawn('python3', ['--version'], { encoding: 'utf-8' });
                 if (result.status === 0) {
                     console.log('🐍 Python3 found:', result.stdout.trim());
                     resolve();
                 } else {
-                    const result2 = spawnSync('python', ['--version'], { encoding: 'utf-8' });
+                    const result2 = spawn('python', ['--version'], { encoding: 'utf-8' });
                     if (result2.status === 0) {
                         console.log('🐍 Python found:', result2.stdout.trim());
                         resolve();
@@ -116,7 +116,7 @@ except Exception as e:
             console.log('🔧 Running simple expression:', expression);
             
             const pythonCommand = process.env.PYTHON_PATH || 'python3';
-            const result = spawnSync(pythonCommand, ['-c', `print(${expression})`], {
+            const result = spawn(pythonCommand, ['-c', `print(${expression})`], {
                 timeout: 10000,
                 encoding: 'utf-8'
             });
@@ -162,7 +162,7 @@ except Exception as e:
             
             // Execute Python
             const pythonCommand = process.env.PYTHON_PATH || 'python3';
-            const result = spawnSync(pythonCommand, [tempFile], {
+            const result = spawn(pythonCommand, [tempFile], {
                 timeout: 30000,
                 encoding: 'utf-8',
                 cwd: this.tempDir
@@ -218,7 +218,7 @@ except Exception as e:
         try {
             console.log(`📦 Installing Python library: ${libraryName}`);
             const pipCommand = process.env.PIP_PATH || 'pip3';
-            const result = spawnSync(pipCommand, ['install', libraryName], {
+            const result = spawn(pipCommand, ['install', libraryName], {
                 encoding: 'utf-8',
                 timeout: 120000
             });
