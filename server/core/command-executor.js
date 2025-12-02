@@ -185,7 +185,7 @@ async function executeCommandCode(botInstance, code, context) {
                     BotDataDel: (k) => env.bot.deleteData(k),
                     Ask: (q, o) => env.ask(q, o),
                     
-                    // ✅ FIX: Added Wait function mapping here
+                    // Added Wait function mapping here
                     Wait: (s) => env.wait(s), 
                     
                     // The Generic Caller
@@ -227,10 +227,15 @@ async function executeCommandCode(botInstance, code, context) {
 
                 rules.forEach(rule => { processedCode = processedCode.replace(rule.r, rule.to); });
 
+                // 🔴 FIX: Added explicit newlines (\n) to prevent trailing comments 
+                // from commenting out the closing logic.
                 const run = new Function('env', `
                     with(env) {
                         return (async function() {
-                            try { ${processedCode} ; return "✅ Execution Successful"; } 
+                            try { 
+                                ${processedCode} 
+                                ; return "✅ Execution Successful"; 
+                            } 
                             catch (err) { throw err; }
                         })();
                     }
