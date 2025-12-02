@@ -471,6 +471,8 @@ class BotManager {
             const chatId = msg.chat.id;
             const userId = msg.from.id;
             const text = msg.text || msg.caption || '';
+            
+            const userInput = msg.text || msg.caption || '';
 
             console.log(`📨 Message from ${msg.from.first_name} (${userId}): "${text}"`);
             console.log(`🔑 Bot token: ${token.substring(0, 10)}...`);
