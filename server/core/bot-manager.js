@@ -142,11 +142,6 @@ createExecutionContext(bot, command, msg, userInput) {
         }
     }
     
-    console.log(`🔧 Creating context:`);
-    console.log(`  - userInput: "${userInput}"`);
-    console.log(`  - params: "${params}"`);
-    console.log(`  - command: ${command.id}`);
-    
     const self = this;
     
     return {
@@ -160,7 +155,6 @@ createExecutionContext(bot, command, msg, userInput) {
         botToken: botToken,
         userInput: userInput,      // ✅ সম্পূর্ণ user input
         params: params,            // ✅ শুধুমাত্র কমান্ডের পরের অংশ
-        command: command,          // ✅ command object
         nextCommandHandlers: this.nextCommandHandlers,
         waitingAnswers: this.waitingAnswers,
         callbackHandlers: this.callbackHandlers,
@@ -557,7 +551,7 @@ if (command) {
         // ৪. মেসেজ পাঠানো
         await bot.sendMessage(
             msg.chat.id, 
-            `❌ <b>Unknown Command:</b> ${safeText}\n\nদুঃখিত, এই কমান্ডটি খুঁজে পাওয়া যায়নি।`, 
+            `❌ <b>Unknown Command:</b> <mono>${safeText}</mono>\n\nদুঃখিত, এই কমান্ডটি খুঁজে পাওয়া যায়নি।`, 
             { parse_mode: 'HTML' }
         );
     }
