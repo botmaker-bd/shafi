@@ -172,48 +172,49 @@ async function executeCommandCode(botInstance, code, context) {
         const apiWrapperInstance = new ApiWrapper(botInstance, apiCtx);
         const botObject = { ...apiWrapperInstance, ...botDataFunctions };
 
-        const baseExecutionEnv = {
-            Bot: botObject, 
-            bot: botObject, 
-            Api: botObject, 
-            api: botObject,
-            User: userDataFunctions,
-            msg, 
-            chatId, 
-            userId,
-            userInput: fullUserInput,    // ✅ সম্পূর্ণ input (কমান্ড সহ)
-            command: commandText,         // ✅ শুধুমাত্র কমান্ড অংশ
-            params: params,               // ✅ শুধুমাত্র প্যারামিটার অংশ
-            currentUser: msg.from || { id: userId, first_name: context.first_name || 'User' },
-            wait: (sec) => new Promise(r => setTimeout(r, sec * 1000)),
-            sleep: (sec) => new Promise(r => setTimeout(r, sec * 1000)),
-            runPython: (c) => pythonRunner.runPythonCodeSync(c),
-            ask: (q, o) => {
-                return new Promise((resolveAsk, rejectAsk) => {
-                    const waitKey = `${resolvedBotToken}_${userId}_ask`;
-                    botInstance.sendMessage(chatId, q, o).then(() => {
-                        const timeout = setTimeout(() => {
-                            if (nextCommandHandlers?.has(waitKey)) {
-                                nextCommandHandlers.delete(waitKey);
-                                rejectAsk(new Error('Timeout'));
-                            }
-                        }, 5 * 60 * 1000);
+        // ENVIRONMENT SETUP এর এই অংশটি
+const baseExecutionEnv = {
+    Bot: botObject, 
+    bot: botObject,  // ✅ এই bot variable টি user code এ available হবে
+    Api: botObject, 
+    api: botObject,
+    User: userDataFunctions,
+    msg, 
+    chatId, 
+    userId,
+    userInput: fullUserInput,    // ✅ সম্পূর্ণ input (কমান্ড সহ)
+    command: commandText,         // ✅ শুধুমাত্র কমান্ড অংশ
+    params: params,               // ✅ শুধুমাত্র প্যারামিটার অংশ
+    currentUser: msg.from || { id: userId, first_name: context.first_name || 'User' },
+    wait: (sec) => new Promise(r => setTimeout(r, sec * 1000)),
+    sleep: (sec) => new Promise(r => setTimeout(r, sec * 1000)),
+    runPython: (c) => pythonRunner.runPythonCodeSync(c),
+    ask: (q, o) => {
+        return new Promise((resolveAsk, rejectAsk) => {
+            const waitKey = `${resolvedBotToken}_${userId}_ask`;
+            botInstance.sendMessage(chatId, q, o).then(() => {
+                const timeout = setTimeout(() => {
+                    if (nextCommandHandlers?.has(waitKey)) {
+                        nextCommandHandlers.delete(waitKey);
+                        rejectAsk(new Error('Timeout'));
+                    }
+                }, 5 * 60 * 1000);
 
-                        if (nextCommandHandlers) {
-                            nextCommandHandlers.set(waitKey, {
-                                resolve: resolveAsk,
-                                reject: rejectAsk,
-                                timestamp: Date.now()
-                            });
-                        } else {
-                            clearTimeout(timeout);
-                            rejectAsk(new Error('Handler error'));
-                        }
-                    }).catch(rejectAsk);
-                });
-            },
-            waitForAnswer: (q, o) => baseExecutionEnv.ask(q, o)
-        };
+                if (nextCommandHandlers) {
+                    nextCommandHandlers.set(waitKey, {
+                        resolve: resolveAsk,
+                        reject: rejectAsk,
+                        timestamp: Date.now()
+                    });
+                } else {
+                    clearTimeout(timeout);
+                    rejectAsk(new Error('Handler error'));
+                }
+            }).catch(rejectAsk);
+        });
+    },
+    waitForAnswer: (q, o) => baseExecutionEnv.ask(q, o)
+};
 
         // AUTO-AWAIT ENGINE (same as before)
         const executeWithAutoAwait = async (userCode, env) => {
