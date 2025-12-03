@@ -119,37 +119,52 @@ class BotManager {
     }
 
     // ✅ FIXED: CONTEXT CREATION
-    createExecutionContext(bot, command, msg, userInput) {
-        // ✅ FIX: Ensure botToken is properly passed
-        const botToken = command.bot_token;
+    // bot-manager.js - createExecutionContext মেথড
+createExecutionContext(bot, command, msg, userInput) {
+    const botToken = command.bot_token;
+    
+    // ✅ params বের করুন (কমান্ডের পরের অংশ)
+    let params = '';
+    if (userInput && command.command_patterns) {
+        const patterns = command.command_patterns.split(',').map(p => p.trim());
         
-        if (!botToken) {
-            console.error('❌ CRITICAL: command.bot_token is undefined!');
-            console.log('Command structure:', {
-                id: command.id,
-                patterns: command.command_patterns,
-                has_token: !!command.bot_token
-            });
+        for (const pattern of patterns) {
+            // Exact match
+            if (userInput === pattern) {
+                params = '';
+                break;
+            }
+            // Pattern দিয়ে শুরু হলে
+            if (userInput.startsWith(pattern + ' ')) {
+                params = userInput.substring(pattern.length).trim();
+                break;
+            }
         }
+    }
+    
+    console.log(`🔧 Creating context:`);
+    console.log(`  - userInput: "${userInput}"`);
+    console.log(`  - params: "${params}"`);
+    console.log(`  - command: ${command.id}`);
+    
+    const self = this;
+    
+    return {
+        msg: msg,
+        chatId: msg.chat.id,
+        userId: msg.from.id,
+        username: msg.from.username,
+        first_name: msg.from.first_name,
+        last_name: msg.from.last_name,
+        language_code: msg.from.language_code,
+        botToken: botToken,
+        userInput: userInput,      // ✅ সম্পূর্ণ user input
+        params: params,            // ✅ শুধুমাত্র কমান্ডের পরের অংশ
+        command: command,          // ✅ command object
+        nextCommandHandlers: this.nextCommandHandlers,
+        waitingAnswers: this.waitingAnswers,
+        callbackHandlers: this.callbackHandlers,
         
-        console.log(`🔧 Creating context for bot: ${botToken?.substring(0, 10)}...`);
-        
-        const self = this; // Store reference for callbacks
-        
-        return {
-            msg: msg,
-            chatId: msg.chat.id,
-            userId: msg.from.id,
-            username: msg.from.username,
-            first_name: msg.from.first_name,
-            last_name: msg.from.last_name,
-            language_code: msg.from.language_code,
-            botToken: botToken,
-            userInput: userInput,
-            nextCommandHandlers: this.nextCommandHandlers,
-            waitingAnswers: this.waitingAnswers,
-            callbackHandlers: this.callbackHandlers,
-            
             User: {
                 saveData: (key, value) => {
                     const cacheKey = `${botToken}_${msg.from.id}_${key}`;
