@@ -6,24 +6,14 @@ async function executeCommandCode(botInstance, code, context) {
     // ✅ Context থেকে ডাটা নিন
     const msg = context.msg || context;
     const userId = context.userId || msg?.from?.id;
-    const botToken = context.botToken || context.command?.bot_token;
+    const botToken = context.botToken || '';
     
-    // ✅ এই তিনটি ভেরিয়েবল আলাদা আলাদাভাবে set করুন
+    // ✅ এই দুটি ভেরিয়েবল আলাদা আলাদাভাবে set করুন
     const userInput = context.userInput || msg?.text || msg?.caption || '';
-    const command = context.command || {};
     const params = context.params || '';
     
     const chatId = context.chatId || msg?.chat?.id;
     const nextCommandHandlers = context.nextCommandHandlers || new Map();
-    
-    // ✅ ডিবাগ লগ
-    console.log(`🔍 command-executor context:`);
-    console.log(`  - userInput: "${userInput}"`);
-    console.log(`  - params: "${params}"`);
-    console.log(`  - command.id: ${command.id}`);
-    console.log(`  - command.patterns: "${command.command_patterns}"`);
-    console.log(`  - chatId: ${chatId}`);
-    console.log(`  - userId: ${userId}`);
     
     if (!chatId) {
         throw new Error("CRITICAL: Chat ID is missing in context!");
@@ -33,9 +23,8 @@ async function executeCommandCode(botInstance, code, context) {
     
     // --- 1. SETUP ---
     let resolvedBotToken = botToken;
-    if (!resolvedBotToken && command) resolvedBotToken = command.bot_token;
     
-    // Token Fallback
+    // Token Fallback - সরাসরি botInstance থেকে নিন
     if (!resolvedBotToken) {
         try { 
             const i = await botInstance.getMe(); 
@@ -183,7 +172,6 @@ async function executeCommandCode(botInstance, code, context) {
             botToken: resolvedBotToken, 
             userInput, 
             params,
-            command,
             nextCommandHandlers 
         };
         
@@ -201,8 +189,7 @@ async function executeCommandCode(botInstance, code, context) {
             userId,
             userInput,      // ✅ সম্পূর্ণ user input
             params,         // ✅ শুধুমাত্র কমান্ডের পরের অংশ
-            command,        // ✅ command object
-            currentUser: msg.from || { id: userId, first_name: context.first_name || 'User' },
+            currentUser: msg.from || { id: userId, first_name: 'User' },
             wait: (sec) => new Promise(r => setTimeout(r, sec * 1000)),
             sleep: (sec) => new Promise(r => setTimeout(r, sec * 1000)),
             runPython: (c) => pythonRunner.runPythonCodeSync(c),
@@ -291,4 +278,5 @@ async function executeCommandCode(botInstance, code, context) {
     }
 }
 
+console.log('✅ command-executor.js loaded successfully');
 module.exports = { executeCommandCode };
