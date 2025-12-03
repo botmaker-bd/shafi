@@ -551,7 +551,7 @@ if (command) {
         // ৪. মেসেজ পাঠানো
         await bot.sendMessage(
             msg.chat.id, 
-            `❌ <b>Unknown Command:</b> <mono>${safeText}</mono>\n\nদুঃখিত, এই কমান্ডটি খুঁজে পাওয়া যায়নি।`, 
+            `❌ <b>Unknown Command:</b> <code>${safeText}</code>\n\nদুঃখিত, এই কমান্ডটি খুঁজে পাওয়া যায়নি।`, 
             { parse_mode: 'HTML' }
         );
     }
