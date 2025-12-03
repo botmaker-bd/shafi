@@ -3,67 +3,27 @@ const supabase = require('../config/supabase');
 const pythonRunner = require('./python-runner');
 
 async function executeCommandCode(botInstance, code, context) {
-    // ✅ userInput সঠিকভাবে extract করুন
+    // ✅ Context থেকে ডাটা নিন
     const msg = context.msg || context;
     const userId = context.userId || msg?.from?.id;
     const botToken = context.botToken || context.command?.bot_token;
     
-    // ✅ সম্পূর্ণ user input (কমান্ড সহ)
-    const fullUserInput = context.userInput || 
-                         msg?.text || 
-                         msg?.caption || 
-                         '';
-    
-    // ✅ COMMAND এবং PARAMS আলাদা করার লজিক
-    let commandText = '';
-    let params = '';
-    const currentCommand = context.command;
-    
-    if (currentCommand && currentCommand.command_patterns && fullUserInput) {
-        const patterns = currentCommand.command_patterns.split(',').map(p => p.trim());
-        
-        for (const pattern of patterns) {
-            // Exact match
-            if (fullUserInput === pattern) {
-                commandText = pattern;
-                params = '';
-                break;
-            }
-            
-            // Pattern দিয়ে শুরু হলে
-            if (fullUserInput.startsWith(pattern + ' ')) {
-                commandText = pattern;
-                params = fullUserInput.substring(pattern.length).trim();
-                break;
-            }
-            
-            // Alternative: slash ছাড়া pattern
-            if (!pattern.startsWith('/') && fullUserInput.startsWith('/' + pattern)) {
-                const patternWithSlash = '/' + pattern;
-                if (fullUserInput === patternWithSlash || fullUserInput.startsWith(patternWithSlash + ' ')) {
-                    commandText = patternWithSlash;
-                    params = fullUserInput.substring(patternWithSlash.length).trim();
-                    break;
-                }
-            }
-        }
-        
-        // যদি কোনো match না পাওয়া যায়, default হিসেবে
-        if (!commandText && patterns.length > 0) {
-            commandText = patterns[0];
-            params = fullUserInput;
-        }
-    }
+    // ✅ এই তিনটি ভেরিয়েবল আলাদা আলাদাভাবে set করুন
+    const userInput = context.userInput || msg?.text || msg?.caption || '';
+    const command = context.command || {};
+    const params = context.params || '';
     
     const chatId = context.chatId || msg?.chat?.id;
     const nextCommandHandlers = context.nextCommandHandlers || new Map();
     
     // ✅ ডিবাগ লগ
-    console.log(`🔍 EXECUTOR DEBUG:`);
-    console.log(`  - Full Input: "${fullUserInput}"`);
-    console.log(`  - Command Found: "${commandText}"`);
-    console.log(`  - Params Extracted: "${params}"`);
-    console.log(`  - Command Patterns: "${currentCommand?.command_patterns}"`);
+    console.log(`🔍 command-executor context:`);
+    console.log(`  - userInput: "${userInput}"`);
+    console.log(`  - params: "${params}"`);
+    console.log(`  - command.id: ${command.id}`);
+    console.log(`  - command.patterns: "${command.command_patterns}"`);
+    console.log(`  - chatId: ${chatId}`);
+    console.log(`  - userId: ${userId}`);
     
     if (!chatId) {
         throw new Error("CRITICAL: Chat ID is missing in context!");
@@ -71,10 +31,11 @@ async function executeCommandCode(botInstance, code, context) {
     
     const sessionKey = `sess_${userId}_${Date.now()}`;
     
-    // --- বাকি কোড একই থাকবে ---
+    // --- 1. SETUP ---
     let resolvedBotToken = botToken;
-    if (!resolvedBotToken && context.command) resolvedBotToken = context.command.bot_token;
+    if (!resolvedBotToken && command) resolvedBotToken = command.bot_token;
     
+    // Token Fallback
     if (!resolvedBotToken) {
         try { 
             const i = await botInstance.getMe(); 
@@ -85,7 +46,7 @@ async function executeCommandCode(botInstance, code, context) {
     }
 
     try {
-        // SESSION START
+        // --- 2. SESSION START ---
         try {
             await supabase.from('active_sessions').insert({
                 session_id: sessionKey, 
@@ -98,7 +59,7 @@ async function executeCommandCode(botInstance, code, context) {
             console.warn("⚠️ Session logging failed:", sessionErr.message);
         }
 
-        // DATA FUNCTIONS (same as before)
+        // --- 3. DATA FUNCTIONS ---
         const userDataFunctions = {
             saveData: async (key, value) => {
                 const { error } = await supabase.from('universal_data').upsert({
@@ -157,66 +118,99 @@ async function executeCommandCode(botInstance, code, context) {
             }
         };
 
-        // ENVIRONMENT SETUP
+        // --- 4. INTERACTION ---
+        const waitForAnswerLogic = async (question, options = {}) => {
+            return new Promise((resolveWait, rejectWait) => {
+                const waitKey = `${resolvedBotToken}_${userId}`;
+                
+                botInstance.sendMessage(chatId, question, options).then(() => {
+                    const timeout = setTimeout(() => {
+                        if (nextCommandHandlers?.has(waitKey)) {
+                            nextCommandHandlers.delete(waitKey);
+                            rejectWait(new Error('Timeout: User took too long to respond.'));
+                        }
+                    }, 5 * 60 * 1000); // 5 Minutes
+
+                    if (nextCommandHandlers) {
+                        nextCommandHandlers.set(waitKey, {
+                            resolve: (ans) => { clearTimeout(timeout); resolveWait(ans); },
+                            reject: (err) => { clearTimeout(timeout); rejectWait(err); },
+                            timestamp: Date.now()
+                        });
+                    } else {
+                        clearTimeout(timeout);
+                        rejectWait(new Error('Handler system error'));
+                    }
+                }).catch(e => rejectWait(e));
+            });
+        };
+
+        // --- 5. SMART BOT WRAPPER ---
+        const isChatId = (val) => {
+            if (!val) return false;
+            if (typeof val === 'number') return Number.isInteger(val) && Math.abs(val) > 200;
+            if (typeof val === 'string') return val.startsWith('@') || /^-?\d+$/.test(val);
+            return false;
+        };
+
+        const dynamicBotCaller = async (methodName, ...args) => {
+            if (typeof botInstance[methodName] !== 'function') {
+                throw new Error(`Method '${methodName}' missing in API`);
+            }
+            const noChatIdMethods = ['getMe', 'getWebhookInfo', 'deleteWebhook', 'setWebhook', 'answerCallbackQuery', 'answerInlineQuery', 'stopPoll', 'downloadFile', 'logOut', 'close'];
+
+            if (!noChatIdMethods.includes(methodName)) {
+                let shouldInject = false;
+                if (methodName === 'sendLocation') {
+                    if (args.length === 2 || (args.length === 3 && typeof args[2] === 'object')) shouldInject = true;
+                } else if (methodName === 'sendMediaGroup') {
+                    if (Array.isArray(args[0])) shouldInject = true;
+                } else {
+                    if (args.length === 0 || !isChatId(args[0])) {
+                        if (methodName.startsWith('send') || methodName.startsWith('forward') || methodName.startsWith('copy')) shouldInject = true;
+                    }
+                }
+                if (shouldInject) args.unshift(chatId);
+            }
+            return await botInstance[methodName](...args);
+        };
+
+        // --- 6. ENVIRONMENT SETUP ---
         const apiCtx = { 
             msg, 
             chatId, 
             userId, 
             botToken: resolvedBotToken, 
-            userInput: fullUserInput, 
-            command: commandText,
-            params: params,
+            userInput, 
+            params,
+            command,
             nextCommandHandlers 
         };
         
         const apiWrapperInstance = new ApiWrapper(botInstance, apiCtx);
         const botObject = { ...apiWrapperInstance, ...botDataFunctions };
 
-        // ENVIRONMENT SETUP এর এই অংশটি
-const baseExecutionEnv = {
-    Bot: botObject, 
-    bot: botObject,  // ✅ এই bot variable টি user code এ available হবে
-    Api: botObject, 
-    api: botObject,
-    User: userDataFunctions,
-    msg, 
-    chatId, 
-    userId,
-    userInput: fullUserInput,    // ✅ সম্পূর্ণ input (কমান্ড সহ)
-    command: commandText,         // ✅ শুধুমাত্র কমান্ড অংশ
-    params: params,               // ✅ শুধুমাত্র প্যারামিটার অংশ
-    currentUser: msg.from || { id: userId, first_name: context.first_name || 'User' },
-    wait: (sec) => new Promise(r => setTimeout(r, sec * 1000)),
-    sleep: (sec) => new Promise(r => setTimeout(r, sec * 1000)),
-    runPython: (c) => pythonRunner.runPythonCodeSync(c),
-    ask: (q, o) => {
-        return new Promise((resolveAsk, rejectAsk) => {
-            const waitKey = `${resolvedBotToken}_${userId}_ask`;
-            botInstance.sendMessage(chatId, q, o).then(() => {
-                const timeout = setTimeout(() => {
-                    if (nextCommandHandlers?.has(waitKey)) {
-                        nextCommandHandlers.delete(waitKey);
-                        rejectAsk(new Error('Timeout'));
-                    }
-                }, 5 * 60 * 1000);
+        const baseExecutionEnv = {
+            Bot: botObject, 
+            bot: botObject, 
+            Api: botObject, 
+            api: botObject,
+            User: userDataFunctions,
+            msg, 
+            chatId, 
+            userId,
+            userInput,      // ✅ সম্পূর্ণ user input
+            params,         // ✅ শুধুমাত্র কমান্ডের পরের অংশ
+            command,        // ✅ command object
+            currentUser: msg.from || { id: userId, first_name: context.first_name || 'User' },
+            wait: (sec) => new Promise(r => setTimeout(r, sec * 1000)),
+            sleep: (sec) => new Promise(r => setTimeout(r, sec * 1000)),
+            runPython: (c) => pythonRunner.runPythonCodeSync(c),
+            ask: waitForAnswerLogic,
+            waitForAnswer: waitForAnswerLogic
+        };
 
-                if (nextCommandHandlers) {
-                    nextCommandHandlers.set(waitKey, {
-                        resolve: resolveAsk,
-                        reject: rejectAsk,
-                        timestamp: Date.now()
-                    });
-                } else {
-                    clearTimeout(timeout);
-                    rejectAsk(new Error('Handler error'));
-                }
-            }).catch(rejectAsk);
-        });
-    },
-    waitForAnswer: (q, o) => baseExecutionEnv.ask(q, o)
-};
-
-        // AUTO-AWAIT ENGINE (same as before)
+        // --- 7. AUTO-AWAIT ENGINE ---
         const executeWithAutoAwait = async (userCode, env) => {
             const __autoAwait = {
                 UserSave: async (k, v) => await env.User.saveData(k, v),
@@ -232,10 +226,7 @@ const baseExecutionEnv = {
                     return result;
                 },
                 BotGeneric: async (method, ...args) => {
-                    if (typeof botInstance[method] !== 'function') {
-                        throw new Error(`Method '${method}' missing in API`);
-                    }
-                    return await botInstance[method](...args);
+                    return await dynamicBotCaller(method, ...args);
                 }
             };
 
@@ -296,7 +287,7 @@ const baseExecutionEnv = {
     } finally {
         try {
             await supabase.from('active_sessions').delete().eq('session_id', sessionKey);
-        } catch (e) { /* ignore */ }
+        } catch (e) { /* ignore cleanup error */ }
     }
 }
 
