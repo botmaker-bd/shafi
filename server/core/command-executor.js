@@ -173,41 +173,25 @@ async function executeCommandCode(botInstance, code, context) {
             // ask/waitForAnswer সরিয়ে দিয়েছি (apiWrapper থেকে আসবে)
         };
 
-        // server/core/command-executor.js - getUser() FIX
-const baseExecutionEnv = {
-    Bot: botObject, 
-    bot: botObject, 
-    Api: botObject, 
-    api: botObject,
-    User: userDataFunctions,
-    msg, 
-    chatId, 
-    userId,
-    userInput,
-    params,
-    currentUser: msg.from || { id: userId, first_name: 'User' },
-    wait: (ms) => new Promise(r => setTimeout(r, ms)),
-    sleep: (ms) => new Promise(r => setTimeout(r, ms)),
-    runPython: async (c) => await pythonRunner.runPythonCode(c),
-    ask: waitForAnswerLogic,
-    waitForAnswer: waitForAnswerLogic,
-    
-    // ✅ ADD THIS: Global getUser function
-    getUser: () => {
-        const msg = baseExecutionEnv.msg || {};
-        const from = msg.from || {};
-        return {
-            id: from.id || baseExecutionEnv.userId,
-            username: from.username || baseExecutionEnv.username,
-            first_name: from.first_name || baseExecutionEnv.first_name,
-            last_name: from.last_name || baseExecutionEnv.last_name,
-            language_code: from.language_code || baseExecutionEnv.language_code,
-            chat_id: msg.chat?.id || baseExecutionEnv.chatId,
-            is_bot: from.is_bot || false
+        const baseExecutionEnv = {
+            Bot: botObject, 
+            bot: botObject, 
+            Api: botObject, 
+            api: botObject,
+            User: userDataFunctions,
+            msg, 
+            chatId, 
+            userId,
+            userInput,
+            params,
+            currentUser: msg.from || { id: userId, first_name: 'User' },
+            wait: (ms) => new Promise(r => setTimeout(r, ms)),
+            sleep: (ms) => new Promise(r => setTimeout(r, ms)),
+            runPython: async (c) => await pythonRunner.runPythonCode(c),
+            // ✅ Global ask/waitForAnswer functions
+            ask: waitForAnswerLogic,
+            waitForAnswer: waitForAnswerLogic
         };
-    }
-};
-
 
         // AUTO-AWAIT ENGINE
         const executeWithAutoAwait = async (userCode, env) => {
@@ -224,9 +208,6 @@ const baseExecutionEnv = {
                 Python: async (c) => {  
                     return await pythonRunner.runPythonCode(c);
                 },
-                GetUser: async () => {
-        return env.getUser();
-    },
                 BotGeneric: async (method, ...args) => {
                     // ✅ send/reply handle করি (api-wrapper এ আছে)
                     if (method === 'send' || method === 'reply') {
@@ -258,9 +239,6 @@ const baseExecutionEnv = {
                 
                 // Global ask/waitForAnswer
                 { r: /(ask|waitForAnswer)\s*\(([^)]+)\)/g, to: 'await __autoAwait.Ask($2)' },
-                
-                // ✅ getUser() এর জন্য rule যোগ করুন
-                { r: /getUser\s*\(\s*\)/g, to: 'await __autoAwait.GetUser()' },
                 
                 // ✅ FIXED: Bot.ask(), bot.ask(), Api.ask(), api.ask()
                 { r: /(Bot|bot|Api|api)\s*\.\s*(ask|waitForAnswer)\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotGeneric(\'$2\', $3)' },
