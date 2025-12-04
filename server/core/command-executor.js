@@ -1,275 +1,182 @@
+// server/core/command-executor.js - ULTIMATE COMPLETE VERSION
 const ApiWrapper = require('./api-wrapper');
 const supabase = require('../config/supabase');
 const pythonRunner = require('./python-runner');
 
 async function executeCommandCode(botInstance, code, context) {
-    // ✅ Context থেকে ডাটা নিন
+    // Basic Data Extraction
     const msg = context.msg || context;
     const userId = context.userId || msg?.from?.id;
     const botToken = context.botToken || '';
-    
-    // ✅ এই দুটি ভেরিয়েবল আলাদা আলাদাভাবে set করুন
-    const userInput = context.userInput || msg?.text || msg?.caption || '';
-    const params = context.params || '';
-    
     const chatId = context.chatId || msg?.chat?.id;
+    
+    const userInput = context.userInput || msg?.text || '';
+    const params = context.params || '';
     const nextCommandHandlers = context.nextCommandHandlers || new Map();
     
-    if (!chatId) {
-        throw new Error("CRITICAL: Chat ID is missing in context!");
-    }
+    if (!chatId) throw new Error("CRITICAL: Chat ID missing");
     
     const sessionKey = `sess_${userId}_${Date.now()}`;
     
-    // --- 1. SETUP ---
+    // Token Fallback
     let resolvedBotToken = botToken;
-    
-    // Token Fallback - সরাসরি botInstance থেকে নিন
     if (!resolvedBotToken) {
-        try { 
-            const i = await botInstance.getMe(); 
-            resolvedBotToken = i.token; 
-        } catch (e) { 
-            resolvedBotToken = 'fallback_token'; 
-        }
+        try { const i = await botInstance.getMe(); resolvedBotToken = i.token; } 
+        catch (e) { resolvedBotToken = 'fallback'; }
     }
 
     try {
-        // --- 2. SESSION START ---
-        try {
-            await supabase.from('active_sessions').insert({
-                session_id: sessionKey, 
-                bot_token: resolvedBotToken, 
-                user_id: userId.toString(),
-                chat_id: chatId, 
-                started_at: new Date().toISOString()
-            });
-        } catch (sessionErr) {
-            console.warn("⚠️ Session logging failed:", sessionErr.message);
-        }
-
-        // --- 3. DATA FUNCTIONS ---
-        const userDataFunctions = {
+        // --- DATA LAYER (Supabase Wrapper) ---
+        const createDataLayer = (type) => ({
             saveData: async (key, value) => {
                 const { error } = await supabase.from('universal_data').upsert({
-                    data_type: 'user_data', bot_token: resolvedBotToken, user_id: userId.toString(),
+                    data_type: type, bot_token: resolvedBotToken, 
+                    user_id: type === 'user_data' ? userId.toString() : null,
                     data_key: key, data_value: JSON.stringify(value), updated_at: new Date().toISOString()
-                }, { onConflict: 'data_type,bot_token,user_id,data_key' });
-                if (error) throw new Error(`User.saveData failed: ${error.message}`);
+                }, { onConflict: type === 'user_data' ? 'data_type,bot_token,user_id,data_key' : 'data_type,bot_token,data_key' });
+                if (error) throw new Error(`${type} Save Failed: ${error.message}`);
                 return value;
             },
             getData: async (key) => {
-                const { data, error } = await supabase.from('universal_data').select('data_value')
-                    .match({ data_type: 'user_data', bot_token: resolvedBotToken, user_id: userId.toString(), data_key: key })
-                    .maybeSingle();
-                if (error) throw new Error(`User.getData failed: ${error.message}`);
+                const query = supabase.from('universal_data').select('data_value')
+                    .eq('data_type', type).eq('bot_token', resolvedBotToken).eq('data_key', key);
+                if (type === 'user_data') query.eq('user_id', userId.toString());
+                const { data } = await query.maybeSingle();
                 try { return data ? JSON.parse(data.data_value) : null; } catch { return data?.data_value; }
             },
             deleteData: async (key) => {
-                const { error } = await supabase.from('universal_data').delete()
-                    .match({ data_type: 'user_data', bot_token: resolvedBotToken, user_id: userId.toString(), data_key: key });
-                if (error) throw new Error(`User.deleteData failed: ${error.message}`);
+                const query = supabase.from('universal_data').delete()
+                    .eq('data_type', type).eq('bot_token', resolvedBotToken).eq('data_key', key);
+                if (type === 'user_data') query.eq('user_id', userId.toString());
+                await query;
                 return true;
             }
-        };
+        });
 
-        const botDataFunctions = {
-            saveData: async (key, value) => {
-                const { data: exist } = await supabase.from('universal_data').select('id')
-                    .match({ data_type: 'bot_data', bot_token: resolvedBotToken, data_key: key }).maybeSingle();
-                
-                const payload = { 
-                    data_type: 'bot_data', bot_token: resolvedBotToken, 
-                    data_key: key, data_value: JSON.stringify(value), 
-                    updated_at: new Date().toISOString() 
-                };
-
-                let error;
-                if (exist) {
-                    ({ error } = await supabase.from('universal_data').update(payload).eq('id', exist.id));
-                } else {
-                    ({ error } = await supabase.from('universal_data').insert({ ...payload, created_at: new Date().toISOString() }));
-                }
-                if (error) throw new Error(`Bot.saveData failed: ${error.message}`);
-                return value;
-            },
-            getData: async (key) => {
-                const { data, error } = await supabase.from('universal_data').select('data_value')
-                    .match({ data_type: 'bot_data', bot_token: resolvedBotToken, data_key: key }).maybeSingle();
-                if (error) throw new Error(`Bot.getData failed: ${error.message}`);
-                try { return data ? JSON.parse(data.data_value) : null; } catch { return data?.data_value; }
-            },
-            deleteData: async (key) => {
-                const { error } = await supabase.from('universal_data').delete()
-                    .match({ data_type: 'bot_data', bot_token: resolvedBotToken, data_key: key });
-                if (error) throw new Error(`Bot.deleteData failed: ${error.message}`);
-                return true;
-            }
-        };
-
-        // --- 4. INTERACTION ---
+        // --- INTERACTION LAYER (Wait For Answer) ---
         const waitForAnswerLogic = async (question, options = {}) => {
-            return new Promise((resolveWait, rejectWait) => {
+            return new Promise((resolve, reject) => {
                 const waitKey = `${resolvedBotToken}_${userId}`;
                 
+                // প্রশ্ন পাঠানো (Bot Instance দিয়ে)
                 botInstance.sendMessage(chatId, question, options).then(() => {
                     const timeout = setTimeout(() => {
                         if (nextCommandHandlers?.has(waitKey)) {
                             nextCommandHandlers.delete(waitKey);
-                            rejectWait(new Error('Timeout: User took too long to respond.'));
+                            reject(new Error('⏱️ Timeout: উত্তর দিতে দেরি হয়েছে।'));
                         }
-                    }, 5 * 60 * 1000); // 5 Minutes
+                    }, 300 * 1000); // 5 মিনিট
 
-                    if (nextCommandHandlers) {
-                        nextCommandHandlers.set(waitKey, {
-                            resolve: (ans) => { clearTimeout(timeout); resolveWait(ans); },
-                            reject: (err) => { clearTimeout(timeout); rejectWait(err); },
-                            timestamp: Date.now()
-                        });
-                    } else {
-                        clearTimeout(timeout);
-                        rejectWait(new Error('Handler system error'));
-                    }
-                }).catch(e => rejectWait(e));
+                    nextCommandHandlers.set(waitKey, {
+                        resolve: (ans) => { clearTimeout(timeout); resolve(ans); },
+                        reject: (err) => { clearTimeout(timeout); reject(err); },
+                        timestamp: Date.now()
+                    });
+                }).catch(reject);
             });
         };
 
-        // --- 5. SMART BOT WRAPPER ---
-        const isChatId = (val) => {
-            if (!val) return false;
-            if (typeof val === 'number') return Number.isInteger(val) && Math.abs(val) > 200;
-            if (typeof val === 'string') return val.startsWith('@') || /^-?\d+$/.test(val);
-            return false;
-        };
+        // --- ENVIRONMENT SETUP ---
+        const apiCtx = { msg, chatId, userId, botToken: resolvedBotToken, userInput, params };
+        const apiWrapper = new ApiWrapper(botInstance, apiCtx);
 
-        const dynamicBotCaller = async (methodName, ...args) => {
-            if (typeof botInstance[methodName] !== 'function') {
-                throw new Error(`Method '${methodName}' missing in API`);
-            }
-            const noChatIdMethods = ['getMe', 'getWebhookInfo', 'deleteWebhook', 'setWebhook', 'answerCallbackQuery', 'answerInlineQuery', 'stopPoll', 'downloadFile', 'logOut', 'close'];
+        // ✅ Bot.ask এবং Bot.waitForAnswer সেটআপ
+        apiWrapper.ask = waitForAnswerLogic;
+        apiWrapper.waitForAnswer = waitForAnswerLogic;
 
-            if (!noChatIdMethods.includes(methodName)) {
-                let shouldInject = false;
-                if (methodName === 'sendLocation') {
-                    if (args.length === 2 || (args.length === 3 && typeof args[2] === 'object')) shouldInject = true;
-                } else if (methodName === 'sendMediaGroup') {
-                    if (Array.isArray(args[0])) shouldInject = true;
-                } else {
-                    if (args.length === 0 || !isChatId(args[0])) {
-                        if (methodName.startsWith('send') || methodName.startsWith('forward') || methodName.startsWith('copy')) shouldInject = true;
-                    }
-                }
-                if (shouldInject) args.unshift(chatId);
-            }
-            return await botInstance[methodName](...args);
-        };
-
-        // --- 6. ENVIRONMENT SETUP ---
-        const apiCtx = { 
-            msg, 
-            chatId, 
-            userId, 
-            botToken: resolvedBotToken, 
-            userInput, 
-            params,
-            nextCommandHandlers 
-        };
-        
-        const apiWrapperInstance = new ApiWrapper(botInstance, apiCtx);
-        const botObject = { ...apiWrapperInstance, ...botDataFunctions };
-
-        const baseExecutionEnv = {
-            Bot: botObject, 
-            bot: botObject, 
-            Api: botObject, 
-            api: botObject,
-            User: userDataFunctions,
-            msg, 
-            chatId, 
-            userId,
-            userInput,      // ✅ সম্পূর্ণ user input
-            params,         // ✅ শুধুমাত্র কমান্ডের পরের অংশ
-            currentUser: msg.from || { id: userId, first_name: 'User' },
-            wait: (sec) => new Promise(r => setTimeout(r, sec * 1000)),
-            sleep: (sec) => new Promise(r => setTimeout(r, sec * 1000)),
+        const envObject = {
+            Bot: apiWrapper, bot: apiWrapper,
+            Api: apiWrapper, api: apiWrapper,
+            
+            // Data Objects
+            User: createDataLayer('user_data'),
+            BotData: createDataLayer('bot_data'), // Optional Alias
+            
+            // Context Variables
+            msg, chatId, userId, userInput, params,
+            
+            // Utilities
             runPython: (c) => pythonRunner.runPythonCodeSync(c),
             ask: waitForAnswerLogic,
-            waitForAnswer: waitForAnswerLogic
+            wait: apiWrapper.wait,
+            sleep: apiWrapper.sleep
         };
 
-        // --- 7. AUTO-AWAIT ENGINE ---
+        // --- AUTO-AWAIT ENGINE ---
         const executeWithAutoAwait = async (userCode, env) => {
             const __autoAwait = {
-                UserSave: async (k, v) => await env.User.saveData(k, v),
-                UserGet: async (k) => await env.User.getData(k),
-                UserDel: async (k) => await env.User.deleteData(k),
-                BotDataSave: async (k, v) => await env.bot.saveData(k, v),
-                BotDataGet: async (k) => await env.bot.getData(k),
-                BotDataDel: async (k) => await env.bot.deleteData(k),
-                Ask: async (q, o) => await env.ask(q, o),
-                Wait: async (s) => await env.wait(s),
-                Python: async (c) => {  
-                    const result = await pythonRunner.runPythonCode(c);
-                    return result;
-                },
+                // Data Ops
+                UserSave: (k, v) => env.User.saveData(k, v),
+                UserGet: (k) => env.User.getData(k),
+                UserDel: (k) => env.User.deleteData(k),
+                BotDataSave: (k, v) => env.Bot.saveData(k, v),
+                BotDataGet: (k) => env.Bot.getData(k),
+                BotDataDel: (k) => env.Bot.deleteData(k),
+                
+                // Interaction
+                Ask: (q, o) => env.ask(q, o),
+                Wait: (s) => env.Bot.wait(s),
+                Python: (c) => pythonRunner.runPythonCode(c),
+                
+                // Generic Bot Call (This handles dump, details, send, etc.)
                 BotGeneric: async (method, ...args) => {
-                    return await dynamicBotCaller(method, ...args);
+                    if (env.Bot[method]) return await env.Bot[method](...args);
+                    throw new Error(`Method '${method}' not found`);
                 }
             };
 
             const rules = [
+                // 1. Data Operations
                 { r: /User\s*\.\s*saveData\s*\(([^)]+)\)/g,   to: 'await __autoAwait.UserSave($1)' },
                 { r: /User\s*\.\s*getData\s*\(([^)]+)\)/g,    to: 'await __autoAwait.UserGet($1)' },
                 { r: /User\s*\.\s*deleteData\s*\(([^)]+)\)/g, to: 'await __autoAwait.UserDel($1)' },
+                
                 { r: /(Bot|bot)\s*\.\s*saveData\s*\(([^)]+)\)/g,   to: 'await __autoAwait.BotDataSave($2)' },
                 { r: /(Bot|bot)\s*\.\s*getData\s*\(([^)]+)\)/g,    to: 'await __autoAwait.BotDataGet($2)' },
                 { r: /(Bot|bot)\s*\.\s*deleteData\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotDataDel($2)' },
-                { r: /(ask|waitForAnswer)\s*\(([^)]+)\)/g, to: 'await __autoAwait.Ask($2)' },
-                { r: /(wait|sleep)\s*\(([^)]+)\)/g, to: 'await __autoAwait.Wait($2)' },
+
+                // 2. Wait / Sleep (e.g. Bot.sleep(5), wait(5))
+                { r: /(Bot|bot|Api|api)\s*\.\s*(sleep|wait)\s*\(([^)]+)\)/g, to: 'await __autoAwait.Wait($3)' },
+                { r: /(?<!\.)\b(sleep|wait)\s*\(([^)]+)\)/g, to: 'await __autoAwait.Wait($2)' },
+
+                // 3. Ask / WaitForAnswer (e.g. Bot.ask("Hi"), ask("Hi"))
+                { r: /(Bot|bot|Api|api)\s*\.\s*(ask|waitForAnswer)\s*\(([^)]+)\)/g, to: 'await __autoAwait.Ask($3)' },
+                { r: /(?<!\.)\b(ask|waitForAnswer)\s*\(([^)]+)\)/g, to: 'await __autoAwait.Ask($2)' },
+
+                // 4. Python
                 { r: /runPython\s*\(([^)]+)\)/g, to: 'await __autoAwait.Python($1)' },
-                { r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer)([a-zA-Z0-9_]+)\s*\(\s*\)/g, 
+
+                // 5. Generic Bot Methods (send, dump, details, getUser, etc.)
+                // These regexes catch ANY method called on Bot/Api that wasn't handled above
+                { r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer|sleep|wait)([a-zA-Z0-9_]+)\s*\(\s*\)/g, 
                   to: "await __autoAwait.BotGeneric('$2')" },
-                { r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer)([a-zA-Z0-9_]+)\s*\(/g, 
+                { r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer|sleep|wait)([a-zA-Z0-9_]+)\s*\(/g, 
                   to: "await __autoAwait.BotGeneric('$2', " }
             ];
 
-            const enhancedEnv = { ...env, __autoAwait };
             let processedCode = userCode;
+            // Apply all regex rules
+            rules.forEach(rule => { processedCode = processedCode.replace(rule.r, rule.to); });
 
-            rules.forEach(rule => { 
-                processedCode = processedCode.replace(rule.r, rule.to); 
-            });
-
-            const finalCode = `
-                try {
-                    ${processedCode}
-                } catch (error) {
-                    throw error;
-                }
-            `;
-
+            // Execute in safe scope
             const run = new Function('env', `
                 with(env) {
                     return (async function() {
-                        ${finalCode}
+                        try {
+                            ${processedCode}
+                        } catch(e) { throw e; }
                     })();
                 }
             `);
             
-            return await run(enhancedEnv);
+            return await run({ ...env, __autoAwait });
         };
 
         // EXECUTE
-        return await executeWithAutoAwait(code, baseExecutionEnv);
+        return await executeWithAutoAwait(code, envObject);
 
     } catch (error) {
-        console.error('💥 Execution Error:', error);
-        
-        if (error.name === 'AggregateError') {
-            console.error('🔍 Aggregate Errors:', error.errors);
-            throw new Error(`Connection Error: ${error.errors[0]?.message || 'Check Network/Supabase'}`);
-        }
-
+        console.error('Command Exec Error:', error);
         throw error;
     } finally {
         try {
@@ -278,5 +185,4 @@ async function executeCommandCode(botInstance, code, context) {
     }
 }
 
-console.log('✅ command-executor.js loaded successfully');
 module.exports = { executeCommandCode };
