@@ -1,5 +1,7 @@
+// server/core/bot-manager.js - COMPLETELY FIXED AND OPTIMIZED
 const TelegramBot = require('node-telegram-bot-api');
 const supabase = require('../config/supabase');
+const pythonRunner = require('./python-runner');
 const { executeCommandCode } = require('./command-executor');
 
 class BotManager {
@@ -15,7 +17,10 @@ class BotManager {
     }
 
     async initializeAllBots() {
-        if (this.initialized) return;
+        if (this.initialized) {
+            console.log('🔄 Bots already initialized, skipping...');
+            return;
+        }
         
         try {
             console.log('🔄 Initializing all bots from database...');
@@ -24,12 +29,15 @@ class BotManager {
                 .select('token, name, is_active')
                 .eq('is_active', true);
 
-            if (error) throw error;
+            if (error) {
+                console.error('❌ Database error fetching bots:', error);
+                throw error;
+            }
 
             console.log(`📊 Found ${bots?.length || 0} active bots`);
 
             if (!bots || bots.length === 0) {
-                console.log('ℹ️ No active bots found');
+                console.log('ℹ️ No active bots found in database');
                 this.initialized = true;
                 return;
             }
@@ -51,7 +59,7 @@ class BotManager {
             }
 
             this.initialized = true;
-            console.log(`✅ ${successCount}/${bots.length} bots initialized`);
+            console.log(`✅ ${successCount}/${bots.length} bots initialized successfully`);
         } catch (error) {
             console.error('❌ Initialize all bots error:', error);
             throw error;
@@ -80,13 +88,12 @@ class BotManager {
             await this.preloadUserData(command.bot_token, msg.from.id);
             
             const context = this.createExecutionContext(bot, command, msg, userInput);
-
             const result = await executeCommandCode(bot, command.code, context);
             
             console.log(`✅ Command executed successfully: ${command.command_patterns}`);
             return {
                 success: true,
-                message: "Command executed",
+                message: "Command executed successfully",
                 chatId: msg.chat.id,
                 command: command.command_patterns,
                 result: result
@@ -98,11 +105,9 @@ class BotManager {
         }
     }
 
-    // ✅ CORRECT: Context creation without duplicate Bot/User objects
     createExecutionContext(bot, command, msg, userInput) {
         const botToken = command.bot_token;
         
-        // Extract params
         let params = '';
         if (userInput && command.command_patterns) {
             const patterns = command.command_patterns.split(',').map(p => p.trim());
@@ -119,34 +124,7 @@ class BotManager {
             }
         }
         
-        // ✅ ask function for command-executor
-        const askFunction = async (question, options = {}) => {
-            const userKey = `${botToken}_${msg.from.id}`;
-            
-            return new Promise((resolveWait, rejectWait) => {
-                bot.sendMessage(msg.chat.id, question, options).then(() => {
-                    const timeout = setTimeout(() => {
-                        if (this.nextCommandHandlers.has(userKey)) {
-                            this.nextCommandHandlers.delete(userKey);
-                            rejectWait(new Error('Timeout: User took too long to respond.'));
-                        }
-                    }, 5 * 60 * 1000);
-
-                    this.nextCommandHandlers.set(userKey, {
-                        resolve: (ans) => { 
-                            clearTimeout(timeout); 
-                            resolveWait(ans); 
-                        },
-                        reject: (err) => { 
-                            clearTimeout(timeout); 
-                            rejectWait(err); 
-                        },
-                        timestamp: Date.now(),
-                        bot: bot
-                    });
-                }).catch(e => rejectWait(e));
-            });
-        };
+        const self = this;
         
         return {
             msg: msg,
@@ -161,13 +139,144 @@ class BotManager {
             params: params,
             nextCommandHandlers: this.nextCommandHandlers,
             
-            // ✅ ask and waitForAnswer functions (required by command-executor)
-            ask: askFunction,
-            waitForAnswer: askFunction,  // alias
+            User: {
+                saveData: (key, value) => {
+                    const cacheKey = `${botToken}_${msg.from.id}_${key}`;
+                    self.dataCache.set(cacheKey, value);
+                    
+                    self.saveData('user_data', botToken, msg.from.id, key, value)
+                        .catch(err => console.error('❌ Background save error:', err));
+                    
+                    return value;
+                },
+                
+                getData: (key) => {
+                    const cacheKey = `${botToken}_${msg.from.id}_${key}`;
+                    if (self.dataCache.has(cacheKey)) {
+                        return self.dataCache.get(cacheKey);
+                    }
+                    
+                    return null;
+                },
+                
+                deleteData: (key) => {
+                    const cacheKey = `${botToken}_${msg.from.id}_${key}`;
+                    self.dataCache.delete(cacheKey);
+                    
+                    self.deleteData('user_data', botToken, msg.from.id, key)
+                        .catch(err => console.error('❌ Background delete error:', err));
+                    
+                    return true;
+                }
+            },
             
-            // ❌ DON'T add Bot or User objects here - they're created in command-executor
-            // command-executor.js will create proper Bot and User objects with saveData/getData/etc
+            Bot: {
+                saveData: (key, value) => {
+                    const cacheKey = `${botToken}_bot_${key}`;
+                    self.dataCache.set(cacheKey, value);
+                    
+                    self.saveData('bot_data', botToken, null, key, value)
+                        .catch(err => console.error('❌ Background bot save error:', err));
+                    
+                    return value;
+                },
+                
+                getData: (key) => {
+                    const cacheKey = `${botToken}_bot_${key}`;
+                    if (self.dataCache.has(cacheKey)) {
+                        return self.dataCache.get(cacheKey);
+                    }
+                    return null;
+                },
+                
+                deleteData: (key) => {
+                    const cacheKey = `${botToken}_bot_${key}`;
+                    self.dataCache.delete(cacheKey);
+                    
+                    self.deleteData('bot_data', botToken, null, key)
+                        .catch(err => console.error('❌ Background bot delete error:', err));
+                    
+                    return true;
+                }
+            }
         };
+    }
+
+    async processWaitForAnswer(userKey, answerText, answerMsg) {
+        try {
+            const waitingData = this.nextCommandHandlers.get(userKey);
+            if (!waitingData) {
+                console.log(`❌ No waiting data found for user: ${userKey}`);
+                return;
+            }
+
+            console.log(`🎯 Processing waitForAnswer: "${answerText}"`);
+            
+            if (waitingData.resolve) {
+                waitingData.resolve(answerText);
+            }
+            
+            console.log(`✅ waitForAnswer resolved successfully`);
+            
+        } catch (error) {
+            console.error('❌ waitForAnswer processing error:', error);
+            
+            const waitingData = this.nextCommandHandlers.get(userKey);
+            if (waitingData && waitingData.reject) {
+                waitingData.reject(error);
+            }
+        } finally {
+            this.nextCommandHandlers.delete(userKey);
+            console.log(`🧹 Cleaned waitForAnswer for ${userKey}`);
+        }
+    }
+
+    async processCallbackAsCommand(bot, token, callbackQuery) {
+        try {
+            const { data, message, from } = callbackQuery;
+            const callbackData = data;
+            
+            console.log(`🔘 Processing callback as command: ${callbackData} from ${from.first_name}`);
+            
+            const commands = this.botCommands.get(token) || [];
+            const matchingCommand = commands.find(cmd => {
+                if (!cmd.command_patterns) return false;
+                const patterns = cmd.command_patterns.split(',').map(p => p.trim());
+                return patterns.includes(callbackData);
+            });
+            
+            if (matchingCommand) {
+                console.log(`🎯 Found command for callback: ${matchingCommand.command_patterns}`);
+                
+                const callbackMessage = {
+                    chat: message.chat,
+                    from: from,
+                    message_id: message.message_id,
+                    text: callbackData,
+                    date: new Date().getTime() / 1000
+                };
+                
+                await this.executeCommand(bot, matchingCommand, callbackMessage, callbackData);
+            } else {
+                console.log(`❌ No command found for callback: ${callbackData}`);
+                await bot.answerCallbackQuery(callbackQuery.id, { 
+                    text: `Unknown command: ${callbackData}`,
+                    show_alert: true 
+                });
+            }
+            
+        } catch (error) {
+            console.error('❌ Callback command processing error:', error);
+            
+            try {
+                await bot.answerCallbackQuery(callbackQuery.id, { 
+                    text: `Error: ${error.message}`,
+                    show_alert: true 
+                });
+            } catch (answerError) {
+                console.error('❌ Failed to answer callback query:', answerError);
+            }
+        }
     }
 
     async preloadUserData(botToken, userId) {
@@ -217,7 +326,10 @@ class BotManager {
             if (this.USE_WEBHOOK) {
                 bot = new TelegramBot(token, { 
                     polling: false,
-                    request: { timeout: 30000 }
+                    request: { 
+                        concurrency: 10,
+                        timeout: 30000
+                    }
                 });
                 
                 const baseUrl = process.env.BASE_URL;
@@ -249,7 +361,9 @@ class BotManager {
                             ]
                         }
                     },
-                    request: { timeout: 30000 }
+                    request: {
+                        timeout: 30000
+                    }
                 });
             }
 
@@ -277,10 +391,24 @@ class BotManager {
 
     setupEventHandlers(bot, token) {
         bot.on('message', (msg) => this.handleMessage(bot, token, msg));
+        bot.on('edited_message', (msg) => this.handleEditedMessage(bot, token, msg));
         bot.on('callback_query', (callbackQuery) => this.handleCallbackQuery(bot, token, callbackQuery));
         
-        // Optional handlers (remove if not needed)
-        bot.on('edited_message', (msg) => console.log(`✏️ Edited message`));
+        // Optional handlers (commented out if not needed)
+        // bot.on('photo', (msg) => this.handleMedia(bot, token, msg, 'photo'));
+        // bot.on('video', (msg) => this.handleMedia(bot, token, msg, 'video'));
+        // bot.on('document', (msg) => this.handleMedia(bot, token, msg, 'document'));
+        // bot.on('audio', (msg) => this.handleMedia(bot, token, msg, 'audio'));
+        // bot.on('voice', (msg) => this.handleMedia(bot, token, msg, 'voice'));
+        // bot.on('sticker', (msg) => this.handleMedia(bot, token, msg, 'sticker'));
+        // bot.on('location', (msg) => this.handleLocation(bot, token, msg));
+        // bot.on('contact', (msg) => this.handleContact(bot, token, msg));
+        // bot.on('poll', (poll) => this.handlePoll(bot, token, poll));
+        // bot.on('poll_answer', (pollAnswer) => this.handlePollAnswer(bot, token, pollAnswer));
+        // bot.on('inline_query', (inlineQuery) => this.handleInlineQuery(bot, token, inlineQuery));
+        // bot.on('new_chat_members', (msg) => this.handleChatMember(bot, token, msg, 'new'));
+        // bot.on('left_chat_member', (msg) => this.handleChatMember(bot, token, msg, 'left'));
+        
         bot.on('polling_error', (error) => console.error(`❌ Polling error:`, error));
         bot.on('webhook_error', (error) => console.error(`❌ Webhook error:`, error));
         bot.on('error', (error) => console.error(`❌ Bot error:`, error));
@@ -295,36 +423,43 @@ class BotManager {
             const text = msg.text || msg.caption || '';
             const userKey = `${token}_${userId}`;
 
-            console.log(`📨 Message from ${msg.from.first_name}: "${text}"`);
+            console.log(`📨 Message from ${msg.from.first_name} (${userId}): "${text}"`);
 
-            // ✅ 1. Check for ask/waitForAnswer handlers
+            // ১. FIRST - Check for waitForAnswer/ask promises
             if (this.nextCommandHandlers.has(userKey)) {
-                console.log(`✅ ASK HANDLER FOUND! Processing answer...`);
+                console.log(`✅ WAIT FOR ANSWER HANDLER FOUND! Processing...`);
                 const handlerData = this.nextCommandHandlers.get(userKey);
                 
                 if (handlerData && handlerData.resolve) {
+                    console.log(`🎯 Resolving with: "${text}"`);
                     handlerData.resolve(text);
                     this.nextCommandHandlers.delete(userKey);
-                    console.log(`✅ Answer processed successfully`);
+                    console.log(`✅ Resolved successfully`);
                     return;
                 } else {
+                    console.log(`❌ Handler data exists but resolve function missing`);
                     this.nextCommandHandlers.delete(userKey);
                 }
             }
 
-            // 2. Check for commands
+            // ২. Check for commands
             const command = await this.findMatchingCommand(token, text, msg);
             if (command) {
                 await this.executeCommand(bot, command, msg, text);
                 return;
             }
 
-            // 3. Unknown command (private chat only)
-            if (msg.chat.type === 'private') {
-                const safeText = text.substring(0, 20);
+            // ৩. Unknown command response (Private Chat Only)
+            if (msg.chat.type === 'private' && text) {
+                const displayText = text.length > 20 ? text.substring(0, 20) + '...' : text;
+                const safeText = displayText
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;");
+
                 await bot.sendMessage(
-                    chatId, 
-                    `❌ <b>Unknown Command:</b> <code>${safeText}</code>`,
+                    msg.chat.id, 
+                    `❌ <b>Unknown Command:</b> <code>${safeText}</code>\n\nদুঃখিত, এই কমান্ডটি খুঁজে পাওয়া যায়নি।`, 
                     { parse_mode: 'HTML' }
                 );
             }
@@ -335,33 +470,30 @@ class BotManager {
         }
     }
 
+    cleanupStaleHandlers() {
+        const now = Date.now();
+        const STALE_TIMEOUT = 10 * 60 * 1000;
+        
+        for (const [userKey, handlerData] of this.nextCommandHandlers.entries()) {
+            if (now - handlerData.timestamp > STALE_TIMEOUT) {
+                console.log(`🧹 Removing stale handler for ${userKey}`);
+                if (handlerData.reject) {
+                    handlerData.reject(new Error('Timeout: User took too long to respond.'));
+                }
+                this.nextCommandHandlers.delete(userKey);
+            }
+        }
+    }
+
     async handleCallbackQuery(bot, token, callbackQuery) {
         try {
             const { data, message, from } = callbackQuery;
-            console.log(`🔘 Callback: ${data} from ${from.first_name}`);
+            console.log(`🔘 Callback received: ${data} from ${from.first_name}`);
 
-            // Process as command
-            const commands = this.botCommands.get(token) || [];
-            const matchingCommand = commands.find(cmd => {
-                if (!cmd.command_patterns) return false;
-                const patterns = cmd.command_patterns.split(',').map(p => p.trim());
-                return patterns.includes(data);
-            });
-            
-            if (matchingCommand) {
-                console.log(`🎯 Found command for callback: ${matchingCommand.command_patterns}`);
-                
-                const callbackMessage = {
-                    chat: message.chat,
-                    from: from,
-                    message_id: message.message_id,
-                    text: data,
-                    date: new Date().getTime() / 1000
-                };
-                
-                await this.executeCommand(bot, matchingCommand, callbackMessage, data);
-            }
+            // 1. Try to process as a command
+            await this.processCallbackAsCommand(bot, token, callbackQuery);
 
+            // Always answer the callback query
             await bot.answerCallbackQuery(callbackQuery.id);
             
         } catch (error) {
@@ -377,19 +509,50 @@ class BotManager {
         }
     }
 
-    cleanupStaleHandlers() {
-        const now = Date.now();
-        const STALE_TIMEOUT = 10 * 60 * 1000;
-        
-        for (const [userKey, handlerData] of this.nextCommandHandlers.entries()) {
-            if (now - handlerData.timestamp > STALE_TIMEOUT) {
-                console.log(`🧹 Removing stale handler for ${userKey}`);
-                if (handlerData.reject) {
-                    handlerData.reject(new Error('Wait for answer timeout'));
-                }
-                this.nextCommandHandlers.delete(userKey);
+    async handleMedia(bot, token, msg, mediaType) {
+        try {
+            const caption = msg.caption || '';
+            const command = await this.findMatchingCommand(token, caption, msg);
+            if (command) {
+                await this.executeCommand(bot, command, msg, caption);
             }
+        } catch (error) {
+            console.error(`❌ Handle ${mediaType} error:`, error);
         }
+    }
+
+    async handleInlineQuery(bot, token, inlineQuery) {
+        try {
+            console.log(`🔍 Inline query: ${inlineQuery.query}`);
+            // Basic inline query response
+            await bot.answerInlineQuery(inlineQuery.id, []);
+        } catch (error) {
+            console.error('❌ Inline query error:', error);
+        }
+    }
+
+    async handleEditedMessage(bot, token, msg) {
+        console.log(`✏️ Edited message from ${msg.from.first_name}`);
+    }
+
+    async handleLocation(bot, token, msg) {
+        console.log(`📍 Location from ${msg.from.first_name}`);
+    }
+
+    async handleContact(bot, token, msg) {
+        console.log(`📞 Contact from ${msg.from.first_name}`);
+    }
+
+    async handlePoll(bot, token, poll) {
+        console.log(`📊 Poll: ${poll.question}`);
+    }
+
+    async handlePollAnswer(bot, token, pollAnswer) {
+        console.log(`🗳️ Poll answer received`);
+    }
+
+    async handleChatMember(bot, token, msg, type) {
+        console.log(`👥 ${type === 'new' ? 'New' : 'Left'} chat member`);
     }
 
     async findMatchingCommand(token, text, msg) {
@@ -401,35 +564,125 @@ class BotManager {
             const patterns = command.command_patterns.split(',').map(p => p.trim());
             
             for (const pattern of patterns) {
+                // Exact match
                 if (text === pattern) {
-                    console.log(`✅ Exact match: "${text}" = "${pattern}"`);
+                    console.log(`✅ Exact match found: "${text}" = "${pattern}"`);
                     return command;
                 }
                 
+                // Pattern দিয়ে শুরু হলে
                 if (text.startsWith(pattern + ' ')) {
-                    console.log(`✅ Pattern match: "${text}" starts with "${pattern}"`);
+                    console.log(`✅ Pattern match found: "${text}" starts with "${pattern}"`);
                     return command;
                 }
                 
+                // Alternative: slash ছাড়া pattern
                 if (!pattern.startsWith('/') && text.startsWith('/' + pattern)) {
                     const patternWithSlash = '/' + pattern;
                     if (text === patternWithSlash || text.startsWith(patternWithSlash + ' ')) {
-                        console.log(`✅ Alternative match: "${text}" matches "${pattern}"`);
+                        console.log(`✅ Alternative match found: "${text}" matches "${pattern}"`);
                         return command;
                     }
                 }
             }
         }
         
-        console.log(`❌ No matching command for: "${text}"`);
+        console.log(`❌ No matching command found for: "${text}"`);
         return null;
     }
 
     async sendError(bot, chatId, error) {
         try {
-            await bot.sendMessage(chatId, `❌ Error: ${error.message}`, { parse_mode: 'HTML' });
+            const errorMessage = `
+❌ *Error Occurred*
+
+*Message:* ${error.message}
+*Type:* ${error.name}
+
+We've logged this error and will fix it soon.
+            `.trim();
+        
+            await bot.sendMessage(chatId, errorMessage, { parse_mode: 'Markdown' });
         } catch (sendError) {
             console.error('❌ Failed to send error message:', sendError);
+        }
+    }
+
+    async saveData(dataType, botToken, userId, key, value, metadata = {}) {
+        try {
+            const { data, error } = await supabase
+                .from('universal_data')
+                .upsert({
+                    data_type: dataType,
+                    bot_token: botToken,
+                    user_id: userId ? userId.toString() : null,
+                    data_key: key,
+                    data_value: typeof value === 'object' ? JSON.stringify(value) : String(value),
+                    metadata: metadata,
+                    updated_at: new Date().toISOString()
+                }, {
+                    onConflict: 'data_type,bot_token,user_id,data_key'
+                });
+
+            if (error) {
+                console.error('❌ Save data error:', error);
+            }
+            return value;
+        } catch (error) {
+            console.error('❌ Save data error:', error);
+            return value;
+        }
+    }
+
+    async getData(dataType, botToken, userId, key) {
+        try {
+            const { data, error } = await supabase
+                .from('universal_data')
+                .select('data_value, metadata')
+                .eq('data_type', dataType)
+                .eq('bot_token', botToken)
+                .eq('user_id', userId ? userId.toString() : null)
+                .eq('data_key', key)
+                .single();
+
+            if (error) {
+                if (error.code === 'PGRST116') return null;
+                console.error('❌ Get data error:', error);
+                return null;
+            }
+            
+            if (data && data.data_value) {
+                try {
+                    return JSON.parse(data.data_value);
+                } catch {
+                    return data.data_value;
+                }
+            }
+            return null;
+        } catch (error) {
+            console.error('❌ Get data error:', error);
+            return null;
+        }
+    }
+
+    async deleteData(dataType, botToken, userId, key) {
+        try {
+            const { error } = await supabase
+                .from('universal_data')
+                .delete()
+                .eq('data_type', dataType)
+                .eq('bot_token', botToken)
+                .eq('user_id', userId ? userId.toString() : null)
+                .eq('data_key', key);
+
+            if (error) {
+                console.error('❌ Delete data error:', error);
+                return false;
+            }
+            return true;
+        } catch (error) {
+            console.error('❌ Delete data error:', error);
+            return false;
         }
     }
 
@@ -459,8 +712,12 @@ class BotManager {
                 return;
             }
 
-            this.botCommands.set(token, commands || []);
-            console.log(`✅ Updated command cache: ${commands?.length || 0} commands`);
+            this.botCommands.set(token, []);
+            
+            if (commands && Array.isArray(commands)) {
+                this.botCommands.set(token, commands);
+                console.log(`✅ Updated command cache for bot ${token.substring(0,10)}...: ${commands.length} commands`);
+            }
         } catch (error) {
             console.error('❌ Command cache update failed:', error);
         }
