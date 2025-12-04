@@ -210,9 +210,10 @@ const baseExecutionEnv = {
 
 
         // AUTO-AWAIT ENGINE
-        // AUTO-AWAIT ENGINE - FIXED VERSION
+        // AUTO-AWAIT ENGINE - COMPLETELY FIXED
 const executeWithAutoAwait = async (userCode, env) => {
-    const __autoAwait = {
+    // Helper functions
+    const helpers = {
         UserSave: async (k, v) => await env.User.saveData(k, v),
         UserGet: async (k) => await env.User.getData(k),
         UserDel: async (k) => await env.User.deleteData(k),
@@ -222,9 +223,7 @@ const executeWithAutoAwait = async (userCode, env) => {
         Ask: async (q, o) => await env.ask(q, o),
         Wait: async (ms) => await env.wait(ms),
         Sleep: async (ms) => await env.sleep(ms),
-        Python: async (c) => {  
-            return await pythonRunner.runPythonCode(c);
-        },
+        Python: async (c) => await pythonRunner.runPythonCode(c),
         BotGeneric: async (method, ...args) => {
             if (method === 'send' || method === 'reply') {
                 return await env.bot[method](...args);
@@ -239,69 +238,71 @@ const executeWithAutoAwait = async (userCode, env) => {
         }
     };
 
-    const rules = [
-        { r: /User\s*\.\s*saveData\s*\(([^)]+)\)/g, to: 'await UserSave($1)' },
-        { r: /User\s*\.\s*getData\s*\(([^)]+)\)/g, to: 'await UserGet($1)' },
-        { r: /User\s*\.\s*deleteData\s*\(([^)]+)\)/g, to: 'await UserDel($1)' },
-        { r: /(Bot|bot)\s*\.\s*saveData\s*\(([^)]+)\)/g, to: 'await BotDataSave($2)' },
-        { r: /(Bot|bot)\s*\.\s*getData\s*\(([^)]+)\)/g, to: 'await BotDataGet($2)' },
-        { r: /(Bot|bot)\s*\.\s*deleteData\s*\(([^)]+)\)/g, to: 'await BotDataDel($2)' },
-        { r: /(ask|waitForAnswer)\s*\(([^)]+)\)/g, to: 'await Ask($2)' },
-        { r: /(Bot|bot|Api|api)\s*\.\s*(ask|waitForAnswer)\s*\(([^)]+)\)/g, to: 'await BotGeneric(\'$2\', $3)' },
-        { r: /(Bot|bot|Api|api)\s*\.\s*(send|reply)\s*\(([^)]+)\)/g, to: 'await BotGeneric(\'$2\', $3)' },
-        { r: /(Bot|bot|Api|api)\s*\.\s*runPython\s*\(([^)]+)\)/g, to: 'await BotGeneric(\'runPython\', $2)' },
-        { r: /wait\s*\(([^)]+)\)/g, to: 'await Wait($1)' },
-        { r: /sleep\s*\(([^)]+)\)/g, to: 'await Sleep($1)' },
-        { r: /runPython\s*\(([^)]+)\)/g, to: 'await Python($1)' },
-        { r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer|send|reply|runPython)([a-zA-Z0-9_]+)\s*\(\s*\)/g, 
-          to: "await BotGeneric('$2')" },
-        { r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer|send|reply|runPython)([a-zA-Z0-9_]+)\s*\(/g, 
-          to: "await BotGeneric('$2', " }
-    ];
+    // Replace rules - সরাসরি helper functions call হবে
+    const processedCode = userCode
+        .replace(/User\s*\.\s*saveData\s*\(([^)]+)\)/g, 'await __helpers.UserSave($1)')
+        .replace(/User\s*\.\s*getData\s*\(([^)]+)\)/g, 'await __helpers.UserGet($1)')
+        .replace(/User\s*\.\s*deleteData\s*\(([^)]+)\)/g, 'await __helpers.UserDel($1)')
+        .replace(/(Bot|bot)\s*\.\s*saveData\s*\(([^)]+)\)/g, 'await __helpers.BotDataSave($2)')
+        .replace(/(Bot|bot)\s*\.\s*getData\s*\(([^)]+)\)/g, 'await __helpers.BotDataGet($2)')
+        .replace(/(Bot|bot)\s*\.\s*deleteData\s*\(([^)]+)\)/g, 'await __helpers.BotDataDel($2)')
+        .replace(/(ask|waitForAnswer)\s*\(([^)]+)\)/g, 'await __helpers.Ask($2)')
+        .replace(/(Bot|bot|Api|api)\s*\.\s*(ask|waitForAnswer)\s*\(([^)]+)\)/g, "await __helpers.BotGeneric('$2', $3)")
+        .replace(/(Bot|bot|Api|api)\s*\.\s*(send|reply)\s*\(([^)]+)\)/g, "await __helpers.BotGeneric('$2', $3)")
+        .replace(/(Bot|bot|Api|api)\s*\.\s*runPython\s*\(([^)]+)\)/g, "await __helpers.BotGeneric('runPython', $2)")
+        .replace(/wait\s*\(([^)]+)\)/g, 'await __helpers.Wait($1)')
+        .replace(/sleep\s*\(([^)]+)\)/g, 'await __helpers.Sleep($1)')
+        .replace(/runPython\s*\(([^)]+)\)/g, 'await __helpers.Python($1)')
+        .replace(/(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer|send|reply|runPython)([a-zA-Z0-9_]+)\s*\(\s*\)/g, 
+            "await __helpers.BotGeneric('$2')")
+        .replace(/(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer|send|reply|runPython)([a-zA-Z0-9_]+)\s*\(/g, 
+            "await __helpers.BotGeneric('$2', ");
 
-    // ✅ FIXED: Add __autoAwait functions directly to enhancedEnv
-    const enhancedEnv = { 
-        ...env, 
-        // ✅ Direct functions (not through __autoAwait object)
-        UserSave: __autoAwait.UserSave,
-        UserGet: __autoAwait.UserGet,
-        UserDel: __autoAwait.UserDel,
-        BotDataSave: __autoAwait.BotDataSave,
-        BotDataGet: __autoAwait.BotDataGet,
-        BotDataDel: __autoAwait.BotDataDel,
-        Ask: __autoAwait.Ask,
-        Wait: __autoAwait.Wait,
-        Sleep: __autoAwait.Sleep,
-        Python: __autoAwait.Python,
-        BotGeneric: __autoAwait.BotGeneric,
-        // Keep __autoAwait for reference if needed
-        __autoAwait: __autoAwait
+    // Create execution context with all variables
+    const executionContext = {
+        // Environment variables
+        Bot: env.Bot,
+        bot: env.bot,
+        Api: env.Api,
+        api: env.api,
+        User: env.User,
+        msg: env.msg,
+        chatId: env.chatId,
+        userId: env.userId,
+        userInput: env.userInput,
+        params: env.params,
+        currentUser: env.currentUser,
+        
+        // Original functions
+        wait: env.wait,
+        sleep: env.sleep,
+        runPython: env.runPython,
+        ask: env.ask,
+        waitForAnswer: env.waitForAnswer,
+        
+        // Helper functions (prefixed with __ to avoid conflicts)
+        __helpers: helpers
     };
 
-    let processedCode = userCode;
-
-    rules.forEach(rule => { 
-        processedCode = processedCode.replace(rule.r, rule.to); 
-    });
-
-    const finalCode = `
-        try {
-            ${processedCode}
-        } catch (error) {
-            console.error('User code error:', error);
-            throw error;
-        }
-    `;
-
-    const run = new Function('env', `
-        with(env) {
-            return (async function() {
-                ${finalCode}
-            })();
-        }
+    // Create the async function
+    const asyncFunction = new Function('ctx', `
+        const { 
+            Bot, bot, Api, api, User, msg, chatId, userId, userInput, params, currentUser,
+            wait, sleep, runPython, ask, waitForAnswer,
+            __helpers
+        } = ctx;
+        
+        return (async () => {
+            try {
+                ${processedCode}
+            } catch (error) {
+                console.error('User code execution error:', error);
+                throw error;
+            }
+        })();
     `);
-    
-    return await run(enhancedEnv);
+
+    return await asyncFunction(executionContext);
 };
 
         return await executeWithAutoAwait(code, baseExecutionEnv);
