@@ -1,8 +1,7 @@
-// server/core/python-runner.js - FINAL FIX
+// server/core/python-runner.js - আপডেটেড ভার্সন
 const { spawn, spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const supabase = require('../config/supabase');
 
 class PythonRunner {
     constructor() {
@@ -10,68 +9,33 @@ class PythonRunner {
         if (!fs.existsSync(this.tempDir)) {
             fs.mkdirSync(this.tempDir, { recursive: true });
         }
-        this.initialized = false;
-        this.initialize();
     }
 
-    async initialize() {
-        if (this.initialized) return;
-        
-        try {
-            // Check Python availability
-            const pythonExists = spawnSync('python3', ['--version'], {
-                encoding: 'utf-8',
-                timeout: 5000
-            });
-            
-            if (pythonExists.status === 0) {
-                console.log('🐍 Python3 found:', pythonExists.stdout.trim());
-            } else {
-                console.warn('⚠️ Python3 not found, trying python...');
-                const python2 = spawnSync('python', ['--version'], {
-                    encoding: 'utf-8',
-                    timeout: 5000
-                });
-                if (python2.status === 0) {
-                    console.log('🐍 Python found:', python2.stdout.trim());
-                } else {
-                    console.error('❌ Python not found');
-                }
-            }
-            
-            this.initialized = true;
-            console.log('✅ Python runner initialized successfully');
-        } catch (error) {
-            console.error('❌ Python runner initialization failed:', error);
-            this.initialized = true; // Initialize anyway
-        }
-    }
-
-    // ✅ SIMPLE & RELIABLE Python execution
+    // ✅ CLEAN Python execution - NO JSON parsing issues
     async runPythonCode(code) {
-        console.log('🐍 Running Python code...');
-        
-        // If code doesn't end with print statement, add it
-        const trimmedCode = code.trim();
-        if (!trimmedCode.includes('print(') && !trimmedCode.includes('return')) {
-            code = `${code}\nprint("SUCCESS: Code executed")`;
-        }
-        
         return new Promise((resolve, reject) => {
+            console.log('🐍 Running Python code...');
+            
             const tempFile = path.join(this.tempDir, `script_${Date.now()}.py`);
             
-            // Simple Python file
-            const pythonTemplate = `# Python Code
-import sys
+            // Clean Python template
+            const pythonTemplate = `import sys
 import traceback
 
-try:
+def main():
 ${this.indentCode(code, 4)}
-    sys.exit(0)
-except Exception as e:
-    print(f"ERROR: {type(e).__name__}: {str(e)}")
-    print(f"TRACEBACK: {traceback.format_exc()}")
-    sys.exit(1)`;
+
+if __name__ == "__main__":
+    try:
+        result = main()
+        if result is not None:
+            print(str(result))
+        else:
+            print("SUCCESS")
+    except Exception as e:
+        error_msg = f"{type(e).__name__}: {str(e)}"
+        print(f"ERROR: {error_msg}")
+        sys.exit(1)`;
 
             fs.writeFileSync(tempFile, pythonTemplate);
             
@@ -102,17 +66,26 @@ except Exception as e:
                     console.error('❌ Temp file cleanup error:', cleanupError);
                 }
 
+                const output = stdoutData.trim();
+                const errorOutput = stderrData.trim();
+
                 if (code !== 0) {
-                    const errorMsg = stderrData || stdoutData || 'Python execution failed';
-                    console.error('❌ Python process error:', errorMsg);
+                    // Python error occurred
+                    const errorMsg = output.startsWith('ERROR: ') 
+                        ? output.substring(7) 
+                        : errorOutput || 'Python execution failed';
+                    
+                    console.error('❌ Python error:', errorMsg);
                     reject(new Error(errorMsg));
                     return;
                 }
 
                 // Success
-                const output = stdoutData.trim();
-                console.log('✅ Python output:', output);
-                resolve(output || 'Code executed successfully');
+                if (output === 'SUCCESS') {
+                    resolve('Code executed successfully');
+                } else {
+                    resolve(output);
+                }
             });
 
             pythonProcess.on('error', (err) => {
@@ -121,7 +94,7 @@ except Exception as e:
                 } catch (cleanupError) {
                     console.error('❌ Temp file cleanup error:', cleanupError);
                 }
-                reject(new Error(`Python process failed to start: ${err.message}`));
+                reject(new Error(`Python process failed: ${err.message}`));
             });
 
             // Timeout
@@ -143,26 +116,26 @@ except Exception as e:
     runPythonCodeSync(code) {
         console.log('🐍 Running Python code synchronously');
         
-        // If code doesn't end with print statement, add it
-        const trimmedCode = code.trim();
-        if (!trimmedCode.includes('print(') && !trimmedCode.includes('return')) {
-            code = `${code}\nprint("SUCCESS: Code executed")`;
-        }
-        
         try {
             const tempFile = path.join(this.tempDir, `script_sync_${Date.now()}.py`);
             
-            const pythonTemplate = `# Python Code
-import sys
+            const pythonTemplate = `import sys
 import traceback
 
-try:
+def main():
 ${this.indentCode(code, 4)}
-    sys.exit(0)
-except Exception as e:
-    print(f"ERROR: {type(e).__name__}: {str(e)}")
-    print(f"TRACEBACK: {traceback.format_exc()}")
-    sys.exit(1)`;
+
+if __name__ == "__main__":
+    try:
+        result = main()
+        if result is not None:
+            print(str(result))
+        else:
+            print("SUCCESS")
+    except Exception as e:
+        error_msg = f"{type(e).__name__}: {str(e)}"
+        print(f"ERROR: {error_msg}")
+        sys.exit(1)`;
 
             fs.writeFileSync(tempFile, pythonTemplate);
             
@@ -186,17 +159,25 @@ except Exception as e:
                 throw new Error(`Python process error: ${result.error.message}`);
             }
 
+            const output = result.stdout ? result.stdout.trim() : '';
+            const errorOutput = result.stderr ? result.stderr.trim() : '';
+
             if (result.status !== 0) {
-                const errorMsg = result.stderr || result.stdout || 'Python execution failed';
-                throw new Error(errorMsg.split('\n')[0]);
+                const errorMsg = output.startsWith('ERROR: ') 
+                    ? output.substring(7) 
+                    : errorOutput || 'Python execution failed';
+                
+                throw new Error(errorMsg);
             }
 
-            const output = result.stdout ? result.stdout.trim() : 'No output';
-            console.log('✅ Python sync output:', output);
+            if (output === 'SUCCESS') {
+                return 'Code executed successfully';
+            }
+
             return output;
 
         } catch (error) {
-            console.error('❌ Python file execution error:', error);
+            console.error('❌ Python execution error:', error);
             throw error;
         }
     }
@@ -208,30 +189,6 @@ except Exception as e:
             return ' '.repeat(spaces) + line;
         });
         return indentedLines.join('\n');
-    }
-
-    // ✅ SIMPLE Python test method
-    async testPython() {
-        try {
-            const result = await this.runPythonCode(`
-print("Python Test")
-print("Version check:")
-import sys
-print(f"Python {sys.version}")
-print("Basic math: 2 + 3 =", 2 + 3)
-print("✅ Python is working!")
-            `);
-            
-            return {
-                success: true,
-                output: result
-            };
-        } catch (error) {
-            return {
-                success: false,
-                error: error.message
-            };
-        }
     }
 }
 
