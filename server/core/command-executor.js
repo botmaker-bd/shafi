@@ -209,108 +209,109 @@ const baseExecutionEnv = {
 };
 
 
-        // AUTO-AWAIT ENGINE
-        const executeWithAutoAwait = async (userCode, env) => {
-            const __autoAwait = {
-                UserSave: async (k, v) => await env.User.saveData(k, v),
-                UserGet: async (k) => await env.User.getData(k),
-                UserDel: async (k) => await env.User.deleteData(k),
-                BotDataSave: async (k, v) => await env.bot.saveData(k, v),
-                BotDataGet: async (k) => await env.bot.getData(k),
-                BotDataDel: async (k) => await env.bot.deleteData(k),
-                Ask: async (q, o) => await env.ask(q, o),
-                Wait: async (ms) => await env.wait(ms),
-                Sleep: async (ms) => await env.sleep(ms),
-                Python: async (c) => {  
-                    return await pythonRunner.runPythonCode(c);
-                },
-                GetUser: async () => {
-        return env.getUser();
-    },
-                BotGeneric: async (method, ...args) => {
-                    // ✅ send/reply handle করি (api-wrapper এ আছে)
-                    if (method === 'send' || method === 'reply') {
-                        return await env.bot[method](...args);
-                    }
-                    // ✅ ask/waitForAnswer handle করি
-                    if (method === 'ask' || method === 'waitForAnswer') {
-                        return await env.ask(...args);
-                    }
-                    // ✅ runPython handle করি (api-wrapper এ আছে)
-                    if (method === 'runPython') {
-                        return await env.bot.runPython(...args);
-                    }
-                    // ✅ অন্যান্য methods
-                    return await dynamicBotCaller(method, ...args);
-                }
-            };
 
-            const rules = [
-                // User methods
-                { r: /User\s*\.\s*saveData\s*\(([^)]+)\)/g, to: 'await __autoAwait.UserSave($1)' },
-                { r: /User\s*\.\s*getData\s*\(([^)]+)\)/g, to: 'await __autoAwait.UserGet($1)' },
-                { r: /User\s*\.\s*deleteData\s*\(([^)]+)\)/g, to: 'await __autoAwait.UserDel($1)' },
-                
-                // Bot data methods
-                { r: /(Bot|bot)\s*\.\s*saveData\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotDataSave($2)' },
-                { r: /(Bot|bot)\s*\.\s*getData\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotDataGet($2)' },
-                { r: /(Bot|bot)\s*\.\s*deleteData\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotDataDel($2)' },
-                
-                // Global ask/waitForAnswer
-                { r: /(ask|waitForAnswer)\s*\(([^)]+)\)/g, to: 'await __autoAwait.Ask($2)' },
-                
-                // ✅ getUser() এর জন্য rule যোগ করুন
-                { r: /getUser\s*\(\s*\)/g, to: 'await __autoAwait.GetUser()' },
-                
-                // ✅ FIXED: Bot.ask(), bot.ask(), Api.ask(), api.ask()
-                { r: /(Bot|bot|Api|api)\s*\.\s*(ask|waitForAnswer)\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotGeneric(\'$2\', $3)' },
-                
-                // ✅ Bot.send(), bot.send(), etc (api-wrapper এ আছে)
-                { r: /(Bot|bot|Api|api)\s*\.\s*(send|reply)\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotGeneric(\'$2\', $3)' },
-                
-                // ✅ Bot.runPython(), etc
-                { r: /(Bot|bot|Api|api)\s*\.\s*runPython\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotGeneric(\'runPython\', $2)' },
-                
-                // Wait/sleep
-                { r: /wait\s*\(([^)]+)\)/g, to: 'await __autoAwait.Wait($1)' },
-                { r: /sleep\s*\(([^)]+)\)/g, to: 'await __autoAwait.Sleep($1)' },
-                
-                // Global runPython
-                { r: /runPython\s*\(([^)]+)\)/g, to: 'await __autoAwait.Python($1)' },
-                
-                // ✅ FIXED: Other bot methods (exclude list আপডেট)
-                { r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer|send|reply|runPython)([a-zA-Z0-9_]+)\s*\(\s*\)/g, 
-                  to: "await __autoAwait.BotGeneric('$2')" },
-                { r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer|send|reply|runPython)([a-zA-Z0-9_]+)\s*\(/g, 
-                  to: "await __autoAwait.BotGeneric('$2', " }
-            ];
+// ✅ নতুন সঠিক কোড:
+const executeWithAutoAwait = async (userCode, env) => {
+    // __autoAwait অবজেক্ট তৈরি করুন
+    const __autoAwait = {
+        UserSave: async (k, v) => await env.User.saveData(k, v),
+        UserGet: async (k) => await env.User.getData(k),
+        UserDel: async (k) => await env.User.deleteData(k),
+        BotDataSave: async (k, v) => await env.bot.saveData(k, v),
+        BotDataGet: async (k) => await env.bot.getData(k),
+        BotDataDel: async (k) => await env.bot.deleteData(k),
+        Ask: async (q, o) => await env.ask(q, o),
+        Wait: async (ms) => await env.wait(ms),
+        Sleep: async (ms) => await env.sleep(ms),
+        Python: async (c) => {  
+            return await pythonRunner.runPythonCode(c);
+        },
+        GetUser: async () => {
+            return env.getUser();
+        },
+        BotGeneric: async (method, ...args) => {
+            if (method === 'send' || method === 'reply') {
+                return await env.bot[method](...args);
+            }
+            if (method === 'ask' || method === 'waitForAnswer') {
+                return await env.ask(...args);
+            }
+            if (method === 'runPython') {
+                return await env.bot.runPython(...args);
+            }
+            return await dynamicBotCaller(method, ...args);
+        }
+    };
 
-            const enhancedEnv = { ...env, __autoAwait };
-            let processedCode = userCode;
+    const rules = [
+        // User methods
+        { r: /User\s*\.\s*saveData\s*\(([^)]+)\)/g, to: 'await __autoAwait.UserSave($1)' },
+        { r: /User\s*\.\s*getData\s*\(([^)]+)\)/g, to: 'await __autoAwait.UserGet($1)' },
+        { r: /User\s*\.\s*deleteData\s*\(([^)]+)\)/g, to: 'await __autoAwait.UserDel($1)' },
+        
+        // Bot data methods
+        { r: /(Bot|bot)\s*\.\s*saveData\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotDataSave($2)' },
+        { r: /(Bot|bot)\s*\.\s*getData\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotDataGet($2)' },
+        { r: /(Bot|bot)\s*\.\s*deleteData\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotDataDel($2)' },
+        
+        // Global ask/waitForAnswer
+        { r: /(ask|waitForAnswer)\s*\(([^)]+)\)/g, to: 'await __autoAwait.Ask($2)' },
+        
+        // getUser() এর জন্য rule
+        { r: /getUser\s*\(\s*\)/g, to: 'await __autoAwait.GetUser()' },
+        
+        // Bot.ask(), bot.ask(), Api.ask(), api.ask()
+        { r: /(Bot|bot|Api|api)\s*\.\s*(ask|waitForAnswer)\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotGeneric(\'$2\', $3)' },
+        
+        // Bot.send(), bot.send(), etc
+        { r: /(Bot|bot|Api|api)\s*\.\s*(send|reply)\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotGeneric(\'$2\', $3)' },
+        
+        // Bot.runPython(), etc
+        { r: /(Bot|bot|Api|api)\s*\.\s*runPython\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotGeneric(\'runPython\', $2)' },
+        
+        // Wait/sleep
+        { r: /wait\s*\(([^)]+)\)/g, to: 'await __autoAwait.Wait($1)' },
+        { r: /sleep\s*\(([^)]+)\)/g, to: 'await __autoAwait.Sleep($1)' },
+        
+        // Global runPython
+        { r: /runPython\s*\(([^)]+)\)/g, to: 'await __autoAwait.Python($1)' },
+        
+        // Other bot methods (exclude list আপডেট)
+        { r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer|send|reply|runPython)([a-zA-Z0-9_]+)\s*\(\s*\)/g, 
+          to: "await __autoAwait.BotGeneric('$2')" },
+        { r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer|send|reply|runPython)([a-zA-Z0-9_]+)\s*\(/g, 
+          to: "await __autoAwait.BotGeneric('$2', " }
+    ];
 
-            rules.forEach(rule => { 
-                processedCode = processedCode.replace(rule.r, rule.to); 
-            });
+    let processedCode = userCode;
 
-            const finalCode = `
-                try {
-                    ${processedCode}
-                } catch (error) {
-                    throw error;
-                }
-            `;
+    rules.forEach(rule => { 
+        processedCode = processedCode.replace(rule.r, rule.to); 
+    });
 
-            const run = new Function('env', `
-                with(env) {
-                    return (async function() {
-                        ${finalCode}
-                    })();
-                }
-            `);
-            
-            return await run(enhancedEnv);
-        };
+    const finalCode = `
+        try {
+            ${processedCode}
+        } catch (error) {
+            throw error;
+        }
+    `;
 
+    // ✅ FIXED: __autoAwait variable টি explicitly pass করুন
+    const run = new Function('env', '__autoAwait', `
+        const { User, Bot, bot, Api, api, ask, waitForAnswer, wait, sleep, runPython, getUser } = env;
+        
+        return (async function() {
+            try {
+                ${finalCode}
+            } catch (error) {
+                throw error;
+            }
+        })();
+    `);
+    
+    return await run(env, __autoAwait);
+};
         return await executeWithAutoAwait(code, baseExecutionEnv);
 
     } catch (error) {
