@@ -11,11 +11,13 @@ async function executeCommandCode(botInstance, code, context) {
     const chatId = context.chatId || msg?.chat?.id;
     const nextCommandHandlers = context.nextCommandHandlers || new Map();
     
-    if (!chatId) throw new Error("CRITICAL: Chat ID is missing!");
+    if (!chatId) {
+        throw new Error("CRITICAL: Chat ID is missing in context!");
+    }
     
     const sessionKey = `sess_${userId}_${Date.now()}`;
-    let resolvedBotToken = botToken;
     
+    let resolvedBotToken = botToken;
     if (!resolvedBotToken) {
         try { 
             const i = await botInstance.getMe(); 
@@ -39,7 +41,7 @@ async function executeCommandCode(botInstance, code, context) {
             console.warn("⚠️ Session logging failed:", sessionErr.message);
         }
 
-        // DATA FUNCTIONS
+        // --- DATA FUNCTIONS ---
         const userDataFunctions = {
             saveData: async (key, value) => {
                 const { error } = await supabase.from('universal_data').upsert({
@@ -98,7 +100,7 @@ async function executeCommandCode(botInstance, code, context) {
             }
         };
 
-        // WAIT FOR ANSWER LOGIC
+        // --- WAIT FOR ANSWER LOGIC ---
         const waitForAnswerLogic = async (question, options = {}) => {
             return new Promise((resolveWait, rejectWait) => {
                 const waitKey = `${resolvedBotToken}_${userId}`;
@@ -125,7 +127,7 @@ async function executeCommandCode(botInstance, code, context) {
             });
         };
 
-        // SMART BOT WRAPPER
+        // --- DYNAMIC BOT CALLER ---
         const isChatId = (val) => {
             if (!val) return false;
             if (typeof val === 'number') return Number.isInteger(val) && Math.abs(val) > 200;
@@ -137,7 +139,10 @@ async function executeCommandCode(botInstance, code, context) {
             if (typeof botInstance[methodName] !== 'function') {
                 throw new Error(`Method '${methodName}' missing in API`);
             }
-            const noChatIdMethods = ['getMe', 'getWebhookInfo', 'deleteWebhook', 'setWebhook', 'answerCallbackQuery', 'answerInlineQuery', 'stopPoll', 'downloadFile', 'logOut', 'close'];
+            
+            const noChatIdMethods = ['getMe', 'getWebhookInfo', 'deleteWebhook', 'setWebhook', 
+                                   'answerCallbackQuery', 'answerInlineQuery', 'stopPoll', 
+                                   'downloadFile', 'logOut', 'close'];
 
             if (!noChatIdMethods.includes(methodName)) {
                 let shouldInject = false;
@@ -147,7 +152,10 @@ async function executeCommandCode(botInstance, code, context) {
                     if (Array.isArray(args[0])) shouldInject = true;
                 } else {
                     if (args.length === 0 || !isChatId(args[0])) {
-                        if (methodName.startsWith('send') || methodName.startsWith('forward') || methodName.startsWith('copy')) shouldInject = true;
+                        if (methodName.startsWith('send') || methodName.startsWith('forward') || 
+                            methodName.startsWith('copy') || methodName === 'reply' || methodName === 'send') {
+                            shouldInject = true;
+                        }
                     }
                 }
                 if (shouldInject) args.unshift(chatId);
@@ -155,19 +163,27 @@ async function executeCommandCode(botInstance, code, context) {
             return await botInstance[methodName](...args);
         };
 
-        // ENVIRONMENT SETUP
+        // --- ENVIRONMENT SETUP ---
         const apiCtx = { 
-            msg, chatId, userId, botToken: resolvedBotToken, 
-            userInput, params, nextCommandHandlers,
+            msg, 
+            chatId, 
+            userId, 
+            botToken: resolvedBotToken, 
+            userInput, 
+            params,
+            nextCommandHandlers,
             ask: waitForAnswerLogic,
             waitForAnswer: waitForAnswerLogic
         };
         
         const apiWrapperInstance = new ApiWrapper(botInstance, apiCtx);
         
+        // ✅ CORRECT: Don't redefine methods already in ApiWrapper
         const botObject = { 
             ...apiWrapperInstance, 
             ...botDataFunctions
+            // ❌ DON'T add ask/waitForAnswer here - already in ApiWrapper
+            // ❌ DON'T add runPython here - already in ApiWrapper
         };
 
         const baseExecutionEnv = {
@@ -182,14 +198,14 @@ async function executeCommandCode(botInstance, code, context) {
             userInput,
             params,
             currentUser: msg.from || { id: userId, first_name: 'User' },
-            wait: (ms) => new Promise(r => setTimeout(r, ms)),
-            sleep: (ms) => new Promise(r => setTimeout(r, ms)),
-            runPython: async (c) => await pythonRunner.runPythonCode(c),
+            wait: (sec) => new Promise(r => setTimeout(r, sec * 1000)),
+            sleep: (sec) => new Promise(r => setTimeout(r, sec * 1000)),
+            // ❌ DON'T add runPython here - already in Bot object
             ask: waitForAnswerLogic,
             waitForAnswer: waitForAnswerLogic
         };
 
-        // ✅ FIXED AUTO-AWAIT ENGINE
+        // --- AUTO-AWAIT ENGINE ---
         const executeWithAutoAwait = async (userCode, env) => {
             const __autoAwait = {
                 UserSave: async (k, v) => await env.User.saveData(k, v),
@@ -199,69 +215,52 @@ async function executeCommandCode(botInstance, code, context) {
                 BotDataGet: async (k) => await env.bot.getData(k),
                 BotDataDel: async (k) => await env.bot.deleteData(k),
                 Ask: async (q, o) => await env.ask(q, o),
-                Wait: async (ms) => await env.wait(ms),
-                Sleep: async (ms) => await env.sleep(ms),
-                Python: async (c) => await env.runPython(c),
+                Wait: async (s) => await env.wait(s),
+                Python: async (c) => {  
+                    // ✅ Use Bot.runPython() from ApiWrapper
+                    return await env.bot.runPython(c);
+                },
                 BotGeneric: async (method, ...args) => {
-                    if (method === 'send' || method === 'reply') {
-                        return await env.bot[method](...args);
-                    }
+                    // Handle special methods
                     if (method === 'ask' || method === 'waitForAnswer') {
                         return await env.ask(...args);
                     }
                     if (method === 'runPython') {
                         return await env.bot.runPython(...args);
                     }
+                    if (method === 'send' || method === 'reply') {
+                        // These are shortcuts in ApiWrapper
+                        return await env.bot[method](...args);
+                    }
                     return await dynamicBotCaller(method, ...args);
                 }
             };
 
-            // ✅ SIMPLIFIED RULES WITHOUT COMPLEX REGEX
             const rules = [
-                // User methods
-                { pattern: /User\.saveData\(/g, replace: 'await __autoAwait.UserSave(' },
-                { pattern: /User\.getData\(/g, replace: 'await __autoAwait.UserGet(' },
-                { pattern: /User\.deleteData\(/g, replace: 'await __autoAwait.UserDel(' },
-                
-                // Bot data methods
-                { pattern: /Bot\.saveData\(/g, replace: 'await __autoAwait.BotDataSave(' },
-                { pattern: /Bot\.getData\(/g, replace: 'await __autoAwait.BotDataGet(' },
-                { pattern: /Bot\.deleteData\(/g, replace: 'await __autoAwait.BotDataDel(' },
-                { pattern: /bot\.saveData\(/g, replace: 'await __autoAwait.BotDataSave(' },
-                { pattern: /bot\.getData\(/g, replace: 'await __autoAwait.BotDataGet(' },
-                { pattern: /bot\.deleteData\(/g, replace: 'await __autoAwait.BotDataDel(' },
-                
-                // Global functions
-                { pattern: /ask\(/g, replace: 'await __autoAwait.Ask(' },
-                { pattern: /waitForAnswer\(/g, replace: 'await __autoAwait.Ask(' },
-                { pattern: /wait\(/g, replace: 'await __autoAwait.Wait(' },
-                { pattern: /sleep\(/g, replace: 'await __autoAwait.Sleep(' },
-                { pattern: /runPython\(/g, replace: 'await __autoAwait.Python(' },
-                
-                // Bot methods with simple patterns
-                { pattern: /Bot\.ask\(/g, replace: 'await __autoAwait.BotGeneric(\'ask\',' },
-                { pattern: /Bot\.waitForAnswer\(/g, replace: 'await __autoAwait.BotGeneric(\'waitForAnswer\',' },
-                { pattern: /Bot\.send\(/g, replace: 'await __autoAwait.BotGeneric(\'send\',' },
-                { pattern: /Bot\.reply\(/g, replace: 'await __autoAwait.BotGeneric(\'reply\',' },
-                { pattern: /Bot\.runPython\(/g, replace: 'await __autoAwait.BotGeneric(\'runPython\',' },
-                
-                // Lowercase bot
-                { pattern: /bot\.ask\(/g, replace: 'await __autoAwait.BotGeneric(\'ask\',' },
-                { pattern: /bot\.waitForAnswer\(/g, replace: 'await __autoAwait.BotGeneric(\'waitForAnswer\',' },
-                { pattern: /bot\.send\(/g, replace: 'await __autoAwait.BotGeneric(\'send\',' },
-                { pattern: /bot\.reply\(/g, replace: 'await __autoAwait.BotGeneric(\'reply\',' },
-                { pattern: /bot\.runPython\(/g, replace: 'await __autoAwait.BotGeneric(\'runPython\',' },
+                { r: /User\s*\.\s*saveData\s*\(([^)]+)\)/g,   to: 'await __autoAwait.UserSave($1)' },
+                { r: /User\s*\.\s*getData\s*\(([^)]+)\)/g,    to: 'await __autoAwait.UserGet($1)' },
+                { r: /User\s*\.\s*deleteData\s*\(([^)]+)\)/g, to: 'await __autoAwait.UserDel($1)' },
+                { r: /(Bot|bot)\s*\.\s*saveData\s*\(([^)]+)\)/g,   to: 'await __autoAwait.BotDataSave($2)' },
+                { r: /(Bot|bot)\s*\.\s*getData\s*\(([^)]+)\)/g,    to: 'await __autoAwait.BotDataGet($2)' },
+                { r: /(Bot|bot)\s*\.\s*deleteData\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotDataDel($2)' },
+                { r: /(ask|waitForAnswer)\s*\(([^)]+)\)/g, to: 'await __autoAwait.Ask($2)' },
+                { r: /(Bot|bot|Api|api)\s*\.\s*(ask|waitForAnswer)\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotGeneric(\'$2\', $3)' },
+                { r: /(Bot|bot|Api|api)\s*\.\s*(send|reply)\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotGeneric(\'$2\', $3)' },
+                { r: /(Bot|bot|Api|api)\s*\.\s*runPython\s*\(([^)]+)\)/g, to: 'await __autoAwait.Python($1)' },
+                { r: /runPython\s*\(([^)]+)\)/g, to: 'await __autoAwait.Python($1)' },
+                { r: /(wait|sleep)\s*\(([^)]+)\)/g, to: 'await __autoAwait.Wait($2)' },
+                { r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer|runPython|send|reply)([a-zA-Z0-9_]+)\s*\(\s*\)/g, 
+                  to: "await __autoAwait.BotGeneric('$2')" },
+                { r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer|runPython|send|reply)([a-zA-Z0-9_]+)\s*\(/g, 
+                  to: "await __autoAwait.BotGeneric('$2', " }
             ];
 
+            const enhancedEnv = { ...env, __autoAwait };
             let processedCode = userCode;
-            
-            // Simple replacement without complex regex groups
-            rules.forEach(rule => {
-                processedCode = processedCode.replace(rule.pattern, rule.replace);
-            });
 
-            // Debug log for processed code
-            console.log('🔧 Processed code (first 500 chars):', processedCode.substring(0, 500));
+            rules.forEach(rule => { 
+                processedCode = processedCode.replace(rule.r, rule.to); 
+            });
 
             const finalCode = `
                 try {
@@ -279,10 +278,10 @@ async function executeCommandCode(botInstance, code, context) {
                 }
             `);
             
-            return await run({ ...env, __autoAwait });
-
+            return await run(enhancedEnv);
         };
 
+        // EXECUTE
         return await executeWithAutoAwait(code, baseExecutionEnv);
 
     } catch (error) {
