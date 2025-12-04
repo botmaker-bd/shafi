@@ -28,7 +28,6 @@ async function executeCommandCode(botInstance, code, context) {
     }
 
     try {
-        // Session logging
         try {
             await supabase.from('active_sessions').insert({
                 session_id: sessionKey, 
@@ -41,7 +40,6 @@ async function executeCommandCode(botInstance, code, context) {
             console.warn("⚠️ Session logging failed:", sessionErr.message);
         }
 
-        // --- DATA FUNCTIONS ---
         const userDataFunctions = {
             saveData: async (key, value) => {
                 const { error } = await supabase.from('universal_data').upsert({
@@ -100,7 +98,6 @@ async function executeCommandCode(botInstance, code, context) {
             }
         };
 
-        // --- WAIT FOR ANSWER LOGIC ---
         const waitForAnswerLogic = async (question, options = {}) => {
             return new Promise((resolveWait, rejectWait) => {
                 const waitKey = `${resolvedBotToken}_${userId}`;
@@ -127,7 +124,6 @@ async function executeCommandCode(botInstance, code, context) {
             });
         };
 
-        // --- DYNAMIC BOT CALLER ---
         const isChatId = (val) => {
             if (!val) return false;
             if (typeof val === 'number') return Number.isInteger(val) && Math.abs(val) > 200;
@@ -139,10 +135,7 @@ async function executeCommandCode(botInstance, code, context) {
             if (typeof botInstance[methodName] !== 'function') {
                 throw new Error(`Method '${methodName}' missing in API`);
             }
-            
-            const noChatIdMethods = ['getMe', 'getWebhookInfo', 'deleteWebhook', 'setWebhook', 
-                                   'answerCallbackQuery', 'answerInlineQuery', 'stopPoll', 
-                                   'downloadFile', 'logOut', 'close'];
+            const noChatIdMethods = ['getMe', 'getWebhookInfo', 'deleteWebhook', 'setWebhook', 'answerCallbackQuery', 'answerInlineQuery', 'stopPoll', 'downloadFile', 'logOut', 'close'];
 
             if (!noChatIdMethods.includes(methodName)) {
                 let shouldInject = false;
@@ -152,8 +145,7 @@ async function executeCommandCode(botInstance, code, context) {
                     if (Array.isArray(args[0])) shouldInject = true;
                 } else {
                     if (args.length === 0 || !isChatId(args[0])) {
-                        if (methodName.startsWith('send') || methodName.startsWith('forward') || 
-                            methodName.startsWith('copy') || methodName === 'reply' || methodName === 'send') {
+                        if (methodName.startsWith('send') || methodName.startsWith('forward') || methodName.startsWith('copy')) {
                             shouldInject = true;
                         }
                     }
@@ -163,7 +155,6 @@ async function executeCommandCode(botInstance, code, context) {
             return await botInstance[methodName](...args);
         };
 
-        // --- ENVIRONMENT SETUP ---
         const apiCtx = { 
             msg, 
             chatId, 
@@ -178,12 +169,9 @@ async function executeCommandCode(botInstance, code, context) {
         
         const apiWrapperInstance = new ApiWrapper(botInstance, apiCtx);
         
-        // ✅ CORRECT: Don't redefine methods already in ApiWrapper
         const botObject = { 
             ...apiWrapperInstance, 
             ...botDataFunctions
-            // ❌ DON'T add ask/waitForAnswer here - already in ApiWrapper
-            // ❌ DON'T add runPython here - already in ApiWrapper
         };
 
         const baseExecutionEnv = {
@@ -200,12 +188,10 @@ async function executeCommandCode(botInstance, code, context) {
             currentUser: msg.from || { id: userId, first_name: 'User' },
             wait: (sec) => new Promise(r => setTimeout(r, sec * 1000)),
             sleep: (sec) => new Promise(r => setTimeout(r, sec * 1000)),
-            // ❌ DON'T add runPython here - already in Bot object
             ask: waitForAnswerLogic,
             waitForAnswer: waitForAnswerLogic
         };
 
-        // --- AUTO-AWAIT ENGINE ---
         const executeWithAutoAwait = async (userCode, env) => {
             const __autoAwait = {
                 UserSave: async (k, v) => await env.User.saveData(k, v),
@@ -217,11 +203,9 @@ async function executeCommandCode(botInstance, code, context) {
                 Ask: async (q, o) => await env.ask(q, o),
                 Wait: async (s) => await env.wait(s),
                 Python: async (c) => {  
-                    // ✅ Use Bot.runPython() from ApiWrapper
                     return await env.bot.runPython(c);
                 },
                 BotGeneric: async (method, ...args) => {
-                    // Handle special methods
                     if (method === 'ask' || method === 'waitForAnswer') {
                         return await env.ask(...args);
                     }
@@ -229,7 +213,6 @@ async function executeCommandCode(botInstance, code, context) {
                         return await env.bot.runPython(...args);
                     }
                     if (method === 'send' || method === 'reply') {
-                        // These are shortcuts in ApiWrapper
                         return await env.bot[method](...args);
                     }
                     return await dynamicBotCaller(method, ...args);
@@ -255,33 +238,32 @@ async function executeCommandCode(botInstance, code, context) {
                   to: "await __autoAwait.BotGeneric('$2', " }
             ];
 
-            const enhancedEnv = { ...env, __autoAwait };
+            const enhancedEnv = { 
+                ...env, 
+                __autoAwait 
+            };
+            
             let processedCode = userCode;
 
             rules.forEach(rule => { 
                 processedCode = processedCode.replace(rule.r, rule.to); 
             });
 
+            // ✅ FIXED: Use enhancedEnv directly instead of with(env)
             const finalCode = `
                 try {
+                    const env = __env;
                     ${processedCode}
                 } catch (error) {
                     throw error;
                 }
             `;
 
-            const run = new Function('env', `
-                with(env) {
-                    return (async function() {
-                        ${finalCode}
-                    })();
-                }
-            `);
+            const run = new Function('__env', finalCode);
             
             return await run(enhancedEnv);
         };
 
-        // EXECUTE
         return await executeWithAutoAwait(code, baseExecutionEnv);
 
     } catch (error) {
