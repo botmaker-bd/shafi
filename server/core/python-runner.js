@@ -1,4 +1,4 @@
-// server/core/python-runner.js - COMPLETELY FIXED WITH spawn
+// server/core/python-runner.js - OPTIMIZED AND FIXED
 const { spawn, spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -20,7 +20,7 @@ class PythonRunner {
         try {
             await this.checkPython();
             this.initialized = true;
-            console.log('✅ Python runner initialized successfully');
+            console.log('✅ Python runner initialized');
         } catch (error) {
             console.error('❌ Python runner initialization failed:', error);
         }
@@ -54,17 +54,12 @@ class PythonRunner {
         });
     }
 
-    // ✅ SYNC VERSION - Fix for "pythonRunner.runPythonCodeSync is not a function"
+    // ✅ FIXED: SYNC VERSION (for command-executor.js)
     runPythonCodeSync(code) {
         try {
-            console.log('🐍 Running Python code synchronously');
+            console.log('🐍 Running Python code synchronously:', code.substring(0, 100) + '...');
             
-            // Check if it's a simple expression
-            if (this.isSimpleExpression(code)) {
-                return this.runSimpleExpressionSync(code);
-            }
-            
-            // For multi-line code
+            // Use async version with synchronous execution
             return this.runPythonFileSync(code);
             
         } catch (error) {
@@ -73,178 +68,170 @@ class PythonRunner {
         }
     }
 
-    // ✅ ASYNC VERSION
+    // ✅ FIXED: ASYNC VERSION (for api-wrapper.js)
     async runPythonCode(code) {
-        return new Promise((resolve, reject) => {
-            console.log('🐍 Running Python code asynchronously');
+        try {
+            console.log('🐍 Running Python code asynchronously:', code.substring(0, 100) + '...');
             
-            const tempFile = path.join(this.tempDir, `script_${Date.now()}.py`);
+            const tempFile = path.join(this.tempDir, `script_${Date.now()}_${Math.random().toString(36).substring(2, 9)}.py`);
             
-            // Create Python template
+            // ✅ FIXED: IMPROVED PYTHON TEMPLATE
             const pythonTemplate = `# Python Code Execution
 import sys
 import json
+import io
+import contextlib
 
 def main():
     try:
-${this.indentCode(code, 8)}
-        return {"success": True, "output": "Code executed successfully"}
+        # Capture print output
+        output_capture = io.StringIO()
+        with contextlib.redirect_stdout(output_capture):
+            # User code
+${this.indentCode(code, 12)}
+        
+        # Get captured output
+        printed_output = output_capture.getvalue().strip()
+        
+        # Return success with captured output
+        return {
+            "success": True, 
+            "output": printed_output if printed_output else "Code executed successfully"
+        }
     except Exception as e:
-        return {"success": False, "error": str(e), "type": type(e).__name__}
+        return {
+            "success": False, 
+            "error": str(e), 
+            "type": type(e).__name__,
+            "traceback": str(e.__traceback__) if hasattr(e, '__traceback__') else None
+        }
 
 if __name__ == "__main__":
     result = main()
-    print(json.dumps(result))`;
+    print(json.dumps(result, ensure_ascii=False))`;
 
             // Write to temp file
-            fs.writeFileSync(tempFile, pythonTemplate);
-            console.log(`📄 Created temp Python file: ${tempFile}`);
-
+            fs.writeFileSync(tempFile, pythonTemplate, 'utf8');
+            
             const pythonCommand = process.env.PYTHON_PATH || 'python3';
             
             // Use spawn for async execution
             const pythonProcess = spawn(pythonCommand, [tempFile], {
                 cwd: this.tempDir,
                 stdio: ['pipe', 'pipe', 'pipe'],
-                timeout: 30000
+                timeout: 30000,
+                shell: false
             });
 
-            let stdoutData = '';
-            let stderrData = '';
+            return new Promise((resolve, reject) => {
+                let stdoutData = '';
+                let stderrData = '';
 
-            pythonProcess.stdout.on('data', (data) => {
-                stdoutData += data.toString();
-            });
+                pythonProcess.stdout.on('data', (data) => {
+                    stdoutData += data.toString();
+                });
 
-            pythonProcess.stderr.on('data', (data) => {
-                stderrData += data.toString();
-            });
+                pythonProcess.stderr.on('data', (data) => {
+                    stderrData += data.toString();
+                });
 
-            pythonProcess.on('close', (code) => {
-                // Cleanup
-                try {
-                    if (fs.existsSync(tempFile)) {
-                        fs.unlinkSync(tempFile);
-                        console.log(`🧹 Cleaned up temp file: ${tempFile}`);
+                pythonProcess.on('close', (code) => {
+                    // Cleanup
+                    this.cleanupTempFile(tempFile);
+                    
+                    if (code !== 0) {
+                        const errorMsg = stderrData || 'Python execution failed';
+                        console.error(`❌ Python process exited with code ${code}:`, errorMsg);
+                        reject(new Error(`Python Error: ${errorMsg}`));
+                        return;
                     }
-                } catch (cleanupError) {
-                    console.error('❌ Temp file cleanup error:', cleanupError);
-                }
 
-                if (code !== 0) {
-                    console.error(`❌ Python process exited with code ${code}`);
-                    reject(new Error(stderrData || 'Python execution failed'));
-                    return;
-                }
-
-                try {
-                    // Try to parse JSON output
-                    const result = JSON.parse(stdoutData);
-                    if (result.success) {
-                        resolve(result.output || 'Code executed successfully');
-                    } else {
-                        reject(new Error(`Python Error: ${result.error}`));
-                    }
-                } catch (parseError) {
-                    // If not JSON, return raw output
-                    resolve(stdoutData.trim() || 'Code executed (no output)');
-                }
-            });
-
-            pythonProcess.on('error', (err) => {
-                console.error('❌ Python process error:', err);
-                try {
-                    if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
-                } catch (cleanupError) {
-                    console.error('❌ Temp file cleanup error:', cleanupError);
-                }
-                reject(new Error(`Python process failed to start: ${err.message}`));
-            });
-
-            // Handle timeout
-            setTimeout(() => {
-                if (pythonProcess.exitCode === null) {
-                    pythonProcess.kill('SIGTERM');
                     try {
-                        if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
-                    } catch (cleanupError) {
-                        console.error('❌ Temp file cleanup error:', cleanupError);
+                        // Try to parse JSON output
+                        if (stdoutData.trim()) {
+                            const result = JSON.parse(stdoutData);
+                            if (result.success) {
+                                resolve(result.output || 'Code executed successfully');
+                            } else {
+                                reject(new Error(`Python Error: ${result.error}`));
+                            }
+                        } else {
+                            resolve('Code executed (no output)');
+                        }
+                    } catch (parseError) {
+                        // If not JSON, return raw output
+                        console.log('⚠️ Output was not JSON, returning raw:', stdoutData.substring(0, 200));
+                        resolve(stdoutData.trim() || 'Code executed (no output)');
                     }
-                    reject(new Error('Python execution timeout (30 seconds)'));
-                }
-            }, 30000);
+                });
 
-        });
-    }
+                pythonProcess.on('error', (err) => {
+                    this.cleanupTempFile(tempFile);
+                    console.error('❌ Python process error:', err);
+                    reject(new Error(`Python process failed to start: ${err.message}`));
+                });
 
-    // ✅ CHECK IF SIMPLE EXPRESSION
-    isSimpleExpression(code) {
-        const simplePattern = /^[0-9+\-*/().\s]+$/;
-        const trimmed = code.trim();
-        return simplePattern.test(trimmed) && 
-               !trimmed.includes('\n') && 
-               !trimmed.includes('import') && 
-               !trimmed.includes('def ') &&
-               !trimmed.includes('print(');
-    }
+                // Handle timeout
+                const timeout = setTimeout(() => {
+                    if (pythonProcess.exitCode === null) {
+                        pythonProcess.kill('SIGTERM');
+                        this.cleanupTempFile(tempFile);
+                        reject(new Error('Python execution timeout (30 seconds)'));
+                    }
+                }, 30000);
 
-    // ✅ RUN SIMPLE EXPRESSION SYNC
-    runSimpleExpressionSync(expression) {
-        try {
-            console.log('🔧 Running simple expression:', expression);
-            
-            const pythonCommand = process.env.PYTHON_PATH || 'python3';
-            const result = spawnSync(pythonCommand, ['-c', `print(${expression})`], {
-                timeout: 10000,
-                encoding: 'utf-8',
-                stdio: ['pipe', 'pipe', 'pipe']
+                // Clear timeout on completion
+                pythonProcess.on('close', () => clearTimeout(timeout));
             });
-
-            if (result.error) {
-                throw new Error(`Python process error: ${result.error.message}`);
-            }
-
-            if (result.status !== 0) {
-                throw new Error(result.stderr || 'Python execution failed');
-            }
-
-            const output = result.stdout ? result.stdout.trim() : 'No output';
-            console.log('✅ Simple expression result:', output);
-            return output;
 
         } catch (error) {
-            console.error('❌ Simple expression error:', error);
+            console.error('❌ Python execution setup error:', error);
             throw error;
         }
     }
 
-    // ✅ RUN PYTHON FILE SYNC
+    // ✅ FIXED: RUN PYTHON FILE SYNC
     runPythonFileSync(code) {
         try {
             const tempFile = path.join(this.tempDir, `script_sync_${Date.now()}.py`);
             
-            // Python template for sync execution
+            // Same improved template as async version
             const pythonTemplate = `# Python Code Execution
 import sys
 import json
+import io
+import contextlib
 
 def main():
     try:
-${this.indentCode(code, 8)}
-        # If no explicit return, capture print output
-        return {"success": True, "output": "Code executed successfully"}
+        # Capture print output
+        output_capture = io.StringIO()
+        with contextlib.redirect_stdout(output_capture):
+            # User code
+${this.indentCode(code, 12)}
+        
+        # Get captured output
+        printed_output = output_capture.getvalue().strip()
+        
+        # Return success with captured output
+        return {
+            "success": True, 
+            "output": printed_output if printed_output else "Code executed successfully"
+        }
     except Exception as e:
-        return {"success": False, "error": str(e), "type": type(e).__name__}
+        return {
+            "success": False, 
+            "error": str(e), 
+            "type": type(e).__name__,
+            "traceback": str(e.__traceback__) if hasattr(e, '__traceback__') else None
+        }
 
 if __name__ == "__main__":
     result = main()
-    print(json.dumps(result))`;
+    print(json.dumps(result, ensure_ascii=False))`;
 
-            // Write Python file
-            fs.writeFileSync(tempFile, pythonTemplate);
-            console.log('📄 Python sync file created:', tempFile);
+            fs.writeFileSync(tempFile, pythonTemplate, 'utf8');
             
-            // Execute Python
             const pythonCommand = process.env.PYTHON_PATH || 'python3';
             const result = spawnSync(pythonCommand, [tempFile], {
                 timeout: 30000,
@@ -253,28 +240,19 @@ if __name__ == "__main__":
                 stdio: ['pipe', 'pipe', 'pipe']
             });
 
-            // Clean up
-            try {
-                if (fs.existsSync(tempFile)) {
-                    fs.unlinkSync(tempFile);
-                    console.log('🧹 Cleaned up sync temp file');
-                }
-            } catch (cleanupError) {
-                console.error('❌ Temp file cleanup error:', cleanupError);
-            }
+            this.cleanupTempFile(tempFile);
 
-            // Check for errors
             if (result.error) {
                 throw new Error(`Python process error: ${result.error.message}`);
             }
 
             if (result.status !== 0) {
                 const errorMsg = result.stderr || result.stdout || 'Python execution failed';
-                throw new Error(errorMsg.split('\n')[0]);
+                throw new Error(`Python Error: ${errorMsg.split('\n')[0]}`);
             }
 
-            // Try to parse JSON output
             const stdout = result.stdout ? result.stdout.trim() : '';
+            
             if (stdout) {
                 try {
                     const parsed = JSON.parse(stdout);
@@ -284,7 +262,6 @@ if __name__ == "__main__":
                         throw new Error(`Python Error: ${parsed.error}`);
                     }
                 } catch (parseError) {
-                    // Not JSON, return raw output
                     return stdout || 'Code executed (no output)';
                 }
             }
@@ -297,7 +274,18 @@ if __name__ == "__main__":
         }
     }
 
-    // ✅ PROPER INDENTATION HELPER
+    // ✅ NEW: Cleanup helper
+    cleanupTempFile(filePath) {
+        try {
+            if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+            }
+        } catch (cleanupError) {
+            console.error('❌ Temp file cleanup error:', cleanupError.message);
+        }
+    }
+
+    // ✅ FIXED: Better indentation
     indentCode(code, spaces = 4) {
         const lines = code.split('\n');
         const indentedLines = lines.map(line => {
@@ -305,11 +293,6 @@ if __name__ == "__main__":
             return ' '.repeat(spaces) + line;
         });
         return indentedLines.join('\n');
-    }
-
-    // ✅ COMPATIBILITY METHOD (alias)
-    async runPythonCodeAsync(code) {
-        return await this.runPythonCode(code);
     }
 
     // ✅ INSTALL PYTHON LIBRARY
@@ -339,11 +322,10 @@ if __name__ == "__main__":
             pipProcess.on('close', (code) => {
                 if (code === 0) {
                     console.log(`✅ Successfully installed ${libraryName}`);
-                    // Save to database in background
                     this.saveInstalledLibrary(libraryName).catch(console.error);
                     resolve({ 
+                        success: true,
                         library: libraryName, 
-                        installed: true,
                         output: stdoutData 
                     });
                 } else {
@@ -388,8 +370,6 @@ if __name__ == "__main__":
                     },
                     updated_at: new Date().toISOString()
                 }, { onConflict: 'data_type,data_key' });
-                
-                console.log(`💾 Saved library info: ${libraryName}`);
             }
         } catch (error) {
             console.error('❌ Save library error:', error);
@@ -442,11 +422,10 @@ if __name__ == "__main__":
             pipProcess.on('close', (code) => {
                 if (code === 0) {
                     console.log(`✅ Successfully uninstalled ${libraryName}`);
-                    // Update database in background
                     this.removeInstalledLibrary(libraryName).catch(console.error);
                     resolve({ 
+                        success: true,
                         library: libraryName, 
-                        uninstalled: true,
                         output: stdoutData 
                     });
                 } else {
@@ -485,8 +464,6 @@ if __name__ == "__main__":
                         },
                         updated_at: new Date().toISOString()
                     }, { onConflict: 'data_type,data_key' });
-                    
-                    console.log(`🗑️ Removed library from DB: ${libraryName}`);
                 } catch (e) {
                     console.error('❌ Parse error removing library:', e);
                 }
