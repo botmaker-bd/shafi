@@ -122,7 +122,7 @@ router.post('/add', async (req, res) => {
             }
         }
 
-        // Save to database
+        // Save to database - WITHOUT bot_id field
         const { data: botData, error: dbError } = await supabase
             .from('bots')
             .insert([{
@@ -131,8 +131,8 @@ router.post('/add', async (req, res) => {
                 username: botInfo.username,
                 user_id: userId,
                 webhook_url: webhookUrl,
-                is_active: true,
-                bot_id: botInfo.id.toString()
+                is_active: true
+                // ❌ bot_id: botInfo.id.toString() - REMOVED
             }])
             .select('*')
             .single();
