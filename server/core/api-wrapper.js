@@ -3,27 +3,29 @@ class ApiWrapper {
     constructor(bot, context) {
         this.bot = bot;
         this.context = context;
-        this.setupAllMethods();
-        this.setupMetadataMethods();
+        this.setupAllMethods();        // Official Telegram methods
+        this.setupPythonMethods();     // Python integration
+        this.setupEnhancedMethods();   // Enhanced utilities
+        this.setupMetadataMethods();   // Metadata methods
     }
 
     setupAllMethods() {
-        // COMPLETE Telegram Bot API Methods
-        const allMethods = [
-            // === MESSAGE METHODS ===
+        // 🔥 OFFICIAL TELEGRAM BOT API METHODS
+        const officialMethods = [
+            // MESSAGES
             'sendMessage', 'forwardMessage', 'copyMessage', 'sendPhoto', 
             'sendAudio', 'sendDocument', 'sendVideo', 'sendAnimation',
             'sendVoice', 'sendVideoNote', 'sendMediaGroup', 'sendLocation',
             'sendVenue', 'sendContact', 'sendPoll', 'sendDice', 'sendChatAction',
 
-            // === MESSAGE EDITING ===
+            // EDITING
             'editMessageText', 'editMessageCaption', 'editMessageMedia',
             'editMessageReplyMarkup', 'editMessageLiveLocation', 'stopMessageLiveLocation',
 
-            // === MESSAGE MANAGEMENT ===
+            // MESSAGE MANAGEMENT
             'deleteMessage', 'deleteMessages',
 
-            // === CHAT METHODS ===
+            // CHAT
             'getChat', 'getChatAdministrators', 'getChatMemberCount',
             'getChatMember', 'setChatTitle', 'setChatDescription',
             'setChatPhoto', 'deleteChatPhoto', 'setChatPermissions',
@@ -34,187 +36,224 @@ class ApiWrapper {
             'banChatSenderChat', 'unbanChatSenderChat', 'setChatStickerSet',
             'deleteChatStickerSet',
 
-            // === CHAT MANAGEMENT ===
+            // CHAT MANAGEMENT
             'getChatMenuButton', 'setChatMenuButton',
             'leaveChat', 'pinChatMessage', 'unpinChatMessage', 'unpinAllChatMessages',
 
-            // === STICKER METHODS ===
+            // STICKERS
             'sendSticker', 'getStickerSet', 'getCustomEmojiStickers',
             'uploadStickerFile', 'createNewStickerSet', 'addStickerToSet',
             'setStickerPositionInSet', 'deleteStickerFromSet', 'setStickerSetThumbnail',
-            'setStickerSetThumb', 'setStickerEmojiList', 'setStickerKeywords',
-            'setStickerMaskPosition', 'setStickerSetTitle',
+            'setStickerEmojiList', 'setStickerKeywords', 'setStickerMaskPosition',
+            'setStickerSetTitle',
 
-            // === FORUM & TOPIC METHODS ===
+            // FORUM & TOPICS
             'createForumTopic', 'editForumTopic', 'closeForumTopic',
             'reopenForumTopic', 'deleteForumTopic', 'unpinAllForumTopicMessages',
             'getForumTopicIconStickers', 'editGeneralForumTopic', 'closeGeneralForumTopic',
             'reopenGeneralForumTopic', 'hideGeneralForumTopic', 'unhideGeneralForumTopic',
 
-            // === INLINE & CALLBACK ===
+            // INLINE & CALLBACK
             'answerInlineQuery', 'answerWebAppQuery', 'answerCallbackQuery',
             'answerPreCheckoutQuery', 'answerShippingQuery',
 
-            // === PAYMENT METHODS ===
+            // PAYMENTS
             'sendInvoice', 'createInvoiceLink', 'refundStarPayment',
 
-            // === BOT MANAGEMENT ===
+            // BOT MANAGEMENT
             'getMe', 'logOut', 'close', 'getMyCommands', 'setMyCommands',
             'deleteMyCommands', 'getMyDescription', 'setMyDescription',
             'getMyShortDescription', 'setMyShortDescription', 'getMyName',
             'setMyName', 'getMyDefaultAdministratorRights', 'setMyDefaultAdministratorRights',
 
-            // === GAME METHODS ===
+            // GAMES
             'sendGame', 'setGameScore', 'getGameHighScores',
 
-            // === FILE METHODS ===
-            'getFile', 'downloadFile'
+            // FILES
+            'getFile'
         ];
 
-        // Bind all methods to this instance with FIXED chatId handling
-        allMethods.forEach(method => {
+        // Bind methods
+        officialMethods.forEach(method => {
             if (this.bot[method]) {
                 this[method] = async (...args) => {
                     try {
-                        // ✅ FIXED: Smart chatId handling
                         let finalArgs = [...args];
                         
                         if (this.needsChatId(method)) {
-                            // If first arg is NOT a number (chatId), then auto-add current chatId
                             if (finalArgs.length === 0 || typeof finalArgs[0] !== 'number') {
                                 finalArgs.unshift(this.context.chatId);
                             }
-                            // If first arg IS a number (chatId), use it directly
                         }
                         
-                        const result = await this.bot[method](...finalArgs);
-                        console.log(`✅ API ${method} executed successfully`);
-                        return result;
+                        return await this.bot[method](...finalArgs);
                     } catch (error) {
-                        console.error(`❌ API ${method} failed:`, error.message);
-                        throw new Error(`Telegram API Error (${method}): ${error.message}`);
+                        console.error(`❌ ${method} failed:`, error.message);
+                        throw error;
                     }
                 };
-            } else {
-                console.warn(`⚠️ Method ${method} not available in bot instance`);
             }
         });
-
-        // Enhanced utility methods
-        this.setupEnhancedMethods();
     }
 
-    // ✅ FIXED: METADATA METHODS SETUP
+    setupPythonMethods() {
+        const pythonRunner = require('./python-runner');
+        
+        this.runPython = async (code) => {
+            try {
+                return await pythonRunner.runPythonCode(code);
+            } catch (error) {
+                console.error('❌ Python execution failed:', error.message);
+                throw error;
+            }
+        };
+        
+        this.installPython = async (library) => {
+            try {
+                return await pythonRunner.installPythonLibrary(library);
+            } catch (error) {
+                console.error('❌ Python install failed:', error.message);
+                throw error;
+            }
+        };
+        
+        this.uninstallPython = async (library) => {
+            try {
+                return await pythonRunner.uninstallPythonLibrary(library);
+            } catch (error) {
+                console.error('❌ Python uninstall failed:', error.message);
+                throw error;
+            }
+        };
+    }
+
+    setupEnhancedMethods() {
+        // ✅ Essential utilities
+        this.wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+        this.sleep = this.wait;
+        
+        // ✅ ask/waitForAnswer - FIXED: Use context's ask function
+        this.ask = (question, options = {}) => {
+            // Check if ask function is provided in context
+            if (this.context.ask && typeof this.context.ask === 'function') {
+                return this.context.ask(question, options);
+            }
+            // Fallback to sendMessage
+            return this.sendMessage(this.context.chatId, question, {
+                parse_mode: 'HTML',
+                ...options
+            });
+        };
+        this.waitForAnswer = this.ask;
+        
+        // ✅ send/reply shortcuts
+        this.send = (text, options = {}) => {
+            return this.sendMessage(this.context.chatId, text, {
+                parse_mode: 'HTML',
+                ...options
+            });
+        };
+        
+        this.reply = (text, options = {}) => {
+            return this.sendMessage(this.context.chatId, text, {
+                reply_to_message_id: this.context.msg?.message_id,
+                parse_mode: 'HTML',
+                ...options
+            });
+        };
+        
+        // ✅ getUser - GLOBAL FUNCTION (not Bot.getUser)
+        this.getUser = () => {
+            const msg = this.context.msg || {};
+            const from = msg.from || {};
+            
+            return {
+                id: from.id || this.context.userId,
+                username: from.username || this.context.username,
+                first_name: from.first_name || this.context.first_name,
+                last_name: from.last_name || this.context.last_name,
+                language_code: from.language_code || this.context.language_code,
+                chat_id: msg.chat?.id || this.context.chatId,
+                is_bot: from.is_bot || false
+            };
+        };
+    }
+
     setupMetadataMethods() {
-        // Add metadata methods to ApiWrapper
-        this.setupMetadataShortcuts();
+        // 🔍 Metadata aliases
+        this.getInfo = async (target = 'chat') => await this.fetchMetadata(target);
+        this.inspect = async (target = 'chat') => await this.fetchMetadata(target);
+        this.details = async (target = 'chat') => await this.fetchMetadata(target);
+        this.meta = async (target = 'chat') => await this.fetchMetadata(target);
     }
 
-    setupMetadataShortcuts() {
-        // 🔍 METADATA INSPECTION METHODS - ORIGINAL RESPONSE ONLY
-        this.metaData = async (target = 'all') => {
-            return await this.getOriginalResponse(target);
-        };
-
-        this.metadata = async (target = 'all') => {
-            return await this.getOriginalResponse(target);
-        };
-
-        this.getMeta = async (target = 'all') => {
-            return await this.getOriginalResponse(target);
-        };
-
-        this.inspect = async (target = 'all') => {
-            return await this.getOriginalResponse(target);
-        };
-    }
-
-    // 🎯 GET ORIGINAL RESPONSE ONLY (JSON FORMAT)
-    async getOriginalResponse(target = 'all') {
+    async fetchMetadata(target = 'chat') {
         try {
-            let originalResponse;
+            let data;
 
             switch (target.toLowerCase()) {
                 case 'chat':
                 case 'channel':
                 case 'group':
-                    originalResponse = await this.bot.getChat(this.context.chatId);
+                    data = await this.bot.getChat(this.context.chatId);
                     break;
 
                 case 'user':
-                case 'userinfo':
-                    // For current user in context
-                    if (this.context.msg?.from) {
-                        originalResponse = this.context.msg.from;
-                    } else {
-                        // Try to get user info from chat member data
-                        originalResponse = await this.bot.getChatMember(this.context.chatId, this.context.userId);
-                    }
+                case 'me':
+                    data = this.context.msg?.from || 
+                           await this.bot.getChatMember(this.context.chatId, this.context.userId);
                     break;
 
                 case 'bot':
-                case 'botinfo':
-                    originalResponse = await this.bot.getMe();
+                    data = await this.bot.getMe();
                     break;
 
-                case 'update':
-                case 'context':
-                    originalResponse = this.context.msg || this.context;
+                case 'message':
+                case 'msg':
+                    data = this.context.msg || this.context;
                     break;
 
                 case 'all':
-                case 'everything':
-                    const [chat, user, bot, update] = await Promise.all([
+                case 'full':
+                    const [chat, user, bot, message] = await Promise.all([
                         this.bot.getChat(this.context.chatId).catch(() => null),
-                        this.bot.getChatMember(this.context.chatId, this.context.userId).catch(() => this.context.msg?.from),
+                        this.bot.getChatMember(this.context.chatId, this.context.userId)
+                            .catch(() => this.context.msg?.from || null),
                         this.bot.getMe().catch(() => null),
                         this.context.msg || this.context
                     ]);
-                    originalResponse = { chat, user, bot, update };
+                    data = { chat, user, bot, message };
                     break;
 
                 default:
-                    // If target is a specific ID
-                    if (typeof target === 'number' || target.startsWith('@')) {
-                        if (typeof target === 'number') {
-                            if (target > 0) {
-                                // Positive number - user ID
-                                originalResponse = await this.bot.getChatMember(this.context.chatId, target);
-                            } else {
-                                // Negative number - chat ID
-                                originalResponse = await this.bot.getChat(target);
-                            }
-                        } else {
-                            // Username
-                            originalResponse = { username: target.substring(1), note: 'Username resolution not implemented' };
-                        }
+                    if (typeof target === 'number') {
+                        data = target > 0 
+                            ? await this.bot.getChatMember(this.context.chatId, target)
+                            : await this.bot.getChat(target);
                     } else {
-                        originalResponse = await this.bot.getChat(this.context.chatId);
+                        data = await this.bot.getChat(this.context.chatId);
                     }
             }
 
-            // Return original response in JSON format
             return {
                 success: true,
-                type: 'original_response',
-                target: target,
-                data: originalResponse,
-                timestamp: new Date().toISOString()
+                data: data,
+                timestamp: new Date().toISOString(),
+                source: target
             };
 
         } catch (error) {
-            console.error('❌ Metadata inspection error:', error);
+            console.error('❌ Metadata fetch error:', error);
             return {
                 success: false,
-                type: 'original_response',
-                target: target,
                 error: error.message,
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                source: target
             };
         }
     }
 
-    // ✅ FIXED: needsChatId method
+    // ✅ KEEP: needsChatId
     needsChatId(method) {
         const chatIdMethods = [
             'sendMessage', 'sendPhoto', 'sendDocument', 'sendVideo', 'sendAudio',
@@ -229,155 +268,6 @@ class ApiWrapper {
             'reopenForumTopic', 'deleteForumTopic', 'sendSticker'
         ];
         return chatIdMethods.includes(method);
-    }
-
-    setupEnhancedMethods() {
-        // User information
-        this.getUser = () => ({
-            id: this.context.userId,
-            username: this.context.username,
-            first_name: this.context.first_name,
-            last_name: this.context.last_name,
-            language_code: this.context.language_code,
-            chat_id: this.context.chatId,
-            is_bot: false
-        });
-
-        // Enhanced send methods
-        this.send = (text, options = {}) => {
-            return this.sendMessage(this.context.chatId, text, {
-                parse_mode: 'HTML',
-                ...options
-            });
-        };
-
-        this.reply = (text, options = {}) => {
-            return this.sendMessage(this.context.chatId, text, {
-                reply_to_message_id: this.context.msg?.message_id,
-                parse_mode: 'HTML',
-                ...options
-            });
-        };
-
-        // Keyboard helpers
-        this.sendKeyboard = (text, buttons, options = {}) => {
-            return this.sendMessage(this.context.chatId, text, {
-                reply_markup: { inline_keyboard: buttons },
-                parse_mode: 'HTML',
-                ...options
-            });
-        };
-
-        this.sendReplyKeyboard = (text, buttons, options = {}) => {
-            return this.sendMessage(this.context.chatId, text, {
-                reply_markup: {
-                    keyboard: buttons,
-                    resize_keyboard: true,
-                    one_time_keyboard: options.one_time || false
-                },
-                parse_mode: 'HTML',
-                ...options
-            });
-        };
-
-        this.removeKeyboard = (text, options = {}) => {
-            return this.sendMessage(this.context.chatId, text, {
-                reply_markup: { remove_keyboard: true },
-                parse_mode: 'HTML',
-                ...options
-            });
-        };
-
-        // Media helpers
-        this.sendImage = (photo, caption = '', options = {}) => {
-            return this.sendPhoto(this.context.chatId, photo, {
-                caption: caption,
-                parse_mode: 'HTML',
-                ...options
-            });
-        };
-
-        this.sendFile = (document, caption = '', options = {}) => {
-            return this.sendDocument(this.context.chatId, document, {
-                caption: caption,
-                parse_mode: 'HTML',
-                ...options
-            });
-        };
-
-        this.sendVideoFile = (video, caption = '', options = {}) => {
-            return this.sendVideo(this.context.chatId, video, {
-                caption: caption,
-                parse_mode: 'HTML',
-                ...options
-            });
-        };
-
-        // Bulk operations
-        this.sendBulkMessages = async (messages, delay = 1000) => {
-            const results = [];
-            for (const message of messages) {
-                try {
-                    const result = await this.sendMessage(this.context.chatId, message);
-                    results.push({ success: true, result });
-                    await this.wait(delay);
-                } catch (error) {
-                    results.push({ success: false, error: error.message });
-                }
-            }
-            return results;
-        };
-
-        // Python integration
-        this.runPython = async (code) => {
-            const pythonRunner = require('./python-runner');
-            return await pythonRunner.runPythonCode(code);
-        };
-
-        this.installPython = async (library) => {
-            const pythonRunner = require('./python-runner');
-            return await pythonRunner.installPythonLibrary(library);
-        };
-
-        this.uninstallPython = async (library) => {
-            const pythonRunner = require('./python-runner');
-            return await pythonRunner.uninstallPythonLibrary(library);
-        };
-
-        // Utility methods
-        this.wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-        // ✅ NEW: Simple ask method without waiting
-        this.ask = (question, options = {}) => {
-            return this.sendMessage(this.context.chatId, question, {
-                parse_mode: 'HTML',
-                ...options
-            });
-        };
-
-        // File download helper
-        this.downloadFile = async (fileId, downloadPath = null) => {
-            const file = await this.getFile(fileId);
-            const fileUrl = `https://api.telegram.org/file/bot${this.context.botToken}/${file.file_path}`;
-            
-            if (downloadPath) {
-                const fs = require('fs');
-                const axios = require('axios');
-                const response = await axios({
-                    method: 'GET',
-                    url: fileUrl,
-                    responseType: 'stream'
-                });
-                
-                response.data.pipe(fs.createWriteStream(downloadPath));
-                return new Promise((resolve, reject) => {
-                    response.data.on('end', () => resolve(downloadPath));
-                    response.data.on('error', reject);
-                });
-            }
-            
-            return fileUrl;
-        };
     }
 }
 
