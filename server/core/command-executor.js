@@ -238,30 +238,31 @@ async function executeCommandCode(botInstance, code, context) {
                   to: "await __autoAwait.BotGeneric('$2', " }
             ];
 
-            const enhancedEnv = { 
-                ...env, 
-                __autoAwait 
-            };
-            
             let processedCode = userCode;
-
             rules.forEach(rule => { 
                 processedCode = processedCode.replace(rule.r, rule.to); 
             });
 
-            // ✅ FIXED: Use enhancedEnv directly instead of with(env)
+            // ✅ FIX: Wrap in async IIFE
             const finalCode = `
-                try {
-                    const env = __env;
-                    ${processedCode}
-                } catch (error) {
-                    throw error;
-                }
+                return (async () => {
+                    try {
+                        const env = __env;
+                        ${processedCode}
+                    } catch (error) {
+                        throw error;
+                    }
+                })();
             `;
 
-            const run = new Function('__env', finalCode);
-            
-            return await run(enhancedEnv);
+            try {
+                const run = new Function('__env', finalCode);
+                const enhancedEnv = { ...env, __autoAwait };
+                return await run(enhancedEnv);
+            } catch (error) {
+                console.error('❌ Code execution error:', error);
+                throw error;
+            }
         };
 
         return await executeWithAutoAwait(code, baseExecutionEnv);
