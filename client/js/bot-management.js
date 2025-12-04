@@ -185,16 +185,13 @@ class BotManager {
                     <div class="bot-info">
                         <h4>${this.escapeHtml(bot.name)}</h4>
                         <p class="bot-username">@${this.escapeHtml(bot.username || 'unknown')}</p>
-        <div class="bot-details">
-            <span class="bot-status ${bot.is_active ? 'active' : 'inactive'}">
-                <i class="fas fa-circle"></i>
-                ${bot.is_active ? 'Active' : 'Inactive'}
-            </span>
-            <span class="webhook-status ${bot.webhook_url ? 'connected' : 'disconnected'}">
-                <i class="fas fa-${bot.webhook_url ? 'link' : 'unlink'}"></i>
-                ${bot.webhook_url ? 'Webhook Set' : 'Polling'}
-            </span>
-        </div>
+                        <div class="bot-details">
+                            <span class="bot-status ${bot.is_active ? 'active' : 'inactive'}">
+                                <i class="fas fa-circle"></i>
+                                ${bot.is_active ? 'Active' : 'Inactive'}
+                            </span>
+                            <span class="webhook-status">${webhookStatus}</span>
+                        </div>
                         <p class="bot-token">
                             <small>Token: ${this.maskToken(bot.token)}</small>
                         </p>
@@ -230,61 +227,52 @@ class BotManager {
         document.getElementById('webhookStatus').textContent = webhookStatus;
     }
 
-    // client/js/bot-management.js - addNewBot ফাংশনে
-async addNewBot() {
-    const tokenInput = document.getElementById('botToken');
-    const nameInput = document.getElementById('botName');
-    
-    const token = tokenInput.value.trim();
-    const name = nameInput.value.trim();
-
-    if (!token) {
-        this.showError('Please enter bot token');
-        return;
-    }
-
-    this.showLoading(true);
-
-    try {
-        const userToken = localStorage.getItem('token');
+    async addNewBot() {
+        const tokenInput = document.getElementById('botToken');
+        const nameInput = document.getElementById('botName');
         
-        // ✅ FIX: Remove userId from request body, it will come from JWT
-        const response = await fetch('/api/bots/add', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${userToken}`
-            },
-            body: JSON.stringify({
-                token,
-                name
-                // userId is now extracted from JWT token
-            })
-        });
+        const token = tokenInput.value.trim();
+        const name = nameInput.value.trim();
 
-        const data = await response.json();
-
-        if (response.ok) {
-            this.showSuccess('Bot added successfully!');
-            tokenInput.value = '';
-            nameInput.value = '';
-            this.toggleAddBotSection(false);
-            await this.loadBots();
-            
-            // Show webhook info if available
-            if (data.webhookUrl) {
-                this.showNotification(`Webhook set: ${data.webhookUrl}`, 'success');
-            }
-        } else {
-            this.showError(data.error || 'Failed to add bot');
+        if (!token) {
+            this.showError('Please enter bot token');
+            return;
         }
-    } catch (error) {
-        console.error('❌ Add bot error:', error);
-        this.showError('Network error while adding bot');
-    } finally {
-        this.showLoading(false);
+
+        this.showLoading(true);
+
+        try {
+            const userToken = localStorage.getItem('token');
+            const response = await fetch('/api/bots/add', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${userToken}`
+                },
+                body: JSON.stringify({
+                    token,
+                    name,
+                    userId: this.user.id
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                this.showSuccess('Bot added successfully!');
+                tokenInput.value = '';
+                nameInput.value = '';
+                this.toggleAddBotSection(false);
+                await this.loadBots();
+            } else {
+                this.showError(data.error || 'Failed to add bot');
+            }
+        } catch (error) {
+            this.showError('Network error while adding bot');
+        } finally {
+            this.showLoading(false);
+        }
     }
-}
 
     async testBotToken() {
         const tokenInput = document.getElementById('botToken');
