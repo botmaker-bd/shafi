@@ -1,31 +1,29 @@
-// server/core/api-wrapper.js - COMPLETELY FIXED VERSION
+// server/core/api-wrapper.js - UPDATED AND OPTIMIZED VERSION
 class ApiWrapper {
     constructor(bot, context) {
         this.bot = bot;
         this.context = context;
-        this.setupAllMethods();        // Official Telegram methods
-        this.setupPythonMethods();     // Python integration
-        this.setupEnhancedMethods();   // Enhanced utilities
-        this.setupMetadataMethods();   // Metadata methods
+        this.setupAllMethods();
+        this.setupMetadataMethods();
     }
 
     setupAllMethods() {
-        // 🔥 OFFICIAL TELEGRAM BOT API METHODS
+        // 🔥 KEEP ONLY OFFICIAL Telegram Bot API Methods
         const officialMethods = [
-            // MESSAGES
+            // === MESSAGE METHODS (Official) ===
             'sendMessage', 'forwardMessage', 'copyMessage', 'sendPhoto', 
             'sendAudio', 'sendDocument', 'sendVideo', 'sendAnimation',
             'sendVoice', 'sendVideoNote', 'sendMediaGroup', 'sendLocation',
             'sendVenue', 'sendContact', 'sendPoll', 'sendDice', 'sendChatAction',
 
-            // EDITING
+            // === MESSAGE EDITING (Official) ===
             'editMessageText', 'editMessageCaption', 'editMessageMedia',
             'editMessageReplyMarkup', 'editMessageLiveLocation', 'stopMessageLiveLocation',
 
-            // MESSAGE MANAGEMENT
+            // === MESSAGE MANAGEMENT (Official) ===
             'deleteMessage', 'deleteMessages',
 
-            // CHAT
+            // === CHAT METHODS (Official) ===
             'getChat', 'getChatAdministrators', 'getChatMemberCount',
             'getChatMember', 'setChatTitle', 'setChatDescription',
             'setChatPhoto', 'deleteChatPhoto', 'setChatPermissions',
@@ -36,44 +34,44 @@ class ApiWrapper {
             'banChatSenderChat', 'unbanChatSenderChat', 'setChatStickerSet',
             'deleteChatStickerSet',
 
-            // CHAT MANAGEMENT
+            // === CHAT MANAGEMENT (Official) ===
             'getChatMenuButton', 'setChatMenuButton',
             'leaveChat', 'pinChatMessage', 'unpinChatMessage', 'unpinAllChatMessages',
 
-            // STICKERS
+            // === STICKER METHODS (Official) ===
             'sendSticker', 'getStickerSet', 'getCustomEmojiStickers',
             'uploadStickerFile', 'createNewStickerSet', 'addStickerToSet',
             'setStickerPositionInSet', 'deleteStickerFromSet', 'setStickerSetThumbnail',
             'setStickerEmojiList', 'setStickerKeywords', 'setStickerMaskPosition',
             'setStickerSetTitle',
 
-            // FORUM & TOPICS
+            // === FORUM & TOPIC METHODS (Official) ===
             'createForumTopic', 'editForumTopic', 'closeForumTopic',
             'reopenForumTopic', 'deleteForumTopic', 'unpinAllForumTopicMessages',
             'getForumTopicIconStickers', 'editGeneralForumTopic', 'closeGeneralForumTopic',
             'reopenGeneralForumTopic', 'hideGeneralForumTopic', 'unhideGeneralForumTopic',
 
-            // INLINE & CALLBACK
+            // === INLINE & CALLBACK (Official) ===
             'answerInlineQuery', 'answerWebAppQuery', 'answerCallbackQuery',
             'answerPreCheckoutQuery', 'answerShippingQuery',
 
-            // PAYMENTS
+            // === PAYMENT METHODS (Official) ===
             'sendInvoice', 'createInvoiceLink', 'refundStarPayment',
 
-            // BOT MANAGEMENT
+            // === BOT MANAGEMENT (Official) ===
             'getMe', 'logOut', 'close', 'getMyCommands', 'setMyCommands',
             'deleteMyCommands', 'getMyDescription', 'setMyDescription',
             'getMyShortDescription', 'setMyShortDescription', 'getMyName',
             'setMyName', 'getMyDefaultAdministratorRights', 'setMyDefaultAdministratorRights',
 
-            // GAMES
+            // === GAME METHODS (Official) ===
             'sendGame', 'setGameScore', 'getGameHighScores',
 
-            // FILES
+            // === FILE METHODS (Official) ===
             'getFile'
         ];
 
-        // Bind methods
+        // Bind only official methods
         officialMethods.forEach(method => {
             if (this.bot[method]) {
                 this[method] = async (...args) => {
@@ -86,107 +84,72 @@ class ApiWrapper {
                             }
                         }
                         
-                        return await this.bot[method](...finalArgs);
+                        const result = await this.bot[method](...finalArgs);
+                        console.log(`✅ API ${method} executed`);
+                        return result;
                     } catch (error) {
-                        console.error(`❌ ${method} failed:`, error.message);
-                        throw error;
+                        console.error(`❌ API ${method} failed:`, error.message);
+                        throw new Error(`Telegram API Error (${method}): ${error.message}`);
                     }
                 };
+            } else {
+                console.warn(`⚠️ Method ${method} not available`);
             }
         });
+
+        // ✅ Keep Python integration methods (exists in command-executor)
+        this.setupPythonMethods();
     }
 
     setupPythonMethods() {
         const pythonRunner = require('./python-runner');
         
+        // ✅ Keep runPython (exists in command-executor)
         this.runPython = async (code) => {
             try {
-                return await pythonRunner.runPythonCode(code);
+                const result = await pythonRunner.runPythonCode(code);
+                console.log('✅ Python code executed');
+                return result;
             } catch (error) {
                 console.error('❌ Python execution failed:', error.message);
-                throw error;
+                throw new Error(`Python Error: ${error.message}`);
             }
         };
         
+        // ✅ Keep installPython (optional, but useful)
         this.installPython = async (library) => {
             try {
-                return await pythonRunner.installPythonLibrary(library);
+                const result = await pythonRunner.installPythonLibrary(library);
+                console.log(`✅ Python library installed: ${library}`);
+                return result;
             } catch (error) {
                 console.error('❌ Python install failed:', error.message);
-                throw error;
+                throw new Error(`Install Error: ${error.message}`);
             }
         };
         
+        // ✅ Keep uninstallPython (optional)
         this.uninstallPython = async (library) => {
             try {
-                return await pythonRunner.uninstallPythonLibrary(library);
+                const result = await pythonRunner.uninstallPythonLibrary(library);
+                console.log(`✅ Python library removed: ${library}`);
+                return result;
             } catch (error) {
                 console.error('❌ Python uninstall failed:', error.message);
-                throw error;
+                throw new Error(`Uninstall Error: ${error.message}`);
             }
-        };
-    }
-
-    setupEnhancedMethods() {
-        // ✅ Essential utilities
-        this.wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-        this.sleep = this.wait;
-        
-        // ✅ ask/waitForAnswer - FIXED: Use context's ask function
-        this.ask = (question, options = {}) => {
-            // Check if ask function is provided in context
-            if (this.context.ask && typeof this.context.ask === 'function') {
-                return this.context.ask(question, options);
-            }
-            // Fallback to sendMessage
-            return this.sendMessage(this.context.chatId, question, {
-                parse_mode: 'HTML',
-                ...options
-            });
-        };
-        this.waitForAnswer = this.ask;
-        
-        // ✅ send/reply shortcuts
-        this.send = (text, options = {}) => {
-            return this.sendMessage(this.context.chatId, text, {
-                parse_mode: 'HTML',
-                ...options
-            });
-        };
-        
-        this.reply = (text, options = {}) => {
-            return this.sendMessage(this.context.chatId, text, {
-                reply_to_message_id: this.context.msg?.message_id,
-                parse_mode: 'HTML',
-                ...options
-            });
-        };
-        
-        // ✅ getUser - GLOBAL FUNCTION (not Bot.getUser)
-        this.getUser = () => {
-            const msg = this.context.msg || {};
-            const from = msg.from || {};
-            
-            return {
-                id: from.id || this.context.userId,
-                username: from.username || this.context.username,
-                first_name: from.first_name || this.context.first_name,
-                last_name: from.last_name || this.context.last_name,
-                language_code: from.language_code || this.context.language_code,
-                chat_id: msg.chat?.id || this.context.chatId,
-                is_bot: from.is_bot || false
-            };
         };
     }
 
     setupMetadataMethods() {
-        // 🔍 Metadata aliases
+        // 🔍 METADATA METHODS - BETTER NAMES
         this.getInfo = async (target = 'chat') => await this.fetchMetadata(target);
         this.inspect = async (target = 'chat') => await this.fetchMetadata(target);
         this.details = async (target = 'chat') => await this.fetchMetadata(target);
         this.meta = async (target = 'chat') => await this.fetchMetadata(target);
     }
 
+    // 🎯 IMPROVED METADATA FETCHING
     async fetchMetadata(target = 'chat') {
         try {
             let data;
@@ -200,8 +163,11 @@ class ApiWrapper {
 
                 case 'user':
                 case 'me':
-                    data = this.context.msg?.from || 
-                           await this.bot.getChatMember(this.context.chatId, this.context.userId);
+                    if (this.context.msg?.from) {
+                        data = this.context.msg.from;
+                    } else {
+                        data = await this.bot.getChatMember(this.context.chatId, this.context.userId);
+                    }
                     break;
 
                 case 'bot':
@@ -226,10 +192,15 @@ class ApiWrapper {
                     break;
 
                 default:
+                    // Handle numeric IDs or usernames
                     if (typeof target === 'number') {
-                        data = target > 0 
-                            ? await this.bot.getChatMember(this.context.chatId, target)
-                            : await this.bot.getChat(target);
+                        if (target > 0) {
+                            data = await this.bot.getChatMember(this.context.chatId, target);
+                        } else {
+                            data = await this.bot.getChat(target);
+                        }
+                    } else if (typeof target === 'string' && target.startsWith('@')) {
+                        data = { username: target.substring(1), type: 'username' };
                     } else {
                         data = await this.bot.getChat(this.context.chatId);
                     }
@@ -253,7 +224,7 @@ class ApiWrapper {
         }
     }
 
-    // ✅ KEEP: needsChatId
+    // ✅ KEEP: needsChatId method (required)
     needsChatId(method) {
         const chatIdMethods = [
             'sendMessage', 'sendPhoto', 'sendDocument', 'sendVideo', 'sendAudio',
@@ -268,6 +239,59 @@ class ApiWrapper {
             'reopenForumTopic', 'deleteForumTopic', 'sendSticker'
         ];
         return chatIdMethods.includes(method);
+    }
+
+    // ✅ KEEP: getUser method (exists in command-executor)
+    getUser() {
+        const msg = this.context.msg || {};
+        const from = msg.from || {};
+        
+        return {
+            id: from.id || this.context.userId,
+            username: from.username || this.context.username,
+            first_name: from.first_name || this.context.first_name,
+            last_name: from.last_name || this.context.last_name,
+            language_code: from.language_code || this.context.language_code,
+            chat_id: msg.chat?.id || this.context.chatId,
+            is_bot: from.is_bot || false
+        };
+    }
+
+    // ✅ KEEP: Essential utility methods (exist in command-executor)
+    setupEnhancedMethods() {
+        // ✅ send - alias for sendMessage with chatId auto-filled
+        this.send = (text, options = {}) => {
+            return this.sendMessage(this.context.chatId, text, {
+                parse_mode: 'HTML',
+                ...options
+            });
+        };
+
+        // ✅ reply - send with reply_to_message_id
+        this.reply = (text, options = {}) => {
+            return this.sendMessage(this.context.chatId, text, {
+                reply_to_message_id: this.context.msg?.message_id,
+                parse_mode: 'HTML',
+                ...options
+            });
+        };
+
+        // ✅ wait - utility for delays (exists in command-executor)
+        this.wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+        
+        // ✅ sleep - alias for wait
+        this.sleep = this.wait;
+        
+        // ✅ ask - for interactive questions (must match command-executor)
+        this.ask = (question, options = {}) => {
+            return this.sendMessage(this.context.chatId, question, {
+                parse_mode: 'HTML',
+                ...options
+            });
+        };
+        
+        // ✅ waitForAnswer - alias for ask
+        this.waitForAnswer = this.ask;
     }
 }
 
