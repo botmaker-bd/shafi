@@ -1,3 +1,4 @@
+// server/core/command-executor.js - COMPLETELY FIXED
 const ApiWrapper = require('./api-wrapper');
 const supabase = require('../config/supabase');
 const pythonRunner = require('./python-runner');
@@ -144,8 +145,10 @@ async function executeCommandCode(botInstance, code, context) {
 
         const dynamicBotCaller = async (methodName, ...args) => {
             if (typeof botInstance[methodName] !== 'function') {
-                throw new Error(`Method '${methodName}' missing in API`);
+                console.warn(`⚠️ Method '${methodName}' not available in bot instance`);
+                throw new Error(`Method '${methodName}' not available`);
             }
+            
             const noChatIdMethods = ['getMe', 'getWebhookInfo', 'deleteWebhook', 'setWebhook', 'answerCallbackQuery', 'answerInlineQuery', 'stopPoll', 'downloadFile', 'logOut', 'close'];
 
             if (!noChatIdMethods.includes(methodName)) {
@@ -161,7 +164,13 @@ async function executeCommandCode(botInstance, code, context) {
                 }
                 if (shouldInject) args.unshift(chatId);
             }
-            return await botInstance[methodName](...args);
+            
+            try {
+                return await botInstance[methodName](...args);
+            } catch (error) {
+                console.error(`❌ Bot API error (${methodName}):`, error.message);
+                throw new Error(`Bot API Error (${methodName}): ${error.message}`);
+            }
         };
 
         // --- 6. ENVIRONMENT SETUP ---
@@ -192,13 +201,81 @@ async function executeCommandCode(botInstance, code, context) {
             currentUser: msg.from || { id: userId, first_name: 'User' },
             wait: (sec) => new Promise(r => setTimeout(r, sec * 1000)),
             sleep: (sec) => new Promise(r => setTimeout(r, sec * 1000)),
-            runPython: (c) => pythonRunner.runPythonCodeSync(c),
+            runPython: (code) => {
+                try {
+                    // ✅ FIXED: Python execution with proper error handling
+                    return pythonRunner.runPythonCodeSync(code);
+                } catch (pythonError) {
+                    // ✅ Telegram-safe error message
+                    let errorMsg = pythonError.message || 'Python execution failed';
+                    
+                    // Escape Markdown characters for Telegram
+                    errorMsg = errorMsg
+                        .replace(/\*/g, '\\*')
+                        .replace(/_/g, '\\_')
+                        .replace(/`/g, '\\`')
+                        .replace(/\[/g, '\\[')
+                        .replace(/\]/g, '\\]')
+                        .replace(/\(/g, '\\(')
+                        .replace(/\)/g, '\\)')
+                        .replace(/~/g, '\\~')
+                        .replace(/>/g, '\\>')
+                        .replace(/#/g, '\\#')
+                        .replace(/\+/g, '\\+')
+                        .replace(/-/g, '\\-')
+                        .replace(/=/g, '\\=')
+                        .replace(/\|/g, '\\|')
+                        .replace(/\{/g, '\\{')
+                        .replace(/\}/g, '\\}')
+                        .replace(/\./g, '\\.')
+                        .replace(/!/g, '\\!');
+                    
+                    throw new Error(`Python Error: ${errorMsg}`);
+                }
+            },
             ask: waitForAnswerLogic,
             waitForAnswer: waitForAnswerLogic
         };
 
-        // --- 7. AUTO-AWAIT ENGINE ---
+        // --- 7. FIXED AUTO-AWAIT ENGINE ---
         const executeWithAutoAwait = async (userCode, env) => {
+            // ✅ FIXED: Safe function creation without 'with' statement
+            const createExecutionFunction = (codeToExecute, executionEnv) => {
+                // Extract all keys from the environment
+                const envKeys = Object.keys(executionEnv);
+                const envValues = envKeys.map(key => executionEnv[key]);
+                
+                // Create parameter string for the function
+                const paramString = envKeys.join(', ');
+                
+                // Create the function with explicit parameters
+                const func = new Function(
+                    paramString,
+                    `
+                    return (async function() {
+                        try {
+                            ${codeToExecute}
+                        } catch (error) {
+                            // ✅ Telegram-safe error messages
+                            let errorMsg = error.message || 'Unknown error';
+                            
+                            // Escape Markdown characters
+                            const markdownChars = ['*', '_', '\`', '[', ']', '(', ')', '~', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'];
+                            for (const char of markdownChars) {
+                                errorMsg = errorMsg.split(char).join('\\\\' + char);
+                            }
+                            
+                            throw new Error(errorMsg);
+                        }
+                    })();
+                    `
+                );
+                
+                // Execute the function with all environment values
+                return func(...envValues);
+            };
+
+            // ✅ FIXED: Auto-await rules
             const __autoAwait = {
                 UserSave: async (k, v) => await env.User.saveData(k, v),
                 UserGet: async (k) => await env.User.getData(k),
@@ -209,72 +286,123 @@ async function executeCommandCode(botInstance, code, context) {
                 Ask: async (q, o) => await env.ask(q, o),
                 Wait: async (s) => await env.wait(s),
                 Python: async (c) => {  
-                    const result = await pythonRunner.runPythonCode(c);
-                    return result;
+                    try {
+                        const result = await pythonRunner.runPythonCode(c);
+                        return result;
+                    } catch (error) {
+                        // Telegram-safe error message
+                        let errorMsg = error.message || 'Python execution failed';
+                        errorMsg = errorMsg.replace(/\*/g, '\\*').replace(/_/g, '\\_').replace(/`/g, '\\`');
+                        throw new Error(`Python Error: ${errorMsg}`);
+                    }
                 },
                 BotGeneric: async (method, ...args) => {
                     return await dynamicBotCaller(method, ...args);
                 }
             };
 
-            const rules = [
-                { r: /User\s*\.\s*saveData\s*\(([^)]+)\)/g,   to: 'await __autoAwait.UserSave($1)' },
-                { r: /User\s*\.\s*getData\s*\(([^)]+)\)/g,    to: 'await __autoAwait.UserGet($1)' },
-                { r: /User\s*\.\s*deleteData\s*\(([^)]+)\)/g, to: 'await __autoAwait.UserDel($1)' },
-                { r: /(Bot|bot)\s*\.\s*saveData\s*\(([^)]+)\)/g,   to: 'await __autoAwait.BotDataSave($2)' },
-                { r: /(Bot|bot)\s*\.\s*getData\s*\(([^)]+)\)/g,    to: 'await __autoAwait.BotDataGet($2)' },
-                { r: /(Bot|bot)\s*\.\s*deleteData\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotDataDel($2)' },
-                { r: /(ask|waitForAnswer)\s*\(([^)]+)\)/g, to: 'await __autoAwait.Ask($2)' },
-                { r: /(wait|sleep)\s*\(([^)]+)\)/g, to: 'await __autoAwait.Wait($2)' },
-                { r: /runPython\s*\(([^)]+)\)/g, to: 'await __autoAwait.Python($1)' },
-                { r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer)([a-zA-Z0-9_]+)\s*\(\s*\)/g, 
-                  to: "await __autoAwait.BotGeneric('$2')" },
-                { r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer)([a-zA-Z0-9_]+)\s*\(/g, 
-                  to: "await __autoAwait.BotGeneric('$2', " }
-            ];
+            // ✅ FIXED: Enhanced environment
+            const enhancedEnv = { 
+                ...env, 
+                __autoAwait,
+                // Add auto-await helpers directly
+                $saveData: __autoAwait.UserSave,
+                $getData: __autoAwait.UserGet,
+                $deleteData: __autoAwait.UserDel,
+                $botSave: __autoAwait.BotDataSave,
+                $botGet: __autoAwait.BotDataGet,
+                $botDelete: __autoAwait.BotDataDel,
+                $ask: __autoAwait.Ask,
+                $wait: __autoAwait.Wait,
+                $python: __autoAwait.Python,
+                $botCall: __autoAwait.BotGeneric
+            };
 
-            const enhancedEnv = { ...env, __autoAwait };
+            // ✅ FIXED: Process code with auto-await
             let processedCode = userCode;
-
-            rules.forEach(rule => { 
-                processedCode = processedCode.replace(rule.r, rule.to); 
+            
+            // Convert async calls to use auto-await helpers
+            processedCode = processedCode.replace(/User\.saveData\s*\(/g, '$saveData(');
+            processedCode = processedCode.replace(/User\.getData\s*\(/g, '$getData(');
+            processedCode = processedCode.replace(/User\.deleteData\s*\(/g, '$deleteData(');
+            processedCode = processedCode.replace(/Bot\.saveData\s*\(/g, '$botSave(');
+            processedCode = processedCode.replace(/Bot\.getData\s*\(/g, '$botGet(');
+            processedCode = processedCode.replace(/Bot\.deleteData\s*\(/g, '$botDelete(');
+            processedCode = processedCode.replace(/bot\.saveData\s*\(/g, '$botSave(');
+            processedCode = processedCode.replace(/bot\.getData\s*\(/g, '$botGet(');
+            processedCode = processedCode.replace(/bot\.deleteData\s*\(/g, '$botDelete(');
+            processedCode = processedCode.replace(/ask\s*\(/g, '$ask(');
+            processedCode = processedCode.replace(/waitForAnswer\s*\(/g, '$ask(');
+            processedCode = processedCode.replace(/wait\s*\(/g, '$wait(');
+            processedCode = processedCode.replace(/sleep\s*\(/g, '$wait(');
+            processedCode = processedCode.replace(/runPython\s*\(/g, '$python(');
+            
+            // Handle bot method calls
+            processedCode = processedCode.replace(/(Bot|bot|Api|api)\.(\w+)\s*\(/g, (match, prefix, method) => {
+                if (['saveData', 'getData', 'deleteData', 'ask', 'waitForAnswer'].includes(method)) {
+                    return match; // Already handled
+                }
+                return `$botCall('${method}', `;
             });
 
-            const finalCode = `
-                try {
-                    ${processedCode}
-                } catch (error) {
-                    throw error;
-                }
-            `;
+            // ✅ FIXED: Add return statement if missing
+            const trimmedCode = processedCode.trim();
+            if (!trimmedCode.includes('return ') && !trimmedCode.includes('Bot.send') && !trimmedCode.includes('bot.send') && 
+                !trimmedCode.includes('Api.send') && !trimmedCode.includes('api.send')) {
+                processedCode += '\nreturn "Command executed successfully";';
+            }
 
-            const run = new Function('env', `
-                with(env) {
-                    return (async function() {
-                        ${finalCode}
-                    })();
-                }
-            `);
-            
-            return await run(enhancedEnv);
+            // ✅ FIXED: Execute the code
+            try {
+                const result = await createExecutionFunction(processedCode, enhancedEnv);
+                return result;
+            } catch (executionError) {
+                console.error('❌ Code execution error:', executionError);
+                throw executionError;
+            }
         };
 
-        // EXECUTE
-        return await executeWithAutoAwait(code, baseExecutionEnv);
+        // ✅ EXECUTE
+        const result = await executeWithAutoAwait(code, baseExecutionEnv);
+        return result;
 
     } catch (error) {
         console.error('💥 Execution Error:', error);
         
+        // ✅ FIXED: Better error handling
+        let errorMessage = error.message || 'Unknown execution error';
+        
+        // Handle AggregateError
         if (error.name === 'AggregateError') {
-            console.error('🔍 Aggregate Errors:', error.errors);
-            throw new Error(`Connection Error: ${error.errors[0]?.message || 'Check Network/Supabase'}`);
+            errorMessage = `Connection Error: ${error.errors[0]?.message || 'Check Network/Supabase'}`;
         }
-
-        throw error;
+        
+        // ✅ FIXED: Telegram-safe error message
+        const markdownChars = ['*', '_', '`', '[', ']', '(', ')', '~', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'];
+        for (const char of markdownChars) {
+            errorMessage = errorMessage.split(char).join('\\' + char);
+        }
+        
+        // Shorten very long error messages
+        if (errorMessage.length > 500) {
+            errorMessage = errorMessage.substring(0, 500) + '... [truncated]';
+        }
+        
+        // Log the original error for debugging
+        console.error('🔍 Original error details:', {
+            name: error.name,
+            message: error.message,
+            stack: error.stack?.split('\n').slice(0, 3).join('\n')
+        });
+        
+        throw new Error(errorMessage);
+        
     } finally {
         try {
             await supabase.from('active_sessions').delete().eq('session_id', sessionKey);
-        } catch (e) { /* ignore cleanup error */ }
+        } catch (e) { 
+            console.warn("⚠️ Session cleanup failed:", e.message);
+        }
     }
 }
 
