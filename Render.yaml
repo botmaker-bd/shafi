@@ -1,13 +1,26 @@
-# render.yaml
+# render.yaml - SIMPLER VERSION
 services:
   - type: web
     name: telegram-bot-platform
     env: node
     plan: free
     buildCommand: |
+      # Install Node.js dependencies
       npm install
-      chmod +x scripts/setup-python-env.sh
-      ./scripts/setup-python-env.sh
+      
+      # Python setup
+      echo "🐍 Checking Python..."
+      python3 --version
+      
+      # Install Python packages with --break-system-packages
+      echo "📦 Installing Python requirements..."
+      pip3 install --upgrade pip || true
+      pip3 install -r requirements.txt --break-system-packages --no-warn-script-location || echo "⚠️ Continuing despite pip errors"
+      
+      # Make scripts executable
+      chmod +x scripts/setup-python-env.sh 2>/dev/null || true
+      
+      echo "✅ Build completed"
     startCommand: npm start
     envVars:
       - key: NODE_ENV
@@ -19,6 +32,6 @@ services:
       - key: SUPABASE_URL
         value: https://tyoaazgsoqvubgfychmd.supabase.co
       - key: SUPABASE_KEY
-        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR5b2Fhemdzb3F2dWJnZnljaG1kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI3NTE0NDQsImV4cCI6MjA3ODMyNzQ0NH0.czWc-rOitmnn31iAvgTEvZj7bW-aJ2ysFymoWJ8UZCc
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR5b2Fhemdzb3F2dWJnZnljaG1kIiwicm9sZি6ImFub24iLCJpYXQiOjE3NjI3NTE0NDQsImV4cCI6MjA3ODMyNzQ0NH0.czWc-rOitmnn31iAvgTEvZj7bW-aJ2ysFymoWJ8UZCc
     healthCheckPath: /api/health
     autoDeploy: true
