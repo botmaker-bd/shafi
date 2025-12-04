@@ -1,4 +1,4 @@
-// server/core/python-runner.js - FIXED VERSION
+// server/core/python-runner.js - UPDATED VERSION
 const { spawn, spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -13,6 +13,8 @@ class PythonRunner {
         this.initialized = false;
         this.pythonPath = null;
         this.pipPath = null;
+        this.installedModules = new Set();
+        this.requirementsFile = path.join(__dirname, '../../requirements.txt');
         this.initialize();
     }
 
@@ -21,7 +23,10 @@ class PythonRunner {
         
         try {
             await this.checkPython();
-            await this.ensureRequirements();
+            await this.checkPip();
+            await this.checkRequirements();
+            await this.installRequirements();
+            
             this.initialized = true;
             console.log('✅ Python runner initialized successfully');
         } catch (error) {
@@ -32,241 +37,304 @@ class PythonRunner {
     async checkPython() {
         return new Promise((resolve, reject) => {
             try {
-                const result = spawnSync('python3', ['--version'], { 
+                // Try python3 first
+                let pythonCommand = 'python3';
+                let result = spawnSync(pythonCommand, ['--version'], { 
                     encoding: 'utf-8',
                     timeout: 5000 
                 });
+                
                 if (result.status === 0) {
-                    this.pythonPath = 'python3';
-                    this.pipPath = 'pip3';
+                    this.pythonPath = pythonCommand;
                     console.log('🐍 Python3 found:', result.stdout.trim());
                     resolve();
-                } else {
-                    const result2 = spawnSync('python', ['--version'], { 
-                        encoding: 'utf-8',
-                        timeout: 5000 
-                    });
-                    if (result2.status === 0) {
-                        this.pythonPath = 'python';
-                        this.pipPath = 'pip';
-                        console.log('🐍 Python found:', result2.stdout.trim());
-                        resolve();
-                    } else {
-                        reject(new Error('Python is not installed or not in PATH'));
-                    }
+                    return;
                 }
+                
+                // Try python
+                pythonCommand = 'python';
+                result = spawnSync(pythonCommand, ['--version'], { 
+                    encoding: 'utf-8',
+                    timeout: 5000 
+                });
+                
+                if (result.status === 0) {
+                    this.pythonPath = pythonCommand;
+                    console.log('🐍 Python found:', result.stdout.trim());
+                    resolve();
+                    return;
+                }
+                
+                // Check environment variable
+                if (process.env.PYTHON_PATH) {
+                    this.pythonPath = process.env.PYTHON_PATH;
+                    console.log('🐍 Python from env:', process.env.PYTHON_PATH);
+                    resolve();
+                    return;
+                }
+                
+                reject(new Error('Python is not installed or not in PATH'));
             } catch (error) {
                 reject(new Error('Python check failed: ' + error.message));
             }
         });
     }
 
-    // ✅ NEW: Ensure requirements are installed
-    async ensureRequirements() {
-        console.log('📦 Ensuring Python requirements are installed...');
-        
-        // Check if we're in a virtual environment
-        const isInVenv = await this.checkVirtualEnv();
-        
-        if (!isInVenv) {
-            console.log('⚠️ Not in virtual environment, installing globally...');
-        }
-        
-        const requirements = [
-            'requests==2.31.0',
-            'telethon==1.28.5', 
-            'pandas==2.1.1',
-            'numpy==1.24.3',
-            'beautifulsoup4==4.12.2',
-            'Pillow==10.0.1',
-            'python-dotenv==1.0.0',
-            'aiohttp==3.8.5'
-        ];
-        
-        for (const req of requirements) {
-            const [moduleName, version] = req.split('==');
-            await this.ensureModule(moduleName, version);
-        }
-    }
-
-    // ✅ NEW: Check if module exists, install if not
-    async ensureModule(moduleName, version) {
+    async checkPip() {
         return new Promise((resolve, reject) => {
-            console.log(`🔍 Checking module: ${moduleName}`);
-            
-            const checkCode = `
-try:
-    import ${moduleName}
-    print("INSTALLED")
-except ImportError:
-    print("NOT_INSTALLED")
-`;
-            
-            const checkProcess = spawn(this.pythonPath, ['-c', checkCode], {
-                encoding: 'utf-8',
-                timeout: 10000
-            });
-
-            let output = '';
-            checkProcess.stdout.on('data', (data) => {
-                output += data.toString();
-            });
-
-            checkProcess.on('close', (code) => {
-                if (output.includes('NOT_INSTALLED')) {
-                    console.log(`📦 Installing ${moduleName}...`);
-                    this.installModule(moduleName, version)
-                        .then(resolve)
-                        .catch(reject);
-                } else {
-                    console.log(`✅ ${moduleName} already installed`);
+            try {
+                // Try pip3 first
+                let pipCommand = 'pip3';
+                let result = spawnSync(pipCommand, ['--version'], {
+                    encoding: 'utf-8',
+                    timeout: 5000
+                });
+                
+                if (result.status === 0) {
+                    this.pipPath = pipCommand;
+                    console.log('📦 Pip3 found');
                     resolve();
+                    return;
                 }
-            });
-
-            checkProcess.on('error', (err) => {
-                console.error(`❌ Module check error for ${moduleName}:`, err);
-                reject(err);
-            });
+                
+                // Try pip
+                pipCommand = 'pip';
+                result = spawnSync(pipCommand, ['--version'], {
+                    encoding: 'utf-8',
+                    timeout: 5000
+                });
+                
+                if (result.status === 0) {
+                    this.pipPath = pipCommand;
+                    console.log('📦 Pip found');
+                    resolve();
+                    return;
+                }
+                
+                // Check python -m pip
+                result = spawnSync(this.pythonPath, ['-m', 'pip', '--version'], {
+                    encoding: 'utf-8',
+                    timeout: 5000
+                });
+                
+                if (result.status === 0) {
+                    this.pipPath = this.pythonPath + ' -m pip';
+                    console.log('📦 Pip via python -m pip');
+                    resolve();
+                    return;
+                }
+                
+                reject(new Error('Pip is not installed'));
+            } catch (error) {
+                reject(new Error('Pip check failed: ' + error.message));
+            }
         });
     }
 
-    // ✅ NEW: Install module with retry logic
-    async installModule(moduleName, version = '') {
+    async checkRequirements() {
         return new Promise((resolve, reject) => {
-            const installCmd = version ? `${moduleName}==${version}` : moduleName;
+            try {
+                if (!fs.existsSync(this.requirementsFile)) {
+                    console.log('📄 Creating requirements.txt file...');
+                    const defaultRequirements = `telethon==1.28.5
+pandas==2.1.1
+numpy==1.24.3
+requests==2.31.0
+beautifulsoup4==4.12.2
+Pillow==10.0.1
+python-dotenv==1.0.0
+aiohttp==3.8.5`;
+                    
+                    fs.writeFileSync(this.requirementsFile, defaultRequirements);
+                    console.log('✅ Created requirements.txt');
+                }
+                
+                const requirements = fs.readFileSync(this.requirementsFile, 'utf8');
+                console.log('📄 Requirements file found:', requirements.split('\n').length, 'modules');
+                resolve(requirements);
+            } catch (error) {
+                reject(new Error('Requirements check failed: ' + error.message));
+            }
+        });
+    }
+
+    async installRequirements() {
+        return new Promise((resolve, reject) => {
+            console.log('📦 Installing Python requirements...');
             
-            console.log(`🚀 Installing: ${installCmd}`);
+            let installProcess;
             
-            const pipProcess = spawn(this.pipPath, [
-                'install', 
-                installCmd,
-                '--quiet',
-                '--disable-pip-version-check'
-            ], {
-                encoding: 'utf-8',
-                timeout: 300000 // 5 minutes
-            });
+            if (this.pipPath.includes(' -m ')) {
+                // python -m pip install -r requirements.txt
+                const parts = this.pipPath.split(' ');
+                installProcess = spawn(parts[0], ['-m', 'pip', 'install', '-r', this.requirementsFile], {
+                    cwd: path.dirname(this.requirementsFile),
+                    stdio: ['pipe', 'pipe', 'pipe'],
+                    timeout: 300000 // 5 minutes
+                });
+            } else {
+                // pip install -r requirements.txt
+                installProcess = spawn(this.pipPath, ['install', '-r', this.requirementsFile], {
+                    cwd: path.dirname(this.requirementsFile),
+                    stdio: ['pipe', 'pipe', 'pipe'],
+                    timeout: 300000
+                });
+            }
 
             let stdoutData = '';
             let stderrData = '';
 
-            pipProcess.stdout.on('data', (data) => {
-                stdoutData += data.toString();
+            installProcess.stdout.on('data', (data) => {
+                const output = data.toString();
+                stdoutData += output;
+                console.log('📦 Pip output:', output.trim());
             });
 
-            pipProcess.stderr.on('data', (data) => {
-                stderrData += data.toString();
+            installProcess.stderr.on('data', (data) => {
+                const output = data.toString();
+                stderrData += output;
+                console.log('⚠️ Pip stderr:', output.trim());
             });
 
-            pipProcess.on('close', (code) => {
+            installProcess.on('close', (code) => {
                 if (code === 0) {
-                    console.log(`✅ Successfully installed ${moduleName}`);
-                    resolve({ 
-                        module: moduleName, 
-                        version: version,
-                        installed: true 
-                    });
+                    console.log('✅ Python requirements installed successfully');
+                    this.loadInstalledModules();
+                    resolve();
                 } else {
-                    // Try without version
-                    if (version) {
-                        console.log(`🔄 Retrying without version specifier...`);
-                        this.installModule(moduleName)
-                            .then(resolve)
-                            .catch(reject);
-                    } else {
-                        console.error(`❌ Failed to install ${moduleName}:`, stderrData);
-                        reject(new Error(`Failed to install ${moduleName}: ${stderrData}`));
-                    }
+                    console.error('❌ Requirements installation failed:', stderrData);
+                    reject(new Error(`Pip install failed: ${stderrData || 'Unknown error'}`));
                 }
             });
 
-            pipProcess.on('error', (err) => {
-                console.error(`❌ Install process error for ${moduleName}:`, err);
-                reject(err);
+            installProcess.on('error', (err) => {
+                console.error('❌ Pip process error:', err);
+                reject(new Error(`Pip process failed: ${err.message}`));
             });
+
+            // Timeout handler
+            setTimeout(() => {
+                if (installProcess.exitCode === null) {
+                    installProcess.kill('SIGTERM');
+                    reject(new Error('Requirements installation timeout (5 minutes)'));
+                }
+            }, 300000);
         });
     }
 
-    // ✅ NEW: Check virtual environment
-    async checkVirtualEnv() {
-        return new Promise((resolve) => {
-            const checkProcess = spawn(this.pythonPath, ['-c', 'import sys; print("VIRTUAL_ENV" if hasattr(sys, "real_prefix") or (hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix) else "NO_VENV")'], {
+    async loadInstalledModules() {
+        try {
+            const result = spawnSync(this.pythonPath, ['-c', `
+import pkg_resources
+modules = [d.key for d in pkg_resources.working_set]
+for module in modules:
+    print(module)
+            `], {
                 encoding: 'utf-8',
-                timeout: 5000
+                timeout: 10000
             });
 
-            let output = '';
-            checkProcess.stdout.on('data', (data) => {
-                output += data.toString();
-            });
-
-            checkProcess.on('close', () => {
-                resolve(output.includes('VIRTUAL_ENV'));
-            });
-        });
+            if (result.status === 0 && result.stdout) {
+                const modules = result.stdout.trim().split('\n');
+                modules.forEach(module => {
+                    this.installedModules.add(module.toLowerCase());
+                });
+                console.log(`✅ Loaded ${this.installedModules.size} installed modules`);
+            }
+        } catch (error) {
+            console.error('❌ Failed to load installed modules:', error);
+        }
     }
 
-    // ✅ FIXED: runPythonCode method with better error handling
-    async runPythonCode(code) {
-        await this.initialize(); // Ensure Python is ready
+    async ensureModuleInstalled(moduleName) {
+        // Extract module name (remove version specifiers)
+        const cleanModuleName = moduleName.split('==')[0].split('>')[0].split('<')[0].split('~')[0].trim();
         
+        if (this.installedModules.has(cleanModuleName.toLowerCase())) {
+            return true;
+        }
+
+        console.log(`📦 Module ${cleanModuleName} not found, installing...`);
+        
+        try {
+            await this.installPythonLibrary(cleanModuleName);
+            this.installedModules.add(cleanModuleName.toLowerCase());
+            return true;
+        } catch (error) {
+            console.error(`❌ Failed to install ${cleanModuleName}:`, error.message);
+            return false;
+        }
+    }
+
+    async safeRunPythonCode(code) {
+        // Extract import statements from code
+        const importRegex = /^(?:from\s+([\w\.]+)|import\s+([\w\.]+(?:\s*,\s*\w+)*))/gm;
+        const imports = [];
+        let match;
+        
+        while ((match = importRegex.exec(code)) !== null) {
+            if (match[1]) {
+                imports.push(match[1].split('.')[0]);
+            }
+            if (match[2]) {
+                match[2].split(',').forEach(imp => {
+                    imports.push(imp.trim().split('.')[0]);
+                });
+            }
+        }
+        
+        // Check and install missing modules
+        for (const module of imports) {
+            if (module && module !== 'sys' && module !== 'os' && module !== 'json' && module !== 'math') {
+                await this.ensureModuleInstalled(module);
+            }
+        }
+        
+        // Run the code
+        return await this.runPythonCode(code);
+    }
+
+    // ✅ FIXED: SYNC VERSION
+    runPythonCodeSync(code) {
+        try {
+            console.log('🐍 Running Python code synchronously');
+            
+            // Check if it's a simple expression
+            if (this.isSimpleExpression(code)) {
+                return this.runSimpleExpressionSync(code);
+            }
+            
+            // For multi-line code
+            return this.runPythonFileSync(code);
+            
+        } catch (error) {
+            console.error('❌ runPythonCodeSync error:', error);
+            throw error;
+        }
+    }
+
+    // ✅ FIXED: ASYNC VERSION
+    async runPythonCode(code) {
         return new Promise((resolve, reject) => {
-            console.log('🐍 Running Python code');
+            console.log('🐍 Running Python code asynchronously');
             
             const tempFile = path.join(this.tempDir, `script_${Date.now()}.py`);
             
-            // ✅ IMPROVED: Better Python template with module imports
+            // Create Python template
             const pythonTemplate = `# Python Code Execution
 import sys
 import json
-import traceback
-
-# Try to import common modules
-def safe_import(module_name, import_name=None):
-    try:
-        if import_name:
-            return __import__(import_name)
-        return __import__(module_name)
-    except ImportError:
-        return None
-
-# Available modules check
-modules_available = {}
-common_modules = [
-    'requests', 'telethon', 'pandas', 'numpy', 
-    'bs4', 'PIL', 'dotenv', 'aiohttp'
-]
-
-for mod in common_modules:
-    if mod == 'bs4':
-        modules_available['bs4'] = safe_import('bs4', 'bs4')
-    elif mod == 'PIL':
-        modules_available['PIL'] = safe_import('PIL', 'PIL.Image')
-    else:
-        modules_available[mod] = safe_import(mod)
 
 def main():
     try:
-        # Make modules available in local scope
-        for name, module in modules_available.items():
-            if module:
-                globals()[name] = module
-        
 ${this.indentCode(code, 8)}
-        
         return {"success": True, "output": "Code executed successfully"}
     except Exception as e:
-        return {
-            "success": False, 
-            "error": str(e), 
-            "type": type(e).__name__,
-            "traceback": traceback.format_exc()
-        }
+        return {"success": False, "error": str(e), "type": type(e).__name__}
 
 if __name__ == "__main__":
     result = main()
-    print(json.dumps(result, default=str))`;
+    print(json.dumps(result))`;
 
             // Write to temp file
             fs.writeFileSync(tempFile, pythonTemplate);
@@ -274,6 +342,7 @@ if __name__ == "__main__":
 
             const pythonCommand = this.pythonPath || process.env.PYTHON_PATH || 'python3';
             
+            // Use spawn for async execution
             const pythonProcess = spawn(pythonCommand, [tempFile], {
                 cwd: this.tempDir,
                 stdio: ['pipe', 'pipe', 'pipe'],
@@ -304,8 +373,7 @@ if __name__ == "__main__":
 
                 if (code !== 0) {
                     console.error(`❌ Python process exited with code ${code}`);
-                    console.error(`Stderr: ${stderrData}`);
-                    reject(new Error(`Python execution failed: ${stderrData}`));
+                    reject(new Error(stderrData || 'Python execution failed'));
                     return;
                 }
 
@@ -315,15 +383,10 @@ if __name__ == "__main__":
                     if (result.success) {
                         resolve(result.output || 'Code executed successfully');
                     } else {
-                        const errorMsg = result.error || 'Unknown Python error';
-                        const fullError = result.traceback ? 
-                            `${errorMsg}\n\nTraceback:\n${result.traceback}` : 
-                            errorMsg;
-                        reject(new Error(fullError));
+                        reject(new Error(`Python Error: ${result.error}`));
                     }
                 } catch (parseError) {
                     // If not JSON, return raw output
-                    console.log('⚠️ Raw output (not JSON):', stdoutData);
                     resolve(stdoutData.trim() || 'Code executed (no output)');
                 }
             });
@@ -350,76 +413,91 @@ if __name__ == "__main__":
                     reject(new Error('Python execution timeout (30 seconds)'));
                 }
             }, 30000);
+
         });
     }
 
-    // ✅ FIXED: runPythonCodeSync with module check
-    runPythonCodeSync(code) {
+    // ✅ CHECK IF SIMPLE EXPRESSION
+    isSimpleExpression(code) {
+        const simplePattern = /^[0-9+\-*/().\s]+$/;
+        const trimmed = code.trim();
+        return simplePattern.test(trimmed) && 
+               !trimmed.includes('\n') && 
+               !trimmed.includes('import') && 
+               !trimmed.includes('def ') &&
+               !trimmed.includes('print(');
+    }
+
+    // ✅ RUN SIMPLE EXPRESSION SYNC
+    runSimpleExpressionSync(expression) {
         try {
-            console.log('🐍 Running Python code synchronously');
+            console.log('🔧 Running simple expression:', expression);
             
-            // Check if it's a simple expression
-            if (this.isSimpleExpression(code)) {
-                return this.runSimpleExpressionSync(code);
+            const pythonCommand = this.pythonPath || process.env.PYTHON_PATH || 'python3';
+            const result = spawnSync(pythonCommand, ['-c', `print(${expression})`], {
+                timeout: 10000,
+                encoding: 'utf-8',
+                stdio: ['pipe', 'pipe', 'pipe']
+            });
+
+            if (result.error) {
+                throw new Error(`Python process error: ${result.error.message}`);
             }
-            
-            // For code that needs modules
+
+            if (result.status !== 0) {
+                throw new Error(result.stderr || 'Python execution failed');
+            }
+
+            const output = result.stdout ? result.stdout.trim() : 'No output';
+            console.log('✅ Simple expression result:', output);
+            return output;
+
+        } catch (error) {
+            console.error('❌ Simple expression error:', error);
+            throw error;
+        }
+    }
+
+    // ✅ RUN PYTHON FILE SYNC
+    runPythonFileSync(code) {
+        try {
             const tempFile = path.join(this.tempDir, `script_sync_${Date.now()}.py`);
             
-            // Better template for sync execution
+            // Python template for sync execution
             const pythonTemplate = `# Python Code Execution
 import sys
 import json
-import traceback
-import subprocess
-
-def install_module(module_name):
-    """Install module if not available"""
-    try:
-        __import__(module_name)
-        return True
-    except ImportError:
-        try:
-            subprocess.check_call([sys.executable, '-m', 'pip', 'install', module_name, '--quiet'])
-            return True
-        except:
-            return False
-
-# Common modules to check
-common_modules = ['requests', 'json', 'os', 'sys', 'math', 'datetime']
-for mod in common_modules:
-    install_module(mod)
 
 def main():
     try:
 ${this.indentCode(code, 8)}
+        # If no explicit return, capture print output
         return {"success": True, "output": "Code executed successfully"}
     except Exception as e:
-        return {
-            "success": False, 
-            "error": str(e), 
-            "type": type(e).__name__,
-            "traceback": traceback.format_exc()
-        }
+        return {"success": False, "error": str(e), "type": type(e).__name__}
 
 if __name__ == "__main__":
     result = main()
-    print(json.dumps(result, default=str))`;
+    print(json.dumps(result))`;
 
+            // Write Python file
             fs.writeFileSync(tempFile, pythonTemplate);
             console.log('📄 Python sync file created:', tempFile);
             
+            // Execute Python
             const pythonCommand = this.pythonPath || process.env.PYTHON_PATH || 'python3';
             const result = spawnSync(pythonCommand, [tempFile], {
                 timeout: 30000,
                 encoding: 'utf-8',
-                cwd: this.tempDir
+                cwd: this.tempDir,
+                stdio: ['pipe', 'pipe', 'pipe']
             });
 
             // Clean up
             try {
                 if (fs.existsSync(tempFile)) {
                     fs.unlinkSync(tempFile);
+                    console.log('🧹 Cleaned up sync temp file');
                 }
             } catch (cleanupError) {
                 console.error('❌ Temp file cleanup error:', cleanupError);
@@ -431,12 +509,12 @@ if __name__ == "__main__":
             }
 
             if (result.status !== 0) {
-                const errorMsg = result.stderr?.toString() || result.stdout?.toString() || 'Python execution failed';
-                throw new Error(errorMsg);
+                const errorMsg = result.stderr || result.stdout || 'Python execution failed';
+                throw new Error(errorMsg.split('\n')[0]);
             }
 
-            // Parse output
-            const stdout = result.stdout?.toString().trim() || '';
+            // Try to parse JSON output
+            const stdout = result.stdout ? result.stdout.trim() : '';
             if (stdout) {
                 try {
                     const parsed = JSON.parse(stdout);
@@ -446,6 +524,7 @@ if __name__ == "__main__":
                         throw new Error(`Python Error: ${parsed.error}`);
                     }
                 } catch (parseError) {
+                    // Not JSON, return raw output
                     return stdout || 'Code executed (no output)';
                 }
             }
@@ -458,93 +537,7 @@ if __name__ == "__main__":
         }
     }
 
-    // ✅ NEW: Test Python installation
-    async testPythonInstallation() {
-        const testCode = `
-import sys
-import subprocess
-import json
-
-results = {
-    "python_version": sys.version,
-    "python_path": sys.executable,
-    "modules": {}
-}
-
-# Test basic modules
-basic_modules = ['os', 'sys', 'json', 'math', 'datetime', 'subprocess']
-for mod in basic_modules:
-    try:
-        __import__(mod)
-        results["modules"][mod] = "✅ Available"
-    except ImportError:
-        results["modules"][mod] = "❌ Missing"
-
-# Test required modules
-required_modules = [
-    'requests', 'telethon', 'pandas', 'numpy',
-    'bs4', 'PIL', 'dotenv', 'aiohttp'
-]
-
-for mod in required_modules:
-    try:
-        if mod == 'bs4':
-            __import__('bs4')
-            results["modules"][mod] = "✅ Available"
-        elif mod == 'PIL':
-            __import__('PIL.Image')
-            results["modules"][mod] = "✅ Available"
-        else:
-            __import__(mod)
-            results["modules"][mod] = "✅ Available"
-    except ImportError:
-        results["modules"][mod] = "❌ Missing"
-
-print(json.dumps(results, indent=2))
-`;
-        
-        return await this.runPythonCode(testCode);
-    }
-
-    // Rest of the methods remain the same...
-    isSimpleExpression(code) {
-        const simplePattern = /^[0-9+\-*/().\s]+$/;
-        const trimmed = code.trim();
-        return simplePattern.test(trimmed) && 
-               !trimmed.includes('\n') && 
-               !trimmed.includes('import') && 
-               !trimmed.includes('def ') &&
-               !trimmed.includes('print(');
-    }
-
-    runSimpleExpressionSync(expression) {
-        try {
-            console.log('🔧 Running simple expression:', expression);
-            
-            const pythonCommand = this.pythonPath || process.env.PYTHON_PATH || 'python3';
-            const result = spawnSync(pythonCommand, ['-c', `print(${expression})`], {
-                timeout: 10000,
-                encoding: 'utf-8'
-            });
-
-            if (result.error) {
-                throw new Error(`Python process error: ${result.error.message}`);
-            }
-
-            if (result.status !== 0) {
-                throw new Error(result.stderr?.toString() || 'Python execution failed');
-            }
-
-            const output = result.stdout?.toString().trim() || 'No output';
-            console.log('✅ Simple expression result:', output);
-            return output;
-
-        } catch (error) {
-            console.error('❌ Simple expression error:', error);
-            throw error;
-        }
-    }
-
+    // ✅ PROPER INDENTATION HELPER
     indentCode(code, spaces = 4) {
         const lines = code.split('\n');
         const indentedLines = lines.map(line => {
@@ -554,32 +547,54 @@ print(json.dumps(results, indent=2))
         return indentedLines.join('\n');
     }
 
+    // ✅ COMPATIBILITY METHOD (alias)
+    async runPythonCodeAsync(code) {
+        return await this.runPythonCode(code);
+    }
+
+    // ✅ INSTALL PYTHON LIBRARY (IMPROVED)
     async installPythonLibrary(libraryName) {
         await this.initialize();
         return new Promise((resolve, reject) => {
             console.log(`📦 Installing Python library: ${libraryName}`);
             
-            const pipCommand = this.pipPath || process.env.PIP_PATH || 'pip3';
-            const pipProcess = spawn(pipCommand, ['install', libraryName], {
-                encoding: 'utf-8',
-                timeout: 120000
-            });
+            let installProcess;
+            
+            if (this.pipPath.includes(' -m ')) {
+                const parts = this.pipPath.split(' ');
+                installProcess = spawn(parts[0], ['-m', 'pip', 'install', libraryName], {
+                    encoding: 'utf-8',
+                    stdio: ['pipe', 'pipe', 'pipe'],
+                    timeout: 120000
+                });
+            } else {
+                installProcess = spawn(this.pipPath, ['install', libraryName], {
+                    encoding: 'utf-8',
+                    stdio: ['pipe', 'pipe', 'pipe'],
+                    timeout: 120000
+                });
+            }
 
             let stdoutData = '';
             let stderrData = '';
 
-            pipProcess.stdout.on('data', (data) => {
+            installProcess.stdout.on('data', (data) => {
                 stdoutData += data.toString();
             });
 
-            pipProcess.stderr.on('data', (data) => {
+            installProcess.stderr.on('data', (data) => {
                 stderrData += data.toString();
             });
 
-            pipProcess.on('close', (code) => {
+            installProcess.on('close', (code) => {
                 if (code === 0) {
                     console.log(`✅ Successfully installed ${libraryName}`);
+                    // Save to database in background
                     this.saveInstalledLibrary(libraryName).catch(console.error);
+                    
+                    // Add to installed modules set
+                    this.installedModules.add(libraryName.toLowerCase());
+                    
                     resolve({ 
                         library: libraryName, 
                         installed: true,
@@ -590,12 +605,11 @@ print(json.dumps(results, indent=2))
                 }
             });
 
-            pipProcess.on('error', (err) => {
+            installProcess.on('error', (err) => {
                 reject(new Error(`Pip process failed: ${err.message}`));
             });
         });
     }
-
 
     // ✅ SAVE INSTALLED LIBRARY INFO
     async saveInstalledLibrary(libraryName) {
@@ -661,29 +675,43 @@ print(json.dumps(results, indent=2))
         return new Promise((resolve, reject) => {
             console.log(`🗑️ Uninstalling Python library: ${libraryName}`);
             
-            const pipCommand = process.env.PIP_PATH || 'pip3';
-            const pipProcess = spawn(pipCommand, ['uninstall', libraryName, '-y'], {
-                encoding: 'utf-8',
-                stdio: ['pipe', 'pipe', 'pipe'],
-                timeout: 60000
-            });
+            let uninstallProcess;
+            
+            if (this.pipPath.includes(' -m ')) {
+                const parts = this.pipPath.split(' ');
+                uninstallProcess = spawn(parts[0], ['-m', 'pip', 'uninstall', libraryName, '-y'], {
+                    encoding: 'utf-8',
+                    stdio: ['pipe', 'pipe', 'pipe'],
+                    timeout: 60000
+                });
+            } else {
+                uninstallProcess = spawn(this.pipPath, ['uninstall', libraryName, '-y'], {
+                    encoding: 'utf-8',
+                    stdio: ['pipe', 'pipe', 'pipe'],
+                    timeout: 60000
+                });
+            }
 
             let stdoutData = '';
             let stderrData = '';
 
-            pipProcess.stdout.on('data', (data) => {
+            uninstallProcess.stdout.on('data', (data) => {
                 stdoutData += data.toString();
             });
 
-            pipProcess.stderr.on('data', (data) => {
+            uninstallProcess.stderr.on('data', (data) => {
                 stderrData += data.toString();
             });
 
-            pipProcess.on('close', (code) => {
+            uninstallProcess.on('close', (code) => {
                 if (code === 0) {
                     console.log(`✅ Successfully uninstalled ${libraryName}`);
                     // Update database in background
                     this.removeInstalledLibrary(libraryName).catch(console.error);
+                    
+                    // Remove from installed modules set
+                    this.installedModules.delete(libraryName.toLowerCase());
+                    
                     resolve({ 
                         library: libraryName, 
                         uninstalled: true,
@@ -694,45 +722,63 @@ print(json.dumps(results, indent=2))
                 }
             });
 
-            pipProcess.on('error', (err) => {
+            uninstallProcess.on('error', (err) => {
                 reject(new Error(`Pip process failed: ${err.message}`));
             });
         });
     }
 
-    // ✅ REMOVE LIBRARY FROM DATABASE
-    async removeInstalledLibrary(libraryName) {
+    // ✅ NEW: Check module availability
+    async checkModule(moduleName) {
         try {
-            const { data: currentData } = await supabase
-                .from('universal_data')
-                .select('data_value')
-                .eq('data_type', 'system')
-                .eq('data_key', 'python_libraries')
-                .single();
+            const result = spawnSync(this.pythonPath, ['-c', `
+try:
+    import ${moduleName}
+    print("AVAILABLE")
+except ImportError:
+    print("NOT_AVAILABLE")
+            `], {
+                encoding: 'utf-8',
+                timeout: 10000
+            });
 
-            if (currentData && currentData.data_value) {
-                try {
-                    let libraries = JSON.parse(currentData.data_value);
-                    libraries = libraries.filter(lib => lib !== libraryName);
-                    
-                    await supabase.from('universal_data').upsert({
-                        data_type: 'system',
-                        data_key: 'python_libraries',
-                        data_value: JSON.stringify(libraries),
-                        metadata: { 
-                            last_updated: new Date().toISOString(),
-                            total_libraries: libraries.length
-                        },
-                        updated_at: new Date().toISOString()
-                    }, { onConflict: 'data_type,data_key' });
-                    
-                    console.log(`🗑️ Removed library from DB: ${libraryName}`);
-                } catch (e) {
-                    console.error('❌ Parse error removing library:', e);
-                }
-            }
+            return result.stdout && result.stdout.includes('AVAILABLE');
         } catch (error) {
-            console.error('❌ Remove library error:', error);
+            return false;
+        }
+    }
+
+    // ✅ NEW: Get Python info
+    async getPythonInfo() {
+        try {
+            const versionResult = spawnSync(this.pythonPath, ['--version'], {
+                encoding: 'utf-8',
+                timeout: 5000
+            });
+
+            const modulesResult = spawnSync(this.pythonPath, ['-c', `
+import sys
+import json
+
+info = {
+    "version": sys.version,
+    "path": sys.executable,
+    "platform": sys.platform
+}
+
+print(json.dumps(info))
+            `], {
+                encoding: 'utf-8',
+                timeout: 10000
+            });
+
+            return {
+                python: versionResult.stdout.trim(),
+                info: modulesResult.stdout ? JSON.parse(modulesResult.stdout) : {},
+                installedModules: Array.from(this.installedModules)
+            };
+        } catch (error) {
+            return { error: error.message };
         }
     }
 }
