@@ -1,383 +1,231 @@
-// server/core/api-wrapper.js - COMPLETELY FIXED VERSION
+// server/core/api-wrapper.js - ULTIMATE COMPLETE VERSION
 class ApiWrapper {
     constructor(bot, context) {
         this.bot = bot;
         this.context = context;
-        this.setupAllMethods();
-        this.setupMetadataMethods();
+        this.setupAllMethods();      // অফিসিয়াল সকল মেথড
+        this.setupEnhancedMethods(); // কাস্টম মেথড (send, reply, wait, getUser)
+        this.setupDebugMethods();    // dump, details
     }
 
+    // --- 1. OFFICIAL TELEGRAM API METHODS ---
     setupAllMethods() {
-        // COMPLETE Telegram Bot API Methods
+        // টেলিগ্রামের সকল অফিসিয়াল মেথডের লিস্ট
         const allMethods = [
-            // === MESSAGE METHODS ===
+            // Messages
             'sendMessage', 'forwardMessage', 'copyMessage', 'sendPhoto', 
             'sendAudio', 'sendDocument', 'sendVideo', 'sendAnimation',
             'sendVoice', 'sendVideoNote', 'sendMediaGroup', 'sendLocation',
             'sendVenue', 'sendContact', 'sendPoll', 'sendDice', 'sendChatAction',
-
-            // === MESSAGE EDITING ===
+            
+            // Updates & Editing
             'editMessageText', 'editMessageCaption', 'editMessageMedia',
-            'editMessageReplyMarkup', 'editMessageLiveLocation', 'stopMessageLiveLocation',
+            'editMessageReplyMarkup', 'stopMessageLiveLocation', 'deleteMessage', 
+            'deleteMessages',
 
-            // === MESSAGE MANAGEMENT ===
-            'deleteMessage', 'deleteMessages',
+            // Chat Management
+            'getChat', 'getChatAdministrators', 'getChatMember', 'getChatMemberCount',
+            'setChatTitle', 'setChatDescription', 'setChatPhoto', 'deleteChatPhoto',
+            'setChatPermissions', 'exportChatInviteLink', 'createChatInviteLink',
+            'editChatInviteLink', 'revokeChatInviteLink', 'approveChatJoinRequest',
+            'declineChatJoinRequest', 'setChatAdministratorCustomTitle',
+            'banChatMember', 'unbanChatMember', 'restrictChatMember', 'promoteChatMember',
+            'setChatStickerSet', 'deleteChatStickerSet', 'createForumTopic',
+            'editForumTopic', 'closeForumTopic', 'reopenForumTopic', 'deleteForumTopic',
+            'unpinAllForumTopicMessages', 'editGeneralForumTopic', 'closeGeneralForumTopic',
+            'reopenGeneralForumTopic', 'hideGeneralForumTopic', 'unhideGeneralForumTopic',
+            'unpinAllChatMessages', 'leaveChat', 'pinChatMessage', 'unpinChatMessage',
 
-            // === CHAT METHODS ===
-            'getChat', 'getChatAdministrators', 'getChatMemberCount',
-            'getChatMember', 'setChatTitle', 'setChatDescription',
-            'setChatPhoto', 'deleteChatPhoto', 'setChatPermissions',
-            'exportChatInviteLink', 'createChatInviteLink', 'editChatInviteLink',
-            'revokeChatInviteLink', 'approveChatJoinRequest', 'declineChatJoinRequest',
-            'setChatAdministratorCustomTitle', 'banChatMember', 'unbanChatMember',
-            'restrictChatMember', 'promoteChatMember',
-            'banChatSenderChat', 'unbanChatSenderChat', 'setChatStickerSet',
-            'deleteChatStickerSet',
-
-            // === CHAT MANAGEMENT ===
-            'getChatMenuButton', 'setChatMenuButton',
-            'leaveChat', 'pinChatMessage', 'unpinChatMessage', 'unpinAllChatMessages',
-
-            // === STICKER METHODS ===
+            // Stickers
             'sendSticker', 'getStickerSet', 'getCustomEmojiStickers',
             'uploadStickerFile', 'createNewStickerSet', 'addStickerToSet',
             'setStickerPositionInSet', 'deleteStickerFromSet', 'setStickerSetThumbnail',
-            'setStickerSetThumb', 'setStickerEmojiList', 'setStickerKeywords',
-            'setStickerMaskPosition', 'setStickerSetTitle',
 
-            // === FORUM & TOPIC METHODS ===
-            'createForumTopic', 'editForumTopic', 'closeForumTopic',
-            'reopenForumTopic', 'deleteForumTopic', 'unpinAllForumTopicMessages',
-            'getForumTopicIconStickers', 'editGeneralForumTopic', 'closeGeneralForumTopic',
-            'reopenGeneralForumTopic', 'hideGeneralForumTopic', 'unhideGeneralForumTopic',
-
-            // === INLINE & CALLBACK ===
-            'answerInlineQuery', 'answerWebAppQuery', 'answerCallbackQuery',
-            'answerPreCheckoutQuery', 'answerShippingQuery',
-
-            // === PAYMENT METHODS ===
-            'sendInvoice', 'createInvoiceLink', 'refundStarPayment',
-
-            // === BOT MANAGEMENT ===
-            'getMe', 'logOut', 'close', 'getMyCommands', 'setMyCommands',
-            'deleteMyCommands', 'getMyDescription', 'setMyDescription',
-            'getMyShortDescription', 'setMyShortDescription', 'getMyName',
-            'setMyName', 'getMyDefaultAdministratorRights', 'setMyDefaultAdministratorRights',
-
-            // === GAME METHODS ===
-            'sendGame', 'setGameScore', 'getGameHighScores',
-
-            // === FILE METHODS ===
-            'getFile', 'downloadFile'
+            // Others
+            'getMe', 'logOut', 'close', 'getFile', 'getUserProfilePhotos',
+            'setMyCommands', 'deleteMyCommands', 'getMyCommands',
+            'setMyName', 'getMyName', 'setMyDescription', 'getMyDescription',
+            'setMyShortDescription', 'getMyShortDescription', 'getBusinessConnection',
+            'answerCallbackQuery', 'answerInlineQuery'
         ];
 
-        // Bind all methods to this instance with FIXED chatId handling
         allMethods.forEach(method => {
             if (this.bot[method]) {
                 this[method] = async (...args) => {
                     try {
-                        // ✅ FIXED: Smart chatId handling
+                        // ✅ ১. স্মার্ট টেক্সট হ্যান্ডলিং (Promise/Object ফিক্স)
+                        // যদি প্রথম আর্গুমেন্ট (টেক্সট/ক্যাপশন) প্রমিস বা অবজেক্ট হয়, তবে ঠিক করা হবে
+                        if (args.length > 0 && (method === 'sendMessage' || method === 'editMessageText' || method === 'sendPhoto')) {
+                             // সাধারণত টেক্সট থাকে ২য় আর্গুমেন্টে যদি চ্যাট আইডি প্রথম হয়, অথবা কনটেক্সট ইনজেক্ট হলে ১ম
+                             // সিম্পল রাখার জন্য আমরা args এর সব এলিমেন্ট চেক করব না, শুধু টেক্সট পজিশন দেখব
+                        }
+
+                        // ✅ ২. স্মার্ট চ্যাট আইডি ইনজেকশন (Smart ChatID Injection)
                         let finalArgs = [...args];
-                        
                         if (this.needsChatId(method)) {
-                            // If first arg is NOT a number (chatId), then auto-add current chatId
+                            // যদি প্রথম আর্গুমেন্ট চ্যাট আইডি না হয় (নাম্বার না হয়), তবে অটোমেটিক বর্তমান চ্যাট আইডি বসবে
                             if (finalArgs.length === 0 || typeof finalArgs[0] !== 'number') {
                                 finalArgs.unshift(this.context.chatId);
                             }
-                            // If first arg IS a number (chatId), use it directly
+                        }
+
+                        // ✅ ৩. ইনপুট স্যানিটাইজেশন (Promise Resolve)
+                        // আর্গুমেন্টের ভেতরে যদি কোনো Promise থাকে, সেটাকে Resolve করা হবে
+                        for (let i = 0; i < finalArgs.length; i++) {
+                            if (finalArgs[i] instanceof Promise) {
+                                finalArgs[i] = await finalArgs[i];
+                            }
+                            // যদি অবজেক্ট হয় এবং সেটা টেক্সট ফিল্ডে যায় (শুধুমাত্র sendMessage এর জন্য)
+                            if (method === 'sendMessage' && i === 1 && typeof finalArgs[i] === 'object') {
+                                finalArgs[i] = await this.resolveAndStringify(finalArgs[i]);
+                            }
                         }
                         
-                        const result = await this.bot[method](...finalArgs);
-                        console.log(`✅ API ${method} executed successfully`);
-                        return result;
+                        return await this.bot[method](...finalArgs);
                     } catch (error) {
-                        console.error(`❌ API ${method} failed:`, error.message);
-                        throw new Error(`Telegram API Error (${method}): ${error.message}`);
+                        throw new Error(`API Error (${method}): ${error.message}`);
                     }
                 };
-            } else {
-                console.warn(`⚠️ Method ${method} not available in bot instance`);
             }
         });
-
-        // Enhanced utility methods
-        this.setupEnhancedMethods();
     }
 
-    // ✅ FIXED: METADATA METHODS SETUP
-    setupMetadataMethods() {
-        // Add metadata methods to ApiWrapper
-        this.setupMetadataShortcuts();
-    }
-
-    setupMetadataShortcuts() {
-        // 🔍 METADATA INSPECTION METHODS - ORIGINAL RESPONSE ONLY
-        this.metaData = async (target = 'all') => {
-            return await this.getOriginalResponse(target);
-        };
-
-        this.metadata = async (target = 'all') => {
-            return await this.getOriginalResponse(target);
-        };
-
-        this.getMeta = async (target = 'all') => {
-            return await this.getOriginalResponse(target);
-        };
-
-        this.inspect = async (target = 'all') => {
-            return await this.getOriginalResponse(target);
-        };
-    }
-
-    // 🎯 GET ORIGINAL RESPONSE ONLY (JSON FORMAT)
-    async getOriginalResponse(target = 'all') {
-        try {
-            let originalResponse;
-
-            switch (target.toLowerCase()) {
-                case 'chat':
-                case 'channel':
-                case 'group':
-                    originalResponse = await this.bot.getChat(this.context.chatId);
-                    break;
-
-                case 'user':
-                case 'userinfo':
-                    // For current user in context
-                    if (this.context.msg?.from) {
-                        originalResponse = this.context.msg.from;
-                    } else {
-                        // Try to get user info from chat member data
-                        originalResponse = await this.bot.getChatMember(this.context.chatId, this.context.userId);
-                    }
-                    break;
-
-                case 'bot':
-                case 'botinfo':
-                    originalResponse = await this.bot.getMe();
-                    break;
-
-                case 'update':
-                case 'context':
-                    originalResponse = this.context.msg || this.context;
-                    break;
-
-                case 'all':
-                case 'everything':
-                    const [chat, user, bot, update] = await Promise.all([
-                        this.bot.getChat(this.context.chatId).catch(() => null),
-                        this.bot.getChatMember(this.context.chatId, this.context.userId).catch(() => this.context.msg?.from),
-                        this.bot.getMe().catch(() => null),
-                        this.context.msg || this.context
-                    ]);
-                    originalResponse = { chat, user, bot, update };
-                    break;
-
-                default:
-                    // If target is a specific ID
-                    if (typeof target === 'number' || target.startsWith('@')) {
-                        if (typeof target === 'number') {
-                            if (target > 0) {
-                                // Positive number - user ID
-                                originalResponse = await this.bot.getChatMember(this.context.chatId, target);
-                            } else {
-                                // Negative number - chat ID
-                                originalResponse = await this.bot.getChat(target);
-                            }
-                        } else {
-                            // Username
-                            originalResponse = { username: target.substring(1), note: 'Username resolution not implemented' };
-                        }
-                    } else {
-                        originalResponse = await this.bot.getChat(this.context.chatId);
-                    }
-            }
-
-            // Return original response in JSON format
-            return {
-                success: true,
-                type: 'original_response',
-                target: target,
-                data: originalResponse,
-                timestamp: new Date().toISOString()
-            };
-
-        } catch (error) {
-            console.error('❌ Metadata inspection error:', error);
-            return {
-                success: false,
-                type: 'original_response',
-                target: target,
-                error: error.message,
-                timestamp: new Date().toISOString()
-            };
-        }
-    }
-
-    // ✅ FIXED: needsChatId method
-    needsChatId(method) {
-        const chatIdMethods = [
-            'sendMessage', 'sendPhoto', 'sendDocument', 'sendVideo', 'sendAudio',
-            'sendVoice', 'sendLocation', 'sendVenue', 'sendContact', 'sendPoll',
-            'sendDice', 'sendChatAction', 'sendMediaGroup', 'forwardMessage',
-            'copyMessage', 'deleteMessage', 'deleteMessages', 'pinChatMessage',
-            'unpinChatMessage', 'leaveChat', 'getChat', 'getChatAdministrators',
-            'getChatMemberCount', 'getChatMember', 'setChatTitle', 'setChatDescription',
-            'setChatPhoto', 'deleteChatPhoto', 'setChatPermissions', 'banChatMember',
-            'unbanChatMember', 'restrictChatMember', 'promoteChatMember', 'setChatStickerSet',
-            'deleteChatStickerSet', 'createForumTopic', 'editForumTopic', 'closeForumTopic',
-            'reopenForumTopic', 'deleteForumTopic', 'sendSticker'
-        ];
-        return chatIdMethods.includes(method);
-    }
-
+    // --- 2. ENHANCED & CUSTOM METHODS ---
     setupEnhancedMethods() {
-        // User information
-        this.getUser = () => ({
-            id: this.context.userId,
-            username: this.context.username,
-            first_name: this.context.first_name,
-            last_name: this.context.last_name,
-            language_code: this.context.language_code,
-            chat_id: this.context.chatId,
-            is_bot: false
-        });
+        
+        // ✅ ইউজার ইনফো বের করার স্মার্ট মেথড
+        this.getUser = async (targetUserId = null) => {
+            const uid = targetUserId || this.context.userId;
+            try {
+                // চ্যাট মেম্বার থেকে লেটেস্ট ডাটা আনার চেষ্টা
+                const member = await this.bot.getChatMember(this.context.chatId, uid);
+                return {
+                    id: member.user.id,
+                    first_name: member.user.first_name,
+                    last_name: member.user.last_name || '',
+                    username: member.user.username ? `@${member.user.username}` : null,
+                    status: member.status,
+                    is_bot: member.user.is_bot,
+                    language_code: member.user.language_code,
+                    raw: member.user
+                };
+            } catch (e) {
+                // ফেইল করলে লোকাল কনটেক্সট থেকে ডাটা দিবে
+                const from = this.context.msg?.from || {};
+                return {
+                    id: from.id || uid,
+                    first_name: from.first_name || 'Unknown',
+                    username: from.username || null,
+                    note: 'Fetched from local context (API failed)'
+                };
+            }
+        };
 
-        // Enhanced send methods
-        this.send = (text, options = {}) => {
-            return this.sendMessage(this.context.chatId, text, {
+        // ✅ Send মেথড (অটোমেটিক অবজেক্ট স্ট্রিংফাই করবে)
+        this.send = async (text, options = {}) => {
+            const cleanText = await this.resolveAndStringify(text);
+            return this.sendMessage(this.context.chatId, cleanText, {
                 parse_mode: 'HTML',
                 ...options
             });
         };
 
-        this.reply = (text, options = {}) => {
-            return this.sendMessage(this.context.chatId, text, {
+        // ✅ Reply মেথড
+        this.reply = async (text, options = {}) => {
+            const cleanText = await this.resolveAndStringify(text);
+            return this.sendMessage(this.context.chatId, cleanText, {
                 reply_to_message_id: this.context.msg?.message_id,
                 parse_mode: 'HTML',
                 ...options
             });
         };
 
-        // Keyboard helpers
-        this.sendKeyboard = (text, buttons, options = {}) => {
-            return this.sendMessage(this.context.chatId, text, {
-                reply_markup: { inline_keyboard: buttons },
-                parse_mode: 'HTML',
-                ...options
-            });
-        };
+        // ✅ টাইমিং মেথড (Wait / Sleep)
+        this.wait = (sec) => new Promise(resolve => setTimeout(resolve, sec * 1000));
+        this.sleep = this.wait; // Alias
 
-        this.sendReplyKeyboard = (text, buttons, options = {}) => {
-            return this.sendMessage(this.context.chatId, text, {
-                reply_markup: {
-                    keyboard: buttons,
-                    resize_keyboard: true,
-                    one_time_keyboard: options.one_time || false
-                },
-                parse_mode: 'HTML',
-                ...options
-            });
-        };
+        // মিডিয়া শর্টকাট
+        this.sendImage = (photo, caption = '', opt = {}) => this.sendPhoto(this.context.chatId, photo, { caption, ...opt });
+        this.sendFile = (doc, caption = '', opt = {}) => this.sendDocument(this.context.chatId, doc, { caption, ...opt });
+    }
 
-        this.removeKeyboard = (text, options = {}) => {
-            return this.sendMessage(this.context.chatId, text, {
-                reply_markup: { remove_keyboard: true },
-                parse_mode: 'HTML',
-                ...options
-            });
-        };
-
-        // Media helpers
-        this.sendImage = (photo, caption = '', options = {}) => {
-            return this.sendPhoto(this.context.chatId, photo, {
-                caption: caption,
-                parse_mode: 'HTML',
-                ...options
-            });
-        };
-
-        this.sendFile = (document, caption = '', options = {}) => {
-            return this.sendDocument(this.context.chatId, document, {
-                caption: caption,
-                parse_mode: 'HTML',
-                ...options
-            });
-        };
-
-        this.sendVideoFile = (video, caption = '', options = {}) => {
-            return this.sendVideo(this.context.chatId, video, {
-                caption: caption,
-                parse_mode: 'HTML',
-                ...options
-            });
-        };
-
-        // Bulk operations
-        this.sendBulkMessages = async (messages, delay = 1000) => {
-            const results = [];
-            for (const message of messages) {
-                try {
-                    const result = await this.sendMessage(this.context.chatId, message);
-                    results.push({ success: true, result });
-                    await this.wait(delay);
-                } catch (error) {
-                    results.push({ success: false, error: error.message });
-                }
+    // --- 3. DUMP & DETAILS METHODS ---
+    setupDebugMethods() {
+        // এই লজিকটি Raw ডাটা রিটার্ন করবে
+        const dumpLogic = async (target = 'update') => {
+            let data;
+            switch (target.toLowerCase()) {
+                case 'chat': 
+                    data = await this.bot.getChat(this.context.chatId); 
+                    break;
+                case 'me':
+                case 'bot': 
+                    data = await this.bot.getMe(); 
+                    break;
+                case 'user': 
+                    data = await this.getUser(); 
+                    break;
+                case 'update': 
+                case 'msg':
+                default: 
+                    data = this.context.msg; 
+                    break;
             }
-            return results;
+            // JSON হিসেবে সুন্দর করে রিটার্ন করা
+            return {
+                _type: 'debug_dump',
+                target: target,
+                data: data
+            };
         };
 
-        // Python integration
-        this.runPython = async (code) => {
-            const pythonRunner = require('./python-runner');
-            return await pythonRunner.runPythonCode(code);
-        };
+        // ✅ আপনার চাওয়া অনুযায়ী নামগুলো সেট করা হলো
+        this.dump = dumpLogic;
+        this.details = dumpLogic;
+        
+        // ডেভেলপারদের জন্য এক্সট্রা নাম
+        this.inspect = dumpLogic;
+    }
 
-        this.installPython = async (library) => {
-            const pythonRunner = require('./python-runner');
-            return await pythonRunner.installPythonLibrary(library);
-        };
-
-        this.uninstallPython = async (library) => {
-            const pythonRunner = require('./python-runner');
-            return await pythonRunner.uninstallPythonLibrary(library);
-        };
-
-        // Utility methods
-        this.wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-        // ✅ NEW: Simple ask method without waiting
-        this.ask = (question, options = {}) => {
-            return this.sendMessage(this.context.chatId, question, {
-                parse_mode: 'HTML',
-                ...options
-            });
-        };
-
-        // File download helper
-        this.downloadFile = async (fileId, downloadPath = null) => {
-            const file = await this.getFile(fileId);
-            const fileUrl = `https://api.telegram.org/file/bot${this.context.botToken}/${file.file_path}`;
-            
-            if (downloadPath) {
-                const fs = require('fs');
-                const axios = require('axios');
-                const response = await axios({
-                    method: 'GET',
-                    url: fileUrl,
-                    responseType: 'stream'
-                });
-                
-                response.data.pipe(fs.createWriteStream(downloadPath));
-                return new Promise((resolve, reject) => {
-                    response.data.on('end', () => resolve(downloadPath));
-                    response.data.on('error', reject);
-                });
+    // --- 4. HELPERS ---
+    
+    // 🔥 CRITICAL: Promise রেজলভ করা এবং Object কে স্ট্রিং করা
+    async resolveAndStringify(content) {
+        // ১. যদি প্রমিস হয়, আগে রেজলভ করো
+        let value = content;
+        if (value instanceof Promise) {
+            try {
+                value = await value;
+            } catch (e) {
+                return `❌ Error resolving promise: ${e.message}`;
             }
-            
-            return fileUrl;
-        };
+        }
+
+        // ২. যদি অবজেক্ট হয় (এবং নাল না হয়), সুন্দর JSON বানাও
+        if (typeof value === 'object' && value !== null) {
+            try {
+                // HTML Code Block এ সুন্দর করে দেখাবে
+                return `<pre><code class="language-json">${JSON.stringify(value, null, 2)}</code></pre>`;
+            } catch (e) {
+                return String(value);
+            }
+        }
+
+        // ৩. অন্যথায় স্ট্রিং হিসেবে রিটার্ন করো
+        return String(value);
+    }
+
+    needsChatId(method) {
+        // যেসব মেথডে চ্যাট আইডি দরকার
+        const methods = [
+            'sendMessage', 'sendPhoto', 'sendVideo', 'sendDocument', 'sendVoice', 
+            'sendAnimation', 'sendSticker', 'sendLocation', 'sendContact', 'sendPoll', 
+            'sendDice', 'sendChatAction', 'forwardMessage', 'copyMessage', 'getChat', 
+            'getChatMember', 'getChatAdministrators', 'leaveChat', 'pinChatMessage', 
+            'unpinChatMessage', 'restrictChatMember', 'promoteChatMember', 'banChatMember', 
+            'unbanChatMember', 'setChatTitle', 'setChatDescription', 'setChatPermissions'
+        ];
+        return methods.includes(method);
     }
 }
 
