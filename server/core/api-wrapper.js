@@ -1,4 +1,4 @@
-// server/core/api-wrapper.js - COMPLETELY FIXED VERSION
+// server/core/api-wrapper.js - FINAL VERSION
 class ApiWrapper {
     constructor(bot, context) {
         this.bot = bot;
@@ -132,13 +132,8 @@ class ApiWrapper {
         this.wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
         this.sleep = this.wait;
         
-        // ✅ ask/waitForAnswer - FIXED: Use context's ask function
+        // ✅ ask/waitForAnswer
         this.ask = (question, options = {}) => {
-            // Check if ask function is provided in context
-            if (this.context.ask && typeof this.context.ask === 'function') {
-                return this.context.ask(question, options);
-            }
-            // Fallback to sendMessage
             return this.sendMessage(this.context.chatId, question, {
                 parse_mode: 'HTML',
                 ...options
@@ -160,22 +155,6 @@ class ApiWrapper {
                 parse_mode: 'HTML',
                 ...options
             });
-        };
-        
-        // ✅ getUser - GLOBAL FUNCTION (not Bot.getUser)
-        this.getUser = () => {
-            const msg = this.context.msg || {};
-            const from = msg.from || {};
-            
-            return {
-                id: from.id || this.context.userId,
-                username: from.username || this.context.username,
-                first_name: from.first_name || this.context.first_name,
-                last_name: from.last_name || this.context.last_name,
-                language_code: from.language_code || this.context.language_code,
-                chat_id: msg.chat?.id || this.context.chatId,
-                is_bot: from.is_bot || false
-            };
         };
     }
 
@@ -251,6 +230,22 @@ class ApiWrapper {
                 source: target
             };
         }
+    }
+
+    // ✅ KEEP: getUser
+    getUser() {
+        const msg = this.context.msg || {};
+        const from = msg.from || {};
+        
+        return {
+            id: from.id || this.context.userId,
+            username: from.username || this.context.username,
+            first_name: from.first_name || this.context.first_name,
+            last_name: from.last_name || this.context.last_name,
+            language_code: from.language_code || this.context.language_code,
+            chat_id: msg.chat?.id || this.context.chatId,
+            is_bot: from.is_bot || false
+        };
     }
 
     // ✅ KEEP: needsChatId
