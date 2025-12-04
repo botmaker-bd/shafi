@@ -173,137 +173,121 @@ async function executeCommandCode(botInstance, code, context) {
             // ask/waitForAnswer সরিয়ে দিয়েছি (apiWrapper থেকে আসবে)
         };
 
-        // server/core/command-executor.js - getUser() FIX
-const baseExecutionEnv = {
-    Bot: botObject, 
-    bot: botObject, 
-    Api: botObject, 
-    api: botObject,
-    User: userDataFunctions,
-    msg, 
-    chatId, 
-    userId,
-    userInput,
-    params,
-    currentUser: msg.from || { id: userId, first_name: 'User' },
-    wait: (ms) => new Promise(r => setTimeout(r, ms)),
-    sleep: (ms) => new Promise(r => setTimeout(r, ms)),
-    runPython: async (c) => await pythonRunner.runPythonCode(c),
-    ask: waitForAnswerLogic,
-    waitForAnswer: waitForAnswerLogic,
-    
-    // ✅ ADD THIS: Global getUser function
-    getUser: () => {
-        const msg = baseExecutionEnv.msg || {};
-        const from = msg.from || {};
-        return {
-            id: from.id || baseExecutionEnv.userId,
-            username: from.username || baseExecutionEnv.username,
-            first_name: from.first_name || baseExecutionEnv.first_name,
-            last_name: from.last_name || baseExecutionEnv.last_name,
-            language_code: from.language_code || baseExecutionEnv.language_code,
-            chat_id: msg.chat?.id || baseExecutionEnv.chatId,
-            is_bot: from.is_bot || false
+        const baseExecutionEnv = {
+            Bot: botObject, 
+            bot: botObject, 
+            Api: botObject, 
+            api: botObject,
+            User: userDataFunctions,
+            msg, 
+            chatId, 
+            userId,
+            userInput,
+            params,
+            currentUser: msg.from || { id: userId, first_name: 'User' },
+            wait: (ms) => new Promise(r => setTimeout(r, ms)),
+            sleep: (ms) => new Promise(r => setTimeout(r, ms)),
+            runPython: async (c) => await pythonRunner.runPythonCode(c),
+            // ✅ Global ask/waitForAnswer functions
+            ask: waitForAnswerLogic,
+            waitForAnswer: waitForAnswerLogic
         };
-    }
-};
-
 
         // AUTO-AWAIT ENGINE
-        // AUTO-AWAIT ENGINE - COMPLETELY FIXED
-const executeWithAutoAwait = async (userCode, env) => {
-    // Helper functions
-    const helpers = {
-        UserSave: async (k, v) => await env.User.saveData(k, v),
-        UserGet: async (k) => await env.User.getData(k),
-        UserDel: async (k) => await env.User.deleteData(k),
-        BotDataSave: async (k, v) => await env.bot.saveData(k, v),
-        BotDataGet: async (k) => await env.bot.getData(k),
-        BotDataDel: async (k) => await env.bot.deleteData(k),
-        Ask: async (q, o) => await env.ask(q, o),
-        Wait: async (ms) => await env.wait(ms),
-        Sleep: async (ms) => await env.sleep(ms),
-        Python: async (c) => await pythonRunner.runPythonCode(c),
-        BotGeneric: async (method, ...args) => {
-            if (method === 'send' || method === 'reply') {
-                return await env.bot[method](...args);
-            }
-            if (method === 'ask' || method === 'waitForAnswer') {
-                return await env.ask(...args);
-            }
-            if (method === 'runPython') {
-                return await env.bot.runPython(...args);
-            }
-            return await dynamicBotCaller(method, ...args);
-        }
-    };
+        const executeWithAutoAwait = async (userCode, env) => {
+            const __autoAwait = {
+                UserSave: async (k, v) => await env.User.saveData(k, v),
+                UserGet: async (k) => await env.User.getData(k),
+                UserDel: async (k) => await env.User.deleteData(k),
+                BotDataSave: async (k, v) => await env.bot.saveData(k, v),
+                BotDataGet: async (k) => await env.bot.getData(k),
+                BotDataDel: async (k) => await env.bot.deleteData(k),
+                Ask: async (q, o) => await env.ask(q, o),
+                Wait: async (ms) => await env.wait(ms),
+                Sleep: async (ms) => await env.sleep(ms),
+                Python: async (c) => {  
+                    return await pythonRunner.runPythonCode(c);
+                },
+                BotGeneric: async (method, ...args) => {
+                    // ✅ send/reply handle করি (api-wrapper এ আছে)
+                    if (method === 'send' || method === 'reply') {
+                        return await env.bot[method](...args);
+                    }
+                    // ✅ ask/waitForAnswer handle করি
+                    if (method === 'ask' || method === 'waitForAnswer') {
+                        return await env.ask(...args);
+                    }
+                    // ✅ runPython handle করি (api-wrapper এ আছে)
+                    if (method === 'runPython') {
+                        return await env.bot.runPython(...args);
+                    }
+                    // ✅ অন্যান্য methods
+                    return await dynamicBotCaller(method, ...args);
+                }
+            };
 
-    // Replace rules - সরাসরি helper functions call হবে
-    const processedCode = userCode
-        .replace(/User\s*\.\s*saveData\s*\(([^)]+)\)/g, 'await __helpers.UserSave($1)')
-        .replace(/User\s*\.\s*getData\s*\(([^)]+)\)/g, 'await __helpers.UserGet($1)')
-        .replace(/User\s*\.\s*deleteData\s*\(([^)]+)\)/g, 'await __helpers.UserDel($1)')
-        .replace(/(Bot|bot)\s*\.\s*saveData\s*\(([^)]+)\)/g, 'await __helpers.BotDataSave($2)')
-        .replace(/(Bot|bot)\s*\.\s*getData\s*\(([^)]+)\)/g, 'await __helpers.BotDataGet($2)')
-        .replace(/(Bot|bot)\s*\.\s*deleteData\s*\(([^)]+)\)/g, 'await __helpers.BotDataDel($2)')
-        .replace(/(ask|waitForAnswer)\s*\(([^)]+)\)/g, 'await __helpers.Ask($2)')
-        .replace(/(Bot|bot|Api|api)\s*\.\s*(ask|waitForAnswer)\s*\(([^)]+)\)/g, "await __helpers.BotGeneric('$2', $3)")
-        .replace(/(Bot|bot|Api|api)\s*\.\s*(send|reply)\s*\(([^)]+)\)/g, "await __helpers.BotGeneric('$2', $3)")
-        .replace(/(Bot|bot|Api|api)\s*\.\s*runPython\s*\(([^)]+)\)/g, "await __helpers.BotGeneric('runPython', $2)")
-        .replace(/wait\s*\(([^)]+)\)/g, 'await __helpers.Wait($1)')
-        .replace(/sleep\s*\(([^)]+)\)/g, 'await __helpers.Sleep($1)')
-        .replace(/runPython\s*\(([^)]+)\)/g, 'await __helpers.Python($1)')
-        .replace(/(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer|send|reply|runPython)([a-zA-Z0-9_]+)\s*\(\s*\)/g, 
-            "await __helpers.BotGeneric('$2')")
-        .replace(/(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer|send|reply|runPython)([a-zA-Z0-9_]+)\s*\(/g, 
-            "await __helpers.BotGeneric('$2', ");
+            const rules = [
+                // User methods
+                { r: /User\s*\.\s*saveData\s*\(([^)]+)\)/g, to: 'await __autoAwait.UserSave($1)' },
+                { r: /User\s*\.\s*getData\s*\(([^)]+)\)/g, to: 'await __autoAwait.UserGet($1)' },
+                { r: /User\s*\.\s*deleteData\s*\(([^)]+)\)/g, to: 'await __autoAwait.UserDel($1)' },
+                
+                // Bot data methods
+                { r: /(Bot|bot)\s*\.\s*saveData\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotDataSave($2)' },
+                { r: /(Bot|bot)\s*\.\s*getData\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotDataGet($2)' },
+                { r: /(Bot|bot)\s*\.\s*deleteData\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotDataDel($2)' },
+                
+                // Global ask/waitForAnswer
+                { r: /(ask|waitForAnswer)\s*\(([^)]+)\)/g, to: 'await __autoAwait.Ask($2)' },
+                
+                // ✅ FIXED: Bot.ask(), bot.ask(), Api.ask(), api.ask()
+                { r: /(Bot|bot|Api|api)\s*\.\s*(ask|waitForAnswer)\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotGeneric(\'$2\', $3)' },
+                
+                // ✅ Bot.send(), bot.send(), etc (api-wrapper এ আছে)
+                { r: /(Bot|bot|Api|api)\s*\.\s*(send|reply)\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotGeneric(\'$2\', $3)' },
+                
+                // ✅ Bot.runPython(), etc
+                { r: /(Bot|bot|Api|api)\s*\.\s*runPython\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotGeneric(\'runPython\', $2)' },
+                
+                // Wait/sleep
+                { r: /wait\s*\(([^)]+)\)/g, to: 'await __autoAwait.Wait($1)' },
+                { r: /sleep\s*\(([^)]+)\)/g, to: 'await __autoAwait.Sleep($1)' },
+                
+                // Global runPython
+                { r: /runPython\s*\(([^)]+)\)/g, to: 'await __autoAwait.Python($1)' },
+                
+                // ✅ FIXED: Other bot methods (exclude list আপডেট)
+                { r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer|send|reply|runPython)([a-zA-Z0-9_]+)\s*\(\s*\)/g, 
+                  to: "await __autoAwait.BotGeneric('$2')" },
+                { r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer|send|reply|runPython)([a-zA-Z0-9_]+)\s*\(/g, 
+                  to: "await __autoAwait.BotGeneric('$2', " }
+            ];
 
-    // Create execution context with all variables
-    const executionContext = {
-        // Environment variables
-        Bot: env.Bot,
-        bot: env.bot,
-        Api: env.Api,
-        api: env.api,
-        User: env.User,
-        msg: env.msg,
-        chatId: env.chatId,
-        userId: env.userId,
-        userInput: env.userInput,
-        params: env.params,
-        currentUser: env.currentUser,
-        
-        // Original functions
-        wait: env.wait,
-        sleep: env.sleep,
-        runPython: env.runPython,
-        ask: env.ask,
-        waitForAnswer: env.waitForAnswer,
-        
-        // Helper functions (prefixed with __ to avoid conflicts)
-        __helpers: helpers
-    };
+            const enhancedEnv = { ...env, __autoAwait };
+            let processedCode = userCode;
 
-    // Create the async function
-    const asyncFunction = new Function('ctx', `
-        const { 
-            Bot, bot, Api, api, User, msg, chatId, userId, userInput, params, currentUser,
-            wait, sleep, runPython, ask, waitForAnswer,
-            __helpers
-        } = ctx;
-        
-        return (async () => {
-            try {
-                ${processedCode}
-            } catch (error) {
-                console.error('User code execution error:', error);
-                throw error;
-            }
-        })();
-    `);
+            rules.forEach(rule => { 
+                processedCode = processedCode.replace(rule.r, rule.to); 
+            });
 
-    return await asyncFunction(executionContext);
-};
+            const finalCode = `
+                try {
+                    ${processedCode}
+                } catch (error) {
+                    throw error;
+                }
+            `;
+
+            const run = new Function('env', `
+                with(env) {
+                    return (async function() {
+                        ${finalCode}
+                    })();
+                }
+            `);
+            
+            return await run(enhancedEnv);
+        };
 
         return await executeWithAutoAwait(code, baseExecutionEnv);
 
