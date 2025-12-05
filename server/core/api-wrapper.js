@@ -1,4 +1,4 @@
-// server/core/api-wrapper.js - COMPLETE WORKING VERSION
+// server/core/api-wrapper.js - FIXED VERSION (no global ask conflict)
 const axios = require('axios');
 
 class ApiWrapper {
@@ -8,6 +8,7 @@ class ApiWrapper {
         this.setupAllMethods();
         this.setupDirectMethods();
         this.setupInspectionMethods();
+        this.setupEnhancedMethods();
     }
 
     setupAllMethods() {
@@ -156,35 +157,6 @@ class ApiWrapper {
                 }
             }
             return results;
-        };
-
-        // ✅ WORKING: Download file
-        this.downloadFile = async (fileId, downloadPath = null) => {
-            try {
-                const file = await this.getFile(fileId);
-                const fileUrl = `https://api.telegram.org/file/bot${this.context.botToken}/${file.file_path}`;
-                
-                if (downloadPath) {
-                    const fs = require('fs');
-                    const response = await axios({
-                        method: 'GET',
-                        url: fileUrl,
-                        responseType: 'stream'
-                    });
-                    
-                    const writer = fs.createWriteStream(downloadPath);
-                    response.data.pipe(writer);
-                    
-                    return new Promise((resolve, reject) => {
-                        writer.on('finish', () => resolve(downloadPath));
-                        writer.on('error', reject);
-                    });
-                }
-                
-                return fileUrl;
-            } catch (error) {
-                throw new Error(`Download failed: ${error.message}`);
-            }
         };
 
         // Wait utility
@@ -384,58 +356,8 @@ class ApiWrapper {
         };
     }
 
-    formatInspectionText(data) {
-        let text = '🔍 *Inspection Results*\n\n';
-        
-        if (data.bot) {
-            text += `🤖 *Bot:* ${data.bot.first_name} (@${data.bot.username})\n`;
-        }
-        
-        if (data.chat) {
-            text += `💬 *Chat:* ${data.chat.title || 'Private'}\n`;
-            text += `   Type: ${data.chat.type}\n`;
-            text += `   ID: ${data.chat.id}\n`;
-        }
-        
-        if (data.user) {
-            const user = data.user;
-            text += `👤 *User:* ${user.first_name || 'Unknown'}\n`;
-            if (user.last_name) text += `   Last: ${user.last_name}\n`;
-            if (user.username) text += `   @${user.username}\n`;
-            text += `   ID: ${user.id}\n`;
-        }
-        
-        if (data.message) {
-            text += `📨 *Message ID:* ${data.message.message_id}\n`;
-            if (data.message.text) {
-                text += `   Text: ${data.message.text.substring(0, 50)}${data.message.text.length > 50 ? '...' : ''}\n`;
-            }
-        }
-        
-        text += `\n⏰ *Time:* ${data.timestamp || new Date().toISOString()}`;
-        
-        return text;
-    }
-
-    needsChatId(method) {
-        const chatIdMethods = [
-            'sendMessage', 'sendPhoto', 'sendDocument', 'sendVideo', 'sendAudio',
-            'sendVoice', 'sendLocation', 'sendVenue', 'sendContact', 'sendPoll',
-            'sendDice', 'sendChatAction', 'sendMediaGroup', 'forwardMessage',
-            'copyMessage', 'deleteMessage', 'deleteMessages', 'pinChatMessage',
-            'unpinChatMessage', 'leaveChat', 'getChat', 'getChatAdministrators',
-            'getChatMemberCount', 'getChatMember', 'setChatTitle', 'setChatDescription',
-            'setChatPhoto', 'deleteChatPhoto', 'setChatPermissions', 'banChatMember',
-            'unbanChatMember', 'restrictChatMember', 'promoteChatMember', 'setChatStickerSet',
-            'deleteChatStickerSet', 'createForumTopic', 'editForumTopic', 'closeForumTopic',
-            'reopenForumTopic', 'deleteForumTopic', 'sendSticker'
-        ];
-        return chatIdMethods.includes(method);
-    }
-
-    // Enhanced methods
     setupEnhancedMethods() {
-        // Ask method (same as waitForAnswer)
+        // ✅ FIXED: Ask method (only in Bot object, not global)
         this.ask = async (question, options = {}) => {
             return new Promise((resolve, reject) => {
                 const waitKey = `${this.context.botToken}_${this.context.userId}`;
@@ -485,10 +407,85 @@ class ApiWrapper {
                 throw new Error(`Install failed: ${error.message}`);
             }
         };
+        
+        // Download file
+        this.downloadFile = async (fileId, downloadPath = null) => {
+            try {
+                const file = await this.getFile(fileId);
+                const fileUrl = `https://api.telegram.org/file/bot${this.context.botToken}/${file.file_path}`;
+                
+                if (downloadPath) {
+                    const fs = require('fs');
+                    const response = await axios({
+                        method: 'GET',
+                        url: fileUrl,
+                        responseType: 'stream'
+                    });
+                    
+                    const writer = fs.createWriteStream(downloadPath);
+                    response.data.pipe(writer);
+                    
+                    return new Promise((resolve, reject) => {
+                        writer.on('finish', () => resolve(downloadPath));
+                        writer.on('error', reject);
+                    });
+                }
+                
+                return fileUrl;
+            } catch (error) {
+                throw new Error(`Download failed: ${error.message}`);
+            }
+        };
+    }
+
+    formatInspectionText(data) {
+        let text = '🔍 *Inspection Results*\n\n';
+        
+        if (data.bot) {
+            text += `🤖 *Bot:* ${data.bot.first_name} (@${data.bot.username})\n`;
+        }
+        
+        if (data.chat) {
+            text += `💬 *Chat:* ${data.chat.title || 'Private'}\n`;
+            text += `   Type: ${data.chat.type}\n`;
+            text += `   ID: ${data.chat.id}\n`;
+        }
+        
+        if (data.user) {
+            const user = data.user;
+            text += `👤 *User:* ${user.first_name || 'Unknown'}\n`;
+            if (user.last_name) text += `   Last: ${user.last_name}\n`;
+            if (user.username) text += `   @${user.username}\n`;
+            text += `   ID: ${user.id}\n`;
+        }
+        
+        if (data.message) {
+            text += `📨 *Message ID:* ${data.message.message_id}\n`;
+            if (data.message.text) {
+                text += `   Text: ${data.message.text.substring(0, 50)}${data.message.text.length > 50 ? '...' : ''}\n`;
+            }
+        }
+        
+        text += `\n⏰ *Time:* ${data.timestamp || new Date().toISOString()}`;
+        
+        return text;
+    }
+
+    needsChatId(method) {
+        const chatIdMethods = [
+            'sendMessage', 'sendPhoto', 'sendDocument', 'sendVideo', 'sendAudio',
+            'sendVoice', 'sendLocation', 'sendVenue', 'sendContact', 'sendPoll',
+            'sendDice', 'sendChatAction', 'sendMediaGroup', 'forwardMessage',
+            'copyMessage', 'deleteMessage', 'deleteMessages', 'pinChatMessage',
+            'unpinChatMessage', 'leaveChat', 'getChat', 'getChatAdministrators',
+            'getChatMemberCount', 'getChatMember', 'setChatTitle', 'setChatDescription',
+            'setChatPhoto', 'deleteChatPhoto', 'setChatPermissions', 'banChatMember',
+            'unbanChatMember', 'restrictChatMember', 'promoteChatMember', 'setChatStickerSet',
+            'deleteChatStickerSet', 'createForumTopic', 'editForumTopic', 'closeForumTopic',
+            'reopenForumTopic', 'deleteForumTopic', 'sendSticker'
+        ];
+        return chatIdMethods.includes(method);
     }
 }
-
-// Add enhanced methods to prototype
-ApiWrapper.prototype.setupEnhancedMethods();
 
 module.exports = ApiWrapper;
