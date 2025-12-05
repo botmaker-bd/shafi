@@ -107,36 +107,54 @@ async function executeCommandCode(botInstance, code, context) {
             }
         };
 
-        // ✅ REMOVED: waitForAnswerLogic from here (moved to ApiWrapper only)
+        // ✅ FIXED: waitForAnswer function
+        const waitForAnswerLogic = async (question, options = {}) => {
+            return new Promise((resolveWait, rejectWait) => {
+                const waitKey = `${resolvedBotToken}_${userId}`;
+                
+                botInstance.sendMessage(chatId, question, options).then(() => {
+                    const timeout = setTimeout(() => {
+                        if (nextCommandHandlers?.has(waitKey)) {
+                            nextCommandHandlers.delete(waitKey);
+                            rejectWait(new Error('Timeout: User took too long to respond.'));
+                        }
+                    }, 5 * 60 * 1000);
 
-        // Bot wrapper
-        const isChatId = (val) => {
-            if (!val) return false;
-            if (typeof val === 'number') return Number.isInteger(val) && Math.abs(val) > 200;
-            if (typeof val === 'string') return val.startsWith('@') || /^-?\d+$/.test(val);
-            return false;
+                    if (nextCommandHandlers) {
+                        nextCommandHandlers.set(waitKey, {
+                            resolve: (ans) => { clearTimeout(timeout); resolveWait(ans); },
+                            reject: (err) => { clearTimeout(timeout); rejectWait(err); },
+                            timestamp: Date.now()
+                        });
+                    } else {
+                        clearTimeout(timeout);
+                        rejectWait(new Error('Handler system error'));
+                    }
+                }).catch(e => rejectWait(e));
+            });
         };
 
+        // Bot wrapper
         const dynamicBotCaller = async (methodName, ...args) => {
             if (typeof botInstance[methodName] !== 'function') {
                 throw new Error(`Method '${methodName}' missing in API`);
             }
+            
             const noChatIdMethods = ['getMe', 'getWebhookInfo', 'deleteWebhook', 'setWebhook', 'answerCallbackQuery', 'answerInlineQuery', 'stopPoll', 'downloadFile', 'logOut', 'close'];
-
+            
+            let finalArgs = [...args];
+            
             if (!noChatIdMethods.includes(methodName)) {
-                let shouldInject = false;
-                if (methodName === 'sendLocation') {
-                    if (args.length === 2 || (args.length === 3 && typeof args[2] === 'object')) shouldInject = true;
-                } else if (methodName === 'sendMediaGroup') {
-                    if (Array.isArray(args[0])) shouldInject = true;
-                } else {
-                    if (args.length === 0 || !isChatId(args[0])) {
-                        if (methodName.startsWith('send') || methodName.startsWith('forward') || methodName.startsWith('copy')) shouldInject = true;
+                const chatIdMethods = ['sendMessage', 'sendPhoto', 'sendDocument', 'sendVideo', 'sendAudio', 'sendVoice', 'sendLocation', 'sendVenue', 'sendContact', 'sendPoll', 'sendDice', 'sendChatAction', 'sendMediaGroup', 'forwardMessage', 'copyMessage', 'deleteMessage', 'getChat', 'getChatAdministrators', 'getChatMemberCount', 'getChatMember', 'setChatTitle', 'setChatDescription', 'setChatPhoto', 'deleteChatPhoto', 'pinChatMessage', 'unpinChatMessage', 'leaveChat', 'sendSticker', 'createForumTopic'];
+                
+                if (chatIdMethods.includes(methodName)) {
+                    if (finalArgs.length === 0 || (typeof finalArgs[0] !== 'number' && !finalArgs[0]?.toString().startsWith('@') && !finalArgs[0]?.toString().startsWith('-'))) {
+                        finalArgs.unshift(chatId);
                     }
                 }
-                if (shouldInject) args.unshift(chatId);
             }
-            return await botInstance[methodName](...args);
+            
+            return await botInstance[methodName](...finalArgs);
         };
 
         // Environment setup
@@ -152,126 +170,335 @@ async function executeCommandCode(botInstance, code, context) {
         
         const apiWrapperInstance = new ApiWrapper(botInstance, apiCtx);
         
-        // ✅ FIXED: getUser function - returns string when used as string
-        const getUserFunction = () => {
-            if (msg?.from) {
-                const userObj = {
-                    id: msg.from.id,
-                    username: msg.from.username || '',
-                    first_name: msg.from.first_name,
-                    last_name: msg.from.last_name || '',
-                    language_code: msg.from.language_code || 'en',
-                    is_bot: msg.from.is_bot || false,
-                    chat_id: chatId
-                };
-                
-                // When called as function, return object
-                // When converted to string, return name
-                userObj.toString = function() {
-                    if (this.first_name && this.last_name) {
-                        return `${this.first_name} ${this.last_name}`;
-                    }
-                    return this.first_name || this.username || `User${this.id}`;
-                };
-                
-                userObj.valueOf = function() {
-                    return this.toString();
-                };
-                
-                return userObj;
-            }
-            const fallbackObj = {
-                id: userId,
-                first_name: 'User',
-                chat_id: chatId,
-                toString: () => 'User',
-                valueOf: () => 'User'
-            };
-            return fallbackObj;
-        };
-
+        // ✅ Create Bot object with specific methods
         const botObject = { 
-            ...apiWrapperInstance, 
-            ...botDataFunctions
+            // Telegram API methods
+            sendMessage: (...args) => dynamicBotCaller('sendMessage', ...args),
+            sendPhoto: (...args) => dynamicBotCaller('sendPhoto', ...args),
+            sendDocument: (...args) => dynamicBotCaller('sendDocument', ...args),
+            sendVideo: (...args) => dynamicBotCaller('sendVideo', ...args),
+            sendAudio: (...args) => dynamicBotCaller('sendAudio', ...args),
+            sendVoice: (...args) => dynamicBotCaller('sendVoice', ...args),
+            sendLocation: (...args) => dynamicBotCaller('sendLocation', ...args),
+            sendContact: (...args) => dynamicBotCaller('sendContact', ...args),
+            sendPoll: (...args) => dynamicBotCaller('sendPoll', ...args),
+            sendChatAction: (...args) => dynamicBotCaller('sendChatAction', ...args),
+            sendMediaGroup: (...args) => dynamicBotCaller('sendMediaGroup', ...args),
+            forwardMessage: (...args) => dynamicBotCaller('forwardMessage', ...args),
+            copyMessage: (...args) => dynamicBotCaller('copyMessage', ...args),
+            deleteMessage: (...args) => dynamicBotCaller('deleteMessage', ...args),
+            getChat: (...args) => dynamicBotCaller('getChat', ...args),
+            getChatAdministrators: (...args) => dynamicBotCaller('getChatAdministrators', ...args),
+            getChatMember: (...args) => dynamicBotCaller('getChatMember', ...args),
+            getChatMemberCount: (...args) => dynamicBotCaller('getChatMemberCount', ...args),
+            setChatTitle: (...args) => dynamicBotCaller('setChatTitle', ...args),
+            setChatDescription: (...args) => dynamicBotCaller('setChatDescription', ...args),
+            pinChatMessage: (...args) => dynamicBotCaller('pinChatMessage', ...args),
+            unpinChatMessage: (...args) => dynamicBotCaller('unpinChatMessage', ...args),
+            leaveChat: (...args) => dynamicBotCaller('leaveChat', ...args),
+            sendSticker: (...args) => dynamicBotCaller('sendSticker', ...args),
+            
+            // Bot info methods
+            getMe: () => dynamicBotCaller('getMe'),
+            getWebhookInfo: () => dynamicBotCaller('getWebhookInfo'),
+            
+            // Callback and inline
+            answerCallbackQuery: (...args) => dynamicBotCaller('answerCallbackQuery', ...args),
+            answerInlineQuery: (...args) => dynamicBotCaller('answerInlineQuery', ...args),
+            
+            // File methods
+            getFile: (...args) => dynamicBotCaller('getFile', ...args),
+            
+            // ✅ NEW: Unified inspect method
+            inspect: async (type = 'all') => {
+                try {
+                    const types = {
+                        user: async () => {
+                            if (msg?.from) {
+                                return msg.from;
+                            }
+                            return { id: userId, note: 'User from context' };
+                        },
+                        chat: async () => await dynamicBotCaller('getChat', chatId),
+                        bot: async () => await dynamicBotCaller('getMe'),
+                        update: async () => msg || context,
+                        message: async () => msg,
+                        call: async () => ({ note: 'Call data not available in this context' }),
+                        response: async () => ({ note: 'Response data not available' }),
+                        all: async () => {
+                            const [botInfo, chatInfo] = await Promise.all([
+                                dynamicBotCaller('getMe'),
+                                dynamicBotCaller('getChat', chatId).catch(() => null)
+                            ]);
+                            return {
+                                bot: botInfo,
+                                chat: chatInfo,
+                                user: msg?.from || { id: userId },
+                                message: msg,
+                                context: {
+                                    chatId,
+                                    userId,
+                                    userInput,
+                                    params
+                                },
+                                timestamp: new Date().toISOString()
+                            };
+                        }
+                    };
+
+                    const handler = types[type.toLowerCase()] || types.all;
+                    const result = await handler();
+                    
+                    return {
+                        success: true,
+                        type: type,
+                        data: result,
+                        timestamp: new Date().toISOString()
+                    };
+                } catch (error) {
+                    return {
+                        success: false,
+                        type: type,
+                        error: error.message,
+                        timestamp: new Date().toISOString()
+                    };
+                }
+            },
+            
+            // ✅ NEW: getInfo method
+            getInfo: async (target = null) => {
+                try {
+                    if (target) {
+                        // Specific target
+                        if (target.startsWith('@')) {
+                            // Username
+                            return {
+                                success: true,
+                                type: 'username',
+                                username: target.substring(1),
+                                note: 'Username lookup not implemented'
+                            };
+                        } else if (!isNaN(target)) {
+                            const id = parseInt(target);
+                            if (id > 0) {
+                                // User ID
+                                try {
+                                    const member = await dynamicBotCaller('getChatMember', chatId, id);
+                                    return {
+                                        success: true,
+                                        type: 'user',
+                                        data: member
+                                    };
+                                } catch {
+                                    return {
+                                        success: true,
+                                        type: 'user',
+                                        id: id,
+                                        note: 'Could not fetch user details'
+                                    };
+                                }
+                            } else {
+                                // Chat ID
+                                try {
+                                    const chat = await dynamicBotCaller('getChat', id);
+                                    return {
+                                        success: true,
+                                        type: 'chat',
+                                        data: chat
+                                    };
+                                } catch {
+                                    return {
+                                        success: true,
+                                        type: 'chat',
+                                        id: id,
+                                        note: 'Could not fetch chat details'
+                                    };
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Default: get everything
+                    const [botInfo, chatInfo] = await Promise.all([
+                        dynamicBotCaller('getMe'),
+                        dynamicBotCaller('getChat', chatId).catch(() => null)
+                    ]);
+                    
+                    return {
+                        success: true,
+                        data: {
+                            bot: botInfo,
+                            chat: chatInfo,
+                            user: msg?.from || { id: userId },
+                            message: msg,
+                            context: {
+                                chatId,
+                                userId,
+                                userInput,
+                                params
+                            }
+                        },
+                        timestamp: new Date().toISOString()
+                    };
+                } catch (error) {
+                    return {
+                        success: false,
+                        error: error.message,
+                        timestamp: new Date().toISOString()
+                    };
+                }
+            },
+            
+            // ✅ NEW: details method (alias for getInfo)
+            details: async (target = null) => {
+                return await botObject.getInfo(target);
+            },
+            
+            // Bot data methods
+            ...botDataFunctions,
+            
+            // ✅ REMOVED: ask/waitForAnswer from Bot object (to avoid conflict)
+            // User should use the global waitForAnswer function instead
         };
 
-        // ✅ FIXED: Clean environment - ONLY Bot object has all functions
+        // Create Api object (same as Bot)
+        const apiObject = {
+            ...botObject,
+            // Api-specific methods can be added here
+        };
+
+        // ✅ FIXED: Complete environment WITHOUT conflicting functions
         const baseExecutionEnv = {
-            // Bot objects - সব ফাংশন এখানে
-            Bot: botObject, 
-            bot: botObject, 
-            Api: botObject, 
-            api: botObject,
+            // Bot and Api objects
+            Bot: botObject,
+            bot: botObject,
+            Api: apiObject,
+            api: apiObject,
             
             // User data functions
             User: userDataFunctions,
             
-            // Message context (read only)
-            msg, 
-            chatId, 
+            // Message context
+            msg,
+            message: msg,
+            chatId,
             userId,
             chat: msg?.chat,
             
-            // ✅ ONLY getUser function (no conflict)
-            getUser: getUserFunction,
+            // User info - ✅ FIXED: getUser function
+            getUser: () => {
+                if (msg?.from) {
+                    return {
+                        id: msg.from.id,
+                        username: msg.from.username || '',
+                        first_name: msg.from.first_name,
+                        last_name: msg.from.last_name || '',
+                        language_code: msg.from.language_code || 'en',
+                        is_bot: msg.from.is_bot || false,
+                        chat_id: chatId
+                    };
+                }
+                return {
+                    id: userId,
+                    first_name: 'User',
+                    chat_id: chatId
+                };
+            },
             
-            // Input data (read only)
+            // ✅ FIXED: waitForAnswer function (global, not on Bot)
+            waitForAnswer: waitForAnswerLogic,
+            
+            // Input data
             userInput,
             params,
             text: userInput,
             
-            // ✅ REMOVED: wait, sleep, runPython, ask, waitForAnswer from here
-            // ✅ REMOVED: log, debug, error from here  
-            // ✅ REMOVED: formatDate, formatTime, random, etc from here
+            // ✅ REMOVED: wait, sleep, runPython from environment (to avoid confusion)
+            // Users should use Bot methods or specific functions
             
-            // ✅ KEPT ONLY: Essential context and getUser
+            // Python execution through Bot object only
+            // runPython is available as Bot.runPython()
+            
+            // Utility functions (safe ones)
+            formatDate: (date = new Date()) => date.toLocaleDateString(),
+            formatTime: (date = new Date()) => date.toLocaleTimeString(),
+            now: () => new Date(),
+            
+            // String utilities
+            escapeHtml: (text) => String(text).replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])),
+            truncate: (text, length = 100) => text.length > length ? text.substring(0, length) + '...' : text,
+            
+            // Validation
+            isNumber: (val) => !isNaN(parseFloat(val)) && isFinite(val),
+            isEmail: (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
         };
 
         // Auto-await engine
         const executeWithAutoAwait = async (userCode, env) => {
             const __autoAwait = {
+                // User data
                 UserSave: async (k, v) => await env.User.saveData(k, v),
                 UserGet: async (k) => await env.User.getData(k),
                 UserDel: async (k) => await env.User.deleteData(k),
+                
+                // Bot data
                 BotDataSave: async (k, v) => await env.bot.saveData(k, v),
                 BotDataGet: async (k) => await env.bot.getData(k),
                 BotDataDel: async (k) => await env.bot.deleteData(k),
-                BotGeneric: async (method, ...args) => {
-                    return await dynamicBotCaller(method, ...args);
-                },
-                BotInspect: async (target, options) => await env.bot.inspect(target, options),
+                
+                // Wait for answer
+                WaitForAnswer: async (q, o) => await env.waitForAnswer(q, o),
+                
+                // Bot methods
+                BotInspect: async (type) => await env.bot.inspect(type),
                 BotGetInfo: async (target) => await env.bot.getInfo(target),
                 BotDetails: async (target) => await env.bot.details(target),
-                BotAsk: async (q, o) => await env.bot.ask(q, o),
-                BotWaitForAnswer: async (q, o) => await env.bot.waitForAnswer(q, o),
-                BotRunPython: async (c) => await env.bot.runPython(c),
-                BotWait: async (ms) => await env.bot.wait(ms),
-                BotSleep: async (ms) => await env.bot.sleep(ms),
-                BotDelay: async (ms) => await env.bot.delay(ms)
+                BotGetMe: async () => await env.bot.getMe(),
+                BotGetChat: async (id) => await env.bot.getChat(id),
+                
+                // Python through Bot
+                BotRunPython: async (code) => {
+                    const pythonRunner = require('./python-runner');
+                    return await pythonRunner.runPythonCode(code);
+                },
+                
+                // Generic Bot methods
+                BotGeneric: async (method, ...args) => {
+                    if (typeof env.bot[method] !== 'function') {
+                        throw new Error(`Bot method '${method}' not found`);
+                    }
+                    return await env.bot[method](...args);
+                }
             };
 
             const rules = [
+                // User data
                 { r: /User\s*\.\s*saveData\s*\(([^)]+)\)/g,   to: 'await __autoAwait.UserSave($1)' },
                 { r: /User\s*\.\s*getData\s*\(([^)]+)\)/g,    to: 'await __autoAwait.UserGet($1)' },
                 { r: /User\s*\.\s*deleteData\s*\(([^)]+)\)/g, to: 'await __autoAwait.UserDel($1)' },
+                
+                // Bot data
                 { r: /(Bot|bot)\s*\.\s*saveData\s*\(([^)]+)\)/g,   to: 'await __autoAwait.BotDataSave($2)' },
                 { r: /(Bot|bot)\s*\.\s*getData\s*\(([^)]+)\)/g,    to: 'await __autoAwait.BotDataGet($2)' },
                 { r: /(Bot|bot)\s*\.\s*deleteData\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotDataDel($2)' },
                 
-                // ✅ FIXED: Bot object methods only
-                { r: /(Bot|bot)\s*\.\s*ask\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotAsk($2)' },
-                { r: /(Bot|bot)\s*\.\s*waitForAnswer\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotWaitForAnswer($2)' },
-                { r: /(Bot|bot)\s*\.\s*runPython\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotRunPython($1)' },
-                { r: /(Bot|bot)\s*\.\s*wait\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotWait($2)' },
-                { r: /(Bot|bot)\s*\.\s*sleep\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotSleep($2)' },
-                { r: /(Bot|bot)\s*\.\s*delay\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotDelay($2)' },
+                // Wait for answer
+                { r: /waitForAnswer\s*\(([^)]+)\)/g, to: 'await __autoAwait.WaitForAnswer($1)' },
+                
+                // Bot inspection methods
                 { r: /(Bot|bot)\s*\.\s*inspect\s*\(([^)]*)\)/g, to: 'await __autoAwait.BotInspect($2)' },
                 { r: /(Bot|bot)\s*\.\s*getInfo\s*\(([^)]*)\)/g, to: 'await __autoAwait.BotGetInfo($2)' },
                 { r: /(Bot|bot)\s*\.\s*details\s*\(([^)]*)\)/g, to: 'await __autoAwait.BotDetails($2)' },
+                { r: /(Bot|bot)\s*\.\s*getMe\s*\(\s*\)/g, to: 'await __autoAwait.BotGetMe()' },
+                { r: /(Bot|bot)\s*\.\s*getChat\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotGetChat($1)' },
                 
-                { r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer|runPython|inspect|getInfo|details|wait|sleep|delay)([a-zA-Z0-9_]+)\s*\(\s*\)/g, 
+                // Python through Bot
+                { r: /(Bot|bot)\s*\.\s*runPython\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotRunPython($2)' },
+                
+                // Generic Bot methods (for sendMessage, sendPhoto, etc.)
+                { r: /(Bot|bot)\s*\.\s*(?!saveData|getData|deleteData|inspect|getInfo|details|getMe|getChat|runPython)([a-zA-Z0-9_]+)\s*\(\s*\)/g, 
                   to: "await __autoAwait.BotGeneric('$2')" },
-                { r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer|runPython|inspect|getInfo|details|wait|sleep|delay)([a-zA-Z0-9_]+)\s*\(/g, 
+                { r: /(Bot|bot)\s*\.\s*(?!saveData|getData|deleteData|inspect|getInfo|details|getMe|getChat|runPython)([a-zA-Z0-9_]+)\s*\(/g, 
                   to: "await __autoAwait.BotGeneric('$2', " }
             ];
 
