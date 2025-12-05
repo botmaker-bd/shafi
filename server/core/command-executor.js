@@ -215,15 +215,19 @@ async function executeCommandCode(botInstance, code, context) {
             return fallbackObj;
         };
 
+        // ✅ CRITICAL FIX: Create botObject with ALL methods
         const botObject = { 
-            ...apiWrapperInstance, 
+            // Telegram API methods from ApiWrapper
+            ...apiWrapperInstance,
+            
+            // Data methods
             ...botDataFunctions,
             
-            // ✅ ADDED: Direct ask method
+            // ✅ ADDED: All special methods
             ask: waitForAnswerLogic,
             waitForAnswer: waitForAnswerLogic,
             
-            // ✅ FIXED: Python runner method
+            // Python
             runPython: async (code) => {
                 try {
                     const result = await pythonRunner.runPythonCode(code);
@@ -233,38 +237,23 @@ async function executeCommandCode(botInstance, code, context) {
                 }
             },
             
-            // ✅ FIXED: Inspection methods
-            inspect: async (target = 'all', options = {}) => {
-                try {
-                    const result = await apiWrapperInstance.inspect(target, options);
-                    return result;
-                } catch (error) {
-                    return { error: error.message };
-                }
-            },
+            // Inspection methods from ApiWrapper
+            inspect: apiWrapperInstance.inspect.bind(apiWrapperInstance),
+            getInfo: apiWrapperInstance.getInfo.bind(apiWrapperInstance),
+            details: apiWrapperInstance.details.bind(apiWrapperInstance),
             
-            getInfo: async (target = 'all') => {
-                try {
-                    const result = await apiWrapperInstance.getInfo(target);
-                    return result;
-                } catch (error) {
-                    return { error: error.message };
-                }
-            },
+            // Utility methods
+            getUser: getUserFunction,
             
-            details: async (target = 'all') => {
-                try {
-                    const result = await apiWrapperInstance.details(target);
-                    return result;
-                } catch (error) {
-                    return { error: error.message };
-                }
-            }
+            // Wait methods
+            wait: (ms) => new Promise(r => setTimeout(r, ms)),
+            sleep: (ms) => new Promise(r => setTimeout(r, ms)),
+            delay: (ms) => new Promise(r => setTimeout(r, ms))
         };
 
         // ✅ FIXED: Complete environment with ALL needed functions
         const baseExecutionEnv = {
-            // Bot objects
+            // Bot objects - all pointing to same object
             Bot: botObject, 
             bot: botObject, 
             Api: botObject, 
@@ -289,23 +278,22 @@ async function executeCommandCode(botInstance, code, context) {
             params,
             text: userInput,
             
-            // Wait functions
-            wait: (sec) => new Promise(r => setTimeout(r, sec * 1000)),
-            sleep: (sec) => new Promise(r => setTimeout(r, sec * 1000)),
-            delay: (sec) => new Promise(r => setTimeout(r, sec * 1000)), // alias
+            // Wait functions (aliases)
+            wait: botObject.wait,
+            sleep: botObject.sleep,
+            delay: botObject.delay,
             
             // Python - directly call pythonRunner
-            runPython: async (code) => {
-                try {
-                    return await pythonRunner.runPythonCode(code);
-                } catch (error) {
-                    throw new Error(`Python Error: ${error.message}`);
-                }
-            },
+            runPython: botObject.runPython,
             
             // ✅ FIXED: Ask functions
             ask: waitForAnswerLogic,
             waitForAnswer: waitForAnswerLogic,
+            
+            // Inspection functions
+            inspect: botObject.inspect,
+            getInfo: botObject.getInfo,
+            details: botObject.details,
             
             // Utility functions
             log: (...args) => console.log('[BOT LOG]:', ...args),
@@ -331,66 +319,88 @@ async function executeCommandCode(botInstance, code, context) {
             
             // JSON utilities
             toJson: (obj) => JSON.stringify(obj, null, 2),
-            parseJson: (str) => JSON.parse(str),
-            
-            // ✅ NEW: Direct inspection methods
-            inspect: async (target = 'all', options = {}) => {
-                try {
-                    return await botObject.inspect(target, options);
-                } catch (error) {
-                    return { error: error.message };
-                }
-            },
-            
-            getInfo: async (target = 'all') => {
-                try {
-                    return await botObject.getInfo(target);
-                } catch (error) {
-                    return { error: error.message };
-                }
-            }
+            parseJson: (str) => JSON.parse(str)
         };
 
         // Auto-await engine
         const executeWithAutoAwait = async (userCode, env) => {
             const __autoAwait = {
+                // User data
                 UserSave: async (k, v) => await env.User.saveData(k, v),
                 UserGet: async (k) => await env.User.getData(k),
                 UserDel: async (k) => await env.User.deleteData(k),
+                
+                // Bot data
                 BotDataSave: async (k, v) => await env.bot.saveData(k, v),
                 BotDataGet: async (k) => await env.bot.getData(k),
                 BotDataDel: async (k) => await env.bot.deleteData(k),
+                
+                // Interaction
                 Ask: async (q, o) => await env.ask(q, o),
                 Wait: async (s) => await env.wait(s),
+                
+                // Python
                 Python: async (c) => {  
                     const result = await env.runPython(c);
                     return result;
                 },
+                
+                // Telegram API methods
                 BotGeneric: async (method, ...args) => {
+                    // Special handling for getMe
+                    if (method === 'getMe') {
+                        return await dynamicBotCaller('getMe');
+                    }
+                    // Special handling for inspect methods
+                    if (method === 'inspect' || method === 'getInfo' || method === 'details') {
+                        return await env.bot[method](...args);
+                    }
+                    // Regular methods
                     return await dynamicBotCaller(method, ...args);
                 },
+                
+                // Inspection
                 Inspect: async (target, options) => await env.bot.inspect(target, options),
                 GetInfo: async (target) => await env.bot.getInfo(target),
-                Details: async (target) => await env.bot.details(target)
+                Details: async (target) => await env.bot.details(target),
+                
+                // Utility
+                GetUser: () => env.getUser()
             };
 
             const rules = [
+                // User data
                 { r: /User\s*\.\s*saveData\s*\(([^)]+)\)/g,   to: 'await __autoAwait.UserSave($1)' },
                 { r: /User\s*\.\s*getData\s*\(([^)]+)\)/g,    to: 'await __autoAwait.UserGet($1)' },
                 { r: /User\s*\.\s*deleteData\s*\(([^)]+)\)/g, to: 'await __autoAwait.UserDel($1)' },
-                { r: /(Bot|bot)\s*\.\s*saveData\s*\(([^)]+)\)/g,   to: 'await __autoAwait.BotDataSave($2)' },
-                { r: /(Bot|bot)\s*\.\s*getData\s*\(([^)]+)\)/g,    to: 'await __autoAwait.BotDataGet($2)' },
-                { r: /(Bot|bot)\s*\.\s*deleteData\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotDataDel($2)' },
+                
+                // Bot data
+                { r: /(Bot|bot|Api|api)\s*\.\s*saveData\s*\(([^)]+)\)/g,   to: 'await __autoAwait.BotDataSave($2)' },
+                { r: /(Bot|bot|Api|api)\s*\.\s*getData\s*\(([^)]+)\)/g,    to: 'await __autoAwait.BotDataGet($2)' },
+                { r: /(Bot|bot|Api|api)\s*\.\s*deleteData\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotDataDel($2)' },
+                
+                // Ask methods
                 { r: /(ask|waitForAnswer)\s*\(([^)]+)\)/g, to: 'await __autoAwait.Ask($2)' },
+                
+                // Wait methods
                 { r: /(wait|sleep|delay)\s*\(([^)]+)\)/g, to: 'await __autoAwait.Wait($2)' },
+                
+                // Python
                 { r: /runPython\s*\(([^)]+)\)/g, to: 'await __autoAwait.Python($1)' },
-                { r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer|runPython|inspect|getInfo|details)([a-zA-Z0-9_]+)\s*\(\s*\)/g, 
-                  to: "await __autoAwait.BotGeneric('$2')" },
-                { r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer|runPython|inspect|getInfo|details)([a-zA-Z0-9_]+)\s*\(/g, 
-                  to: "await __autoAwait.BotGeneric('$2', " },
+                
+                // Inspection methods
                 { r: /(Bot|bot|Api|api)\s*\.\s*inspect\s*\(([^)]*)\)/g, to: 'await __autoAwait.Inspect($2)' },
                 { r: /(Bot|bot|Api|api)\s*\.\s*getInfo\s*\(([^)]*)\)/g, to: 'await __autoAwait.GetInfo($2)' },
-                { r: /(Bot|bot|Api|api)\s*\.\s*details\s*\(([^)]*)\)/g, to: 'await __autoAwait.Details($2)' }
+                { r: /(Bot|bot|Api|api)\s*\.\s*details\s*\(([^)]*)\)/g, to: 'await __autoAwait.Details($2)' },
+                
+                // getUser
+                { r: /getUser\s*\(\s*\)/g, to: '__autoAwait.GetUser()' },
+                
+                // Telegram API methods (excluding special ones)
+                { r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer|runPython|inspect|getInfo|details|getUser|wait|sleep|delay)([a-zA-Z0-9_]+)\s*\(\s*\)/g, 
+                  to: "await __autoAwait.BotGeneric('$2')" },
+                { r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer|runPython|inspect|getInfo|details|getUser|wait|sleep|delay)([a-zA-Z0-9_]+)\s*\(/g, 
+                  to: "await __autoAwait.BotGeneric('$2', " }
             ];
 
             const enhancedEnv = { ...env, __autoAwait };
