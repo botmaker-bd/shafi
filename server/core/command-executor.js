@@ -107,32 +107,7 @@ async function executeCommandCode(botInstance, code, context) {
             }
         };
 
-        // ✅ FIXED: waitForAnswer function (only in bot object, not global)
-        const waitForAnswerLogic = async (question, options = {}) => {
-            return new Promise((resolveWait, rejectWait) => {
-                const waitKey = `${resolvedBotToken}_${userId}`;
-                
-                botInstance.sendMessage(chatId, question, options).then(() => {
-                    const timeout = setTimeout(() => {
-                        if (nextCommandHandlers?.has(waitKey)) {
-                            nextCommandHandlers.delete(waitKey);
-                            rejectWait(new Error('Timeout: User took too long to respond.'));
-                        }
-                    }, 5 * 60 * 1000);
-
-                    if (nextCommandHandlers) {
-                        nextCommandHandlers.set(waitKey, {
-                            resolve: (ans) => { clearTimeout(timeout); resolveWait(ans); },
-                            reject: (err) => { clearTimeout(timeout); rejectWait(err); },
-                            timestamp: Date.now()
-                        });
-                    } else {
-                        clearTimeout(timeout);
-                        rejectWait(new Error('Handler system error'));
-                    }
-                }).catch(e => rejectWait(e));
-            });
-        };
+        // ✅ REMOVED: waitForAnswerLogic from here (moved to ApiWrapper only)
 
         // Bot wrapper
         const isChatId = (val) => {
@@ -217,54 +192,12 @@ async function executeCommandCode(botInstance, code, context) {
 
         const botObject = { 
             ...apiWrapperInstance, 
-            ...botDataFunctions,
-            
-            // ✅ FIXED: Only Bot.ask and Bot.waitForAnswer (not global ask)
-            ask: waitForAnswerLogic,
-            waitForAnswer: waitForAnswerLogic,
-            
-            // ✅ FIXED: Python runner method
-            runPython: async (code) => {
-                try {
-                    const result = await pythonRunner.runPythonCode(code);
-                    return result;
-                } catch (error) {
-                    throw new Error(`Python Error: ${error.message}`);
-                }
-            },
-            
-            // ✅ FIXED: Inspection methods
-            inspect: async (target = 'all', options = {}) => {
-                try {
-                    const result = await apiWrapperInstance.inspect(target, options);
-                    return result;
-                } catch (error) {
-                    return { error: error.message };
-                }
-            },
-            
-            getInfo: async (target = 'all') => {
-                try {
-                    const result = await apiWrapperInstance.getInfo(target);
-                    return result;
-                } catch (error) {
-                    return { error: error.message };
-                }
-            },
-            
-            details: async (target = 'all') => {
-                try {
-                    const result = await apiWrapperInstance.details(target);
-                    return result;
-                } catch (error) {
-                    return { error: error.message };
-                }
-            }
+            ...botDataFunctions
         };
 
-        // ✅ FIXED: Complete environment WITHOUT global ask function
+        // ✅ FIXED: Clean environment - ONLY Bot object has all functions
         const baseExecutionEnv = {
-            // Bot objects
+            // Bot objects - সব ফাংশন এখানে
             Bot: botObject, 
             bot: botObject, 
             Api: botObject, 
@@ -272,82 +205,26 @@ async function executeCommandCode(botInstance, code, context) {
             
             // User data functions
             User: userDataFunctions,
-            user: userDataFunctions, // alias
             
-            // Message context
+            // Message context (read only)
             msg, 
-            message: msg, // alias
             chatId, 
             userId,
             chat: msg?.chat,
             
-            // ✅ FIXED: getUser function that works with string conversion
+            // ✅ ONLY getUser function (no conflict)
             getUser: getUserFunction,
             
-            // Input data
+            // Input data (read only)
             userInput,
             params,
             text: userInput,
             
-            // Wait functions
-            wait: (sec) => new Promise(r => setTimeout(r, sec * 1000)),
-            sleep: (sec) => new Promise(r => setTimeout(r, sec * 1000)),
-            delay: (sec) => new Promise(r => setTimeout(r, sec * 1000)), // alias
+            // ✅ REMOVED: wait, sleep, runPython, ask, waitForAnswer from here
+            // ✅ REMOVED: log, debug, error from here  
+            // ✅ REMOVED: formatDate, formatTime, random, etc from here
             
-            // Python - directly call pythonRunner
-            runPython: async (code) => {
-                try {
-                    return await pythonRunner.runPythonCode(code);
-                } catch (error) {
-                    throw new Error(`Python Error: ${error.message}`);
-                }
-            },
-            
-            // ❌ REMOVED: Global ask function (only Bot.ask available)
-            // No global 'ask' or 'waitForAnswer' here
-            
-            // Utility functions
-            log: (...args) => console.log('[BOT LOG]:', ...args),
-            debug: (...args) => console.log('[BOT DEBUG]:', ...args),
-            error: (...args) => console.error('[BOT ERROR]:', ...args),
-            
-            // Formatting utilities
-            formatDate: (date = new Date()) => date.toLocaleDateString(),
-            formatTime: (date = new Date()) => date.toLocaleTimeString(),
-            now: () => new Date(),
-            
-            // Random utilities
-            random: (min, max) => Math.floor(Math.random() * (max - min + 1)) + min,
-            randomChoice: (arr) => arr[Math.floor(Math.random() * arr.length)],
-            
-            // String utilities
-            escapeHtml: (text) => String(text).replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])),
-            truncate: (text, length = 100) => text.length > length ? text.substring(0, length) + '...' : text,
-            
-            // Validation
-            isNumber: (val) => !isNaN(parseFloat(val)) && isFinite(val),
-            isEmail: (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email),
-            
-            // JSON utilities
-            toJson: (obj) => JSON.stringify(obj, null, 2),
-            parseJson: (str) => JSON.parse(str),
-            
-            // ✅ NEW: Direct inspection methods
-            inspect: async (target = 'all', options = {}) => {
-                try {
-                    return await botObject.inspect(target, options);
-                } catch (error) {
-                    return { error: error.message };
-                }
-            },
-            
-            getInfo: async (target = 'all') => {
-                try {
-                    return await botObject.getInfo(target);
-                } catch (error) {
-                    return { error: error.message };
-                }
-            }
+            // ✅ KEPT ONLY: Essential context and getUser
         };
 
         // Auto-await engine
@@ -359,18 +236,18 @@ async function executeCommandCode(botInstance, code, context) {
                 BotDataSave: async (k, v) => await env.bot.saveData(k, v),
                 BotDataGet: async (k) => await env.bot.getData(k),
                 BotDataDel: async (k) => await env.bot.deleteData(k),
-                Ask: async (q, o) => await env.bot.ask(q, o), // ✅ FIXED: Only bot.ask
-                Wait: async (s) => await env.wait(s),
-                Python: async (c) => {  
-                    const result = await env.runPython(c);
-                    return result;
-                },
                 BotGeneric: async (method, ...args) => {
                     return await dynamicBotCaller(method, ...args);
                 },
-                Inspect: async (target, options) => await env.bot.inspect(target, options),
-                GetInfo: async (target) => await env.bot.getInfo(target),
-                Details: async (target) => await env.bot.details(target)
+                BotInspect: async (target, options) => await env.bot.inspect(target, options),
+                BotGetInfo: async (target) => await env.bot.getInfo(target),
+                BotDetails: async (target) => await env.bot.details(target),
+                BotAsk: async (q, o) => await env.bot.ask(q, o),
+                BotWaitForAnswer: async (q, o) => await env.bot.waitForAnswer(q, o),
+                BotRunPython: async (c) => await env.bot.runPython(c),
+                BotWait: async (ms) => await env.bot.wait(ms),
+                BotSleep: async (ms) => await env.bot.sleep(ms),
+                BotDelay: async (ms) => await env.bot.delay(ms)
             };
 
             const rules = [
@@ -380,16 +257,22 @@ async function executeCommandCode(botInstance, code, context) {
                 { r: /(Bot|bot)\s*\.\s*saveData\s*\(([^)]+)\)/g,   to: 'await __autoAwait.BotDataSave($2)' },
                 { r: /(Bot|bot)\s*\.\s*getData\s*\(([^)]+)\)/g,    to: 'await __autoAwait.BotDataGet($2)' },
                 { r: /(Bot|bot)\s*\.\s*deleteData\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotDataDel($2)' },
-                { r: /(Bot|bot)\.(ask|waitForAnswer)\s*\(([^)]+)\)/g, to: 'await __autoAwait.Ask($3)' }, // ✅ FIXED: Only Bot.ask
-                { r: /(wait|sleep|delay)\s*\(([^)]+)\)/g, to: 'await __autoAwait.Wait($2)' },
-                { r: /runPython\s*\(([^)]+)\)/g, to: 'await __autoAwait.Python($1)' },
-                { r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer|runPython|inspect|getInfo|details)([a-zA-Z0-9_]+)\s*\(\s*\)/g, 
+                
+                // ✅ FIXED: Bot object methods only
+                { r: /(Bot|bot)\s*\.\s*ask\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotAsk($2)' },
+                { r: /(Bot|bot)\s*\.\s*waitForAnswer\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotWaitForAnswer($2)' },
+                { r: /(Bot|bot)\s*\.\s*runPython\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotRunPython($1)' },
+                { r: /(Bot|bot)\s*\.\s*wait\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotWait($2)' },
+                { r: /(Bot|bot)\s*\.\s*sleep\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotSleep($2)' },
+                { r: /(Bot|bot)\s*\.\s*delay\s*\(([^)]+)\)/g, to: 'await __autoAwait.BotDelay($2)' },
+                { r: /(Bot|bot)\s*\.\s*inspect\s*\(([^)]*)\)/g, to: 'await __autoAwait.BotInspect($2)' },
+                { r: /(Bot|bot)\s*\.\s*getInfo\s*\(([^)]*)\)/g, to: 'await __autoAwait.BotGetInfo($2)' },
+                { r: /(Bot|bot)\s*\.\s*details\s*\(([^)]*)\)/g, to: 'await __autoAwait.BotDetails($2)' },
+                
+                { r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer|runPython|inspect|getInfo|details|wait|sleep|delay)([a-zA-Z0-9_]+)\s*\(\s*\)/g, 
                   to: "await __autoAwait.BotGeneric('$2')" },
-                { r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer|runPython|inspect|getInfo|details)([a-zA-Z0-9_]+)\s*\(/g, 
-                  to: "await __autoAwait.BotGeneric('$2', " },
-                { r: /(Bot|bot|Api|api)\s*\.\s*inspect\s*\(([^)]*)\)/g, to: 'await __autoAwait.Inspect($2)' },
-                { r: /(Bot|bot|Api|api)\s*\.\s*getInfo\s*\(([^)]*)\)/g, to: 'await __autoAwait.GetInfo($2)' },
-                { r: /(Bot|bot|Api|api)\s*\.\s*details\s*\(([^)]*)\)/g, to: 'await __autoAwait.Details($2)' }
+                { r: /(Bot|bot|Api|api)\s*\.\s*(?!saveData|getData|deleteData|ask|waitForAnswer|runPython|inspect|getInfo|details|wait|sleep|delay)([a-zA-Z0-9_]+)\s*\(/g, 
+                  to: "await __autoAwait.BotGeneric('$2', " }
             ];
 
             const enhancedEnv = { ...env, __autoAwait };
