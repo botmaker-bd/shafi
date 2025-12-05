@@ -1,4 +1,4 @@
-// server/core/api-wrapper.js - FIXED VERSION (no global ask conflict)
+// server/core/api-wrapper.js - ALL FUNCTIONS IN Bot OBJECT
 const axios = require('axios');
 
 class ApiWrapper {
@@ -8,7 +8,7 @@ class ApiWrapper {
         this.setupAllMethods();
         this.setupDirectMethods();
         this.setupInspectionMethods();
-        this.setupEnhancedMethods();
+        this.setupUtilityMethods();
     }
 
     setupAllMethods() {
@@ -159,10 +159,118 @@ class ApiWrapper {
             return results;
         };
 
+        // ✅ WORKING: Download file
+        this.downloadFile = async (fileId, downloadPath = null) => {
+            try {
+                const file = await this.getFile(fileId);
+                const fileUrl = `https://api.telegram.org/file/bot${this.context.botToken}/${file.file_path}`;
+                
+                if (downloadPath) {
+                    const fs = require('fs');
+                    const response = await axios({
+                        method: 'GET',
+                        url: fileUrl,
+                        responseType: 'stream'
+                    });
+                    
+                    const writer = fs.createWriteStream(downloadPath);
+                    response.data.pipe(writer);
+                    
+                    return new Promise((resolve, reject) => {
+                        writer.on('finish', () => resolve(downloadPath));
+                        writer.on('error', reject);
+                    });
+                }
+                
+                return fileUrl;
+            } catch (error) {
+                throw new Error(`Download failed: ${error.message}`);
+            }
+        };
+    }
+
+    setupUtilityMethods() {
         // Wait utility
         this.wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
         this.sleep = this.wait;
         this.delay = this.wait;
+        
+        // Ask method
+        this.ask = async (question, options = {}) => {
+            return new Promise((resolve, reject) => {
+                const waitKey = `${this.context.botToken}_${this.context.userId}`;
+                const nextCommandHandlers = this.context.nextCommandHandlers;
+                
+                this.sendMessage(this.context.chatId, question, options).then(() => {
+                    const timeout = setTimeout(() => {
+                        if (nextCommandHandlers?.has(waitKey)) {
+                            nextCommandHandlers.delete(waitKey);
+                            reject(new Error('Timeout: User took too long to respond.'));
+                        }
+                    }, 5 * 60 * 1000);
+
+                    if (nextCommandHandlers) {
+                        nextCommandHandlers.set(waitKey, {
+                            resolve: (ans) => { clearTimeout(timeout); resolve(ans); },
+                            reject: (err) => { clearTimeout(timeout); reject(err); },
+                            timestamp: Date.now()
+                        });
+                    } else {
+                        clearTimeout(timeout);
+                        reject(new Error('Handler system error'));
+                    }
+                }).catch(e => reject(e));
+            });
+        };
+
+        // Alias for ask
+        this.waitForAnswer = this.ask;
+        
+        // Python runner
+        this.runPython = async (code) => {
+            try {
+                const pythonRunner = require('./python-runner');
+                return await pythonRunner.runPythonCode(code);
+            } catch (error) {
+                throw new Error(`Python Error: ${error.message}`);
+            }
+        };
+        
+        // Install python package
+        this.installPython = async (packageName) => {
+            try {
+                const pythonRunner = require('./python-runner');
+                return await pythonRunner.installPackage(packageName);
+            } catch (error) {
+                throw new Error(`Install failed: ${error.message}`);
+            }
+        };
+        
+        // Logging utilities
+        this.log = (...args) => console.log('[BOT LOG]:', ...args);
+        this.debug = (...args) => console.log('[BOT DEBUG]:', ...args);
+        this.error = (...args) => console.error('[BOT ERROR]:', ...args);
+        
+        // Formatting utilities
+        this.formatDate = (date = new Date()) => date.toLocaleDateString();
+        this.formatTime = (date = new Date()) => date.toLocaleTimeString();
+        this.now = () => new Date();
+        
+        // Random utilities
+        this.random = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+        this.randomChoice = (arr) => arr[Math.floor(Math.random() * arr.length)];
+        
+        // String utilities
+        this.escapeHtml = (text) => String(text).replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
+        this.truncate = (text, length = 100) => text.length > length ? text.substring(0, length) + '...' : text;
+        
+        // Validation
+        this.isNumber = (val) => !isNaN(parseFloat(val)) && isFinite(val);
+        this.isEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+        
+        // JSON utilities
+        this.toJson = (obj) => JSON.stringify(obj, null, 2);
+        this.parseJson = (str) => JSON.parse(str);
     }
 
     setupInspectionMethods() {
@@ -241,8 +349,11 @@ class ApiWrapper {
                             
                         case 'response':
                         case 'call':
-                            // For API call responses
-                            result.note = 'Use specific API methods for responses';
+                        case 'api':
+                            result.api = {
+                                availableMethods: Object.keys(this).filter(k => typeof this[k] === 'function').length,
+                                note: 'All API methods available via Bot object'
+                            };
                             break;
                             
                         default:
@@ -356,88 +467,6 @@ class ApiWrapper {
         };
     }
 
-    setupEnhancedMethods() {
-        // ✅ FIXED: Ask method (only in Bot object, not global)
-        this.ask = async (question, options = {}) => {
-            return new Promise((resolve, reject) => {
-                const waitKey = `${this.context.botToken}_${this.context.userId}`;
-                const nextCommandHandlers = this.context.nextCommandHandlers;
-                
-                this.sendMessage(this.context.chatId, question, options).then(() => {
-                    const timeout = setTimeout(() => {
-                        if (nextCommandHandlers?.has(waitKey)) {
-                            nextCommandHandlers.delete(waitKey);
-                            reject(new Error('Timeout: User took too long to respond.'));
-                        }
-                    }, 5 * 60 * 1000);
-
-                    if (nextCommandHandlers) {
-                        nextCommandHandlers.set(waitKey, {
-                            resolve: (ans) => { clearTimeout(timeout); resolve(ans); },
-                            reject: (err) => { clearTimeout(timeout); reject(err); },
-                            timestamp: Date.now()
-                        });
-                    } else {
-                        clearTimeout(timeout);
-                        reject(new Error('Handler system error'));
-                    }
-                }).catch(e => reject(e));
-            });
-        };
-
-        // Alias for ask
-        this.waitForAnswer = this.ask;
-        
-        // Python runner
-        this.runPython = async (code) => {
-            try {
-                const pythonRunner = require('./python-runner');
-                return await pythonRunner.runPythonCode(code);
-            } catch (error) {
-                throw new Error(`Python Error: ${error.message}`);
-            }
-        };
-        
-        // Install python package
-        this.installPython = async (packageName) => {
-            try {
-                const pythonRunner = require('./python-runner');
-                return await pythonRunner.installPackage(packageName);
-            } catch (error) {
-                throw new Error(`Install failed: ${error.message}`);
-            }
-        };
-        
-        // Download file
-        this.downloadFile = async (fileId, downloadPath = null) => {
-            try {
-                const file = await this.getFile(fileId);
-                const fileUrl = `https://api.telegram.org/file/bot${this.context.botToken}/${file.file_path}`;
-                
-                if (downloadPath) {
-                    const fs = require('fs');
-                    const response = await axios({
-                        method: 'GET',
-                        url: fileUrl,
-                        responseType: 'stream'
-                    });
-                    
-                    const writer = fs.createWriteStream(downloadPath);
-                    response.data.pipe(writer);
-                    
-                    return new Promise((resolve, reject) => {
-                        writer.on('finish', () => resolve(downloadPath));
-                        writer.on('error', reject);
-                    });
-                }
-                
-                return fileUrl;
-            } catch (error) {
-                throw new Error(`Download failed: ${error.message}`);
-            }
-        };
-    }
-
     formatInspectionText(data) {
         let text = '🔍 *Inspection Results*\n\n';
         
@@ -464,6 +493,10 @@ class ApiWrapper {
             if (data.message.text) {
                 text += `   Text: ${data.message.text.substring(0, 50)}${data.message.text.length > 50 ? '...' : ''}\n`;
             }
+        }
+        
+        if (data.api) {
+            text += `🔧 *API Methods:* ${data.api.availableMethods}\n`;
         }
         
         text += `\n⏰ *Time:* ${data.timestamp || new Date().toISOString()}`;
