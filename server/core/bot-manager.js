@@ -120,21 +120,21 @@ class BotManager {
 
     // ✅ FIXED: CONTEXT CREATION
     // bot-manager.js - createExecutionContext মেথড
+// createExecutionContext(bot, command, msg, userInput) {
+
+// bot-manager.js - শুধুমাত্র createExecutionContext মেথড আপডেট
 createExecutionContext(bot, command, msg, userInput) {
     const botToken = command.bot_token;
     
-    // ✅ params বের করুন (কমান্ডের পরের অংশ)
     let params = '';
     if (userInput && command.command_patterns) {
         const patterns = command.command_patterns.split(',').map(p => p.trim());
         
         for (const pattern of patterns) {
-            // Exact match
             if (userInput === pattern) {
                 params = '';
                 break;
             }
-            // Pattern দিয়ে শুরু হলে
             if (userInput.startsWith(pattern + ' ')) {
                 params = userInput.substring(pattern.length).trim();
                 break;
@@ -153,87 +153,93 @@ createExecutionContext(bot, command, msg, userInput) {
         last_name: msg.from.last_name,
         language_code: msg.from.language_code,
         botToken: botToken,
-        userInput: userInput,      // ✅ সম্পূর্ণ user input
-        params: params,            // ✅ শুধুমাত্র কমান্ডের পরের অংশ
+        userInput: userInput,
+        params: params,
         nextCommandHandlers: this.nextCommandHandlers,
         waitingAnswers: this.waitingAnswers,
         callbackHandlers: this.callbackHandlers,
         
-            User: {
-                saveData: (key, value) => {
-                    const cacheKey = `${botToken}_${msg.from.id}_${key}`;
-                    self.dataCache.set(cacheKey, value);
-                    
-                    self.saveData('user_data', botToken, msg.from.id, key, value)
-                        .catch(err => console.error('❌ Background save error:', err));
-                    
-                    return value;
-                },
+        // ✅ ADDED: Direct references for easier access
+        user: msg.from,
+        chat: msg.chat,
+        message: msg,
+        
+        // Data functions
+        User: {
+            saveData: (key, value) => {
+                const cacheKey = `${botToken}_${msg.from.id}_${key}`;
+                self.dataCache.set(cacheKey, value);
                 
-                getData: (key) => {
-                    const cacheKey = `${botToken}_${msg.from.id}_${key}`;
-                    if (self.dataCache.has(cacheKey)) {
-                        return self.dataCache.get(cacheKey);
-                    }
-                    
-                    const defaults = {
-                        'total_usage': 0,
-                        'user_count': 1,
-                        'usage_count': 0
-                    };
-                    
-                    return defaults[key] || null;
-                },
+                self.saveData('user_data', botToken, msg.from.id, key, value)
+                    .catch(err => console.error('❌ Background save error:', err));
                 
-                deleteData: (key) => {
-                    const cacheKey = `${botToken}_${msg.from.id}_${key}`;
-                    self.dataCache.delete(cacheKey);
-                    
-                    self.deleteData('user_data', botToken, msg.from.id, key)
-                        .catch(err => console.error('❌ Background delete error:', err));
-                    
-                    return true;
-                },
-                
-                increment: (key, amount = 1) => {
-                    const current = this.User.getData(key) || 0;
-                    const newValue = parseInt(current) + amount;
-                    this.User.saveData(key, newValue);
-                    return newValue;
-                }
+                return value;
             },
             
-            Bot: {
-                saveData: (key, value) => {
-                    const cacheKey = `${botToken}_bot_${key}`;
-                    self.dataCache.set(cacheKey, value);
-                    
-                    self.saveData('bot_data', botToken, null, key, value)
-                        .catch(err => console.error('❌ Background bot save error:', err));
-                    
-                    return value;
-                },
-                
-                getData: (key) => {
-                    const cacheKey = `${botToken}_bot_${key}`;
-                    if (self.dataCache.has(cacheKey)) {
-                        return self.dataCache.get(cacheKey);
-                    }
-                    return null;
-                },
-                
-                deleteData: (key) => {
-                    const cacheKey = `${botToken}_bot_${key}`;
-                    self.dataCache.delete(cacheKey);
-                    
-                    self.deleteData('bot_data', botToken, null, key)
-                        .catch(err => console.error('❌ Background bot delete error:', err));
-                    
-                    return true;
+            getData: (key) => {
+                const cacheKey = `${botToken}_${msg.from.id}_${key}`;
+                if (self.dataCache.has(cacheKey)) {
+                    return self.dataCache.get(cacheKey);
                 }
+                
+                const defaults = {
+                    'total_usage': 0,
+                    'user_count': 1,
+                    'usage_count': 0
+                };
+                
+                return defaults[key] || null;
+            },
+            
+            deleteData: (key) => {
+                const cacheKey = `${botToken}_${msg.from.id}_${key}`;
+                self.dataCache.delete(cacheKey);
+                
+                self.deleteData('user_data', botToken, msg.from.id, key)
+                    .catch(err => console.error('❌ Background delete error:', err));
+                
+                return true;
+            },
+            
+            increment: (key, amount = 1) => {
+                const current = this.User.getData(key) || 0;
+                const newValue = parseInt(current) + amount;
+                this.User.saveData(key, newValue);
+                return newValue;
             }
-        };
-    }
+        },
+        
+        Bot: {
+            saveData: (key, value) => {
+                const cacheKey = `${botToken}_bot_${key}`;
+                self.dataCache.set(cacheKey, value);
+                
+                self.saveData('bot_data', botToken, null, key, value)
+                    .catch(err => console.error('❌ Background bot save error:', err));
+                
+                return value;
+            },
+            
+            getData: (key) => {
+                const cacheKey = `${botToken}_bot_${key}`;
+                if (self.dataCache.has(cacheKey)) {
+                    return self.dataCache.get(cacheKey);
+                }
+                return null;
+            },
+            
+            deleteData: (key) => {
+                const cacheKey = `${botToken}_bot_${key}`;
+                self.dataCache.delete(cacheKey);
+                
+                self.deleteData('bot_data', botToken, null, key)
+                    .catch(err => console.error('❌ Background bot delete error:', err));
+                
+                return true;
+            }
+        }
+    };
+}
 
     // ✅ FIXED: Setup Command Answer Handler with ERROR HANDLING
 
